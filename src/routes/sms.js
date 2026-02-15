@@ -229,12 +229,26 @@ async function handleMessageAI(phone, message) {
   if (route.intent === 'details') {
     const picks = session?.lastPicks;
     if (session && picks?.length > 0) {
-      const pickIndex = Math.min((parseInt(route.event_reference, 10) || 1) - 1, picks.length - 1);
+      const ref = parseInt(route.event_reference, 10);
+
+      if (!ref || isNaN(ref)) {
+        // No number specified — show details for ALL picks
+        const details = picks.map((pick, i) => {
+          const event = session.lastEvents[pick.event_id];
+          return event ? `${i + 1}. ${formatEventDetails(event)}` : null;
+        }).filter(Boolean);
+        await sendSMS(phone, details.join('\n\n').slice(0, 1500));
+        console.log(`All details sent to ${masked}`);
+        return;
+      }
+
+      // Specific pick number requested
+      const pickIndex = Math.min(ref - 1, picks.length - 1);
       const pick = picks[Math.max(0, pickIndex)];
       const event = session.lastEvents[pick.event_id];
       if (event) {
         await sendSMS(phone, formatEventDetails(event));
-        console.log(`Details sent to ${masked}`);
+        console.log(`Details ${ref} sent to ${masked}`);
         return;
       }
     }

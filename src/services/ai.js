@@ -421,8 +421,8 @@ CURATION RULES:
 SMS COMPOSITION RULES:
 - HARD LIMIT: 480 characters total. Count carefully.
 - Voice: warm, concise, opinionated friend texting you. Light NYC shorthand OK.
-- Format: Lead pick (name, venue, neighborhood, time, price, 1-sentence why) + "Also:" alts + CTA.
-- End with: "Reply DETAILS, MORE, or FREE."
+- NUMBER each pick: "1. Event @ Venue — why" then "2. Event @ Venue — why" etc.
+- End with: "Reply DETAILS 1, DETAILS 2, MORE, or FREE."
 - If no good events: honest "quiet night" message + suggest adjacent neighborhood.
 
 Return STRICT JSON:
