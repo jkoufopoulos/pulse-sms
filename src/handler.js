@@ -4,6 +4,7 @@ const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
 const { getEvents } = require('./events');
 const { routeMessage, composeResponse } = require('./ai');
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
+const { parseAsNycTime } = require('./geo');
 
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
 
@@ -84,9 +85,11 @@ function formatTime(isoStr) {
     return isoStr;
   }
   try {
-    const d = new Date(isoStr);
-    if (isNaN(d)) return isoStr;
-    return d.toLocaleString('en-US', {
+    // Use parseAsNycTime to correctly handle offset-less ISO strings
+    // (e.g. Eventbrite's "2026-02-15T19:00:00" which is NYC local, not UTC)
+    const ms = parseAsNycTime(isoStr);
+    if (isNaN(ms)) return isoStr;
+    return new Date(ms).toLocaleString('en-US', {
       timeZone: 'America/New_York',
       weekday: 'short', month: 'short', day: 'numeric',
       hour: 'numeric', minute: '2-digit',
@@ -135,9 +138,14 @@ function formatEventDetails(event) {
     detail += `\n${formatTime(event.start_time_local)}`;
     if (event.end_time_local) {
       try {
-        const start = new Date(event.start_time_local);
-        const end = new Date(event.end_time_local);
-        if (start.toDateString() === end.toDateString()) {
+        const startMs = parseAsNycTime(event.start_time_local);
+        const endMs = parseAsNycTime(event.end_time_local);
+        const start = new Date(startMs);
+        const end = new Date(endMs);
+        // Compare dates in NYC timezone
+        const startDate = start.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+        const endDate = end.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+        if (startDate === endDate) {
           detail += ` – ${end.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' })}`;
         } else {
           detail += ` – ${formatTime(event.end_time_local)}`;

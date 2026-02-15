@@ -216,4 +216,4 @@ function filterUpcomingEvents(events) {
   });
 }
 
-module.exports = { resolveNeighborhood, rankEventsByProximity, getNycDateString, inferCategory, haversine, filterUpcomingEvents, getEventDate };
+module.exports = { resolveNeighborhood, rankEventsByProximity, getNycDateString, inferCategory, haversine, filterUpcomingEvents, getEventDate, parseAsNycTime };

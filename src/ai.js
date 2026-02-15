@@ -1,4 +1,5 @@
 const Anthropic = require('@anthropic-ai/sdk');
+const { getEventDate, getNycDateString } = require('./geo');
 
 let client = null;
 function getClient() {
@@ -197,22 +198,31 @@ VALID_NEIGHBORHOODS: ${neighborhoodNames.join(', ')}`;
 async function composeResponse(message, events, neighborhood, filters) {
   const now = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
 
-  const eventListStr = events.map(e => JSON.stringify({
-    id: e.id,
-    name: e.name,
-    venue_name: e.venue_name,
-    neighborhood: e.neighborhood,
-    start_time_local: e.start_time_local,
-    end_time_local: e.end_time_local,
-    is_free: e.is_free,
-    price_display: e.price_display,
-    category: e.category,
-    short_detail: e.short_detail || e.description_short,
-    source_name: e.source_name,
-    source_weight: e.source_weight,
-    confidence: e.confidence,
-    ticket_url: e.ticket_url,
-  })).join('\n');
+  const todayNyc = getNycDateString(0);
+  const tomorrowNyc = getNycDateString(1);
+
+  const eventListStr = events.map(e => {
+    const eventDate = getEventDate(e);
+    const dayLabel = eventDate === todayNyc ? 'TODAY' : eventDate === tomorrowNyc ? 'TOMORROW' : eventDate;
+    return JSON.stringify({
+      id: e.id,
+      name: e.name,
+      venue_name: e.venue_name,
+      neighborhood: e.neighborhood,
+      date_local: eventDate,
+      day: dayLabel,
+      start_time_local: e.start_time_local,
+      end_time_local: e.end_time_local,
+      is_free: e.is_free,
+      price_display: e.price_display,
+      category: e.category,
+      short_detail: e.short_detail || e.description_short,
+      source_name: e.source_name,
+      source_weight: e.source_weight,
+      confidence: e.confidence,
+      ticket_url: e.ticket_url,
+    });
+  }).join('\n');
 
   const userPrompt = `Current time (NYC): ${now}
 User message: "${message}"
