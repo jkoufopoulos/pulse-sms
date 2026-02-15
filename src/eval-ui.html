@@ -558,11 +558,23 @@ function timeCell(e) {
     if (e.date_local) return `<span style="color:#f6e05e">${esc(e.date_local)}</span>`;
     return '<span style="color:#fc8181">—</span>';
   }
+  return formatTimeDisplay(e.start_time_local);
+}
+
+function formatTimeDisplay(val) {
+  // Bare date (no time) — parse as local components to avoid UTC midnight shift
+  if (!/T|:/.test(val)) {
+    try {
+      const [y, m, d] = val.split('-').map(Number);
+      if (y && m && d) return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } catch {}
+    return esc(val);
+  }
   try {
-    const d = new Date(e.start_time_local);
-    if (isNaN(d)) return esc(e.start_time_local);
+    const d = new Date(val);
+    if (isNaN(d)) return esc(val);
     return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-  } catch { return esc(e.start_time_local); }
+  } catch { return esc(val); }
 }
 
 function priceCell(e) {
@@ -763,11 +775,7 @@ function simTimeCell(e) {
     if (e.date_local) return esc(e.date_local);
     return '—';
   }
-  try {
-    const d = new Date(e.start_time_local);
-    if (isNaN(d)) return esc(e.start_time_local);
-    return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-  } catch { return esc(e.start_time_local); }
+  return formatTimeDisplay(e.start_time_local);
 }
 
 function setSimStatus(msg) {

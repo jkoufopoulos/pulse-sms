@@ -73,6 +73,16 @@ const rateLimitInterval = setInterval(() => {
 
 // --- Event detail formatting ---
 function formatTime(isoStr) {
+  // Bare date (no time component) — parse as local to avoid UTC midnight shift
+  if (!/T|:/.test(isoStr)) {
+    try {
+      const [y, m, d] = isoStr.split('-').map(Number);
+      if (y && m && d) {
+        return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      }
+    } catch {}
+    return isoStr;
+  }
   try {
     const d = new Date(isoStr);
     if (isNaN(d)) return isoStr;
