@@ -98,6 +98,39 @@ const sessionInterval = setInterval(() => {
 }, 10 * 60 * 1000);
 
 // =======================================================
+// Test endpoint — runs full pipeline, returns response over HTTP
+// Gated behind PULSE_TEST_MODE=true env var
+// =======================================================
+
+if (process.env.PULSE_TEST_MODE === 'true') {
+  router.post('/test', async (req, res) => {
+    const { Body: message, From: phone } = req.body;
+    if (!message?.trim()) {
+      return res.status(400).json({ error: 'Missing Body parameter' });
+    }
+    const testPhone = phone || '+10000000000';
+    const captured = [];
+    // Temporarily replace sendSMS to capture output
+    const smsService = require('../services/sms');
+    const originalSend = smsService.sendSMS;
+    smsService.sendSMS = async (to, body) => {
+      captured.push({ to, body, timestamp: new Date().toISOString() });
+      console.log(`[TEST] Would send to ${to}: ${body.slice(0, 80)}...`);
+      return { sid: 'TEST_' + Date.now() };
+    };
+    try {
+      await handleMessage(testPhone, message.trim());
+      res.json({ ok: true, messages: captured });
+    } catch (err) {
+      res.status(500).json({ error: err.message, messages: captured });
+    } finally {
+      smsService.sendSMS = originalSend;
+    }
+  });
+  console.log('Test endpoint enabled: POST /api/sms/test');
+}
+
+// =======================================================
 // Webhook endpoint — responds immediately, processes async
 // =======================================================
 
