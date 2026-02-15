@@ -101,75 +101,151 @@ async function fetchEventbriteEvents() {
     }
 
     const html = await res.text();
-    const $ = cheerio.load(html);
-
-    const jsonLdCount = $('script[type="application/ld+json"]').length;
-    const events = [];
-    $('script[type="application/ld+json"]').each((i, el) => {
-      try {
-        const data = JSON.parse($(el).html());
-        const items = data.itemListElement || (Array.isArray(data) ? data : [data]);
-        for (const item of items) {
-          const e = item.item || item;
-          if (e['@type'] !== 'Event') continue;
-
-          const location = e.location || {};
-          const address = location.address || {};
-          const geo = location.geo || {};
-
-          const geoLat = parseFloat(geo.latitude);
-          const geoLng = parseFloat(geo.longitude);
-          const neighborhood = (isNaN(geoLat) && /^(new york|brooklyn|manhattan|queens)$/i.test((address.addressLocality || '').trim()))
-            ? null
-            : resolveNeighborhood(address.addressLocality, geoLat, geoLng);
-
-          const id = makeEventId(e.name, location.name, e.startDate, 'eventbrite');
-
-          const offers = e.offers || {};
-          const lowPrice = parseFloat(offers.lowPrice || offers.price || '');
-          const nameAndDesc = ((e.name || '') + ' ' + (e.description || '')).toLowerCase();
-          const isFree = lowPrice === 0 || nameAndDesc.includes('free admission') || nameAndDesc.includes('free entry');
-          const priceDisplay = !isNaN(lowPrice) ? (lowPrice === 0 ? 'free' : `$${lowPrice}+`) : null;
-
-          const category = inferCategory(nameAndDesc);
-
-          events.push({
-            id,
-            source_name: 'eventbrite',
-            source_type: 'aggregator',
-            source_weight: 0.7,
-            name: e.name,
-            description_short: (e.description || '').slice(0, 180) || null,
-            short_detail: (e.description || '').slice(0, 180) || null,
-            venue_name: location.name || 'TBA',
-            venue_address: [address.streetAddress, address.addressLocality].filter(Boolean).join(', '),
-            neighborhood,
-            start_time_local: e.startDate || null,
-            end_time_local: e.endDate || null,
-            date_local: e.startDate ? e.startDate.slice(0, 10) : null,
-            time_window: null,
-            is_free: isFree,
-            price_display: priceDisplay,
-            category,
-            subcategory: null,
-            confidence: 0.85,
-            ticket_url: e.url || null,
-            map_url: null,
-            map_hint: address.streetAddress || null,
-          });
-        }
-      } catch (err) { console.warn('Skipped malformed JSON-LD block:', err.message); }
-    });
-
-    if (events.length === 0 && jsonLdCount > 0) {
-      console.warn(`Eventbrite: found ${jsonLdCount} JSON-LD blocks but extracted 0 events — page structure may have changed`);
-    }
-    console.log(`Eventbrite: ${events.length} events (from ${jsonLdCount} JSON-LD blocks)`);
+    const events = parseEventbriteServerData(html) || parseEventbriteJsonLd(html);
+    console.log(`Eventbrite: ${events.length} events`);
     return events;
   } catch (err) {
     console.error('Eventbrite error:', err.message);
     return [];
   }
+}
+
+/**
+ * Parse events from Eventbrite's __SERVER_DATA__ embedded JSON (primary method).
+ * Returns array of normalized events, or null if __SERVER_DATA__ not found.
+ */
+function parseEventbriteServerData(html) {
+  const match = html.match(/window\.__SERVER_DATA__\s*=\s*({[\s\S]*?});\s*<\/script>/);
+  if (!match) return null;
+
+  let serverData;
+  try { serverData = JSON.parse(match[1]); } catch { return null; }
+
+  const results = serverData?.search_data?.events?.results;
+  if (!Array.isArray(results) || results.length === 0) return null;
+
+  const events = [];
+  for (const e of results) {
+    if (e.is_online_event) continue;
+
+    const venue = e.primary_venue || {};
+    const addr = venue.address || {};
+
+    const geoLat = parseFloat(addr.latitude);
+    const geoLng = parseFloat(addr.longitude);
+    const neighborhood = (isNaN(geoLat) && /^(new york|brooklyn|manhattan|queens)$/i.test((addr.city || '').trim()))
+      ? null
+      : resolveNeighborhood(addr.city, geoLat, geoLng);
+
+    // Build full ISO datetime from separate date + time fields
+    const startDateTime = e.start_date && e.start_time
+      ? `${e.start_date}T${e.start_time}:00`
+      : e.start_date || null;
+    const endDateTime = e.end_date && e.end_time
+      ? `${e.end_date}T${e.end_time}:00`
+      : e.end_date || null;
+
+    const id = makeEventId(e.name, venue.name, e.start_date, 'eventbrite');
+
+    const nameAndDesc = ((e.name || '') + ' ' + (e.summary || '')).toLowerCase();
+    const isFree = nameAndDesc.includes('free admission') || nameAndDesc.includes('free entry') || nameAndDesc.includes('free event');
+    const category = inferCategory(nameAndDesc);
+
+    events.push({
+      id,
+      source_name: 'eventbrite',
+      source_type: 'aggregator',
+      source_weight: 0.7,
+      name: e.name,
+      description_short: (e.summary || '').slice(0, 180) || null,
+      short_detail: (e.summary || '').slice(0, 180) || null,
+      venue_name: venue.name || 'TBA',
+      venue_address: addr.localized_address_display || [addr.address_1, addr.city].filter(Boolean).join(', '),
+      neighborhood,
+      start_time_local: startDateTime,
+      end_time_local: endDateTime,
+      date_local: e.start_date || null,
+      time_window: null,
+      is_free: isFree,
+      price_display: isFree ? 'free' : null,
+      category,
+      subcategory: null,
+      confidence: 0.85,
+      ticket_url: e.url || null,
+      map_url: null,
+      map_hint: addr.address_1 || null,
+    });
+  }
+
+  console.log(`Eventbrite: parsed ${events.length} events from __SERVER_DATA__`);
+  return events;
+}
+
+/**
+ * Fallback: parse events from JSON-LD blocks (older Eventbrite format, no times).
+ */
+function parseEventbriteJsonLd(html) {
+  const $ = cheerio.load(html);
+  const events = [];
+
+  $('script[type="application/ld+json"]').each((i, el) => {
+    try {
+      const data = JSON.parse($(el).html());
+      const items = data.itemListElement || (Array.isArray(data) ? data : [data]);
+      for (const item of items) {
+        const e = item.item || item;
+        if (e['@type'] !== 'Event') continue;
+
+        const location = e.location || {};
+        const address = location.address || {};
+        const geo = location.geo || {};
+
+        const geoLat = parseFloat(geo.latitude);
+        const geoLng = parseFloat(geo.longitude);
+        const neighborhood = (isNaN(geoLat) && /^(new york|brooklyn|manhattan|queens)$/i.test((address.addressLocality || '').trim()))
+          ? null
+          : resolveNeighborhood(address.addressLocality, geoLat, geoLng);
+
+        const id = makeEventId(e.name, location.name, e.startDate, 'eventbrite');
+
+        const offers = e.offers || {};
+        const lowPrice = parseFloat(offers.lowPrice || offers.price || '');
+        const nameAndDesc = ((e.name || '') + ' ' + (e.description || '')).toLowerCase();
+        const isFree = lowPrice === 0 || nameAndDesc.includes('free admission') || nameAndDesc.includes('free entry');
+        const priceDisplay = !isNaN(lowPrice) ? (lowPrice === 0 ? 'free' : `$${lowPrice}+`) : null;
+
+        const category = inferCategory(nameAndDesc);
+
+        events.push({
+          id,
+          source_name: 'eventbrite',
+          source_type: 'aggregator',
+          source_weight: 0.7,
+          name: e.name,
+          description_short: (e.description || '').slice(0, 180) || null,
+          short_detail: (e.description || '').slice(0, 180) || null,
+          venue_name: location.name || 'TBA',
+          venue_address: [address.streetAddress, address.addressLocality].filter(Boolean).join(', '),
+          neighborhood,
+          start_time_local: e.startDate || null,
+          end_time_local: e.endDate || null,
+          date_local: e.startDate ? e.startDate.slice(0, 10) : null,
+          time_window: null,
+          is_free: isFree,
+          price_display: priceDisplay,
+          category,
+          subcategory: null,
+          confidence: 0.85,
+          ticket_url: e.url || null,
+          map_url: null,
+          map_hint: address.streetAddress || null,
+        });
+      }
+    } catch (err) { console.warn('Skipped malformed JSON-LD block:', err.message); }
+  });
+
+  console.log(`Eventbrite: parsed ${events.length} events from JSON-LD (fallback)`);
+  return events;
 }
 
 // ============================================================
