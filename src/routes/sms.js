@@ -7,6 +7,7 @@ const { renderSMS } = require('../services/sms-render');
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('../services/sms');
 
 const USE_AI_ROUTING = process.env.PULSE_AI_ROUTING !== 'false'; // default: true
+const USE_LEGACY_COMMANDS = process.env.PULSE_LEGACY_COMMANDS === 'true'; // default: false
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
 
 const router = express.Router();
@@ -211,7 +212,7 @@ async function handleMessageAI(phone, message) {
 
   // --- Help ---
   if (route.intent === 'help') {
-    const reply = route.reply || "Pulse — text a neighborhood, landmark, or subway stop to get tonight's picks.\n\nExamples: East Village, Williamsburg, near Prospect Park, Bedford Ave\n\nDETAILS — more info (DETAILS 2 for pick #2)\nMORE — next batch\nFREE — free events only";
+    const reply = route.reply || "Hey! I'm Pulse — your go-to for what's happening in NYC tonight. Just text me a neighborhood, a landmark, or even a subway stop and I'll send you my best picks. Try something like \"East Village\" or \"near Prospect Park\" and we'll go from there!";
     await sendSMS(phone, reply.slice(0, 480));
     console.log(`Help sent to ${masked}`);
     return;
