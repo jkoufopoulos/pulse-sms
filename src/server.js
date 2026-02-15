@@ -3,7 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const smsRoutes = require('./routes/sms');
 const { clearSmsIntervals } = require('./routes/sms');
-const { refreshCache, getCacheStatus } = require('./services/events');
+const { refreshCache, getCacheStatus, scheduleDailyScrape, clearSchedule } = require('./services/events');
 
 // Validate required env vars — exit if critical ones are missing
 const required = ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER', 'ANTHROPIC_API_KEY', 'TAVILY_API_KEY'];
@@ -38,23 +38,15 @@ if (process.env.PULSE_TEST_MODE === 'true') {
 const server = app.listen(PORT, () => {
   console.log(`Pulse listening on port ${PORT}`);
 
-  // Fire-and-forget initial cache load (don't block the server)
+  // Scrape on startup, then schedule daily at 10am ET
   refreshCache().catch(err => console.error('Initial cache load failed:', err.message));
+  scheduleDailyScrape();
 });
-
-// Refresh cache every 2 hours
-const cacheInterval = setInterval(async () => {
-  try {
-    await refreshCache();
-  } catch (err) {
-    console.error('Cache refresh failed:', err.message);
-  }
-}, 2 * 60 * 60 * 1000);
 
 // Graceful shutdown
 function shutdown(signal) {
   console.log(`${signal} received, shutting down gracefully...`);
-  clearInterval(cacheInterval);
+  clearSchedule();
   clearSmsIntervals();
   server.close(() => {
     console.log('Server closed');
