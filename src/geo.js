@@ -124,14 +124,6 @@ function haversine(lat1, lng1, lat2, lng2) {
 }
 
 /**
- * Filter out events that have likely already ended.
- * Keeps events that:
- * - Have no parseable start time (let Claude decide)
- * - Started within the last 2 hours (might still be going)
- * - Haven't started yet
- * - Have an end_time that's still in the future
- */
-/**
  * Parse a datetime string as NYC time. If the string has no timezone offset,
  * assume it's Eastern Time and append the current NYC UTC offset.
  */
@@ -152,6 +144,14 @@ function parseAsNycTime(dtString) {
   return new Date(dtString + `${sign}${absH}:00`).getTime();
 }
 
+/**
+ * Filter out events that have likely already ended.
+ * Keeps events that:
+ * - Have no parseable start time (let Claude decide)
+ * - Started within the last 2 hours (might still be going)
+ * - Haven't started yet
+ * - Have an end_time that's still in the future
+ */
 function filterUpcomingEvents(events) {
   const now = Date.now();
   const twoHoursAgo = now - 2 * 60 * 60 * 1000;

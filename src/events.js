@@ -1,5 +1,5 @@
 const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents } = require('./sources');
-const { rankEventsByProximity, filterUpcomingEvents } = require('../utils/geo');
+const { rankEventsByProximity, filterUpcomingEvents } = require('./geo');
 
 // --- Daily event cache ---
 let eventCache = [];

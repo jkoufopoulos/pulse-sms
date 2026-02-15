@@ -1,9 +1,9 @@
 require('dotenv').config();
 
 const express = require('express');
-const smsRoutes = require('./routes/sms');
-const { clearSmsIntervals } = require('./routes/sms');
-const { refreshCache, getCacheStatus, scheduleDailyScrape, clearSchedule } = require('./services/events');
+const smsRoutes = require('./handler');
+const { clearSmsIntervals } = require('./handler');
+const { refreshCache, getCacheStatus, scheduleDailyScrape, clearSchedule } = require('./events');
 
 // Validate required env vars — exit if critical ones are missing
 const required = ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER', 'ANTHROPIC_API_KEY', 'TAVILY_API_KEY'];

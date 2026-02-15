@@ -3,10 +3,9 @@
  * Run: node test/smoke.test.js
  */
 
-const { renderSMS } = require('../src/services/sms-render');
-const { extractNeighborhood } = require('../src/utils/neighborhoods');
-const { makeEventId } = require('../src/services/sources');
-const { resolveNeighborhood, inferCategory, haversine, getNycDateString, rankEventsByProximity, filterUpcomingEvents } = require('../src/utils/geo');
+const { extractNeighborhood } = require('../src/neighborhoods');
+const { makeEventId } = require('../src/sources');
+const { resolveNeighborhood, inferCategory, haversine, getNycDateString, rankEventsByProximity, filterUpcomingEvents } = require('../src/geo');
 
 let pass = 0;
 let fail = 0;
@@ -20,41 +19,6 @@ function check(name, condition) {
     console.error(`  FAIL: ${name}`);
   }
 }
-
-// ---- renderSMS ----
-console.log('\nrenderSMS:');
-
-const eventMap = {
-  abc123: {
-    name: 'DJ Night', venue_name: 'Output', neighborhood: 'Williamsburg',
-    start_time_local: '2026-02-14T21:00:00', is_free: false, price_display: '$20',
-  },
-  def456: {
-    name: 'Jazz at Smalls', venue_name: 'Smalls', neighborhood: 'West Village',
-    start_time_local: '2026-02-14T20:00:00', is_free: false, price_display: '$20',
-  },
-};
-
-const basic = renderSMS({ picks: [{ rank: 1, event_id: 'abc123', why: 'Sick lineup' }] }, eventMap);
-check('includes event name', basic.includes('DJ Night'));
-check('includes venue', basic.includes('Output'));
-check('within 480 chars', basic.length <= 480);
-check('includes CTA', basic.includes('Reply DETAILS'));
-
-const multi = renderSMS({
-  picks: [
-    { rank: 1, event_id: 'abc123', why: 'Sick lineup' },
-    { rank: 2, event_id: 'def456', why: 'Chill vibes' },
-  ],
-}, eventMap);
-check('multi-pick includes Also:', multi.includes('Also:'));
-check('multi-pick within 480', multi.length <= 480);
-
-check('clarification', renderSMS({ need_clarification: true, clarifying_question: 'What hood?', picks: [] }, {}) === 'What hood?');
-check('fallback note', renderSMS({ picks: [] }, {}).includes('Quiet night'));
-
-const missing = renderSMS({ picks: [{ rank: 1, event_id: 'missing', why: 'Great show' }] }, eventMap);
-check('missing event falls back to why', missing.includes('Great show'));
 
 // ---- extractNeighborhood ----
 console.log('\nextractNeighborhood:');
@@ -115,31 +79,6 @@ check('grand central', extractNeighborhood('grand central') === 'Midtown');
 check('atlantic ave', extractNeighborhood('at atlantic ave') === 'Downtown Brooklyn');
 check('atlantic terminal', extractNeighborhood('atlantic terminal') === 'Downtown Brooklyn');
 check('dekalb', extractNeighborhood('near dekalb') === 'Downtown Brooklyn');
-
-// ---- follow-up pattern detection (legacy flow) ----
-console.log('\nfollow-up patterns (legacy flow):');
-
-const FOLLOWUP_DETAILS = /\b(when|what time|how late|starts at|where|address|location|directions|how do i get|tell me more|sounds good|interested|that one|i'm down|let's go|how much|cost|price|tickets|cover)\b/;
-const FOLLOWUP_MORE = /\b(what else|anything else|other options|next|show me more)\b/;
-const FOLLOWUP_FREE = /\b(free stuff|anything free|no cover)\b/;
-
-check('when does that start', FOLLOWUP_DETAILS.test('when does that start?'));
-check('what time is it', FOLLOWUP_DETAILS.test('what time is it?'));
-check('where is that', FOLLOWUP_DETAILS.test('where is that?'));
-check('how do i get there', FOLLOWUP_DETAILS.test('how do i get there'));
-check('tell me more', FOLLOWUP_DETAILS.test('tell me more about that'));
-check('sounds good', FOLLOWUP_DETAILS.test('sounds good!'));
-check('i\'m down', FOLLOWUP_DETAILS.test("i'm down"));
-check('how much is it', FOLLOWUP_DETAILS.test('how much is it'));
-check('any cover', FOLLOWUP_DETAILS.test('is there a cover?'));
-check('what else is there', FOLLOWUP_MORE.test('what else is there?'));
-check('anything else', FOLLOWUP_MORE.test('anything else?'));
-check('show me more', FOLLOWUP_MORE.test('show me more'));
-check('next', FOLLOWUP_MORE.test('next'));
-check('anything free', FOLLOWUP_FREE.test('anything free tonight?'));
-check('no cover', FOLLOWUP_FREE.test('no cover please'));
-check('no false positive: events tonight', !FOLLOWUP_DETAILS.test('events tonight'));
-check('no false positive: williamsburg', !FOLLOWUP_MORE.test('williamsburg'));
 
 // ---- makeEventId ----
 console.log('\nmakeEventId:');
@@ -202,7 +141,7 @@ const events = [
 const ranked = rankEventsByProximity(events, 'East Village');
 check('closest first', ranked[0].id === '1');
 check('includes nearby Wburg', ranked.some(e => e.id === '2'));
-check('includes unknown neighborhood', ranked.some(e => e.id === '3'));
+check('excludes unknown neighborhood (dist 4 > 3km cutoff)', !ranked.some(e => e.id === '3'));
 check('excludes distant Astoria', !ranked.some(e => e.id === '4'));
 
 const noTarget = rankEventsByProximity(events, null);

@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const cheerio = require('cheerio');
 const { extractEvents } = require('./ai');
-const { resolveNeighborhood, getNycDateString, inferCategory } = require('../utils/geo');
+const { resolveNeighborhood, getNycDateString, inferCategory } = require('./geo');
 
 const FETCH_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',

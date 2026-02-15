@@ -1,13 +1,10 @@
 const express = require('express');
 const twilio = require('twilio');
-const { extractNeighborhood, NEIGHBORHOODS } = require('../utils/neighborhoods');
-const { getEvents } = require('../services/events');
-const { pickEvents, interpretMessage, routeMessage, composeResponse } = require('../services/ai');
-const { renderSMS } = require('../services/sms-render');
-const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('../services/sms');
+const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
+const { getEvents } = require('./events');
+const { routeMessage, composeResponse } = require('./ai');
+const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
 
-const USE_AI_ROUTING = process.env.PULSE_AI_ROUTING !== 'false'; // default: true
-const USE_LEGACY_COMMANDS = process.env.PULSE_LEGACY_COMMANDS === 'true'; // default: false
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
 
 const router = express.Router();
@@ -154,7 +151,7 @@ router.post('/incoming', (req, res) => {
 });
 
 // =======================================================
-// Async message handler — dispatcher routes to AI or legacy
+// Async message handler
 // =======================================================
 
 // --- TCPA opt-out keywords — must not respond to these ---
@@ -177,24 +174,15 @@ async function handleMessage(phone, message) {
   //   return;
   // }
 
-  if (USE_AI_ROUTING) {
+  try {
+    await handleMessageAI(phone, message);
+  } catch (err) {
+    console.error('AI flow error:', err.message);
     try {
-      await handleMessageAI(phone, message);
-    } catch (err) {
-      // Don't fall back to legacy if Twilio is the problem — it'll just fail again
-      if (err.message?.includes('sendSMS timed out') || err.code === 20003 || err.status >= 500) {
-        console.error('Twilio/send failure, not retrying via legacy:', err.message);
-        return;
-      }
-      console.error('AI flow error, falling back to legacy:', err.message);
-      try {
-        await handleMessageLegacy(phone, message);
-      } catch (legacyErr) {
-        console.error('Legacy flow also failed:', legacyErr.message);
-      }
+      await sendSMS(phone, "Pulse hit a snag — try again in a sec!");
+    } catch (smsErr) {
+      console.error(`Failed to send error SMS to ${masked}:`, smsErr.message);
     }
-  } else {
-    await handleMessageLegacy(phone, message);
   }
 }
 
@@ -359,245 +347,6 @@ async function handleMessageAI(phone, message) {
 
   await sendSMS(phone, result.sms_text);
   console.log(`AI response sent to ${masked}`);
-}
-
-// =======================================================
-// Legacy flow — regex-first routing (original handleMessage)
-// =======================================================
-
-async function handleMessageLegacy(phone, message) {
-  const masked = maskPhone(phone);
-
-  try {
-    const upper = message.trim().toUpperCase();
-
-    // --- Handle HELP ---
-    if (upper === 'HELP' || upper === 'HELP?' || upper === '?') {
-      await sendSMS(phone, "Pulse — text a neighborhood, landmark, or subway stop to get tonight's picks.\n\nExamples: East Village, Williamsburg, near Prospect Park, Bedford Ave\n\nDETAILS — more info (DETAILS 2 for pick #2)\nMORE — next batch\nFREE — free events only");
-      return;
-    }
-
-    // --- Follow-up intent detection (natural language → route) ---
-    // Only triggers if user has an active session
-    {
-      const session = getSession(phone);
-      if (session && session.lastPicks?.length > 0) {
-        const lower = message.trim().toLowerCase();
-        if (/\b(when|what time|how late|starts at)\b/.test(lower)) {
-          // Route to DETAILS
-          const lead = session.lastPicks[0];
-          const event = session.lastEvents[lead.event_id];
-          if (event) {
-            await sendSMS(phone, formatEventDetails(event));
-            console.log(`Follow-up DETAILS sent to ${masked}`);
-            return;
-          }
-        }
-        if (/\b(where|address|location|directions|how do i get)\b/.test(lower)) {
-          const lead = session.lastPicks[0];
-          const event = session.lastEvents[lead.event_id];
-          if (event) {
-            await sendSMS(phone, formatEventDetails(event));
-            console.log(`Follow-up DETAILS sent to ${masked}`);
-            return;
-          }
-        }
-        if (/\b(tell me more|sounds good|interested|that one|i'm down|let's go)\b/.test(lower)) {
-          const lead = session.lastPicks[0];
-          const event = session.lastEvents[lead.event_id];
-          if (event) {
-            await sendSMS(phone, formatEventDetails(event));
-            console.log(`Follow-up DETAILS sent to ${masked}`);
-            return;
-          }
-        }
-        if (/\b(free stuff|anything free|no cover)\b/.test(lower)) {
-          // Route to FREE — checked before price/cover to avoid "no cover" → DETAILS
-          const neighborhood = session.lastNeighborhood;
-          const events = await getEvents(neighborhood);
-          const freeEvents = events.filter(e => e.is_free);
-          if (freeEvents.length === 0) {
-            await sendSMS(phone, `No free events found near ${neighborhood} tonight. Text "${neighborhood}" to see all events instead.`);
-            return;
-          }
-          const eventMap = {};
-          for (const e of freeEvents) eventMap[e.id] = e;
-          const picksResult = await pickEvents('show me free events only', freeEvents, neighborhood);
-          const response = renderSMS(picksResult, eventMap);
-          setSession(phone, { lastPicks: picksResult.picks || [], lastEvents: eventMap, lastNeighborhood: neighborhood });
-          await sendSMS(phone, response);
-          console.log(`Follow-up FREE sent to ${masked}`);
-          return;
-        }
-        if (/\b(how much|cost|price|tickets|cover)\b/.test(lower)) {
-          const lead = session.lastPicks[0];
-          const event = session.lastEvents[lead.event_id];
-          if (event) {
-            await sendSMS(phone, formatEventDetails(event));
-            console.log(`Follow-up DETAILS sent to ${masked}`);
-            return;
-          }
-        }
-        if (/\b(what else|anything else|other options|next|show me more)\b/.test(lower)) {
-          // Route to MORE
-          const shownIds = new Set(session.lastPicks.map(p => p.event_id));
-          const remaining = Object.values(session.lastEvents).filter(e => !shownIds.has(e.id));
-          if (remaining.length > 0) {
-            const eventMap = {};
-            for (const e of remaining) eventMap[e.id] = e;
-            const picksResult = await pickEvents('show me more options', remaining, session.lastNeighborhood);
-            const response = renderSMS(picksResult, eventMap);
-            setSession(phone, { lastPicks: picksResult.picks || [], lastEvents: eventMap, lastNeighborhood: session.lastNeighborhood });
-            await sendSMS(phone, response);
-            console.log(`Follow-up MORE sent to ${masked}`);
-            return;
-          }
-          await sendSMS(phone, "That's all I've got for now. Try a different neighborhood or check back later!");
-          return;
-        }
-      }
-    }
-
-    // --- Handle DETAILS/MORE/FREE commands ---
-    // Flexible matching: "DETAILS", "DETAILS 2", "details please" all work
-    if (upper === 'DETAILS' || upper.startsWith('DETAILS ')) {
-      const session = getSession(phone);
-      if (session && session.lastPicks?.length > 0) {
-        const pickNum = parseInt(upper.replace('DETAILS', '').trim(), 10) || 1;
-        const pickIndex = Math.min(Math.max(0, pickNum - 1), session.lastPicks.length - 1);
-        const pick = session.lastPicks[pickIndex];
-        const event = session.lastEvents[pick.event_id];
-        if (event) {
-          await sendSMS(phone, formatEventDetails(event));
-          console.log(`DETAILS ${pickNum} sent to ${masked}`);
-          return;
-        }
-      }
-      await sendSMS(phone, "No recent picks to show details for. Text a neighborhood to get started!");
-      return;
-    }
-
-    if (upper === 'MORE' || upper.startsWith('MORE ')) {
-      const session = getSession(phone);
-      if (session && session.lastEvents) {
-        const allShownIds = new Set((session.allPicks || session.lastPicks || []).map(p => p.event_id));
-        const remaining = Object.values(session.lastEvents).filter(e => !allShownIds.has(e.id));
-        if (remaining.length > 0) {
-          const eventMap = {};
-          for (const e of remaining) eventMap[e.id] = e;
-          const picksResult = await pickEvents('show me more options', remaining, session.lastNeighborhood);
-          const response = renderSMS(picksResult, eventMap);
-          const newAllPicks = [...(session.allPicks || session.lastPicks || []), ...(picksResult.picks || [])];
-          setSession(phone, { lastPicks: picksResult.picks || [], allPicks: newAllPicks, lastEvents: session.lastEvents, lastNeighborhood: session.lastNeighborhood });
-          await sendSMS(phone, response);
-          console.log(`MORE sent to ${masked}`);
-          return;
-        }
-      }
-      await sendSMS(phone, session ? "That's all I've got for now. Try a different neighborhood or check back later!" : "Text a neighborhood to get started! (e.g. 'East Village', 'Williamsburg')");
-      return;
-    }
-
-    if (upper === 'FREE' || upper.startsWith('FREE ')) {
-      const session = getSession(phone);
-      const neighborhood = session?.lastNeighborhood || extractNeighborhood(message);
-      if (!neighborhood) {
-        await sendSMS(phone, "Hey! What neighborhood are you near? (e.g. 'East Village', 'Williamsburg', 'LES')");
-        return;
-      }
-      const events = await getEvents(neighborhood);
-      const freeEvents = events.filter(e => e.is_free);
-      if (freeEvents.length === 0) {
-        await sendSMS(phone, `No free events found near ${neighborhood} tonight. Text "${neighborhood}" to see all events instead.`);
-        return;
-      }
-      const eventMap = {};
-      for (const e of freeEvents) eventMap[e.id] = e;
-      const picksResult = await pickEvents('show me free events only', freeEvents, neighborhood);
-      const response = renderSMS(picksResult, eventMap);
-      setSession(phone, { lastPicks: picksResult.picks || [], lastEvents: eventMap, lastNeighborhood: neighborhood });
-      await sendSMS(phone, response);
-      console.log(`FREE sent to ${masked}`);
-      return;
-    }
-
-    // --- Normal flow ---
-
-    // 1. Extract neighborhood from message, fall back to session
-    let neighborhood = extractNeighborhood(message);
-
-    if (!neighborhood) {
-      const session = getSession(phone);
-      if (session?.lastNeighborhood) {
-        neighborhood = session.lastNeighborhood;
-        console.log(`No neighborhood in message, using session: ${neighborhood}`);
-      } else {
-        // Claude fallback — interpret unrecognized message
-        try {
-          console.log(`No neighborhood found, trying Claude interpretation`);
-          const interpretation = await interpretMessage(message);
-
-          if (interpretation.neighborhood) {
-            // Validate through extractNeighborhood
-            const validated = extractNeighborhood(interpretation.neighborhood);
-            if (validated) {
-              neighborhood = validated;
-              console.log(`Claude interpreted neighborhood: ${neighborhood}`);
-            }
-          }
-
-          if (!neighborhood) {
-            if (interpretation.reply) {
-              await sendSMS(phone, interpretation.reply.slice(0, 480));
-              console.log(`Claude reply sent to ${masked}`);
-              return;
-            }
-            await sendSMS(phone, "Hey! What neighborhood are you near? (e.g. 'East Village', 'Williamsburg', 'LES')");
-            return;
-          }
-        } catch (err) {
-          console.error('interpretMessage error:', err.message);
-          await sendSMS(phone, "Hey! What neighborhood are you near? (e.g. 'East Village', 'Williamsburg', 'LES')");
-          return;
-        }
-      }
-    }
-
-    // 2. Get events (cache + Tavily fallback)
-    const events = await getEvents(neighborhood);
-
-    console.log(`Found ${events.length} events near ${neighborhood}`);
-
-    // 3. Build event map for rendering
-    const eventMap = {};
-    for (const e of events) {
-      eventMap[e.id] = e;
-    }
-
-    // 4. Call pickEvents → get JSON picks
-    const picksResult = await pickEvents(message, events, neighborhood);
-
-    console.log(`Picks: ${picksResult.picks?.length || 0}, clarification: ${picksResult.need_clarification}`);
-
-    // 5. Render SMS from picks
-    const response = renderSMS(picksResult, eventMap);
-
-    // 6. Save session for DETAILS/MORE/FREE follow-ups
-    setSession(phone, { lastPicks: picksResult.picks || [], lastEvents: eventMap, lastNeighborhood: neighborhood });
-
-    // 7. Send via Twilio
-    await sendSMS(phone, response);
-
-    console.log(`Response sent to ${masked}`);
-  } catch (err) {
-    console.error('Error handling SMS:', err.message);
-
-    try {
-      await sendSMS(phone, "Pulse hit a snag — try again in a sec!");
-    } catch (smsErr) {
-      console.error(`Failed to send error SMS to ${maskPhone(phone)}:`, smsErr.message);
-    }
-  }
 }
 
 // Cleanup intervals (for graceful shutdown)
