@@ -57,15 +57,40 @@ const rateLimitInterval = setInterval(() => {
 }, 10 * 60 * 1000);
 
 // --- Event detail formatting ---
+function formatTime(isoStr) {
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d)) return isoStr;
+    return d.toLocaleString('en-US', {
+      timeZone: 'America/New_York',
+      weekday: 'short', month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit',
+    });
+  } catch { return isoStr; }
+}
+
+function cleanUrl(url) {
+  try {
+    const u = new URL(url);
+    // Strip UTM and tracking params
+    for (const key of [...u.searchParams.keys()]) {
+      if (key.startsWith('utm_') || key === 'ref' || key === 'fbclid') {
+        u.searchParams.delete(key);
+      }
+    }
+    return u.toString().replace(/\?$/, '');
+  } catch { return url; }
+}
+
 function formatEventDetails(event) {
   let detail = `${event.name}`;
   if (event.venue_name && event.venue_name !== 'TBA') detail += ` at ${event.venue_name}`;
-  if (event.start_time_local) detail += `\n${event.start_time_local}`;
-  if (event.end_time_local) detail += ` – ${event.end_time_local}`;
+  if (event.start_time_local) detail += `\n${formatTime(event.start_time_local)}`;
+  if (event.end_time_local) detail += ` – ${formatTime(event.end_time_local)}`;
   if (event.is_free) detail += `\nFree!`;
   else if (event.price_display) detail += `\n${event.price_display}`;
   if (event.venue_address) detail += `\n${event.venue_address}`;
-  if (event.ticket_url) detail += `\nTickets: ${event.ticket_url}`;
+  if (event.ticket_url) detail += `\n${cleanUrl(event.ticket_url)}`;
   if (event.map_hint) detail += `\nNear: ${event.map_hint}`;
   return detail.slice(0, 480);
 }
