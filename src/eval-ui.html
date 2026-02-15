@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse Eval Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+    background: #0a0a0a; color: #e0e0e0; font-size: 14px; line-height: 1.4;
+  }
+
+  /* Summary bar */
+  .summary {
+    display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+    padding: 16px 20px; background: #1a1a1a; border-bottom: 1px solid #333;
+  }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-value { font-size: 18px; font-weight: 600; }
+  .source-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500;
+  }
+  .source-skint { background: #2d1f4e; color: #b794f6; }
+  .source-eventbrite { background: #1f3d2d; color: #68d391; }
+  .source-songkick { background: #3d2d1f; color: #f6ad55; }
+  .health-ok { color: #68d391; }
+  .health-warn { color: #f6ad55; }
+  .health-bad { color: #fc8181; }
+
+  /* Actions bar */
+  .actions {
+    display: flex; gap: 10px; align-items: center; padding: 12px 20px;
+    background: #141414; border-bottom: 1px solid #282828;
+  }
+  button {
+    padding: 8px 16px; border: 1px solid #444; border-radius: 6px;
+    background: #222; color: #e0e0e0; cursor: pointer; font-size: 13px;
+    transition: background 0.15s;
+  }
+  button:hover { background: #333; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.primary { background: #2563eb; border-color: #3b82f6; color: #fff; }
+  button.primary:hover { background: #1d4ed8; }
+  .status-msg { font-size: 12px; color: #888; margin-left: 8px; }
+
+  /* Filters */
+  .filters {
+    display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+    padding: 10px 20px; background: #111; border-bottom: 1px solid #282828;
+  }
+  .filter-group { display: flex; align-items: center; gap: 6px; }
+  .filter-group label { font-size: 12px; color: #aaa; cursor: pointer; }
+  .filter-group input[type="checkbox"] { accent-color: #3b82f6; }
+  select {
+    padding: 4px 8px; background: #222; border: 1px solid #444; border-radius: 4px;
+    color: #e0e0e0; font-size: 12px;
+  }
+  .filter-group input[type="range"] { width: 80px; accent-color: #3b82f6; }
+  .range-val { font-size: 12px; color: #aaa; min-width: 16px; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; padding: 0 20px 20px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th {
+    text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 600;
+    color: #888; text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 2px solid #333; cursor: pointer; user-select: none;
+    white-space: nowrap;
+  }
+  th:hover { color: #bbb; }
+  th .sort-arrow { font-size: 10px; margin-left: 4px; }
+  td {
+    padding: 8px 10px; border-bottom: 1px solid #1f1f1f;
+    font-size: 13px; vertical-align: top; max-width: 250px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  tr:hover { background: #1a1a2e; }
+  tr.selected { background: #1a2a3e; }
+  tr.flagged td { opacity: 0.85; }
+
+  /* Badges */
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 500;
+  }
+  .flag-badge {
+    display: inline-block; padding: 1px 6px; border-radius: 8px;
+    font-size: 10px; font-weight: 500; margin: 1px 2px;
+    background: #3d2020; color: #fc8181;
+  }
+  .flag-badge.warn { background: #3d3420; color: #f6e05e; }
+  .score-cell { font-weight: 700; font-size: 15px; }
+  .score-high { color: #68d391; }
+  .score-mid { color: #f6e05e; }
+  .score-low { color: #fc8181; }
+  .confidence-bar {
+    display: inline-block; width: 40px; height: 6px; border-radius: 3px;
+    background: #333; position: relative; vertical-align: middle;
+  }
+  .confidence-fill {
+    height: 100%; border-radius: 3px; position: absolute; left: 0; top: 0;
+  }
+
+  /* Detail panel */
+  .detail-panel {
+    position: fixed; bottom: 0; left: 0; right: 0; max-height: 45vh;
+    background: #1a1a1a; border-top: 2px solid #3b82f6; overflow-y: auto;
+    padding: 16px 20px; display: none; z-index: 10;
+  }
+  .detail-panel.open { display: block; }
+  .detail-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px;
+  }
+  .detail-header h3 { font-size: 16px; color: #fff; }
+  .detail-close {
+    background: none; border: none; color: #888; font-size: 20px;
+    cursor: pointer; padding: 4px 8px;
+  }
+  .detail-close:hover { color: #fff; }
+  .detail-json {
+    background: #111; border: 1px solid #333; border-radius: 6px;
+    padding: 12px; font-family: 'SF Mono', Monaco, monospace; font-size: 12px;
+    white-space: pre-wrap; word-break: break-all; color: #a5d6ff;
+    max-height: 30vh; overflow-y: auto;
+  }
+</style>
+</head>
+<body>
+
+<!-- Summary Bar -->
+<div class="summary" id="summary">
+  <div class="stat">
+    <span class="stat-label">Total Events</span>
+    <span class="stat-value" id="total-count">--</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">Cache Age</span>
+    <span class="stat-value" id="cache-age">--</span>
+  </div>
+  <div id="source-pills"></div>
+</div>
+
+<!-- Actions -->
+<div class="actions">
+  <button onclick="refreshCache()" id="btn-refresh">Refresh Cache</button>
+  <button onclick="runScoring()" id="btn-score" class="primary">Run AI Scoring</button>
+  <span class="status-msg" id="status-msg"></span>
+</div>
+
+<!-- Filters -->
+<div class="filters">
+  <div class="filter-group">
+    <input type="checkbox" id="f-skint" checked onchange="applyFilters()">
+    <label for="f-skint" class="source-pill source-skint">Skint</label>
+  </div>
+  <div class="filter-group">
+    <input type="checkbox" id="f-eventbrite" checked onchange="applyFilters()">
+    <label for="f-eventbrite" class="source-pill source-eventbrite">Eventbrite</label>
+  </div>
+  <div class="filter-group">
+    <input type="checkbox" id="f-songkick" checked onchange="applyFilters()">
+    <label for="f-songkick" class="source-pill source-songkick">Songkick</label>
+  </div>
+  <div class="filter-group" style="margin-left: 12px;">
+    <label for="f-neighborhood" style="margin-right: 4px;">Neighborhood:</label>
+    <select id="f-neighborhood" onchange="applyFilters()">
+      <option value="">All</option>
+    </select>
+  </div>
+  <div class="filter-group" style="margin-left: 12px;">
+    <label>Min Score:</label>
+    <input type="range" id="f-score" min="0" max="10" value="0" oninput="document.getElementById('score-val').textContent=this.value; applyFilters()">
+    <span class="range-val" id="score-val">0</span>
+  </div>
+  <div class="filter-group" style="margin-left: 12px;">
+    <input type="checkbox" id="f-flagged" onchange="applyFilters()">
+    <label for="f-flagged">Flagged only</label>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th data-col="source_name" onclick="sortBy('source_name')">Source <span class="sort-arrow"></span></th>
+        <th data-col="name" onclick="sortBy('name')">Name <span class="sort-arrow"></span></th>
+        <th data-col="venue_name" onclick="sortBy('venue_name')">Venue <span class="sort-arrow"></span></th>
+        <th data-col="neighborhood" onclick="sortBy('neighborhood')">Neighborhood <span class="sort-arrow"></span></th>
+        <th data-col="start_time_local" onclick="sortBy('start_time_local')">Time <span class="sort-arrow"></span></th>
+        <th data-col="category" onclick="sortBy('category')">Category <span class="sort-arrow"></span></th>
+        <th data-col="price" onclick="sortBy('price')">Price <span class="sort-arrow"></span></th>
+        <th data-col="confidence" onclick="sortBy('confidence')">Conf <span class="sort-arrow"></span></th>
+        <th data-col="ai_score" onclick="sortBy('ai_score')">AI Score <span class="sort-arrow"></span></th>
+        <th>Flags</th>
+      </tr>
+    </thead>
+    <tbody id="event-table"></tbody>
+  </table>
+</div>
+
+<!-- Detail Panel -->
+<div class="detail-panel" id="detail-panel">
+  <div class="detail-header">
+    <h3 id="detail-title">Event Details</h3>
+    <button class="detail-close" onclick="closeDetail()">&times;</button>
+  </div>
+  <pre class="detail-json" id="detail-json"></pre>
+</div>
+
+<script>
+let allEvents = [];
+let aiScores = {};  // event_id -> { score, flags, note }
+let currentSort = { col: 'source_name', asc: true };
+let selectedId = null;
+
+// ========== Data Loading ==========
+
+async function loadEvents() {
+  setStatus('Loading events...');
+  try {
+    const res = await fetch('/api/eval/events');
+    const data = await res.json();
+    allEvents = data.events || [];
+    updateSummary(data);
+    populateNeighborhoodFilter();
+    applyFilters();
+    setStatus(`Loaded ${allEvents.length} events`);
+  } catch (err) {
+    setStatus('Failed to load events: ' + err.message);
+  }
+}
+
+async function refreshCache() {
+  const btn = document.getElementById('btn-refresh');
+  btn.disabled = true;
+  setStatus('Refreshing cache...');
+  try {
+    const res = await fetch('/api/eval/refresh', { method: 'POST' });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    allEvents = data.events || [];
+    aiScores = {};
+    updateSummary(data);
+    populateNeighborhoodFilter();
+    applyFilters();
+    setStatus(`Cache refreshed: ${allEvents.length} events`);
+  } catch (err) {
+    setStatus('Refresh failed: ' + err.message);
+  }
+  btn.disabled = false;
+}
+
+async function runScoring() {
+  const btn = document.getElementById('btn-score');
+  btn.disabled = true;
+  setStatus(`Scoring ${allEvents.length} events with Claude...`);
+  try {
+    const res = await fetch('/api/eval/score', { method: 'POST' });
+    const scores = await res.json();
+    if (scores.error) throw new Error(scores.error);
+    aiScores = {};
+    for (const s of scores) {
+      aiScores[s.event_id] = s;
+    }
+    applyFilters();
+    setStatus(`Scored ${scores.length} events`);
+  } catch (err) {
+    setStatus('Scoring failed: ' + err.message);
+  }
+  btn.disabled = false;
+}
+
+// ========== Summary ==========
+
+function updateSummary(data) {
+  document.getElementById('total-count').textContent = (data.events || []).length;
+  const ageMs = data.timestamp ? Date.now() - data.timestamp : null;
+  document.getElementById('cache-age').textContent = ageMs
+    ? Math.round(ageMs / 60000) + 'm ago'
+    : 'never';
+
+  const counts = { Skint: 0, Eventbrite: 0, Songkick: 0 };
+  for (const e of (data.events || [])) {
+    const src = normalizeSource(e.source_name);
+    if (counts[src] !== undefined) counts[src]++;
+  }
+
+  const pills = document.getElementById('source-pills');
+  pills.innerHTML = '';
+  for (const [src, count] of Object.entries(counts)) {
+    const cls = 'source-' + src.toLowerCase();
+    const pill = document.createElement('span');
+    pill.className = 'source-pill ' + cls;
+    pill.textContent = `${src}: ${count}`;
+    pills.appendChild(pill);
+  }
+}
+
+// ========== Filters & Sort ==========
+
+function populateNeighborhoodFilter() {
+  const sel = document.getElementById('f-neighborhood');
+  const current = sel.value;
+  const hoods = [...new Set(allEvents.map(e => e.neighborhood).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">All</option>';
+  for (const h of hoods) {
+    const opt = document.createElement('option');
+    opt.value = h; opt.textContent = h;
+    sel.appendChild(opt);
+  }
+  sel.value = current;
+}
+
+function getClientFlags(e) {
+  const flags = [];
+  if (!e.venue_name || e.venue_name === 'TBA') flags.push('missing_venue');
+  if (!e.neighborhood) flags.push('no_neighborhood');
+  if (!e.start_time_local) {
+    flags.push('no_time');
+  } else if (e.start_time_local && !e.start_time_local.includes('T') && !e.start_time_local.includes(':')) {
+    flags.push('no_time');
+  }
+  if (e.confidence != null && e.confidence < 0.5) flags.push('low_confidence');
+  return flags;
+}
+
+function getAllFlags(e) {
+  const client = getClientFlags(e);
+  const ai = aiScores[e.id]?.flags || [];
+  return [...new Set([...client, ...ai])];
+}
+
+function applyFilters() {
+  const showSkint = document.getElementById('f-skint').checked;
+  const showEB = document.getElementById('f-eventbrite').checked;
+  const showSK = document.getElementById('f-songkick').checked;
+  const hood = document.getElementById('f-neighborhood').value;
+  const minScore = parseInt(document.getElementById('f-score').value);
+  const flaggedOnly = document.getElementById('f-flagged').checked;
+
+  let filtered = allEvents.filter(e => {
+    const src = normalizeSource(e.source_name);
+    if (src === 'Skint' && !showSkint) return false;
+    if (src === 'Eventbrite' && !showEB) return false;
+    if (src === 'Songkick' && !showSK) return false;
+    if (hood && e.neighborhood !== hood) return false;
+    if (minScore > 0) {
+      const s = aiScores[e.id]?.score;
+      if (s == null || s < minScore) return false;
+    }
+    if (flaggedOnly && getAllFlags(e).length === 0) return false;
+    return true;
+  });
+
+  // Sort
+  filtered.sort((a, b) => {
+    let va, vb;
+    if (currentSort.col === 'ai_score') {
+      va = aiScores[a.id]?.score ?? -1;
+      vb = aiScores[b.id]?.score ?? -1;
+    } else if (currentSort.col === 'confidence') {
+      va = a.confidence ?? -1;
+      vb = b.confidence ?? -1;
+    } else if (currentSort.col === 'price') {
+      va = a.is_free ? 'free' : (a.price_display || 'zzz');
+      vb = b.is_free ? 'free' : (b.price_display || 'zzz');
+    } else {
+      va = (a[currentSort.col] || '').toString().toLowerCase();
+      vb = (b[currentSort.col] || '').toString().toLowerCase();
+    }
+    if (va < vb) return currentSort.asc ? -1 : 1;
+    if (va > vb) return currentSort.asc ? 1 : -1;
+    return 0;
+  });
+
+  renderTable(filtered);
+  updateSortArrows();
+}
+
+function sortBy(col) {
+  if (currentSort.col === col) {
+    currentSort.asc = !currentSort.asc;
+  } else {
+    currentSort = { col, asc: col === 'ai_score' || col === 'confidence' ? false : true };
+  }
+  applyFilters();
+}
+
+function updateSortArrows() {
+  document.querySelectorAll('th').forEach(th => {
+    const arrow = th.querySelector('.sort-arrow');
+    if (!arrow) return;
+    if (th.dataset.col === currentSort.col) {
+      arrow.textContent = currentSort.asc ? ' \u25B2' : ' \u25BC';
+    } else {
+      arrow.textContent = '';
+    }
+  });
+}
+
+// ========== Rendering ==========
+
+function renderTable(events) {
+  const tbody = document.getElementById('event-table');
+  tbody.innerHTML = '';
+
+  for (const e of events) {
+    const tr = document.createElement('tr');
+    const flags = getAllFlags(e);
+    if (flags.length > 0) tr.classList.add('flagged');
+    if (e.id === selectedId) tr.classList.add('selected');
+    tr.onclick = () => showDetail(e);
+
+    const src = normalizeSource(e.source_name);
+    const srcClass = 'source-' + src.toLowerCase();
+    const aiScore = aiScores[e.id]?.score;
+
+    tr.innerHTML = `
+      <td><span class="badge ${srcClass}">${src}</span></td>
+      <td title="${esc(e.name || '')}">${esc(e.name || '—')}</td>
+      <td>${venueCell(e)}</td>
+      <td>${e.neighborhood ? esc(e.neighborhood) : '<span style="color:#fc8181">—</span>'}</td>
+      <td>${timeCell(e)}</td>
+      <td>${esc(e.category || '—')}</td>
+      <td>${priceCell(e)}</td>
+      <td>${confidenceCell(e)}</td>
+      <td>${scoreCell(aiScore)}</td>
+      <td>${flagCells(flags)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function venueCell(e) {
+  if (!e.venue_name || e.venue_name === 'TBA') return '<span style="color:#fc8181">TBA</span>';
+  return esc(e.venue_name);
+}
+
+function timeCell(e) {
+  if (!e.start_time_local) {
+    if (e.date_local) return `<span style="color:#f6e05e">${esc(e.date_local)}</span>`;
+    return '<span style="color:#fc8181">—</span>';
+  }
+  try {
+    const d = new Date(e.start_time_local);
+    if (isNaN(d)) return esc(e.start_time_local);
+    return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  } catch { return esc(e.start_time_local); }
+}
+
+function priceCell(e) {
+  if (e.is_free) return '<span style="color:#68d391">Free</span>';
+  return esc(e.price_display || '—');
+}
+
+function confidenceCell(e) {
+  if (e.confidence == null) return '—';
+  const pct = Math.round(e.confidence * 100);
+  const color = e.confidence >= 0.7 ? '#68d391' : e.confidence >= 0.5 ? '#f6e05e' : '#fc8181';
+  return `<span class="confidence-bar"><span class="confidence-fill" style="width:${pct}%;background:${color}"></span></span> <span style="font-size:11px;color:${color}">${e.confidence.toFixed(2)}</span>`;
+}
+
+function scoreCell(score) {
+  if (score == null) return '<span style="color:#555">—</span>';
+  const cls = score >= 7 ? 'score-high' : score >= 4 ? 'score-mid' : 'score-low';
+  return `<span class="score-cell ${cls}">${score}</span>`;
+}
+
+function flagCells(flags) {
+  if (flags.length === 0) return '';
+  return flags.map(f => {
+    const warn = ['low_confidence', 'no_time'].includes(f);
+    return `<span class="flag-badge${warn ? ' warn' : ''}">${f.replace(/_/g, ' ')}</span>`;
+  }).join('');
+}
+
+// ========== Detail Panel ==========
+
+function showDetail(e) {
+  selectedId = e.id;
+  document.getElementById('detail-title').textContent = e.name || 'Event Details';
+  const combined = { ...e };
+  if (aiScores[e.id]) combined._ai_eval = aiScores[e.id];
+  combined._client_flags = getClientFlags(e);
+  document.getElementById('detail-json').textContent = JSON.stringify(combined, null, 2);
+  document.getElementById('detail-panel').classList.add('open');
+  // Re-render to show selected highlight
+  applyFilters();
+}
+
+function closeDetail() {
+  selectedId = null;
+  document.getElementById('detail-panel').classList.remove('open');
+  applyFilters();
+}
+
+// ========== Helpers ==========
+
+function normalizeSource(name) {
+  if (!name) return 'Unknown';
+  const n = name.toLowerCase();
+  if (n.includes('skint')) return 'Skint';
+  if (n.includes('eventbrite')) return 'Eventbrite';
+  if (n.includes('songkick')) return 'Songkick';
+  return name;
+}
+
+function esc(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function setStatus(msg) {
+  document.getElementById('status-msg').textContent = msg;
+}
+
+// Keyboard shortcut: Escape closes detail panel
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDetail();
+});
+
+// Init
+loadEvents();
+</script>
+</body>
+</html>

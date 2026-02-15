@@ -28,10 +28,47 @@ app.get('/', (req, res) => {
 // SMS webhook
 app.use('/api/sms', smsRoutes);
 
-// SMS simulator UI (test mode only)
+// SMS simulator UI + Eval dashboard (test mode only)
 if (process.env.PULSE_TEST_MODE === 'true') {
   app.get('/test', (req, res) => {
     res.sendFile(require('path').join(__dirname, 'test-ui.html'));
+  });
+
+  // Eval dashboard UI
+  app.get('/eval', (req, res) => {
+    res.sendFile(require('path').join(__dirname, 'eval-ui.html'));
+  });
+
+  // API: get all cached events
+  app.get('/api/eval/events', (req, res) => {
+    const { getRawCache } = require('./events');
+    res.json(getRawCache());
+  });
+
+  // API: run AI scoring on cached events
+  app.post('/api/eval/score', async (req, res) => {
+    try {
+      const { getRawCache } = require('./events');
+      const { scoreEvents } = require('./eval');
+      const { events } = getRawCache();
+      const scored = await scoreEvents(events);
+      res.json(scored);
+    } catch (err) {
+      console.error('Eval scoring error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API: force cache refresh
+  app.post('/api/eval/refresh', async (req, res) => {
+    try {
+      const { refreshCache, getRawCache } = require('./events');
+      await refreshCache();
+      res.json(getRawCache());
+    } catch (err) {
+      console.error('Eval refresh error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
   });
 }
 

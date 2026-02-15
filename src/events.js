@@ -147,4 +147,8 @@ function getCacheStatus() {
   };
 }
 
-module.exports = { refreshCache, getEvents, getCacheStatus, scheduleDailyScrape, clearSchedule };
+function getRawCache() {
+  return { events: [...eventCache], timestamp: cacheTimestamp };
+}
+
+module.exports = { refreshCache, getEvents, getCacheStatus, getRawCache, scheduleDailyScrape, clearSchedule };
