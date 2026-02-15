@@ -534,7 +534,7 @@ function renderTable(events) {
 
     tr.innerHTML = `
       <td><span class="badge ${srcClass}">${src}</span></td>
-      <td title="${esc(e.name || '')}">${esc(e.name || '—')}</td>
+      <td title="${esc(e.name || '')}">${nameLink(e)}</td>
       <td>${venueCell(e)}</td>
       <td>${e.neighborhood ? esc(e.neighborhood) : '<span style="color:#fc8181">—</span>'}</td>
       <td>${timeCell(e)}</td>
@@ -546,6 +546,13 @@ function renderTable(events) {
     `;
     tbody.appendChild(tr);
   }
+}
+
+function nameLink(e) {
+  const name = esc(e.name || '—');
+  const url = e.ticket_url || e.source_url;
+  if (url) return `<a href="${esc(url)}" target="_blank" rel="noopener" style="color:#93c5fd;text-decoration:none;" onclick="event.stopPropagation()">${name}</a>`;
+  return name;
 }
 
 function venueCell(e) {
@@ -714,7 +721,7 @@ function renderSimResults(data) {
     tr.className = 'picked-row';
     tr.innerHTML = `
       <td>${pick ? pick.rank : '—'}</td>
-      <td title="${esc(event.name || '')}">${esc(event.name || '—')}</td>
+      <td title="${esc(event.name || '')}">${nameLink(event)}</td>
       <td>${esc(event.venue_name || '—')}</td>
       <td>${simTimeCell(event)}</td>
       <td>${esc(event.source_name || '—')}</td>
@@ -729,7 +736,7 @@ function renderSimResults(data) {
     const tr = document.createElement('tr');
     tr.className = 'notpicked-row';
     tr.innerHTML = `
-      <td title="${esc(event.name || '')}">${esc(event.name || '—')}</td>
+      <td title="${esc(event.name || '')}">${nameLink(event)}</td>
       <td>${esc(event.venue_name || '—')}</td>
       <td>${simTimeCell(event)}</td>
       <td>${esc(event.source_name || '—')}</td>
@@ -744,7 +751,7 @@ function renderSimResults(data) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${i + 1}</td>
-      <td title="${esc(event.name || '')}">${esc(event.name || '—')}</td>
+      <td title="${esc(event.name || '')}">${nameLink(event)}</td>
       <td>${esc(event.venue_name || '—')}</td>
       <td>${esc(event.neighborhood || '—')}</td>
       <td>${simTimeCell(event)}</td>
