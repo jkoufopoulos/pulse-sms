@@ -229,7 +229,31 @@ Compose the SMS now. Remember: 480 char hard limit, end with CTA.`;
   }
 
   const validIds = new Set(events.map(e => e.id));
-  const validPicks = (parsed.picks || []).filter(p => p && typeof p.event_id === 'string' && validIds.has(p.event_id));
+  const rawPicks = parsed.picks || [];
+  let validPicks = rawPicks.filter(p => p && typeof p.event_id === 'string' && validIds.has(p.event_id));
+
+  // Fallback: if Claude hallucinated IDs, try matching by event name
+  if (validPicks.length === 0 && rawPicks.length > 0) {
+    console.warn(`composeResponse: ${rawPicks.length} picks had invalid IDs, attempting name match`);
+    const nameToId = new Map(events.map(e => [(e.name || '').toLowerCase(), e.id]));
+    validPicks = rawPicks.map(p => {
+      if (p && validIds.has(p.event_id)) return p;
+      // Try to find event by name substring in the sms_text or pick fields
+      for (const [name, id] of nameToId) {
+        if (name && p.event_id && name.includes(p.event_id.toLowerCase())) return { ...p, event_id: id };
+      }
+      return null;
+    }).filter(Boolean);
+    // Last resort: just use the first N events that Claude mentioned in sms_text
+    if (validPicks.length === 0) {
+      validPicks = events.filter(e =>
+        parsed.sms_text.toLowerCase().includes((e.name || '').toLowerCase().slice(0, 20))
+      ).slice(0, 3).map((e, i) => ({ rank: i + 1, event_id: e.id }));
+      if (validPicks.length > 0) {
+        console.log(`composeResponse: recovered ${validPicks.length} picks via sms_text name matching`);
+      }
+    }
+  }
 
   return {
     sms_text: parsed.sms_text.slice(0, 480),
