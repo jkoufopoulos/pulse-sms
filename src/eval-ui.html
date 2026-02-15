@@ -742,9 +742,15 @@ function renderSimResults(data) {
       <td>${esc(event.venue_name || '—')}</td>
       <td>${simTimeCell(event)}</td>
       <td>${esc(event.source_name || '—')}</td>
+      <td style="color:#a5d6ff;font-style:italic;max-width:300px;white-space:normal;">${pick && pick.why ? esc(pick.why) : '—'}</td>
     `;
     pickedTbody.appendChild(tr);
   }
+
+  // Not picked reasoning
+  const reasonEl = document.getElementById('sim-not-picked-reason');
+  const notPickedReason = data.compose_result.not_picked_reason;
+  reasonEl.textContent = notPickedReason ? `"${notPickedReason}"` : '';
 
   // Not picked table
   const notPickedTbody = document.getElementById('sim-notpicked');
