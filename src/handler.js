@@ -99,11 +99,25 @@ function cleanUrl(url) {
     const u = new URL(url);
     // Strip UTM and tracking params
     for (const key of [...u.searchParams.keys()]) {
-      if (key.startsWith('utm_') || key === 'ref' || key === 'fbclid') {
+      if (key.startsWith('utm_') || key === 'ref' || key === 'fbclid' || key === 'aff') {
         u.searchParams.delete(key);
       }
     }
-    return u.toString().replace(/\?$/, '');
+    let clean = u.toString().replace(/\?$/, '');
+
+    // Shorten Eventbrite: extract trailing numeric ID → eventbrite.com/e/<id>
+    const ebMatch = clean.match(/eventbrite\.com\/e\/.*?(\d{10,})$/);
+    if (ebMatch) return `https://www.eventbrite.com/e/${ebMatch[1]}`;
+
+    // Shorten Dice: extract hash prefix → dice.fm/event/<hash>
+    const diceMatch = clean.match(/dice\.fm\/event\/([a-z0-9]+)-/);
+    if (diceMatch) return `https://dice.fm/event/${diceMatch[1]}`;
+
+    // Shorten Songkick: strip slug after concert ID
+    const skMatch = clean.match(/(songkick\.com\/concerts\/\d+)/);
+    if (skMatch) return `https://www.${skMatch[1]}`;
+
+    return clean;
   } catch { return url; }
 }
 
