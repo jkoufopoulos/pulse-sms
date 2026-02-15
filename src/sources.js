@@ -115,7 +115,7 @@ async function fetchEventbriteEvents() {
  * Returns array of normalized events, or null if __SERVER_DATA__ not found.
  */
 function parseEventbriteServerData(html) {
-  const match = html.match(/window\.__SERVER_DATA__\s*=\s*({[\s\S]*?});\s*<\/script>/);
+  const match = html.match(/window\.__SERVER_DATA__\s*=\s*({[\s\S]*?})\s*;/);
   if (!match) return null;
 
   let serverData;
