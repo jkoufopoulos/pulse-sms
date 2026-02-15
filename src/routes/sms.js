@@ -4,7 +4,7 @@ const { extractNeighborhood, NEIGHBORHOODS } = require('../utils/neighborhoods')
 const { getEvents } = require('../services/events');
 const { pickEvents, interpretMessage, routeMessage, composeResponse } = require('../services/ai');
 const { renderSMS } = require('../services/sms-render');
-const { sendSMS, maskPhone } = require('../services/sms');
+const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('../services/sms');
 
 const USE_AI_ROUTING = process.env.PULSE_AI_ROUTING !== 'false'; // default: true
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
@@ -109,22 +109,14 @@ if (process.env.PULSE_TEST_MODE === 'true') {
       return res.status(400).json({ error: 'Missing Body parameter' });
     }
     const testPhone = phone || '+10000000000';
-    const captured = [];
-    // Temporarily replace sendSMS to capture output
-    const smsService = require('../services/sms');
-    const originalSend = smsService.sendSMS;
-    smsService.sendSMS = async (to, body) => {
-      captured.push({ to, body, timestamp: new Date().toISOString() });
-      console.log(`[TEST] Would send to ${to}: ${body.slice(0, 80)}...`);
-      return { sid: 'TEST_' + Date.now() };
-    };
+    enableTestCapture();
     try {
       await handleMessage(testPhone, message.trim());
+      const captured = disableTestCapture() || [];
       res.json({ ok: true, messages: captured });
     } catch (err) {
+      const captured = disableTestCapture() || [];
       res.status(500).json({ error: err.message, messages: captured });
-    } finally {
-      smsService.sendSMS = originalSend;
     }
   });
   console.log('Test endpoint enabled: POST /api/sms/test');
