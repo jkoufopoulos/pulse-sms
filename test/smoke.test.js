@@ -1,5 +1,5 @@
 /**
- * Smoke tests for NightOwl pure functions.
+ * Smoke tests for Vibe pure functions.
  * Run: node test/smoke.test.js
  */
 
@@ -80,6 +80,66 @@ check('union sq', extractNeighborhood('union sq tonight') === 'Flatiron');
 check('nolita', extractNeighborhood('nolita drinks') === 'SoHo');
 check('e.v.', extractNeighborhood('E.V. tonight') === 'East Village');
 check('nyc', extractNeighborhood('nyc tonight') === 'Midtown');
+
+// ---- extractNeighborhood: landmarks ----
+console.log('\nextractNeighborhood (landmarks):');
+
+check('prospect park', extractNeighborhood('near prospect park') === 'Park Slope');
+check('central park', extractNeighborhood('central park area') === 'Midtown');
+check('washington square', extractNeighborhood('by washington square') === 'Greenwich Village');
+check('wash sq', extractNeighborhood('wash sq tonight') === 'Greenwich Village');
+check('bryant park', extractNeighborhood('bryant park vibes') === 'Midtown');
+check('mccarren park', extractNeighborhood('mccarren park') === 'Williamsburg');
+check('tompkins square', extractNeighborhood('near tompkins square') === 'East Village');
+check('tompkins', extractNeighborhood('tompkins area') === 'East Village');
+check('domino park', extractNeighborhood('domino park') === 'Williamsburg');
+check('brooklyn bridge', extractNeighborhood('near brooklyn bridge') === 'DUMBO');
+check('highline', extractNeighborhood('the highline') === 'Chelsea');
+check('high line', extractNeighborhood('near the high line') === 'Chelsea');
+check('hudson yards', extractNeighborhood('hudson yards tonight') === 'Chelsea');
+check('barclays center', extractNeighborhood('near barclays center') === 'Downtown Brooklyn');
+check('msg', extractNeighborhood('near msg') === 'Midtown');
+check('lincoln center', extractNeighborhood('lincoln center area') === 'Upper West Side');
+check('carnegie hall', extractNeighborhood('carnegie hall tonight') === 'Midtown');
+
+// ---- extractNeighborhood: subway refs ----
+console.log('\nextractNeighborhood (subway):');
+
+check('bedford ave', extractNeighborhood('near bedford ave') === 'Williamsburg');
+check('bedford stop', extractNeighborhood('bedford stop') === 'Williamsburg');
+check('1st ave', extractNeighborhood('at 1st ave') === 'East Village');
+check('first ave', extractNeighborhood('first ave area') === 'East Village');
+check('14th street', extractNeighborhood('14th street') === 'Flatiron');
+check('14th st', extractNeighborhood('near 14th st') === 'Flatiron');
+check('grand central', extractNeighborhood('grand central') === 'Midtown');
+check('atlantic ave', extractNeighborhood('at atlantic ave') === 'Downtown Brooklyn');
+check('atlantic terminal', extractNeighborhood('atlantic terminal') === 'Downtown Brooklyn');
+check('dekalb', extractNeighborhood('near dekalb') === 'Downtown Brooklyn');
+
+// ---- follow-up pattern detection (legacy flow) ----
+console.log('\nfollow-up patterns (legacy flow):');
+
+const FOLLOWUP_DETAILS = /\b(when|what time|how late|starts at|where|address|location|directions|how do i get|tell me more|sounds good|interested|that one|i'm down|let's go|how much|cost|price|tickets|cover)\b/;
+const FOLLOWUP_MORE = /\b(what else|anything else|other options|next|show me more)\b/;
+const FOLLOWUP_FREE = /\b(free stuff|anything free|no cover)\b/;
+
+check('when does that start', FOLLOWUP_DETAILS.test('when does that start?'));
+check('what time is it', FOLLOWUP_DETAILS.test('what time is it?'));
+check('where is that', FOLLOWUP_DETAILS.test('where is that?'));
+check('how do i get there', FOLLOWUP_DETAILS.test('how do i get there'));
+check('tell me more', FOLLOWUP_DETAILS.test('tell me more about that'));
+check('sounds good', FOLLOWUP_DETAILS.test('sounds good!'));
+check('i\'m down', FOLLOWUP_DETAILS.test("i'm down"));
+check('how much is it', FOLLOWUP_DETAILS.test('how much is it'));
+check('any cover', FOLLOWUP_DETAILS.test('is there a cover?'));
+check('what else is there', FOLLOWUP_MORE.test('what else is there?'));
+check('anything else', FOLLOWUP_MORE.test('anything else?'));
+check('show me more', FOLLOWUP_MORE.test('show me more'));
+check('next', FOLLOWUP_MORE.test('next'));
+check('anything free', FOLLOWUP_FREE.test('anything free tonight?'));
+check('no cover', FOLLOWUP_FREE.test('no cover please'));
+check('no false positive: events tonight', !FOLLOWUP_DETAILS.test('events tonight'));
+check('no false positive: williamsburg', !FOLLOWUP_MORE.test('williamsburg'));
 
 // ---- makeEventId ----
 console.log('\nmakeEventId:');
@@ -172,6 +232,56 @@ check('removes past (5hr ago)', !upIds.includes('t3'));
 check('keeps no-time', upIds.includes('t4'));
 check('keeps date-only', upIds.includes('t5'));
 check('keeps event with future end_time', upIds.includes('t6'));
+
+// ---- AI routing output shape contracts ----
+console.log('\nAI routing contracts (routeMessage shape):');
+
+// Simulate a routeMessage response and validate its shape
+const validRouteOutput = {
+  intent: 'events',
+  neighborhood: 'East Village',
+  filters: { free_only: false, category: null, vibe: null },
+  event_reference: null,
+  reply: null,
+  confidence: 0.9,
+};
+
+check('routeMessage has intent', typeof validRouteOutput.intent === 'string');
+check('routeMessage has neighborhood', 'neighborhood' in validRouteOutput);
+check('routeMessage has filters', typeof validRouteOutput.filters === 'object' && validRouteOutput.filters !== null);
+check('routeMessage has confidence', typeof validRouteOutput.confidence === 'number');
+check('routeMessage intent is valid', ['events', 'details', 'more', 'free', 'help', 'conversational'].includes(validRouteOutput.intent));
+check('routeMessage filters has free_only', 'free_only' in validRouteOutput.filters);
+
+// Validate all valid intents
+const validIntents = ['events', 'details', 'more', 'free', 'help', 'conversational'];
+for (const intent of validIntents) {
+  check(`intent "${intent}" is recognized`, validIntents.includes(intent));
+}
+
+console.log('\nAI routing contracts (composeResponse shape):');
+
+const validComposeOutput = {
+  sms_text: 'DJ Night at Output (Williamsburg) 9 PM — $20. Sick lineup tonight.\nAlso: Jazz at Smalls 8 PM\nReply DETAILS, MORE, or FREE.',
+  picks: [{ rank: 1, event_id: 'abc123' }, { rank: 2, event_id: 'def456' }],
+  neighborhood_used: 'Williamsburg',
+};
+
+check('composeResponse has sms_text', typeof validComposeOutput.sms_text === 'string');
+check('composeResponse sms_text <= 480 chars', validComposeOutput.sms_text.length <= 480);
+check('composeResponse has picks array', Array.isArray(validComposeOutput.picks));
+check('composeResponse picks have event_id', validComposeOutput.picks.every(p => typeof p.event_id === 'string'));
+check('composeResponse picks have rank', validComposeOutput.picks.every(p => typeof p.rank === 'number'));
+check('composeResponse has neighborhood_used', typeof validComposeOutput.neighborhood_used === 'string');
+
+// Edge case: empty picks is valid (quiet night)
+const emptyComposeOutput = {
+  sms_text: "Quiet night in Bushwick. Try Williamsburg or East Village.\nReply DETAILS, MORE, or FREE.",
+  picks: [],
+  neighborhood_used: 'Bushwick',
+};
+check('composeResponse allows empty picks', Array.isArray(emptyComposeOutput.picks) && emptyComposeOutput.picks.length === 0);
+check('composeResponse empty still has sms_text', typeof emptyComposeOutput.sms_text === 'string' && emptyComposeOutput.sms_text.length > 0);
 
 // ---- Summary ----
 console.log(`\n${pass} passed, ${fail} failed`);

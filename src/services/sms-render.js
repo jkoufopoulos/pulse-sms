@@ -20,7 +20,7 @@ function renderSMS(picksResult, eventMap) {
   // No picks at all
   if (picks.length === 0) {
     const fallback = picksResult.fallback_note || "Quiet night — try a different neighborhood or check back later.";
-    return truncate(fallback + CTA, MAX_SMS_LENGTH);
+    return truncate(fallback + '\nText another neighborhood to try again.', MAX_SMS_LENGTH);
   }
 
   // Build lead pick
@@ -28,11 +28,10 @@ function renderSMS(picksResult, eventMap) {
   const leadEvent = eventMap[lead.event_id];
   const leadLine = formatLeadPick(leadEvent, lead.why);
 
-  // Build alt picks
-  const alts = picks.slice(1).map(p => {
-    const event = eventMap[p.event_id];
-    return formatAltPick(event, p.why);
-  });
+  // Build alt picks (skip entries with missing events)
+  const alts = picks.slice(1)
+    .filter(p => eventMap[p.event_id])
+    .map(p => formatAltPick(eventMap[p.event_id], p.why));
 
   // Assemble message, respecting char limit
   let msg = leadLine;
@@ -61,7 +60,8 @@ function formatLeadPick(event, why) {
   if (!event) return why || 'Check this out tonight.';
 
   const parts = [];
-  parts.push(event.name);
+  const displayName = event.name.length > 80 ? event.name.slice(0, 77) + '...' : event.name;
+  parts.push(displayName);
 
   if (event.venue_name && event.venue_name !== 'TBA') {
     parts.push(`at ${event.venue_name}`);

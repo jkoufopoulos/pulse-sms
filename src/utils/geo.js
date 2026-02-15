@@ -1,5 +1,17 @@
 const { NEIGHBORHOODS } = require('./neighborhoods');
 
+// Borough-level fallback map (L8: moved to module scope)
+const BOROUGH_MAP = {
+  'brooklyn': 'Williamsburg',
+  'manhattan': 'Midtown',
+  'queens': 'Astoria',
+  'bronx': null,
+  'staten island': null,
+  'new york': 'Midtown',
+  'new york (nyc)': 'Midtown',
+  'new york city': 'Midtown',
+};
+
 /**
  * Try to match a locality string (e.g. "Brooklyn", "Manhattan") or lat/lng
  * to one of our defined neighborhoods.
@@ -36,17 +48,7 @@ function resolveNeighborhood(locality, lat, lng) {
   // Borough-level fallback — only used when no coordinates available
   if (locality) {
     const lower = locality.toLowerCase();
-    const boroughMap = {
-      'brooklyn': 'Williamsburg',
-      'manhattan': 'Midtown',
-      'queens': 'Astoria',
-      'bronx': null,
-      'staten island': null,
-      'new york': 'Midtown',
-      'new york (nyc)': 'Midtown',
-      'new york city': 'Midtown',
-    };
-    if (boroughMap[lower] !== undefined) return boroughMap[lower];
+    if (BOROUGH_MAP[lower] !== undefined) return BOROUGH_MAP[lower];
   }
 
   return null;
@@ -93,10 +95,8 @@ function rankEventsByProximity(events, targetNeighborhood) {
  * Get today's (or today+offset) date string in NYC timezone as YYYY-MM-DD.
  */
 function getNycDateString(dayOffset = 0) {
-  const d = new Date();
-  const parts = d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).split('-');
-  const nycDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]) + dayOffset);
-  return nycDate.toISOString().slice(0, 10);
+  const d = new Date(Date.now() + dayOffset * 86400000);
+  return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 }
 
 /**
@@ -131,21 +131,46 @@ function haversine(lat1, lng1, lat2, lng2) {
  * - Haven't started yet
  * - Have an end_time that's still in the future
  */
+/**
+ * Parse a datetime string as NYC time. If the string has no timezone offset,
+ * assume it's Eastern Time and append the current NYC UTC offset.
+ */
+function parseAsNycTime(dtString) {
+  if (!dtString) return NaN;
+  // Already has timezone info (Z, +HH:MM, -HH:MM) — parse as-is
+  if (/[Z+-]\d{2}:?\d{2}$/.test(dtString) || dtString.endsWith('Z')) {
+    return new Date(dtString).getTime();
+  }
+  // Detect current NYC offset (handles EST/EDT automatically)
+  const nycNow = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
+  const nycMs = new Date(nycNow).getTime();
+  const utcMs = Date.now();
+  const offsetMs = Math.round((nycMs - utcMs) / 3600000) * 3600000; // round to nearest hour
+  const offsetHours = offsetMs / 3600000;
+  const sign = offsetHours >= 0 ? '+' : '-';
+  const absH = String(Math.abs(offsetHours)).padStart(2, '0');
+  return new Date(dtString + `${sign}${absH}:00`).getTime();
+}
+
 function filterUpcomingEvents(events) {
   const now = Date.now();
   const twoHoursAgo = now - 2 * 60 * 60 * 1000;
+  const todayNyc = getNycDateString(0);
 
   return events.filter(e => {
+    // Filter out events with a date_local in the past
+    if (e.date_local && e.date_local < todayNyc) return false;
+
     if (!e.start_time_local) return true;
     if (!/T\d{2}:/.test(e.start_time_local)) return true;
 
     try {
-      const eventMs = new Date(e.start_time_local).getTime();
+      const eventMs = parseAsNycTime(e.start_time_local);
       if (isNaN(eventMs)) return true;
 
       // If event has an end time still in the future, include it regardless of start
       if (e.end_time_local && /T\d{2}:/.test(e.end_time_local)) {
-        const endMs = new Date(e.end_time_local).getTime();
+        const endMs = parseAsNycTime(e.end_time_local);
         if (!isNaN(endMs) && endMs > now) return true;
       }
 

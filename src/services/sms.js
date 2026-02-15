@@ -9,15 +9,24 @@ function getClient() {
   return client;
 }
 
+function maskPhone(phone) {
+  if (!phone || phone.length < 4) return '****';
+  return phone.slice(0, -4).replace(/\d/g, '*') + phone.slice(-4);
+}
+
 async function sendSMS(to, body) {
-  const msg = await getClient().messages.create({
+  const sendPromise = getClient().messages.create({
     body,
     from: process.env.TWILIO_PHONE_NUMBER,
     to,
   });
-  const masked = to.length > 4 ? to.slice(0, -4).replace(/\d/g, '*') + to.slice(-4) : '****';
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('sendSMS timed out after 10s')), 10000)
+  );
+  const msg = await Promise.race([sendPromise, timeoutPromise]);
+  const masked = maskPhone(to);
   console.log(`SMS sent to ${masked}: ${msg.sid}`);
   return msg;
 }
 
-module.exports = { sendSMS };
+module.exports = { sendSMS, maskPhone };

@@ -1,6 +1,6 @@
 const { extractEvents } = require('./ai');
 const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, normalizeExtractedEvent } = require('./sources');
-const { rankEventsByProximity, filterUpcomingEvents } = require('../utils/geo');
+const { rankEventsByProximity, filterUpcomingEvents, getNycDateString } = require('../utils/geo');
 
 // --- In-memory event cache with 2-hour TTL ---
 let eventCache = [];
@@ -88,7 +88,7 @@ async function searchTavily(neighborhood) {
     return [];
   }
 
-  const query = `events tonight ${neighborhood} NYC`;
+  const query = `events tonight in ${neighborhood} NYC ${getNycDateString(0)}`;
   console.log(`Tavily search: "${query}"`);
 
   try {

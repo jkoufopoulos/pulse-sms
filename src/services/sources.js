@@ -11,8 +11,8 @@ const FETCH_HEADERS = {
 /**
  * Generate a stable event ID from name + venue + date.
  */
-function makeEventId(name, venue, date) {
-  const raw = `${(name || '').toLowerCase().trim()}|${(venue || '').toLowerCase().trim()}|${(date || '').trim()}`;
+function makeEventId(name, venue, date, source) {
+  const raw = `${(name || '').toLowerCase().trim()}|${(venue || '').toLowerCase().trim()}|${(date || '').trim()}|${(source || '').trim()}`;
   return crypto.createHash('md5').update(raw).digest('hex').slice(0, 12);
 }
 
@@ -110,13 +110,13 @@ async function fetchEventbriteEvents() {
           const address = location.address || {};
           const geo = location.geo || {};
 
-          const neighborhood = resolveNeighborhood(
-            address.addressLocality,
-            parseFloat(geo.latitude),
-            parseFloat(geo.longitude)
-          );
+          const geoLat = parseFloat(geo.latitude);
+          const geoLng = parseFloat(geo.longitude);
+          const neighborhood = (isNaN(geoLat) && /^(new york|brooklyn|manhattan|queens)$/i.test((address.addressLocality || '').trim()))
+            ? null
+            : resolveNeighborhood(address.addressLocality, geoLat, geoLng);
 
-          const id = makeEventId(e.name, location.name, e.startDate);
+          const id = makeEventId(e.name, location.name, e.startDate, 'eventbrite');
 
           const offers = e.offers || {};
           const lowPrice = parseFloat(offers.lowPrice || offers.price || '');
@@ -203,13 +203,13 @@ async function fetchSongkickEvents() {
           const startDate = e.startDate ? e.startDate.slice(0, 10) : null;
           if (startDate && startDate !== today && startDate !== tomorrow) continue;
 
-          const neighborhood = resolveNeighborhood(
-            address.addressLocality,
-            parseFloat(geo.latitude),
-            parseFloat(geo.longitude)
-          );
+          const geoLat = parseFloat(geo.latitude);
+          const geoLng = parseFloat(geo.longitude);
+          const neighborhood = (isNaN(geoLat) && /^(new york|brooklyn|manhattan|queens)$/i.test((address.addressLocality || '').trim()))
+            ? null
+            : resolveNeighborhood(address.addressLocality, geoLat, geoLng);
 
-          const id = makeEventId(e.name, location.name, startDate);
+          const id = makeEventId(e.name, location.name, startDate, 'songkick');
 
           const offers = e.offers || {};
           const skPrice = parseFloat(offers.lowPrice || offers.price || '');
@@ -257,7 +257,7 @@ async function fetchSongkickEvents() {
 // ============================================================
 
 function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
-  const id = makeEventId(e.name, e.venue_name, e.date_local || e.start_time_local || '');
+  const id = makeEventId(e.name, e.venue_name, e.date_local || e.start_time_local || '', sourceName);
 
   // Validate Claude-extracted neighborhood against known neighborhoods, then fall back to geo
   const neighborhood = resolveNeighborhood(e.neighborhood, parseFloat(e.latitude), parseFloat(e.longitude));
@@ -277,7 +277,7 @@ function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
     end_time_local: e.end_time_local || null,
     date_local: e.date_local || null,
     time_window: e.time_window || null,
-    is_free: e.is_free != null ? e.is_free : false,
+    is_free: e.is_free === true,
     price_display: e.price_display || null,
     category: e.category || 'other',
     subcategory: e.subcategory || null,

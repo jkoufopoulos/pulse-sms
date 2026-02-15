@@ -17,19 +17,19 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Parse URL-encoded bodies (Twilio sends form data)
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: false, limit: '5kb' }));
 app.use(express.json());
 
 // Health check with cache + source status
 app.get('/', (req, res) => {
-  res.json({ status: 'ok', service: 'nightowl', ...getCacheStatus() });
+  res.json({ status: 'ok', service: 'vibe', ...getCacheStatus() });
 });
 
 // SMS webhook
 app.use('/api/sms', smsRoutes);
 
 const server = app.listen(PORT, () => {
-  console.log(`NightOwl listening on port ${PORT}`);
+  console.log(`Vibe listening on port ${PORT}`);
 
   // Fire-and-forget initial cache load (don't block the server)
   refreshCache().catch(err => console.error('Initial cache load failed:', err.message));

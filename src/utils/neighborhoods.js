@@ -9,7 +9,7 @@ const NEIGHBORHOODS = {
   },
   'Lower East Side': {
     lat: 40.7150, lng: -73.9843, radius_km: 0.8,
-    aliases: ['lower east side', 'les', 'lower east']
+    aliases: ['lower east side', 'les', 'lower east', 'chinatown', 'little italy']
   },
   'Williamsburg': {
     lat: 40.7081, lng: -73.9571, radius_km: 1.2,
@@ -17,11 +17,11 @@ const NEIGHBORHOODS = {
   },
   'Bushwick': {
     lat: 40.6944, lng: -73.9213, radius_km: 1.0,
-    aliases: ['bushwick']
+    aliases: ['bushwick', 'east williamsburg', 'east wburg', 'ridgewood']
   },
   'Chelsea': {
     lat: 40.7465, lng: -74.0014, radius_km: 0.8,
-    aliases: ['chelsea']
+    aliases: ['chelsea', 'meatpacking', 'meatpacking district']
   },
   'SoHo': {
     lat: 40.7233, lng: -73.9985, radius_km: 0.6,
@@ -37,7 +37,7 @@ const NEIGHBORHOODS = {
   },
   'Midtown': {
     lat: 40.7549, lng: -73.9840, radius_km: 1.5,
-    aliases: ['midtown', 'midtown manhattan', 'times square', 'herald square']
+    aliases: ['midtown', 'midtown manhattan', 'times square', 'herald square', 'murray hill', 'kips bay']
   },
   'Upper West Side': {
     lat: 40.7870, lng: -73.9754, radius_km: 1.5,
@@ -65,7 +65,7 @@ const NEIGHBORHOODS = {
   },
   'Park Slope': {
     lat: 40.6710, lng: -73.9814, radius_km: 1.0,
-    aliases: ['park slope']
+    aliases: ['park slope', 'south slope']
   },
   'Downtown Brooklyn': {
     lat: 40.6934, lng: -73.9867, radius_km: 0.8,
@@ -121,6 +121,40 @@ const BOROUGH_MAP = {
   'nyc': 'Midtown',
   'new york': 'Midtown',
   'queens': 'Astoria',
+  // Landmarks
+  'prospect park': 'Park Slope',
+  'central park': 'Midtown',
+  'washington square': 'Greenwich Village',
+  'wash sq': 'Greenwich Village',
+  'bryant park': 'Midtown',
+  'mccarren park': 'Williamsburg',
+  'mccarren': 'Williamsburg',
+  'tompkins square': 'East Village',
+  'tompkins': 'East Village',
+  'domino park': 'Williamsburg',
+  'brooklyn bridge': 'DUMBO',
+  'highline': 'Chelsea',
+  'high line': 'Chelsea',
+  'hudson yards': 'Chelsea',
+  'barclays': 'Downtown Brooklyn',
+  'barclays center': 'Downtown Brooklyn',
+  'msg': 'Midtown',
+  'madison square garden': 'Midtown',
+  'rockefeller': 'Midtown',
+  'rock center': 'Midtown',
+  'lincoln center': 'Upper West Side',
+  'carnegie hall': 'Midtown',
+  // Subway references
+  'bedford ave': 'Williamsburg',
+  'bedford stop': 'Williamsburg',
+  '1st ave': 'East Village',
+  'first ave': 'East Village',
+  '14th street': 'Flatiron',
+  '14th st': 'Flatiron',
+  'grand central': 'Midtown',
+  'atlantic ave': 'Downtown Brooklyn',
+  'atlantic terminal': 'Downtown Brooklyn',
+  'dekalb': 'Downtown Brooklyn',
 };
 
 // Precompile word-boundary regexes to prevent false positives
