@@ -1,0 +1,19 @@
+{
+  "name": "local-events-smsapp",
+  "version": "1.0.0",
+  "description": "SMS-based AI assistant for NYC event discovery",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "express": "^4.21.0",
+    "twilio": "^5.4.0",
+    "dotenv": "^16.4.0"
+  }
+}

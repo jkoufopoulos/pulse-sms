@@ -1,0 +1,131 @@
+const NEIGHBORHOODS = {
+  'East Village': {
+    lat: 40.7264, lng: -73.9818, radius_km: 0.8,
+    aliases: ['east village', 'ev', 'e village']
+  },
+  'West Village': {
+    lat: 40.7336, lng: -73.9999, radius_km: 0.7,
+    aliases: ['west village', 'wv', 'w village', 'the village']
+  },
+  'Lower East Side': {
+    lat: 40.7150, lng: -73.9843, radius_km: 0.8,
+    aliases: ['lower east side', 'les', 'lower east']
+  },
+  'Williamsburg': {
+    lat: 40.7081, lng: -73.9571, radius_km: 1.2,
+    aliases: ['williamsburg', 'wburg', 'billyburg']
+  },
+  'Bushwick': {
+    lat: 40.6944, lng: -73.9213, radius_km: 1.0,
+    aliases: ['bushwick']
+  },
+  'Chelsea': {
+    lat: 40.7465, lng: -74.0014, radius_km: 0.8,
+    aliases: ['chelsea']
+  },
+  'SoHo': {
+    lat: 40.7233, lng: -73.9985, radius_km: 0.6,
+    aliases: ['soho', 'so ho']
+  },
+  'NoHo': {
+    lat: 40.7290, lng: -73.9937, radius_km: 0.4,
+    aliases: ['noho', 'no ho']
+  },
+  'Tribeca': {
+    lat: 40.7163, lng: -74.0086, radius_km: 0.6,
+    aliases: ['tribeca', 'tri beca']
+  },
+  'Midtown': {
+    lat: 40.7549, lng: -73.9840, radius_km: 1.5,
+    aliases: ['midtown', 'midtown manhattan', 'times square', 'herald square']
+  },
+  'Upper West Side': {
+    lat: 40.7870, lng: -73.9754, radius_km: 1.5,
+    aliases: ['upper west side', 'uws', 'upper west']
+  },
+  'Upper East Side': {
+    lat: 40.7736, lng: -73.9566, radius_km: 1.5,
+    aliases: ['upper east side', 'ues', 'upper east']
+  },
+  'Harlem': {
+    lat: 40.8116, lng: -73.9465, radius_km: 1.5,
+    aliases: ['harlem']
+  },
+  'Astoria': {
+    lat: 40.7723, lng: -73.9301, radius_km: 1.2,
+    aliases: ['astoria']
+  },
+  'Long Island City': {
+    lat: 40.7425, lng: -73.9561, radius_km: 1.0,
+    aliases: ['long island city', 'lic']
+  },
+  'Greenpoint': {
+    lat: 40.7274, lng: -73.9514, radius_km: 0.8,
+    aliases: ['greenpoint', 'gpoint']
+  },
+  'Park Slope': {
+    lat: 40.6710, lng: -73.9814, radius_km: 1.0,
+    aliases: ['park slope']
+  },
+  'Downtown Brooklyn': {
+    lat: 40.6934, lng: -73.9867, radius_km: 0.8,
+    aliases: ['downtown brooklyn', 'downtown bk']
+  },
+  'DUMBO': {
+    lat: 40.7033, lng: -73.9890, radius_km: 0.5,
+    aliases: ['dumbo']
+  },
+  'Hell\'s Kitchen': {
+    lat: 40.7638, lng: -73.9918, radius_km: 0.8,
+    aliases: ["hell's kitchen", 'hells kitchen', 'hk', 'clinton']
+  },
+  'Greenwich Village': {
+    lat: 40.7336, lng: -73.9999, radius_km: 0.7,
+    aliases: ['greenwich village', 'greenwich']
+  },
+  'Flatiron': {
+    lat: 40.7395, lng: -73.9903, radius_km: 0.6,
+    aliases: ['flatiron', 'gramercy', 'union square']
+  },
+  'Financial District': {
+    lat: 40.7075, lng: -74.0089, radius_km: 0.8,
+    aliases: ['financial district', 'fidi', 'wall street', 'downtown manhattan']
+  },
+  'Crown Heights': {
+    lat: 40.6694, lng: -73.9422, radius_km: 1.2,
+    aliases: ['crown heights']
+  },
+  'Bed-Stuy': {
+    lat: 40.6872, lng: -73.9418, radius_km: 1.2,
+    aliases: ['bed-stuy', 'bed stuy', 'bedford stuyvesant', 'bedstuy']
+  },
+};
+
+// Build a flat lookup: alias → neighborhood name
+const ALIAS_MAP = new Map();
+for (const [name, data] of Object.entries(NEIGHBORHOODS)) {
+  for (const alias of data.aliases) {
+    ALIAS_MAP.set(alias, name);
+  }
+}
+
+// Sort aliases longest-first so "east village" matches before "east"
+const SORTED_ALIASES = [...ALIAS_MAP.keys()].sort((a, b) => b.length - a.length);
+
+function extractNeighborhood(message) {
+  const lower = message.toLowerCase();
+  for (const alias of SORTED_ALIASES) {
+    if (lower.includes(alias)) {
+      return ALIAS_MAP.get(alias);
+    }
+  }
+  return null;
+}
+
+function getNeighborhoodCoords(name) {
+  const data = NEIGHBORHOODS[name];
+  if (!data) return null;
+  return { lat: data.lat, lng: data.lng, radius_km: data.radius_km };
+}
+
+module.exports = { NEIGHBORHOODS, extractNeighborhood, getNeighborhoodCoords };
