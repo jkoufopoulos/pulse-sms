@@ -197,10 +197,10 @@ OUTPUT: STRICT JSON with an array of events
 
   const response = await getClient().messages.create({
     model: MODELS.extract,
-    max_tokens: 4096,
+    max_tokens: 8192,
     system: EXTRACTION_PROMPT,
     messages: [{ role: 'user', content: userPrompt }],
-  }, { timeout: 30000 });
+  }, { timeout: 60000 });
 
   const text = response.content?.[0]?.text || '';
 

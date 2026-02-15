@@ -36,24 +36,31 @@ async function fetchSkintEvents() {
     const html = await res.text();
     const $ = cheerio.load(html);
 
-    // The Skint's main content
-    let content = '';
-    const selectors = ['.entry-content', '.post-content', 'article', '.content', 'main'];
-    for (const sel of selectors) {
-      const el = $(sel).first();
-      if (el.length && el.text().trim().length > 200) {
-        content = el.text().trim();
-        break;
+    // Extract individual event paragraphs from The Skint's editorial format.
+    // Each event is a <p> starting with a date/time pattern (e.g. "fri 8pm:", "thru 2/19:").
+    // Filter out sponsored content and non-event paragraphs to reduce Claude token cost.
+    const entry = $('.entry-content').first();
+    if (!entry.length) {
+      console.warn('Skint: .entry-content not found');
+      return [];
+    }
+
+    const eventPattern = /^(mon|tue|wed|thu|fri|sat|sun|thru|today|tonight|daily|\d{1,2}\/\d{1,2})/i;
+    const eventParagraphs = [];
+    entry.find('p').each((i, el) => {
+      const text = $(el).text().trim();
+      if (!text || text.length < 30) return;
+      if (text.toLowerCase().startsWith('sponsored')) return;
+      if (eventPattern.test(text)) {
+        eventParagraphs.push(text);
       }
-    }
+    });
 
-    if (!content || content.length < 200) {
-      content = $('body').text().trim();
-    }
-
-    // Truncate to avoid token limits (Sonnet handles 200K tokens; 15K chars is safe)
-    if (content.length > 15000) {
-      content = content.slice(0, 15000);
+    // Cap at 12 paragraphs to keep Claude extraction fast (today + tomorrow is enough)
+    let content = eventParagraphs.slice(0, 12).join('\n\n');
+    if (content.length < 50) {
+      // Fallback to full text if pattern matching fails
+      content = entry.text().trim().slice(0, 5000);
     }
 
     if (content.length < 50) {
@@ -61,7 +68,7 @@ async function fetchSkintEvents() {
       return [];
     }
 
-    console.log(`Skint content: ${content.length} chars`);
+    console.log(`Skint content: ${content.length} chars (${eventParagraphs.length} event paragraphs)`);
 
     const result = await extractEvents(content, 'theskint', 'https://theskint.com/');
     const events = (result.events || [])
