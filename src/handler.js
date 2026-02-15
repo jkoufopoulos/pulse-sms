@@ -208,7 +208,14 @@ async function handleMessageAI(phone, message) {
 
   // --- Conversational ---
   if (route.intent === 'conversational') {
-    const reply = route.reply || "Hey! Text a neighborhood whenever you're ready to go out.";
+    let reply = route.reply || "Hey! Text a neighborhood whenever you're ready to go out.";
+    // If there's an active session, nudge toward "more" instead of generic redirect
+    if (session?.lastNeighborhood) {
+      reply = reply.replace(
+        /text (?:me )?a neighborhood[^.]*/i,
+        `say "more" for more ${session.lastNeighborhood} picks, or text a different neighborhood`
+      );
+    }
     await sendSMS(phone, reply.slice(0, 480));
     console.log(`Conversational reply sent to ${masked}`);
     return;

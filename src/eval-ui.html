@@ -104,6 +104,67 @@
     height: 100%; border-radius: 3px; position: absolute; left: 0; top: 0;
   }
 
+  /* Simulate panel */
+  .simulate-section {
+    padding: 12px 20px; background: #141414; border-bottom: 1px solid #282828;
+  }
+  .simulate-bar {
+    display: flex; gap: 10px; align-items: center;
+  }
+  .simulate-results {
+    display: none; margin-top: 16px;
+  }
+  .simulate-results.open { display: block; }
+  .sim-funnel {
+    display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 12px; font-size: 13px; color: #aaa;
+  }
+  .sim-funnel .funnel-step {
+    display: flex; align-items: center; gap: 4px;
+  }
+  .sim-funnel .funnel-num {
+    font-weight: 700; font-size: 16px; color: #e0e0e0;
+  }
+  .sim-funnel .funnel-arrow { color: #555; font-size: 14px; }
+  .sms-bubble {
+    background: #1a3a1a; border: 1px solid #2d5a2d; border-radius: 12px;
+    padding: 14px 18px; margin-bottom: 16px; max-width: 500px;
+    font-size: 14px; line-height: 1.5; color: #c6f6c6; white-space: pre-wrap;
+  }
+  .sms-bubble-label {
+    font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .sim-table-section { margin-bottom: 16px; }
+  .sim-table-section h4 {
+    font-size: 13px; font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;
+  }
+  .sim-table-section h4 .dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  }
+  .dot-picked { background: #68d391; }
+  .dot-notpicked { background: #555; }
+  .dot-candidate { background: #3b82f6; }
+  .sim-table {
+    width: 100%; border-collapse: collapse;
+  }
+  .sim-table th {
+    text-align: left; padding: 6px 10px; font-size: 11px; font-weight: 600;
+    color: #888; text-transform: uppercase; border-bottom: 1px solid #333;
+    cursor: default;
+  }
+  .sim-table td {
+    padding: 6px 10px; border-bottom: 1px solid #1f1f1f;
+    font-size: 13px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sim-table tr.picked-row { background: rgba(104, 211, 145, 0.08); }
+  .sim-table tr.notpicked-row { opacity: 0.6; }
+  .sim-expand-toggle {
+    background: none; border: 1px solid #333; color: #aaa; font-size: 12px;
+    padding: 4px 12px; border-radius: 4px; cursor: pointer; margin-top: 4px;
+  }
+  .sim-expand-toggle:hover { background: #222; color: #e0e0e0; }
+
   /* Detail panel */
   .detail-panel {
     position: fixed; bottom: 0; left: 0; right: 0; max-height: 45vh;
@@ -149,6 +210,57 @@
   <button onclick="refreshCache()" id="btn-refresh">Refresh Cache</button>
   <button onclick="runScoring()" id="btn-score" class="primary">Run AI Scoring</button>
   <span class="status-msg" id="status-msg"></span>
+</div>
+
+<!-- Simulate -->
+<div class="simulate-section">
+  <div class="simulate-bar">
+    <label for="sim-neighborhood" style="font-size:13px; color:#aaa;">Simulate Request:</label>
+    <select id="sim-neighborhood">
+      <option value="">Select neighborhood...</option>
+    </select>
+    <button onclick="runSimulate()" id="btn-simulate" class="primary">Simulate</button>
+    <span class="status-msg" id="sim-status"></span>
+  </div>
+  <div class="simulate-results" id="sim-results">
+    <div class="sim-funnel" id="sim-funnel"></div>
+    <div class="sms-bubble-label">Claude's SMS</div>
+    <div class="sms-bubble" id="sim-sms"></div>
+    <div class="sim-table-section">
+      <h4><span class="dot dot-picked"></span> Picked by Claude</h4>
+      <table class="sim-table">
+        <thead>
+          <tr>
+            <th>Rank</th><th>Name</th><th>Venue</th><th>Time</th><th>Source</th>
+          </tr>
+        </thead>
+        <tbody id="sim-picked"></tbody>
+      </table>
+    </div>
+    <div class="sim-table-section">
+      <h4><span class="dot dot-notpicked"></span> Sent but Not Picked</h4>
+      <table class="sim-table">
+        <thead>
+          <tr>
+            <th>Name</th><th>Venue</th><th>Time</th><th>Source</th>
+          </tr>
+        </thead>
+        <tbody id="sim-notpicked"></tbody>
+      </table>
+    </div>
+    <div class="sim-table-section" id="sim-candidates-section" style="display:none;">
+      <h4><span class="dot dot-candidate"></span> All Candidates (proximity ranked)</h4>
+      <table class="sim-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Name</th><th>Venue</th><th>Neighborhood</th><th>Time</th><th>Source</th>
+          </tr>
+        </thead>
+        <tbody id="sim-candidates"></tbody>
+      </table>
+    </div>
+    <button class="sim-expand-toggle" id="sim-expand-btn" onclick="toggleCandidates()">Show all candidates</button>
+  </div>
 </div>
 
 <!-- Filters -->
@@ -520,12 +632,155 @@ function setStatus(msg) {
   document.getElementById('status-msg').textContent = msg;
 }
 
+// ========== Simulate ==========
+
+function populateSimNeighborhoods() {
+  const sel = document.getElementById('sim-neighborhood');
+  const hoods = [
+    'Astoria', 'Bed-Stuy', 'Bushwick', 'Chelsea', 'Crown Heights',
+    'Downtown Brooklyn', 'DUMBO', 'East Village', 'Financial District',
+    'Flatiron', 'Greenpoint', 'Greenwich Village', "Hell's Kitchen",
+    'Harlem', 'Long Island City', 'Lower East Side', 'Midtown', 'NoHo',
+    'Park Slope', 'SoHo', 'Tribeca', 'Upper East Side', 'Upper West Side',
+    'West Village', 'Williamsburg'
+  ];
+  for (const h of hoods) {
+    const opt = document.createElement('option');
+    opt.value = h; opt.textContent = h;
+    sel.appendChild(opt);
+  }
+}
+
+async function runSimulate() {
+  const hood = document.getElementById('sim-neighborhood').value;
+  if (!hood) { setSimStatus('Select a neighborhood first'); return; }
+
+  const btn = document.getElementById('btn-simulate');
+  btn.disabled = true;
+  setSimStatus('Simulating ' + hood + '...');
+
+  try {
+    const res = await fetch('/api/eval/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ neighborhood: hood }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    renderSimResults(data);
+    setSimStatus('');
+  } catch (err) {
+    setSimStatus('Simulate failed: ' + err.message);
+    document.getElementById('sim-results').classList.remove('open');
+  }
+  btn.disabled = false;
+}
+
+function renderSimResults(data) {
+  document.getElementById('sim-results').classList.add('open');
+
+  // Funnel stats
+  const funnel = document.getElementById('sim-funnel');
+  funnel.innerHTML = `
+    <span class="funnel-step"><span class="funnel-num">${data.candidates.length}</span> in proximity</span>
+    <span class="funnel-arrow">&rarr;</span>
+    <span class="funnel-step"><span class="funnel-num">${data.sent_to_claude.length}</span> sent to Claude</span>
+    <span class="funnel-arrow">&rarr;</span>
+    <span class="funnel-step"><span class="funnel-num">${data.picked.length}</span> picked</span>
+  `;
+
+  // SMS bubble
+  document.getElementById('sim-sms').textContent = data.compose_result.sms_text;
+
+  // Picked table
+  const pickedTbody = document.getElementById('sim-picked');
+  pickedTbody.innerHTML = '';
+  const picks = data.compose_result.picks || [];
+  for (const event of data.picked) {
+    const pick = picks.find(p => p.event_id === event.id);
+    const tr = document.createElement('tr');
+    tr.className = 'picked-row';
+    tr.innerHTML = `
+      <td>${pick ? pick.rank : '—'}</td>
+      <td title="${esc(event.name || '')}">${esc(event.name || '—')}</td>
+      <td>${esc(event.venue_name || '—')}</td>
+      <td>${simTimeCell(event)}</td>
+      <td>${esc(event.source_name || '—')}</td>
+    `;
+    pickedTbody.appendChild(tr);
+  }
+
+  // Not picked table
+  const notPickedTbody = document.getElementById('sim-notpicked');
+  notPickedTbody.innerHTML = '';
+  for (const event of data.not_picked) {
+    const tr = document.createElement('tr');
+    tr.className = 'notpicked-row';
+    tr.innerHTML = `
+      <td title="${esc(event.name || '')}">${esc(event.name || '—')}</td>
+      <td>${esc(event.venue_name || '—')}</td>
+      <td>${simTimeCell(event)}</td>
+      <td>${esc(event.source_name || '—')}</td>
+    `;
+    notPickedTbody.appendChild(tr);
+  }
+
+  // Candidates table (hidden by default)
+  const candTbody = document.getElementById('sim-candidates');
+  candTbody.innerHTML = '';
+  data.candidates.forEach((event, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${i + 1}</td>
+      <td title="${esc(event.name || '')}">${esc(event.name || '—')}</td>
+      <td>${esc(event.venue_name || '—')}</td>
+      <td>${esc(event.neighborhood || '—')}</td>
+      <td>${simTimeCell(event)}</td>
+      <td>${esc(event.source_name || '—')}</td>
+    `;
+    candTbody.appendChild(tr);
+  });
+
+  // Reset expand state
+  document.getElementById('sim-candidates-section').style.display = 'none';
+  document.getElementById('sim-expand-btn').textContent = 'Show all candidates';
+}
+
+function toggleCandidates() {
+  const section = document.getElementById('sim-candidates-section');
+  const btn = document.getElementById('sim-expand-btn');
+  if (section.style.display === 'none') {
+    section.style.display = 'block';
+    btn.textContent = 'Hide candidates';
+  } else {
+    section.style.display = 'none';
+    btn.textContent = 'Show all candidates';
+  }
+}
+
+function simTimeCell(e) {
+  if (!e.start_time_local) {
+    if (e.date_local) return esc(e.date_local);
+    return '—';
+  }
+  try {
+    const d = new Date(e.start_time_local);
+    if (isNaN(d)) return esc(e.start_time_local);
+    return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  } catch { return esc(e.start_time_local); }
+}
+
+function setSimStatus(msg) {
+  document.getElementById('sim-status').textContent = msg;
+}
+
 // Keyboard shortcut: Escape closes detail panel
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeDetail();
 });
 
 // Init
+populateSimNeighborhoods();
 loadEvents();
 </script>
 </body>
