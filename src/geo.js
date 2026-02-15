@@ -55,10 +55,28 @@ function resolveNeighborhood(locality, lat, lng) {
 }
 
 /**
- * Rank events by proximity to target neighborhood.
- * Light filter: include everything within ~5km (same borough-ish),
- * plus all events with unknown neighborhood (let Claude decide).
- * Sorted: closest first, then unknown-neighborhood events at the end.
+ * Extract the NYC date (YYYY-MM-DD) from an event's date_local or start_time_local.
+ */
+function getEventDate(event) {
+  if (event.date_local) return event.date_local;
+  if (!event.start_time_local) return null;
+  // Try ISO parse
+  try {
+    const ms = parseAsNycTime(event.start_time_local);
+    if (!isNaN(ms)) {
+      return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+    }
+  } catch {}
+  // Try bare date (YYYY-MM-DD without time)
+  const dateMatch = event.start_time_local.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (dateMatch) return dateMatch[1];
+  return null;
+}
+
+/**
+ * Rank events by date (today first) then proximity to target neighborhood.
+ * Filter: include everything within ~3km.
+ * Sort: today > tomorrow > future, then closest first within each tier.
  */
 function rankEventsByProximity(events, targetNeighborhood) {
   if (!targetNeighborhood) return events;
@@ -66,28 +84,43 @@ function rankEventsByProximity(events, targetNeighborhood) {
   const targetData = NEIGHBORHOODS[targetNeighborhood];
   if (!targetData) return events;
 
-  const scored = events.map(e => {
-    const hood = e.neighborhood;
-    if (!hood) return { event: e, dist: 4.0 }; // unknown = include, sort late
+  const todayNyc = getNycDateString(0);
+  const tomorrowNyc = getNycDateString(1);
 
-    const hoodData = NEIGHBORHOODS[hood];
-    if (!hoodData) {
-      for (const [name, data] of Object.entries(NEIGHBORHOODS)) {
-        if (data.aliases.includes(hood.toLowerCase()) || name.toLowerCase() === hood.toLowerCase()) {
-          const dist = haversine(targetData.lat, targetData.lng, data.lat, data.lng);
-          return { event: e, dist };
+  const scored = events.map(e => {
+    // Distance
+    const hood = e.neighborhood;
+    let dist = 4.0;
+    if (hood) {
+      const hoodData = NEIGHBORHOODS[hood];
+      if (hoodData) {
+        dist = haversine(targetData.lat, targetData.lng, hoodData.lat, hoodData.lng);
+      } else {
+        for (const [name, data] of Object.entries(NEIGHBORHOODS)) {
+          if (data.aliases.includes(hood.toLowerCase()) || name.toLowerCase() === hood.toLowerCase()) {
+            dist = haversine(targetData.lat, targetData.lng, data.lat, data.lng);
+            break;
+          }
         }
       }
-      return { event: e, dist: 4.0 };
     }
 
-    const dist = haversine(targetData.lat, targetData.lng, hoodData.lat, hoodData.lng);
-    return { event: e, dist };
+    // Date tier: today first, then tomorrow, then future
+    const eventDate = getEventDate(e);
+    let dateTier;
+    if (!eventDate || eventDate === todayNyc) dateTier = 0;
+    else if (eventDate === tomorrowNyc) dateTier = 1;
+    else dateTier = 2;
+
+    return { event: e, dist, dateTier };
   });
 
   return scored
     .filter(s => s.dist <= 3)
-    .sort((a, b) => a.dist - b.dist)
+    .sort((a, b) => {
+      if (a.dateTier !== b.dateTier) return a.dateTier - b.dateTier;
+      return a.dist - b.dist;
+    })
     .map(s => s.event);
 }
 
@@ -158,8 +191,9 @@ function filterUpcomingEvents(events) {
   const todayNyc = getNycDateString(0);
 
   return events.filter(e => {
-    // Filter out events with a date_local in the past
-    if (e.date_local && e.date_local < todayNyc) return false;
+    // Filter out events whose date is in the past (derived from any available field)
+    const eventDate = getEventDate(e);
+    if (eventDate && eventDate < todayNyc) return false;
 
     if (!e.start_time_local) return true;
     if (!/T\d{2}:/.test(e.start_time_local)) return true;
@@ -182,4 +216,4 @@ function filterUpcomingEvents(events) {
   });
 }
 
-module.exports = { resolveNeighborhood, rankEventsByProximity, getNycDateString, inferCategory, haversine, filterUpcomingEvents };
+module.exports = { resolveNeighborhood, rankEventsByProximity, getNycDateString, inferCategory, haversine, filterUpcomingEvents, getEventDate };

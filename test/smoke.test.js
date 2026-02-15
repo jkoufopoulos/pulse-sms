@@ -159,8 +159,9 @@ const timeEvents = [
   { id: 't2', start_time_local: makeTime(-1) },       // 1hr ago (within window)
   { id: 't3', start_time_local: makeTime(-5) },       // 5hrs ago (should be filtered)
   { id: 't4', start_time_local: null },                // no time
-  { id: 't5', start_time_local: '2026-02-14' },       // date only
+  { id: 't5', start_time_local: getNycDateString(1) }, // date-only (tomorrow)
   { id: 't6', start_time_local: makeTime(-4), end_time_local: makeTime(1) },  // ended but end in future
+  { id: 't7', start_time_local: '2020-01-01' },       // date-only past
 ];
 const upcoming = filterUpcomingEvents(timeEvents);
 const upIds = upcoming.map(e => e.id);
@@ -169,8 +170,9 @@ check('keeps future', upIds.includes('t1'));
 check('keeps recent (within 2hr)', upIds.includes('t2'));
 check('removes past (5hr ago)', !upIds.includes('t3'));
 check('keeps no-time', upIds.includes('t4'));
-check('keeps date-only', upIds.includes('t5'));
+check('keeps date-only tomorrow', upIds.includes('t5'));
 check('keeps event with future end_time', upIds.includes('t6'));
+check('removes date-only past', !upIds.includes('t7'));
 
 // ---- AI routing output shape contracts ----
 console.log('\nAI routing contracts (routeMessage shape):');

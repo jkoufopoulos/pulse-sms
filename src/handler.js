@@ -7,6 +7,21 @@ const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('.
 
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
 
+// --- Adjacent neighborhood helper (Euclidean approx, fine for NYC scale) ---
+function getAdjacentNeighborhoods(hood, count = 3) {
+  const target = NEIGHBORHOODS[hood];
+  if (!target) return [];
+  return Object.entries(NEIGHBORHOODS)
+    .filter(([name]) => name !== hood)
+    .map(([name, data]) => ({
+      name,
+      dist: Math.sqrt(Math.pow(target.lat - data.lat, 2) + Math.pow(target.lng - data.lng, 2)),
+    }))
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, count)
+    .map(d => d.name);
+}
+
 const router = express.Router();
 
 // --- Twilio webhook signature validation ---
@@ -83,16 +98,107 @@ function cleanUrl(url) {
 }
 
 function formatEventDetails(event) {
-  let detail = `${event.name}`;
-  if (event.venue_name && event.venue_name !== 'TBA') detail += ` at ${event.venue_name}`;
-  if (event.start_time_local) detail += `\n${formatTime(event.start_time_local)}`;
-  if (event.end_time_local) detail += ` – ${formatTime(event.end_time_local)}`;
+  const venue = event.venue_name && event.venue_name !== 'TBA' ? event.venue_name : null;
+
+  // Dedupe: skip "at Venue" if event name already contains venue
+  let detail = event.name || '';
+  if (venue && !detail.toLowerCase().includes(venue.toLowerCase())) {
+    detail += ` at ${venue}`;
+  }
+
+  // Time — show end time compactly if same day
+  if (event.start_time_local) {
+    detail += `\n${formatTime(event.start_time_local)}`;
+    if (event.end_time_local) {
+      try {
+        const start = new Date(event.start_time_local);
+        const end = new Date(event.end_time_local);
+        if (start.toDateString() === end.toDateString()) {
+          detail += ` – ${end.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' })}`;
+        } else {
+          detail += ` – ${formatTime(event.end_time_local)}`;
+        }
+      } catch {
+        detail += ` – ${formatTime(event.end_time_local)}`;
+      }
+    }
+  }
+
   if (event.is_free) detail += `\nFree!`;
   else if (event.price_display) detail += `\n${event.price_display}`;
+
   if (event.venue_address) detail += `\n${event.venue_address}`;
   if (event.ticket_url) detail += `\n${cleanUrl(event.ticket_url)}`;
-  if (event.map_hint) detail += `\nNear: ${event.map_hint}`;
+
+  // Only show map_hint if it adds info beyond the address
+  if (event.map_hint && (!event.venue_address || !event.venue_address.includes(event.map_hint))) {
+    detail += `\nNear ${event.map_hint}`;
+  }
+
   return detail.slice(0, 480);
+}
+
+// --- Deterministic pre-router (skips Claude for obvious intents) ---
+function preRoute(message, session) {
+  const msg = message.trim();
+  const lower = msg.toLowerCase();
+  const base = { filters: { free_only: false, category: null, vibe: null }, event_reference: null, reply: null, confidence: 1.0 };
+
+  // Help
+  if (/^(help|\?)$/i.test(msg)) {
+    return { ...base, intent: 'help', neighborhood: null };
+  }
+
+  // Bare numbers → details (only if session has picks)
+  if (/^[1-3]$/.test(msg) && session?.lastPicks?.length > 0) {
+    return { ...base, intent: 'details', neighborhood: null, event_reference: msg };
+  }
+
+  // More
+  if (/^(more|show me more|what else|anything else|what else you got|next|what's next)$/i.test(msg)) {
+    return { ...base, intent: 'more', neighborhood: session?.lastNeighborhood || null };
+  }
+
+  // Free
+  if (/^(free|free stuff|free events|free tonight|anything free)$/i.test(msg)) {
+    return { ...base, intent: 'free', neighborhood: session?.lastNeighborhood || null, filters: { free_only: true, category: null, vibe: null } };
+  }
+
+  // Event name match from session picks (e.g. "vince anderson" matches "Rev. Vince Anderson @ Union Pool")
+  if (session?.lastPicks && session?.lastEvents && lower.length >= 3) {
+    for (let i = 0; i < session.lastPicks.length; i++) {
+      const event = session.lastEvents[session.lastPicks[i].event_id];
+      if (!event?.name) continue;
+      if (event.name.toLowerCase().includes(lower)) {
+        return { ...base, intent: 'details', neighborhood: null, event_reference: String(i + 1) };
+      }
+    }
+  }
+
+  // Greetings
+  if (/^(hey|hi|hello|yo|sup|what's up|wassup|hola|howdy)$/i.test(msg)) {
+    return { ...base, intent: 'conversational', neighborhood: null, reply: "Hey! Text me a neighborhood and I'll find you something good tonight." };
+  }
+
+  // Thanks
+  if (/^(thanks|thank you|thx|ty|appreciate it|cheers)$/i.test(msg)) {
+    return { ...base, intent: 'conversational', neighborhood: null, reply: "Anytime! Text a neighborhood when you're ready to go out again." };
+  }
+
+  // Bye
+  if (/^(bye|later|peace|gn|good night|night|see ya|cya|deuces)$/i.test(msg)) {
+    return { ...base, intent: 'conversational', neighborhood: null, reply: "Later! Hit me up whenever." };
+  }
+
+  // Bare neighborhood (short messages only — longer ones need Claude for intent/filters)
+  if (msg.length <= 25) {
+    const hood = extractNeighborhood(msg);
+    if (hood) {
+      return { ...base, intent: 'events', neighborhood: hood };
+    }
+  }
+
+  return null; // Fall through to Claude
 }
 
 // --- Session store for DETAILS/MORE/FREE ---
@@ -219,9 +325,10 @@ async function handleMessageAI(phone, message) {
   const masked = maskPhone(phone);
   const session = getSession(phone);
 
-  // CALL 1: Route the message
-  const route = await routeMessage(message, session, NEIGHBORHOOD_NAMES);
-  console.log(`AI route: intent=${route.intent}, neighborhood=${route.neighborhood}, confidence=${route.confidence}`);
+  // Try deterministic pre-routing first, fall back to Claude
+  const preRouted = preRoute(message, session);
+  const route = preRouted || await routeMessage(message, session, NEIGHBORHOOD_NAMES);
+  console.log(`${preRouted ? 'Pre' : 'AI'} route: intent=${route.intent}, neighborhood=${route.neighborhood}, confidence=${route.confidence}`);
 
   // --- Help ---
   if (route.intent === 'help') {
@@ -273,7 +380,7 @@ async function handleMessageAI(phone, message) {
         return;
       }
     }
-    await sendSMS(phone, "No recent picks to show details for. Text a neighborhood to get started!");
+    await sendSMS(phone, "I don't have any recent picks to pull up — text me a neighborhood and let's start fresh!");
     return;
   }
 
@@ -293,7 +400,7 @@ async function handleMessageAI(phone, message) {
 
   // Still no neighborhood — ask the user
   if (!neighborhood && route.intent === 'events') {
-    await sendSMS(phone, "Hey! What neighborhood are you near? (e.g. 'East Village', 'Williamsburg', 'LES')");
+    await sendSMS(phone, "Where are you headed? Drop me a neighborhood like East Village, Williamsburg, or LES.");
     return;
   }
 
@@ -313,21 +420,27 @@ async function handleMessageAI(phone, message) {
         return;
       }
     }
-    await sendSMS(phone, session ? "That's all I've got for now. Try a different neighborhood or check back later!" : "Text a neighborhood to get started! (e.g. 'East Village', 'Williamsburg')");
+    if (session?.lastNeighborhood) {
+      const nearby = getAdjacentNeighborhoods(session.lastNeighborhood, 2);
+      const suggestion = nearby.length > 0 ? ` Try ${nearby.join(' or ')} — they're close by.` : ' Try a different neighborhood or check back later!';
+      await sendSMS(phone, `That's everything I've got near ${session.lastNeighborhood}.${suggestion}`);
+    } else {
+      await sendSMS(phone, "Text me a neighborhood and I'll find you something! East Village, Williamsburg, LES — whatever's close.");
+    }
     return;
   }
 
   // --- Free ---
   if (route.intent === 'free') {
     if (!neighborhood && !session?.lastNeighborhood) {
-      await sendSMS(phone, "Hey! What neighborhood are you near? (e.g. 'East Village', 'Williamsburg', 'LES')");
+      await sendSMS(phone, "Where are you headed? Drop me a neighborhood like East Village, Williamsburg, or LES.");
       return;
     }
     const hood = neighborhood || session.lastNeighborhood;
     const events = await getEvents(hood);
     const freeEvents = events.filter(e => e.is_free);
     if (freeEvents.length === 0) {
-      await sendSMS(phone, `No free events found near ${hood} tonight. Text "${hood}" to see all events instead.`);
+      await sendSMS(phone, `Not seeing any free stuff near ${hood} right now — want everything instead? Just text "${hood}" again.`);
       return;
     }
     const result = await composeResponse(message, freeEvents, hood, route.filters);
@@ -346,7 +459,7 @@ async function handleMessageAI(phone, message) {
 
   // Ask for neighborhood if we still don't have one
   if (!neighborhood) {
-    await sendSMS(phone, "Hey! What neighborhood are you near? (e.g. 'East Village', 'Williamsburg', 'LES')");
+    await sendSMS(phone, "Where are you headed? Drop me a neighborhood like East Village, Williamsburg, or LES.");
     return;
   }
 
@@ -361,7 +474,9 @@ async function handleMessageAI(phone, message) {
   }
 
   if (events.length === 0) {
-    await sendSMS(phone, `Quiet night in ${hood} — not seeing much right now. Try a nearby neighborhood or check back later!`);
+    const nearby = getAdjacentNeighborhoods(hood, 2);
+    const suggestion = nearby.length > 0 ? ` Try ${nearby.join(' or ')}?` : ' Check back later!';
+    await sendSMS(phone, `Quiet night in ${hood} — not seeing much right now.${suggestion}`);
     return;
   }
 
