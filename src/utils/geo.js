@@ -86,7 +86,7 @@ function rankEventsByProximity(events, targetNeighborhood) {
   });
 
   return scored
-    .filter(s => s.dist <= 5)
+    .filter(s => s.dist <= 3)
     .sort((a, b) => a.dist - b.dist)
     .map(s => s.event);
 }

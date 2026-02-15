@@ -44,15 +44,28 @@ const EXTRACTION_PROMPT = `You are an Event Extractor for Pulse (NYC). Convert m
 
 TRUTH + SAFETY
 - Extract ONLY what is explicitly present in the source text.
-- Do NOT guess dates, times, venues, neighborhoods, prices, or descriptions.
+- Do NOT guess venues, neighborhoods, prices, or descriptions.
 - If a field is missing, set it null and increase "needs_review".
-- Prefer NYC interpretation (America/New_York) but do not assume a date if not specified.
+- Prefer NYC interpretation (America/New_York).
+
+DATE RESOLUTION — CRITICAL
+- The retrieval timestamp (retrieved_at_nyc) tells you today's date and day of week.
+- Resolve relative day names to actual dates using the retrieval date:
+  - If retrieved on Saturday and text says "fri" → that means YESTERDAY (the past Friday), NOT next Friday.
+  - If retrieved on Saturday and text says "sat" → that means TODAY.
+  - If retrieved on Saturday and text says "sun" → that means TOMORROW.
+  - "thru" dates (e.g. "thru 2/19") are end dates — set end_time_local, leave date_local null.
+  - "today"/"tonight" → use retrieved_at_nyc date.
+- Always set date_local to the resolved YYYY-MM-DD. If you cannot resolve the date, set date_local null.
+- NEVER assign a date in the past to date_local if the event is meant to be upcoming.
+- If a day name refers to a day that has already passed this week, that event is OVER — set confidence to 0.1.
 
 CONFIDENCE GUIDELINES
 - 0.9+: name + date/time + location clearly present
 - 0.7–0.85: name + (date OR time window) + partial location
 - 0.4–0.65: name is clear but time/location ambiguous
 - <0.4: too ambiguous; set needs_review=true
+- 0.1: event date has already passed
 
 DEDUPE HINT
 - If multiple items appear to describe the same event, still output them separately; downstream will dedupe by name+venue+date.`;
@@ -399,7 +412,8 @@ SOURCE TRUST HIERARCHY (prefer higher-trust sources when options are comparable)
 
 CURATION RULES:
 - Pick 1–3 events. Prefer "NYC cool": gallery openings, DJ nights, indie shows, weird pop-ups, small venues.
-- Prefer nearer + sooner + lower friction (walk-up, free, no huge commute).
+- STRONGLY prefer events IN the user's requested neighborhood. Only suggest events from other neighborhoods if there's nothing good in theirs.
+- When including events from adjacent neighborhoods, mention the actual neighborhood in the SMS (e.g. "nearby in Williamsburg:" or "worth the walk to LES:").
 - Higher source_weight + higher confidence = more trustworthy.
 - NEVER invent events. ONLY use events from the provided list.
 - If nothing is worth recommending, say so honestly.
