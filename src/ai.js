@@ -108,6 +108,8 @@ DATE AWARENESS — CRITICAL:
 
 SOURCE TRUST HIERARCHY (prefer higher-trust sources when options are comparable):
 - The Skint (weight 0.9): hand-curated editorial, highest trust
+- Resident Advisor (weight 0.85): electronic music & nightlife, DJ events
+- Dice (weight 0.8): ticketed events, concerts, DJ nights
 - Songkick (weight 0.75): music-focused, reliable for concerts
 - Eventbrite (weight 0.7): structured ticketing aggregator
 
@@ -131,9 +133,10 @@ Return STRICT JSON:
 {
   "sms_text": "the complete SMS message, max 480 chars",
   "picks": [
-    { "rank": 1, "event_id": "..." },
-    { "rank": 2, "event_id": "..." }
+    { "rank": 1, "event_id": "...", "why": "short reason for picking this event" },
+    { "rank": 2, "event_id": "...", "why": "short reason" }
   ],
+  "not_picked_reason": "1 sentence on why you skipped the other events",
   "neighborhood_used": "the neighborhood these events are for"
 }`;
 
@@ -270,6 +273,7 @@ Compose the SMS now. Remember: 480 char hard limit, end with CTA.`;
   return {
     sms_text: parsed.sms_text.slice(0, 480),
     picks: validPicks,
+    not_picked_reason: parsed.not_picked_reason || null,
     neighborhood_used: parsed.neighborhood_used || neighborhood,
   };
 }

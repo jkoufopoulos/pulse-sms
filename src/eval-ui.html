@@ -24,6 +24,8 @@
     padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500;
   }
   .source-skint { background: #2d1f4e; color: #b794f6; }
+  .source-ra { background: #1f2d4e; color: #90cdf4; }
+  .source-dice { background: #4e1f3d; color: #f687b3; }
   .source-eventbrite { background: #1f3d2d; color: #68d391; }
   .source-songkick { background: #3d2d1f; color: #f6ad55; }
   .health-ok { color: #68d391; }
@@ -231,7 +233,7 @@
       <table class="sim-table">
         <thead>
           <tr>
-            <th>Rank</th><th>Name</th><th>Venue</th><th>Time</th><th>Source</th>
+            <th>Rank</th><th>Name</th><th>Venue</th><th>Time</th><th>Source</th><th>Why</th>
           </tr>
         </thead>
         <tbody id="sim-picked"></tbody>
@@ -239,6 +241,7 @@
     </div>
     <div class="sim-table-section">
       <h4><span class="dot dot-notpicked"></span> Sent but Not Picked</h4>
+      <div class="sim-not-picked-reason" id="sim-not-picked-reason" style="font-size:12px;color:#aaa;margin-bottom:8px;font-style:italic;"></div>
       <table class="sim-table">
         <thead>
           <tr>
@@ -268,6 +271,14 @@
   <div class="filter-group">
     <input type="checkbox" id="f-skint" checked onchange="applyFilters()">
     <label for="f-skint" class="source-pill source-skint">Skint</label>
+  </div>
+  <div class="filter-group">
+    <input type="checkbox" id="f-ra" checked onchange="applyFilters()">
+    <label for="f-ra" class="source-pill source-ra">RA</label>
+  </div>
+  <div class="filter-group">
+    <input type="checkbox" id="f-dice" checked onchange="applyFilters()">
+    <label for="f-dice" class="source-pill source-dice">Dice</label>
   </div>
   <div class="filter-group">
     <input type="checkbox" id="f-eventbrite" checked onchange="applyFilters()">
@@ -396,7 +407,7 @@ function updateSummary(data) {
     ? Math.round(ageMs / 60000) + 'm ago'
     : 'never';
 
-  const counts = { Skint: 0, Eventbrite: 0, Songkick: 0 };
+  const counts = { Skint: 0, RA: 0, Dice: 0, Eventbrite: 0, Songkick: 0 };
   for (const e of (data.events || [])) {
     const src = normalizeSource(e.source_name);
     if (counts[src] !== undefined) counts[src]++;
@@ -449,6 +460,8 @@ function getAllFlags(e) {
 
 function applyFilters() {
   const showSkint = document.getElementById('f-skint').checked;
+  const showRA = document.getElementById('f-ra').checked;
+  const showDice = document.getElementById('f-dice').checked;
   const showEB = document.getElementById('f-eventbrite').checked;
   const showSK = document.getElementById('f-songkick').checked;
   const hood = document.getElementById('f-neighborhood').value;
@@ -458,6 +471,8 @@ function applyFilters() {
   let filtered = allEvents.filter(e => {
     const src = normalizeSource(e.source_name);
     if (src === 'Skint' && !showSkint) return false;
+    if (src === 'RA' && !showRA) return false;
+    if (src === 'Dice' && !showDice) return false;
     if (src === 'Eventbrite' && !showEB) return false;
     if (src === 'Songkick' && !showSK) return false;
     if (hood && e.neighborhood !== hood) return false;
@@ -636,6 +651,8 @@ function normalizeSource(name) {
   if (!name) return 'Unknown';
   const n = name.toLowerCase();
   if (n.includes('skint')) return 'Skint';
+  if (n === 'ra') return 'RA';
+  if (n === 'dice') return 'Dice';
   if (n.includes('eventbrite')) return 'Eventbrite';
   if (n.includes('songkick')) return 'Songkick';
   return name;

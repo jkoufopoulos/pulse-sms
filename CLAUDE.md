@@ -9,8 +9,8 @@ Daily scrape (10am ET)     Incoming SMS
         │                       │
         ▼                       ▼
    sources.js              handler.js
-   (Skint, Eventbrite,     (webhook, dedup,
-    Songkick)               sessions)
+   (Skint, RA, Dice,       (webhook, dedup,
+    Eventbrite, Songkick)   sessions)
         │                       │
         ▼                       │
    events.js ◄──────────────────┤
@@ -34,7 +34,7 @@ Daily scrape (10am ET)     Incoming SMS
 | `handler.js` | Twilio webhook, dedup, rate limiter, sessions, message dispatcher, AI flow |
 | `ai.js` | 3 Claude calls: `routeMessage`, `composeResponse`, `extractEvents` |
 | `events.js` | Daily event cache, source health tracking, `getEvents()` |
-| `sources.js` | Scrapers: The Skint (HTML→Claude), Eventbrite (JSON-LD), Songkick (JSON-LD) |
+| `sources.js` | Scrapers: The Skint (HTML→Claude), RA (GraphQL), Dice (__NEXT_DATA__), Eventbrite (JSON-LD), Songkick (JSON-LD) |
 | `twilio.js` | `sendSMS` with timeout, test capture mode for simulator |
 | `geo.js` | `resolveNeighborhood`, proximity ranking, haversine, time filtering |
 | `neighborhoods.js` | 25 NYC neighborhoods with coords, aliases, landmarks, subway stops |
@@ -77,6 +77,6 @@ npm test               # runs smoke tests (pure functions only, no API calls)
 - **Conversational UX**: Claude routes all messages (no regex commands). Users text naturally; Claude figures out intent, neighborhood, and filters.
 - **Daily cache**: Events are scraped once at 10am ET and cached in memory. Incoming messages read from cache — no scraping in the hot path.
 - **Two-call AI flow**: Call 1 routes intent + neighborhood. Call 2 picks events + writes the SMS. This keeps each call focused and fast.
-- **No Tavily in hot path**: Tavily was removed from the live request path. All event data comes from the daily scrape (Skint, Eventbrite, Songkick).
-- **Source trust hierarchy**: Skint (0.9) > Songkick (0.75) > Eventbrite (0.7). Claude is told to prefer higher-trust sources.
+- **No Tavily in hot path**: Tavily was removed from the live request path. All event data comes from the daily scrape (Skint, RA, Dice, Eventbrite, Songkick).
+- **Source trust hierarchy**: Skint (0.9) > RA (0.85) > Dice (0.8) > Songkick (0.75) > Eventbrite (0.7). Claude is told to prefer higher-trust sources.
 - **480-char SMS limit**: All responses are capped at 480 chars. Claude is prompted to write concisely.

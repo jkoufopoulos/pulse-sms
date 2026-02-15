@@ -1,4 +1,4 @@
-const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents } = require('./sources');
+const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents } = require('./sources');
 const { rankEventsByProximity, filterUpcomingEvents } = require('./geo');
 
 // --- Daily event cache ---
@@ -11,6 +11,8 @@ const sourceHealth = {
   Skint: { consecutiveZeros: 0, lastCount: 0 },
   Songkick: { consecutiveZeros: 0, lastCount: 0 },
   Eventbrite: { consecutiveZeros: 0, lastCount: 0 },
+  RA: { consecutiveZeros: 0, lastCount: 0 },
+  Dice: { consecutiveZeros: 0, lastCount: 0 },
 };
 const HEALTH_WARN_THRESHOLD = 3;
 
@@ -24,18 +26,22 @@ async function refreshCache() {
   refreshPromise = (async () => {
     console.log('Refreshing event cache (all sources)...');
 
-    const [skintEvents, eventbriteEvents, songkickEvents] = await Promise.allSettled([
+    const [skintEvents, eventbriteEvents, songkickEvents, raEvents, diceEvents] = await Promise.allSettled([
       fetchSkintEvents(),
       fetchEventbriteEvents(),
       fetchSongkickEvents(),
+      fetchRAEvents(),
+      fetchDiceEvents(),
     ]);
 
     const allEvents = [];
     const seen = new Set();
 
-    // Merge in priority order: Skint first (highest trust), then Songkick, then Eventbrite
+    // Merge in priority order by source_weight: Skint (0.9) > RA (0.85) > Dice (0.8) > Songkick (0.75) > Eventbrite (0.7)
     const sources = [
       { result: skintEvents, label: 'Skint' },
+      { result: raEvents, label: 'RA' },
+      { result: diceEvents, label: 'Dice' },
       { result: songkickEvents, label: 'Songkick' },
       { result: eventbriteEvents, label: 'Eventbrite' },
     ];
