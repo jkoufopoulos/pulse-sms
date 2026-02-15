@@ -28,6 +28,13 @@ app.get('/', (req, res) => {
 // SMS webhook
 app.use('/api/sms', smsRoutes);
 
+// SMS simulator UI (test mode only)
+if (process.env.PULSE_TEST_MODE === 'true') {
+  app.get('/test', (req, res) => {
+    res.sendFile(require('path').join(__dirname, 'test-ui.html'));
+  });
+}
+
 const server = app.listen(PORT, () => {
   console.log(`Pulse listening on port ${PORT}`);
 
