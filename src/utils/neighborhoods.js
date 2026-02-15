@@ -1,7 +1,7 @@
 const NEIGHBORHOODS = {
   'East Village': {
     lat: 40.7264, lng: -73.9818, radius_km: 0.8,
-    aliases: ['east village', 'ev', 'e village']
+    aliases: ['east village', 'ev', 'e village', 'e.v.', 'e.v']
   },
   'West Village': {
     lat: 40.7336, lng: -73.9999, radius_km: 0.7,
@@ -25,7 +25,7 @@ const NEIGHBORHOODS = {
   },
   'SoHo': {
     lat: 40.7233, lng: -73.9985, radius_km: 0.6,
-    aliases: ['soho', 'so ho']
+    aliases: ['soho', 'so ho', 'nolita']
   },
   'NoHo': {
     lat: 40.7290, lng: -73.9937, radius_km: 0.4,
@@ -80,12 +80,12 @@ const NEIGHBORHOODS = {
     aliases: ["hell's kitchen", 'hells kitchen', 'hk', 'clinton']
   },
   'Greenwich Village': {
-    lat: 40.7336, lng: -73.9999, radius_km: 0.7,
+    lat: 40.7308, lng: -73.9973, radius_km: 0.7,
     aliases: ['greenwich village', 'greenwich']
   },
   'Flatiron': {
     lat: 40.7395, lng: -73.9903, radius_km: 0.6,
-    aliases: ['flatiron', 'gramercy', 'union square']
+    aliases: ['flatiron', 'gramercy', 'union square', 'union sq']
   },
   'Financial District': {
     lat: 40.7075, lng: -74.0089, radius_km: 0.8,
@@ -112,11 +112,39 @@ for (const [name, data] of Object.entries(NEIGHBORHOODS)) {
 // Sort aliases longest-first so "east village" matches before "east"
 const SORTED_ALIASES = [...ALIAS_MAP.keys()].sort((a, b) => b.length - a.length);
 
+// Borough/shorthand map — used only for SMS input extraction, not for resolveNeighborhood
+// (resolveNeighborhood has its own borough fallback with geo priority)
+const BOROUGH_MAP = {
+  'brooklyn': 'Williamsburg',
+  'bk': 'Williamsburg',
+  'manhattan': 'Midtown',
+  'nyc': 'Midtown',
+  'new york': 'Midtown',
+  'queens': 'Astoria',
+};
+
+// Precompile word-boundary regexes to prevent false positives
+// (e.g. "ev" matching inside "events", "every", "never")
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Combine neighborhood aliases + borough shortcuts, sorted longest-first
+const ALL_ENTRIES = [
+  ...SORTED_ALIASES.map(alias => ({ key: alias, value: ALIAS_MAP.get(alias) })),
+  ...Object.entries(BOROUGH_MAP).map(([key, value]) => ({ key, value })),
+].sort((a, b) => b.key.length - a.key.length);
+
+const EXTRACT_PATTERNS = ALL_ENTRIES.map(({ key, value }) => ({
+  value,
+  regex: new RegExp(`(?<!\\w)${escapeRegex(key)}(?!\\w)`),
+}));
+
 function extractNeighborhood(message) {
   const lower = message.toLowerCase();
-  for (const alias of SORTED_ALIASES) {
-    if (lower.includes(alias)) {
-      return ALIAS_MAP.get(alias);
+  for (const { value, regex } of EXTRACT_PATTERNS) {
+    if (regex.test(lower)) {
+      return value;
     }
   }
   return null;

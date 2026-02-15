@@ -15,7 +15,8 @@ async function sendSMS(to, body) {
     from: process.env.TWILIO_PHONE_NUMBER,
     to,
   });
-  console.log(`SMS sent to ${to}: ${msg.sid}`);
+  const masked = to.length > 4 ? to.slice(0, -4).replace(/\d/g, '*') + to.slice(-4) : '****';
+  console.log(`SMS sent to ${masked}: ${msg.sid}`);
   return msg;
 }
 
