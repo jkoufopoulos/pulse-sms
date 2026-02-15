@@ -1,5 +1,5 @@
 /**
- * Smoke tests for Vibe pure functions.
+ * Smoke tests for Pulse pure functions.
  * Run: node test/smoke.test.js
  */
 

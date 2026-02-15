@@ -1,5 +1,5 @@
 {
-  "name": "local-events-smsapp",
+  "name": "pulse-sms",
   "version": "2.0.0",
   "description": "SMS-based AI assistant for NYC event discovery",
   "main": "src/server.js",

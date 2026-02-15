@@ -6,7 +6,7 @@ const { pickEvents, interpretMessage, routeMessage, composeResponse } = require(
 const { renderSMS } = require('../services/sms-render');
 const { sendSMS, maskPhone } = require('../services/sms');
 
-const USE_AI_ROUTING = process.env.VIBE_AI_ROUTING !== 'false'; // default: true
+const USE_AI_ROUTING = process.env.PULSE_AI_ROUTING !== 'false'; // default: true
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
 
 const router = express.Router();
@@ -186,7 +186,7 @@ async function handleMessageAI(phone, message) {
 
   // --- Help ---
   if (route.intent === 'help') {
-    const reply = route.reply || "NightOwl — text a neighborhood, landmark, or subway stop to get tonight's picks.\n\nExamples: East Village, Williamsburg, near Prospect Park, Bedford Ave\n\nDETAILS — more info (DETAILS 2 for pick #2)\nMORE — next batch\nFREE — free events only";
+    const reply = route.reply || "Pulse — text a neighborhood, landmark, or subway stop to get tonight's picks.\n\nExamples: East Village, Williamsburg, near Prospect Park, Bedford Ave\n\nDETAILS — more info (DETAILS 2 for pick #2)\nMORE — next batch\nFREE — free events only";
     await sendSMS(phone, reply.slice(0, 480));
     console.log(`Help sent to ${masked}`);
     return;
@@ -333,7 +333,7 @@ async function handleMessageLegacy(phone, message) {
 
     // --- Handle HELP ---
     if (upper === 'HELP' || upper === 'HELP?' || upper === '?') {
-      await sendSMS(phone, "NightOwl — text a neighborhood, landmark, or subway stop to get tonight's picks.\n\nExamples: East Village, Williamsburg, near Prospect Park, Bedford Ave\n\nDETAILS — more info (DETAILS 2 for pick #2)\nMORE — next batch\nFREE — free events only");
+      await sendSMS(phone, "Pulse — text a neighborhood, landmark, or subway stop to get tonight's picks.\n\nExamples: East Village, Williamsburg, near Prospect Park, Bedford Ave\n\nDETAILS — more info (DETAILS 2 for pick #2)\nMORE — next batch\nFREE — free events only");
       return;
     }
 
@@ -553,7 +553,7 @@ async function handleMessageLegacy(phone, message) {
     console.error('Error handling SMS:', err.message);
 
     try {
-      await sendSMS(phone, "Vibe hit a snag — try again in a sec!");
+      await sendSMS(phone, "Pulse hit a snag — try again in a sec!");
     } catch (smsErr) {
       console.error(`Failed to send error SMS to ${maskPhone(phone)}:`, smsErr.message);
     }

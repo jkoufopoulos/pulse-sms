@@ -3,3 +3,4 @@ node_modules/
 .DS_Store
 ISSUES.md
 SPEC.md
+twilio_2FA_recovery_code.txt

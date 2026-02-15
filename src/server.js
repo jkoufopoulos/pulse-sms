@@ -22,14 +22,14 @@ app.use(express.json());
 
 // Health check with cache + source status
 app.get('/', (req, res) => {
-  res.json({ status: 'ok', service: 'vibe', ...getCacheStatus() });
+  res.json({ status: 'ok', service: 'pulse', ...getCacheStatus() });
 });
 
 // SMS webhook
 app.use('/api/sms', smsRoutes);
 
 const server = app.listen(PORT, () => {
-  console.log(`Vibe listening on port ${PORT}`);
+  console.log(`Pulse listening on port ${PORT}`);
 
   // Fire-and-forget initial cache load (don't block the server)
   refreshCache().catch(err => console.error('Initial cache load failed:', err.message));
