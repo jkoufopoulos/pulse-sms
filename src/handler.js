@@ -416,7 +416,7 @@ async function handleMessageAI(phone, message) {
 
   // --- Help ---
   if (route.intent === 'help') {
-    const reply = route.reply || "Hey! I'm Pulse — text me a neighborhood and I'll send you tonight's best picks. Try \"East Village\" or \"Williamsburg\" to start. You can ask for FREE events, specific vibes like comedy or live music, or reply MORE after any rec to keep exploring.";
+    const reply = route.reply || "Hey! I'm Pulse — text me a neighborhood and I'll send you tonight's best picks. Try \"East Village\" or \"Williamsburg\" to start. You can ask for free events, specific vibes like comedy or live music, or reply \"more\" after any rec to keep exploring.";
     const sms = reply.slice(0, 480);
     await sendSMS(phone, sms);
     console.log(`Help sent to ${masked}`);
