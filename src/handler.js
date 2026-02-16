@@ -613,8 +613,8 @@ async function handleMessageAI(phone, message) {
     const events = await getEvents(hood);
     let freeEvents = events.filter(e => e.is_free);
 
-    // If cached free events are thin, supplement with Tavily
-    if (freeEvents.length <= 2) {
+    // If cached free events can't fill at least 2 picks, supplement with Tavily
+    if (freeEvents.length < 2) {
       await sendSMS(phone, freeEvents.length > 0
         ? `Let me see what else is free near ${hood}...`
         : `Checking what's free near ${hood}...`);
