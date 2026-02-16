@@ -22,16 +22,20 @@ function runExpectationEvals(trace, expected) {
   }
 
   if (expected.neighborhood) {
-    // Check both routing and composition neighborhoods — pass if either matches
+    // Check routing, resolved, and composition neighborhoods — pass if any matches
     // (compose may legitimately pick events from adjacent neighborhoods)
     const routeHood = trace.routing.result?.neighborhood;
+    const resolvedHood = trace.routing.resolved_neighborhood;
     const composeHood = trace.composition.neighborhood_used;
-    const match = routeHood === expected.neighborhood || composeHood === expected.neighborhood;
-    const actual = composeHood || routeHood;
+    const match = routeHood === expected.neighborhood
+      || resolvedHood === expected.neighborhood
+      || composeHood === expected.neighborhood;
     results.push({
       name: 'expected_neighborhood',
       pass: match,
-      detail: match ? (composeHood || routeHood) : `expected ${expected.neighborhood}, got route=${routeHood}, compose=${composeHood}`,
+      detail: match
+        ? expected.neighborhood
+        : `expected ${expected.neighborhood}, got route=${routeHood}, resolved=${resolvedHood}, compose=${composeHood}`,
     });
   }
 

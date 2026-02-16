@@ -485,6 +485,9 @@ async function handleMessageAI(phone, message) {
     neighborhood = session?.lastNeighborhood || null;
   }
 
+  // Capture the handler's resolved neighborhood in the trace
+  trace.routing.resolved_neighborhood = neighborhood;
+
   // Still no neighborhood — ask the user
   if (!neighborhood && route.intent === 'events') {
     const sms = "Where are you headed? Drop me a neighborhood like East Village, Williamsburg, or LES.";
