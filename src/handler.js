@@ -655,7 +655,7 @@ async function handleMessageAI(phone, message) {
 
       try {
         const tavilyResults = await searchTavilyEvents(hood, {
-          query: `best free things to do near ${hood} NYC tonight bars with games pool shuffleboard arcade cheap hangouts`,
+          query: `free events tonight ${hood} NYC ${new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'long', day: 'numeric', year: 'numeric' })} no cover free entry`,
         });
 
         if (tavilyResults.length > 0) {

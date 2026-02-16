@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const cheerio = require('cheerio');
 const { extractEvents } = require('./ai');
-const { resolveNeighborhood, getNycDateString, inferCategory } = require('./geo');
+const { resolveNeighborhood, getNycDateString, inferCategory, filterUpcomingEvents } = require('./geo');
 
 const FETCH_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
@@ -705,8 +705,20 @@ async function searchTavilyEvents(neighborhood, { query: customQuery } = {}) {
     const data = await res.json();
     const results = data.results || [];
 
+    // Fix 5: Drop stale results — if Tavily returns a published_date older than 7 days, skip it
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const freshResults = results.filter(r => {
+      if (!r.published_date) return true; // no date = assume fresh
+      try {
+        return new Date(r.published_date).getTime() > sevenDaysAgo;
+      } catch { return true; }
+    });
+    if (freshResults.length < results.length) {
+      console.log(`Tavily: dropped ${results.length - freshResults.length} stale results (>7 days old)`);
+    }
+
     // Combine result content into a single text block for Claude extraction
-    const rawText = results
+    const rawText = freshResults
       .map(r => `[Source: ${r.url}]\n${r.title}\n${r.content}`)
       .join('\n\n---\n\n');
 
@@ -715,10 +727,16 @@ async function searchTavilyEvents(neighborhood, { query: customQuery } = {}) {
     const extracted = await extractEvents(rawText, 'tavily', query);
     const events = (extracted.events || [])
       .map(raw => normalizeExtractedEvent(raw, 'tavily', 'search', 0.6))
-      .filter(e => e.name && e.confidence >= 0.4);
+      .filter(e => e.name && e.confidence >= 0.6); // Fix 2: tighter threshold for Tavily (was 0.4)
 
-    console.log(`Tavily: ${events.length} events for ${neighborhood}`);
-    return events;
+    // Fix 1: filter out past events — Tavily results skip the daily cache pipeline
+    const upcoming = filterUpcomingEvents(events);
+    if (upcoming.length < events.length) {
+      console.log(`Tavily: dropped ${events.length - upcoming.length} past events`);
+    }
+
+    console.log(`Tavily: ${upcoming.length} events for ${neighborhood}`);
+    return upcoming;
   } catch (err) {
     console.error('Tavily search error:', err.message);
     return [];

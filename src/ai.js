@@ -126,7 +126,7 @@ SOURCE TRUST HIERARCHY (prefer higher-trust sources when options are comparable)
 
 CURATION RULES:
 - Pick 1–3 events. Prefer "NYC cool": gallery openings, DJ nights, indie shows, weird pop-ups, small venues.
-- Search-sourced items may include bars, game spots, or venues — recommend these naturally alongside events when they're genuinely cool.
+- Search-sourced items (source_name "tavily") may include permanent venues like bars or game spots with no specific date/time. Frame these as "solid spots to check out" — NOT "tonight at 9pm". Example: "The Last Resort is a solid low-key bar in EV if you want a chill hang."
 - STRONGLY prefer events IN the user's requested neighborhood. Only suggest events from other neighborhoods if there's nothing good in theirs.
 - When including events from adjacent neighborhoods, mention the actual neighborhood (e.g. "nearby in Wburg" or "worth the walk to LES").
 - Higher source_weight + higher confidence = more trustworthy.
