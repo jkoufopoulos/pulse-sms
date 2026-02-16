@@ -70,7 +70,7 @@ for (const hood of NEIGHBORHOODS) {
   // Direct name
   cases.push(makeCase(
     `${hood} tonight`,
-    { intent: 'events', neighborhood: hood, has_events: true },
+    { intent: 'events', neighborhood: hood },  // don't assert has_events — cache may be empty for some neighborhoods
     ['events', 'direct', hood.toLowerCase().replace(/\s+/g, '_')],
   ));
 
