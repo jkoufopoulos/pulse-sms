@@ -1,4 +1,4 @@
-const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchTavilyFreeEvents } = require('./sources');
+const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchTavilyFreeEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchEventbriteComedy, fetchEventbriteArts } = require('./sources');
 const { rankEventsByProximity, filterUpcomingEvents } = require('./geo');
 
 // --- Daily event cache ---
@@ -14,6 +14,10 @@ const sourceHealth = {
   RA: { consecutiveZeros: 0, lastCount: 0 },
   Dice: { consecutiveZeros: 0, lastCount: 0 },
   Tavily: { consecutiveZeros: 0, lastCount: 0 },
+  NonsenseNYC: { consecutiveZeros: 0, lastCount: 0 },
+  OhMyRockness: { consecutiveZeros: 0, lastCount: 0 },
+  EventbriteComedy: { consecutiveZeros: 0, lastCount: 0 },
+  EventbriteArts: { consecutiveZeros: 0, lastCount: 0 },
 };
 const HEALTH_WARN_THRESHOLD = 3;
 
@@ -27,25 +31,33 @@ async function refreshCache() {
   refreshPromise = (async () => {
     console.log('Refreshing event cache (all sources)...');
 
-    const [skintEvents, eventbriteEvents, songkickEvents, raEvents, diceEvents, tavilyFreeEvents] = await Promise.allSettled([
+    const [skintEvents, eventbriteEvents, songkickEvents, raEvents, diceEvents, tavilyFreeEvents, nonsenseEvents, ohMyRocknessEvents, eventbriteComedyEvents, eventbriteArtsEvents] = await Promise.allSettled([
       fetchSkintEvents(),
       fetchEventbriteEvents(),
       fetchSongkickEvents(),
       fetchRAEvents(),
       fetchDiceEvents(),
       fetchTavilyFreeEvents(),
+      fetchNonsenseNYC(),
+      fetchOhMyRockness(),
+      fetchEventbriteComedy(),
+      fetchEventbriteArts(),
     ]);
 
     const allEvents = [];
     const seen = new Set();
 
-    // Merge in priority order by source_weight: Skint (0.9) > RA (0.85) > Dice (0.8) > Songkick (0.75) > Eventbrite (0.7) > Tavily (0.6)
+    // Merge in priority order by source_weight: Skint/NonsenseNYC (0.9) > RA/OhMyRockness (0.85) > Dice (0.8) > Songkick (0.75) > Eventbrite (0.7) > Tavily (0.6)
     const sources = [
       { result: skintEvents, label: 'Skint' },
+      { result: nonsenseEvents, label: 'NonsenseNYC' },
       { result: raEvents, label: 'RA' },
+      { result: ohMyRocknessEvents, label: 'OhMyRockness' },
       { result: diceEvents, label: 'Dice' },
       { result: songkickEvents, label: 'Songkick' },
       { result: eventbriteEvents, label: 'Eventbrite' },
+      { result: eventbriteComedyEvents, label: 'EventbriteComedy' },
+      { result: eventbriteArtsEvents, label: 'EventbriteArts' },
       { result: tavilyFreeEvents, label: 'Tavily' },
     ];
 
