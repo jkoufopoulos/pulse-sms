@@ -15,6 +15,11 @@ const MODELS = {
 
 const EXTRACTION_PROMPT = `You are an Event Extractor for Pulse (NYC). Convert messy source text into normalized event records.
 
+VENUES + PLACES
+- Source text may include bars, restaurants, game spots, pool halls, arcades, or other venues — not just events.
+- Extract these as records too: use the venue/business name as "name", set category to the best fit (e.g. "nightlife" for bars, "community" for arcades/game spots), and set is_free based on whether entry is free.
+- For permanent venues with no specific date/time, set date_local and start_time_local to null, time_window to "evening", and confidence to 0.6.
+
 TRUTH + SAFETY
 - Extract ONLY what is explicitly present in the source text.
 - Do NOT guess venues, neighborhoods, prices, or descriptions.

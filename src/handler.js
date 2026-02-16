@@ -620,11 +620,8 @@ async function handleMessageAI(phone, message) {
         : `Checking what's free near ${hood}...`);
 
       try {
-        const today = new Date().toLocaleDateString('en-US', {
-          timeZone: 'America/New_York', month: 'long', day: 'numeric', year: 'numeric',
-        });
         const tavilyResults = await searchTavilyEvents(hood, {
-          query: `free things to do tonight ${hood} NYC ${today} bars games cool spots`,
+          query: `best free things to do near ${hood} NYC tonight bars with games pool shuffleboard arcade cheap hangouts`,
         });
 
         if (tavilyResults.length > 0) {
