@@ -99,6 +99,46 @@ const NEIGHBORHOODS = {
     lat: 40.6872, lng: -73.9418, radius_km: 1.2,
     aliases: ['bed-stuy', 'bed stuy', 'bedford stuyvesant', 'bedstuy']
   },
+  'Fort Greene': {
+    lat: 40.6892, lng: -73.9742, radius_km: 0.8,
+    aliases: ['fort greene', 'clinton hill']
+  },
+  'Prospect Heights': {
+    lat: 40.6775, lng: -73.9692, radius_km: 0.8,
+    aliases: ['prospect heights']
+  },
+  'Cobble Hill': {
+    lat: 40.6860, lng: -73.9957, radius_km: 0.8,
+    aliases: ['cobble hill', 'boerum hill', 'carroll gardens']
+  },
+  'Gowanus': {
+    lat: 40.6734, lng: -73.9880, radius_km: 0.8,
+    aliases: ['gowanus']
+  },
+  'Red Hook': {
+    lat: 40.6734, lng: -74.0080, radius_km: 0.8,
+    aliases: ['red hook']
+  },
+  'Sunset Park': {
+    lat: 40.6514, lng: -74.0027, radius_km: 1.2,
+    aliases: ['sunset park', 'industry city']
+  },
+  'East Harlem': {
+    lat: 40.7957, lng: -73.9389, radius_km: 1.2,
+    aliases: ['east harlem', 'el barrio', 'spanish harlem']
+  },
+  'Washington Heights': {
+    lat: 40.8417, lng: -73.9393, radius_km: 1.5,
+    aliases: ['washington heights', 'wash heights', 'the heights', 'inwood']
+  },
+  'Jackson Heights': {
+    lat: 40.7557, lng: -73.8831, radius_km: 1.2,
+    aliases: ['jackson heights']
+  },
+  'Flushing': {
+    lat: 40.7580, lng: -73.8317, radius_km: 1.5,
+    aliases: ['flushing', 'downtown flushing']
+  },
 };
 
 // Build a flat lookup: alias → neighborhood name
