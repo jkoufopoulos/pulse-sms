@@ -20,6 +20,10 @@ VENUES + PLACES
 - Extract these as records too: use the venue/business name as "name", set category to the best fit (e.g. "nightlife" for bars, "community" for arcades/game spots), and set is_free based on whether entry is free.
 - For permanent venues with no specific date/time, set date_local and start_time_local to null, time_window to "evening", and confidence to 0.6.
 
+SOURCE URLs
+- Raw text may contain [Source: URL] markers before each item. Use the URL from the nearest preceding [Source: ...] marker as that event's source_url.
+- ALWAYS prefer per-item [Source: URL] over the top-level source_url input.
+
 TRUTH + SAFETY
 - Extract ONLY what is explicitly present in the source text.
 - Do NOT guess venues, neighborhoods, prices, or descriptions.
