@@ -216,6 +216,11 @@ function preRoute(message, session) {
     return { ...base, intent: 'details', neighborhood: null, event_reference: msg };
   }
 
+  // Affirmative reply to "would you travel to X?" nudge
+  if (/^(yes|yeah|ya|yea|yep|yup|sure|ok|okay|down|let's go|lets go|bet|absolutely|definitely|why not|i'm down|im down)$/i.test(msg) && session?.pendingNearby) {
+    return { ...base, intent: 'events', neighborhood: session.pendingNearby };
+  }
+
   // More
   if (/^(more|show me more|what else|anything else|what else you got|next|what's next)$/i.test(msg)) {
     return { ...base, intent: 'more', neighborhood: session?.lastNeighborhood || null };
@@ -661,6 +666,39 @@ async function handleMessageAI(phone, message) {
     await sendSMS(phone, sms);
     finalizeTrace(sms, 'events');
     return;
+  }
+
+  // Check if any events are actually in the requested neighborhood
+  const inHood = events.filter(e => e.neighborhood === hood);
+  if (inHood.length === 0) {
+    // Find the most common nearby neighborhood and what's there
+    const hoodCounts = {};
+    for (const e of events) {
+      if (e.neighborhood) hoodCounts[e.neighborhood] = (hoodCounts[e.neighborhood] || 0) + 1;
+    }
+    const topNearby = Object.entries(hoodCounts).sort((a, b) => b[1] - a[1])[0];
+    if (topNearby) {
+      const nearbyHood = topNearby[0];
+      const nearbyEvents = events.filter(e => e.neighborhood === nearbyHood);
+      // Describe what's there — grab the dominant category
+      const cats = {};
+      for (const e of nearbyEvents) {
+        const c = e.category || 'events';
+        cats[c] = (cats[c] || 0) + 1;
+      }
+      const topCat = Object.entries(cats).sort((a, b) => b[1] - a[1])[0]?.[0] || 'events';
+      const vibeWord = { live_music: 'some music', nightlife: 'some nightlife', comedy: 'some comedy', art: 'some art', community: 'something cool', food_drink: 'some food & drinks', theater: 'some theater' }[topCat] || 'some stuff going on';
+
+      const sms = `Hey not much going on in ${hood}... would you travel to ${nearbyHood} for ${vibeWord}?`;
+      // Save nearby hood + events so an affirmative reply can pick up
+      const eventMap = {};
+      for (const e of events) eventMap[e.id] = e;
+      setSession(phone, { lastNeighborhood: hood, pendingNearby: nearbyHood, lastEvents: eventMap });
+      await sendSMS(phone, sms);
+      console.log(`Nudge sent to ${masked}: ${hood} → ${nearbyHood}`);
+      finalizeTrace(sms, 'events');
+      return;
+    }
   }
 
   // Pre-filter to top 8 by proximity to reduce token cost
