@@ -5,6 +5,8 @@ const { getEvents } = require('./events');
 const { routeMessage, composeResponse } = require('./ai');
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
 const { parseAsNycTime } = require('./geo');
+const { searchTavilyEvents } = require('./sources');
+const { startTrace, saveTrace } = require('./traces');
 
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
 
@@ -354,19 +356,53 @@ async function handleMessage(phone, message) {
 // =======================================================
 
 async function handleMessageAI(phone, message) {
+  const traceStart = Date.now();
   const masked = maskPhone(phone);
   const session = getSession(phone);
+  const trace = startTrace(masked, message);
+
+  // Capture session state before processing
+  if (session) {
+    trace.session_before = {
+      lastNeighborhood: session.lastNeighborhood || null,
+      lastPicks: (session.lastPicks || []).map(p => ({ event_id: p.event_id })),
+    };
+  }
+
+  // Helper: finalize and save trace
+  function finalizeTrace(smsText, intent) {
+    trace.output_sms = smsText || null;
+    trace.output_sms_length = smsText ? smsText.length : 0;
+    trace.output_intent = intent || trace.routing.result?.intent || null;
+    trace.total_latency_ms = Date.now() - traceStart;
+    saveTrace(trace);
+  }
 
   // Try deterministic pre-routing first, fall back to Claude
   const preRouted = preRoute(message, session);
-  const route = preRouted || await routeMessage(message, session, NEIGHBORHOOD_NAMES);
+  let route;
+  if (preRouted) {
+    route = preRouted;
+    trace.routing.pre_routed = true;
+    trace.routing.result = { intent: route.intent, neighborhood: route.neighborhood, confidence: route.confidence };
+    trace.routing.latency_ms = 0;
+  } else {
+    const routeStart = Date.now();
+    route = await routeMessage(message, session, NEIGHBORHOOD_NAMES);
+    trace.routing.latency_ms = Date.now() - routeStart;
+    trace.routing.pre_routed = false;
+    trace.routing.result = { intent: route.intent, neighborhood: route.neighborhood, confidence: route.confidence };
+    trace.routing.raw_response = route._raw || null;
+  }
   console.log(`${preRouted ? 'Pre' : 'AI'} route: intent=${route.intent}, neighborhood=${route.neighborhood}, confidence=${route.confidence}`);
 
   // --- Help ---
   if (route.intent === 'help') {
     const reply = route.reply || "Hey! I'm Pulse — your go-to for what's happening in NYC tonight. Just text me a neighborhood, a landmark, or even a subway stop and I'll send you my best picks. Try something like \"East Village\" or \"near Prospect Park\" and we'll go from there!";
-    await sendSMS(phone, reply.slice(0, 480));
+    const sms = reply.slice(0, 480);
+    await sendSMS(phone, sms);
     console.log(`Help sent to ${masked}`);
+    finalizeTrace(sms, 'help');
     return;
   }
 
@@ -380,8 +416,10 @@ async function handleMessageAI(phone, message) {
         `say "more" for more ${session.lastNeighborhood} picks, or text a different neighborhood`
       );
     }
-    await sendSMS(phone, reply.slice(0, 480));
+    const sms = reply.slice(0, 480);
+    await sendSMS(phone, sms);
     console.log(`Conversational reply sent to ${masked}`);
+    finalizeTrace(sms, 'conversational');
     return;
   }
 
@@ -397,8 +435,10 @@ async function handleMessageAI(phone, message) {
           const event = session.lastEvents[pick.event_id];
           return event ? `${i + 1}. ${formatEventDetails(event)}` : null;
         }).filter(Boolean);
-        await sendSMS(phone, details.join('\n\n').slice(0, 1500));
+        const sms = details.join('\n\n').slice(0, 1500);
+        await sendSMS(phone, sms);
         console.log(`All details sent to ${masked}`);
+        finalizeTrace(sms, 'details');
         return;
       }
 
@@ -407,12 +447,16 @@ async function handleMessageAI(phone, message) {
       const pick = picks[Math.max(0, pickIndex)];
       const event = session.lastEvents[pick.event_id];
       if (event) {
-        await sendSMS(phone, formatEventDetails(event));
+        const sms = formatEventDetails(event);
+        await sendSMS(phone, sms);
         console.log(`Details ${ref} sent to ${masked}`);
+        finalizeTrace(sms, 'details');
         return;
       }
     }
-    await sendSMS(phone, "I don't have any recent picks to pull up — text me a neighborhood and let's start fresh!");
+    const sms = "I don't have any recent picks to pull up — text me a neighborhood and let's start fresh!";
+    await sendSMS(phone, sms);
+    finalizeTrace(sms, 'details');
     return;
   }
 
@@ -432,55 +476,158 @@ async function handleMessageAI(phone, message) {
 
   // Still no neighborhood — ask the user
   if (!neighborhood && route.intent === 'events') {
-    await sendSMS(phone, "Where are you headed? Drop me a neighborhood like East Village, Williamsburg, or LES.");
+    const sms = "Where are you headed? Drop me a neighborhood like East Village, Williamsburg, or LES.";
+    await sendSMS(phone, sms);
+    finalizeTrace(sms, 'events');
     return;
+  }
+
+  // Helper: capture compose trace data and finalize
+  async function composeAndSend(composeEvents, hood, filters, intentLabel) {
+    trace.events.sent_to_claude = composeEvents.length;
+    trace.events.sent_ids = composeEvents.map(e => e.id);
+
+    const composeStart = Date.now();
+    const result = await composeResponse(message, composeEvents, hood, filters);
+    trace.composition.latency_ms = Date.now() - composeStart;
+    trace.composition.raw_response = result._raw || null;
+    trace.composition.picks = result.picks || [];
+    trace.composition.not_picked_reason = result.not_picked_reason || null;
+    trace.composition.neighborhood_used = result.neighborhood_used || hood;
+
+    return result;
   }
 
   // --- More ---
   if (route.intent === 'more') {
+    const allShownIds = new Set((session?.allPicks || session?.lastPicks || []).map(p => p.event_id));
+
     if (session && session.lastEvents) {
-      const allShownIds = new Set((session.allPicks || session.lastPicks || []).map(p => p.event_id));
       const remaining = Object.values(session.lastEvents).filter(e => !allShownIds.has(e.id));
       if (remaining.length > 0) {
         const hood = neighborhood || session.lastNeighborhood;
         const composeRemaining = remaining.slice(0, 8);
-        const result = await composeResponse(message, composeRemaining, hood, route.filters);
+        trace.events.cache_size = Object.keys(session.lastEvents).length;
+        trace.events.candidates_count = remaining.length;
+        trace.events.candidate_ids = remaining.map(e => e.id);
+        const result = await composeAndSend(composeRemaining, hood, route.filters, 'more');
         const newAllPicks = [...(session.allPicks || session.lastPicks || []), ...(result.picks || [])];
         setSession(phone, { lastPicks: result.picks || [], allPicks: newAllPicks, lastEvents: session.lastEvents, lastNeighborhood: hood });
         await sendSMS(phone, result.sms_text);
         console.log(`More sent to ${masked}`);
+        finalizeTrace(result.sms_text, 'more');
         return;
       }
     }
-    if (session?.lastNeighborhood) {
-      const nearby = getAdjacentNeighborhoods(session.lastNeighborhood, 2);
-      const suggestion = nearby.length > 0 ? ` Try ${nearby.join(' or ')} — they're close by.` : ' Try a different neighborhood or check back later!';
-      await sendSMS(phone, `That's everything I've got near ${session.lastNeighborhood}.${suggestion}`);
-    } else {
-      await sendSMS(phone, "Text me a neighborhood and I'll find you something! East Village, Williamsburg, LES — whatever's close.");
+
+    if (!session?.lastNeighborhood) {
+      const sms = "Text me a neighborhood and I'll find you something! East Village, Williamsburg, LES — whatever's close.";
+      await sendSMS(phone, sms);
+      finalizeTrace(sms, 'more');
+      return;
     }
+
+    const hood = neighborhood || session.lastNeighborhood;
+
+    // Check if we have unused Tavily events from a previous search
+    const tavilyRemaining = (session.tavilyEvents || [])
+      .filter(e => !allShownIds.has(e.id));
+
+    if (tavilyRemaining.length > 0) {
+      const composeEvents = tavilyRemaining.slice(0, 8);
+      trace.events.candidates_count = tavilyRemaining.length;
+      trace.events.candidate_ids = tavilyRemaining.map(e => e.id);
+      const result = await composeAndSend(composeEvents, hood, route.filters, 'more');
+      const newAllPicks = [...(session.allPicks || session.lastPicks || []), ...(result.picks || [])];
+      setSession(phone, {
+        ...session,
+        lastPicks: result.picks || [],
+        allPicks: newAllPicks,
+        lastNeighborhood: hood,
+      });
+      await sendSMS(phone, result.sms_text);
+      console.log(`More (tavily cache) sent to ${masked}`);
+      finalizeTrace(result.sms_text, 'more');
+      return;
+    }
+
+    if (!session.tavilySearched) {
+      // First time exhausting cache — try Tavily
+      await sendSMS(phone, `Digging deeper for ${hood} events, one sec...`);
+
+      try {
+        const tavilyEvents = await searchTavilyEvents(hood);
+
+        // Filter out any events we've already shown
+        const fresh = tavilyEvents.filter(e => !allShownIds.has(e.id));
+
+        if (fresh.length > 0) {
+          const composeEvents = fresh.slice(0, 8);
+          trace.events.candidates_count = fresh.length;
+          trace.events.candidate_ids = fresh.map(e => e.id);
+          const result = await composeAndSend(composeEvents, hood, route.filters, 'more');
+          const tavilyEventMap = {};
+          for (const e of tavilyEvents) tavilyEventMap[e.id] = e;
+          const newAllPicks = [...(session.allPicks || session.lastPicks || []), ...(result.picks || [])];
+          setSession(phone, {
+            ...session,
+            lastPicks: result.picks || [],
+            allPicks: newAllPicks,
+            lastEvents: { ...session.lastEvents, ...tavilyEventMap },
+            tavilyEvents: tavilyEvents,
+            tavilySearched: true,
+            lastNeighborhood: hood,
+          });
+          await sendSMS(phone, result.sms_text);
+          console.log(`Tavily results sent to ${masked}`);
+          finalizeTrace(result.sms_text, 'more');
+          return;
+        }
+      } catch (err) {
+        console.error('Tavily fallback error:', err.message);
+      }
+
+      // Tavily failed or found nothing
+      session.tavilySearched = true;
+      setSession(phone, { ...session, tavilySearched: true });
+    }
+
+    // Truly exhausted — all sources + Tavily done
+    const nearby = getAdjacentNeighborhoods(hood, 2);
+    const suggestion = nearby.length > 0 ? ` Try ${nearby.join(' or ')} — they're close by.` : ' Try a different neighborhood or check back later!';
+    const sms = `That's all I could find near ${hood}.${suggestion}`;
+    await sendSMS(phone, sms);
+    finalizeTrace(sms, 'more');
     return;
   }
 
   // --- Free ---
   if (route.intent === 'free') {
     if (!neighborhood && !session?.lastNeighborhood) {
-      await sendSMS(phone, "Where are you headed? Drop me a neighborhood like East Village, Williamsburg, or LES.");
+      const sms = "Where are you headed? Drop me a neighborhood like East Village, Williamsburg, or LES.";
+      await sendSMS(phone, sms);
+      finalizeTrace(sms, 'free');
       return;
     }
     const hood = neighborhood || session.lastNeighborhood;
     const events = await getEvents(hood);
     const freeEvents = events.filter(e => e.is_free);
     if (freeEvents.length === 0) {
-      await sendSMS(phone, `Not seeing any free stuff near ${hood} right now — want everything instead? Just text "${hood}" again.`);
+      const sms = `Not seeing any free stuff near ${hood} right now — want everything instead? Just text "${hood}" again.`;
+      await sendSMS(phone, sms);
+      finalizeTrace(sms, 'free');
       return;
     }
-    const result = await composeResponse(message, freeEvents, hood, route.filters);
+    trace.events.cache_size = events.length;
+    trace.events.candidates_count = freeEvents.length;
+    trace.events.candidate_ids = freeEvents.map(e => e.id);
+    const result = await composeAndSend(freeEvents, hood, route.filters, 'free');
     const eventMap = {};
     for (const e of freeEvents) eventMap[e.id] = e;
     setSession(phone, { lastPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: hood });
     await sendSMS(phone, result.sms_text);
     console.log(`Free events sent to ${masked}`);
+    finalizeTrace(result.sms_text, 'free');
     return;
   }
 
@@ -491,7 +638,9 @@ async function handleMessageAI(phone, message) {
 
   // Ask for neighborhood if we still don't have one
   if (!neighborhood) {
-    await sendSMS(phone, "Where are you headed? Drop me a neighborhood like East Village, Williamsburg, or LES.");
+    const sms = "Where are you headed? Drop me a neighborhood like East Village, Williamsburg, or LES.";
+    await sendSMS(phone, sms);
+    finalizeTrace(sms, route.intent);
     return;
   }
 
@@ -508,15 +657,22 @@ async function handleMessageAI(phone, message) {
   if (events.length === 0) {
     const nearby = getAdjacentNeighborhoods(hood, 2);
     const suggestion = nearby.length > 0 ? ` Try ${nearby.join(' or ')}?` : ' Check back later!';
-    await sendSMS(phone, `Quiet night in ${hood} — not seeing much right now.${suggestion}`);
+    const sms = `Quiet night in ${hood} — not seeing much right now.${suggestion}`;
+    await sendSMS(phone, sms);
+    finalizeTrace(sms, 'events');
     return;
   }
 
   // Pre-filter to top 8 by proximity to reduce token cost
   const composeEvents = events.slice(0, 8);
 
+  // Capture event funnel data
+  trace.events.cache_size = events.length;
+  trace.events.candidates_count = events.length;
+  trace.events.candidate_ids = events.map(e => e.id);
+
   // CALL 2: Compose response
-  const result = await composeResponse(message, composeEvents, hood, route.filters);
+  const result = await composeAndSend(composeEvents, hood, route.filters, 'events');
 
   // Keep full event map in session so MORE can access remaining events
   const eventMap = {};
@@ -526,6 +682,7 @@ async function handleMessageAI(phone, message) {
 
   await sendSMS(phone, result.sms_text);
   console.log(`AI response sent to ${masked}`);
+  finalizeTrace(result.sms_text, 'events');
 }
 
 // Cleanup intervals (for graceful shutdown)
@@ -537,3 +694,4 @@ function clearSmsIntervals() {
 
 module.exports = router;
 module.exports.clearSmsIntervals = clearSmsIntervals;
+module.exports.setSession = setSession;

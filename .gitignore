@@ -4,3 +4,4 @@ node_modules/
 ISSUES.md
 SPEC.md
 twilio_2FA_recovery_code.txt
+data/

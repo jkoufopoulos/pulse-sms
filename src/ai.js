@@ -178,6 +178,7 @@ VALID_NEIGHBORHOODS: ${neighborhoodNames.join(', ')}`;
       event_reference: null,
       reply: "Sorry, I didn't catch that. Text a neighborhood to see tonight's picks, or HELP for commands.",
       confidence: 0,
+      _raw: text,
     };
   }
 
@@ -188,6 +189,7 @@ VALID_NEIGHBORHOODS: ${neighborhoodNames.join(', ')}`;
     event_reference: parsed.event_reference || null,
     reply: parsed.reply || null,
     confidence: parsed.confidence || 0,
+    _raw: text,
   };
 }
 
@@ -285,6 +287,7 @@ Compose the SMS now. Remember: 480 char hard limit, end with CTA.`;
     picks: validPicks,
     not_picked_reason: parsed.not_picked_reason || null,
     neighborhood_used: parsed.neighborhood_used || neighborhood,
+    _raw: text,
   };
 }
 

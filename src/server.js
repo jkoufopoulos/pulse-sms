@@ -71,6 +71,42 @@ if (process.env.PULSE_TEST_MODE === 'true') {
     }
   });
 
+  // API: trace endpoints
+  const { getRecentTraces, getTraceById, annotateTrace, loadTraces } = require('./traces');
+  loadTraces(); // Load existing traces from disk at startup
+
+  app.get('/api/eval/traces', (req, res) => {
+    const limit = parseInt(req.query.limit) || 100;
+    res.json(getRecentTraces(limit));
+  });
+
+  app.get('/api/eval/traces/:id', (req, res) => {
+    const trace = getTraceById(req.params.id);
+    if (!trace) return res.status(404).json({ error: 'Trace not found' });
+    res.json(trace);
+  });
+
+  app.post('/api/eval/traces/:id/annotate', (req, res) => {
+    const { verdict, failure_modes, notes } = req.body;
+    if (!verdict || !['pass', 'fail'].includes(verdict)) {
+      return res.status(400).json({ error: 'verdict must be "pass" or "fail"' });
+    }
+    const ok = annotateTrace(req.params.id, { verdict, failure_modes, notes });
+    if (!ok) return res.status(404).json({ error: 'Trace not found' });
+    res.json({ ok: true });
+  });
+
+  // API: session injection for eval runner
+  const { setSession } = require('./handler');
+  app.post('/api/eval/session', (req, res) => {
+    const { phone, session } = req.body;
+    if (!phone) return res.status(400).json({ error: 'Missing phone' });
+    if (session) {
+      setSession(phone, session);
+    }
+    res.json({ ok: true });
+  });
+
   // API: simulate a neighborhood request — shows the full event funnel
   app.post('/api/eval/simulate', async (req, res) => {
     try {
