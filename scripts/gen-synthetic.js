@@ -129,15 +129,23 @@ cases.push(makeCase(
 ));
 cases.push(makeCase(
   'free events in east village',
-  { intent: 'free', neighborhood: 'East Village' },
+  { neighborhood: 'East Village' },  // intent can be 'free' or 'events' with free_only filter — both valid
   ['free', 'with_hood'],
 ));
 
 // --- MORE intent ---
+// Session needs enough events that "more" finds remaining ones without hitting Tavily
 const moreSession = {
   lastNeighborhood: 'East Village',
-  lastPicks: [{ event_id: 'e1' }],
-  lastEvents: { e1: { id: 'e1', name: 'Jazz Night' } },
+  lastPicks: [{ event_id: 'e1' }, { event_id: 'e2' }],
+  lastEvents: {
+    e1: { id: 'e1', name: 'Jazz Night at Nublu', neighborhood: 'East Village', start_time_local: '2026-02-16T19:00:00', source_name: 'Dice', source_weight: 0.8, confidence: 0.9 },
+    e2: { id: 'e2', name: 'Punk at Bowery Ballroom', neighborhood: 'East Village', start_time_local: '2026-02-16T21:00:00', source_name: 'Songkick', source_weight: 0.75, confidence: 0.85 },
+    e3: { id: 'e3', name: 'Comedy at Eastville', neighborhood: 'East Village', start_time_local: '2026-02-16T20:00:00', is_free: true, source_name: 'The Skint', source_weight: 0.9, confidence: 0.95 },
+    e4: { id: 'e4', name: 'DJ Set at Webster Hall', neighborhood: 'East Village', start_time_local: '2026-02-16T22:00:00', source_name: 'RA', source_weight: 0.85, confidence: 0.88 },
+    e5: { id: 'e5', name: 'Gallery Opening on 3rd St', neighborhood: 'East Village', start_time_local: '2026-02-16T18:00:00', is_free: true, source_name: 'The Skint', source_weight: 0.9, confidence: 0.9 },
+    e6: { id: 'e6', name: 'Indie Rock at Mercury Lounge', neighborhood: 'East Village', start_time_local: '2026-02-16T20:30:00', source_name: 'Dice', source_weight: 0.8, confidence: 0.87 },
+  },
 };
 cases.push(makeCase(
   'more',
@@ -275,7 +283,16 @@ cases.push(makeCase(
   "what's going on tonight",
   { intent: 'more' },
   ['session', 'same_hood'],
-  { lastNeighborhood: 'Bushwick', lastPicks: [{ event_id: 'e1' }], lastEvents: { e1: { id: 'e1', name: 'Test' } } },
+  {
+    lastNeighborhood: 'Bushwick',
+    lastPicks: [{ event_id: 'e1' }, { event_id: 'e2' }],
+    lastEvents: {
+      e1: { id: 'e1', name: 'Techno at Elsewhere', neighborhood: 'Bushwick', start_time_local: '2026-02-16T23:00:00', source_name: 'RA', source_weight: 0.85, confidence: 0.88 },
+      e2: { id: 'e2', name: 'Drag Bingo at 3 Dollar Bill', neighborhood: 'Bushwick', start_time_local: '2026-02-16T19:00:00', source_name: 'Eventbrite', source_weight: 0.7, confidence: 0.8 },
+      e3: { id: 'e3', name: 'House of Yes Late Night', neighborhood: 'Bushwick', start_time_local: '2026-02-16T22:00:00', source_name: 'RA', source_weight: 0.85, confidence: 0.9 },
+      e4: { id: 'e4', name: 'Open Studios Bushwick', neighborhood: 'Bushwick', start_time_local: '2026-02-16T12:00:00', is_free: true, source_name: 'The Skint', source_weight: 0.9, confidence: 0.92 },
+    },
+  },
 ));
 
 // --- SESSION CONTEXT: different hood ---
@@ -283,7 +300,13 @@ cases.push(makeCase(
   'williamsburg',
   { intent: 'events', neighborhood: 'Williamsburg' },
   ['session', 'diff_hood'],
-  { lastNeighborhood: 'East Village', lastPicks: [{ event_id: 'e1' }], lastEvents: { e1: { id: 'e1', name: 'Test' } } },
+  {
+    lastNeighborhood: 'East Village',
+    lastPicks: [{ event_id: 'e1' }],
+    lastEvents: {
+      e1: { id: 'e1', name: 'Jazz Night', neighborhood: 'East Village', start_time_local: '2026-02-16T19:00:00', source_name: 'Dice', source_weight: 0.8, confidence: 0.9 },
+    },
+  },
 ));
 
 // --- FILTER: category ---

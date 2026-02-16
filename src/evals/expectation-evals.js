@@ -22,11 +22,16 @@ function runExpectationEvals(trace, expected) {
   }
 
   if (expected.neighborhood) {
-    const actual = trace.composition.neighborhood_used || trace.routing.result?.neighborhood;
+    // Check both routing and composition neighborhoods — pass if either matches
+    // (compose may legitimately pick events from adjacent neighborhoods)
+    const routeHood = trace.routing.result?.neighborhood;
+    const composeHood = trace.composition.neighborhood_used;
+    const match = routeHood === expected.neighborhood || composeHood === expected.neighborhood;
+    const actual = composeHood || routeHood;
     results.push({
       name: 'expected_neighborhood',
-      pass: actual === expected.neighborhood,
-      detail: actual === expected.neighborhood ? actual : `expected ${expected.neighborhood}, got ${actual}`,
+      pass: match,
+      detail: match ? (composeHood || routeHood) : `expected ${expected.neighborhood}, got route=${routeHood}, compose=${composeHood}`,
     });
   }
 

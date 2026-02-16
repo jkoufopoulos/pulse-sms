@@ -291,11 +291,12 @@ Compose the SMS now. Remember: 480 char hard limit, end with CTA.`;
 
   // Sanitize neighborhood_used — Claude sometimes adds parenthetical notes
   // e.g. "East Village (with nearby Flatiron)" → "East Village"
+  // Also rejects hallucinated neighborhoods (e.g. "Fort Greene") not in our system
   let neighborhoodUsed = parsed.neighborhood_used || neighborhood;
   if (neighborhoodUsed) {
     const cleaned = neighborhoodUsed.replace(/\s*\(.*\)$/, '').trim();
-    const validNames = events.map(e => e.neighborhood).filter(Boolean);
-    if (validNames.includes(cleaned) || cleaned === neighborhood) {
+    const validNeighborhoods = Object.keys(require('./neighborhoods').NEIGHBORHOODS);
+    if (validNeighborhoods.includes(cleaned)) {
       neighborhoodUsed = cleaned;
     } else {
       neighborhoodUsed = neighborhood; // fall back to requested neighborhood

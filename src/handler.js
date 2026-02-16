@@ -465,7 +465,10 @@ async function handleMessageAI(phone, message) {
   }
 
   // --- Resolve neighborhood ---
-  let neighborhood = route.neighborhood;
+  // Prefer deterministic extraction from user's message over Claude's interpretation
+  // (Claude sometimes maps aliases wrong, e.g. "east wburg" → Williamsburg instead of Bushwick)
+  const extracted = extractNeighborhood(message);
+  let neighborhood = extracted || route.neighborhood;
 
   // Validate against known neighborhoods
   if (neighborhood && !NEIGHBORHOOD_NAMES.includes(neighborhood)) {
