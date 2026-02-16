@@ -14,15 +14,16 @@ function maskPhone(phone) {
   return phone.slice(0, -4).replace(/\d/g, '*') + phone.slice(-4);
 }
 
-// Test capture mode — when set, sendSMS pushes to this array instead of Twilio
-let _testCapture = null;
+// Test capture mode — per-phone capture so concurrent test requests don't bleed
+const _testCaptures = new Map(); // phone → messages[]
 
-function enableTestCapture() { _testCapture = []; return _testCapture; }
-function disableTestCapture() { const msgs = _testCapture; _testCapture = null; return msgs; }
+function enableTestCapture(phone) { _testCaptures.set(phone, []); }
+function disableTestCapture(phone) { const msgs = _testCaptures.get(phone) || []; _testCaptures.delete(phone); return msgs; }
 
 async function sendSMS(to, body) {
-  if (_testCapture) {
-    _testCapture.push({ to, body, timestamp: new Date().toISOString() });
+  const capture = _testCaptures.get(to);
+  if (capture) {
+    capture.push({ to, body, timestamp: new Date().toISOString() });
     console.log(`[TEST] Captured SMS to ${maskPhone(to)}: ${body.slice(0, 80)}...`);
     return { sid: 'TEST_' + Date.now() };
   }

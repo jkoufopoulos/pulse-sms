@@ -276,13 +276,13 @@ if (process.env.PULSE_TEST_MODE === 'true') {
       return res.status(400).json({ error: 'Missing Body parameter' });
     }
     const testPhone = phone || '+10000000000';
-    enableTestCapture();
+    enableTestCapture(testPhone);
     try {
       await handleMessage(testPhone, message.trim());
-      const captured = disableTestCapture() || [];
+      const captured = disableTestCapture(testPhone);
       res.json({ ok: true, messages: captured });
     } catch (err) {
-      const captured = disableTestCapture() || [];
+      const captured = disableTestCapture(testPhone);
       res.status(500).json({ error: err.message, messages: captured });
     }
   });
