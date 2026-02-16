@@ -4,8 +4,7 @@ const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
 const { getEvents } = require('./events');
 const { routeMessage, composeResponse, composeDetails, isSearchUrl } = require('./ai');
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
-const { parseAsNycTime, filterUpcomingEvents } = require('./geo');
-const { searchTavilyEvents } = require('./sources');
+const { parseAsNycTime } = require('./geo');
 const { startTrace, saveTrace } = require('./traces');
 
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
@@ -569,72 +568,7 @@ async function handleMessageAI(phone, message) {
 
     const hood = neighborhood || session.lastNeighborhood;
 
-    // Check if we have unused Tavily events from a previous search
-    // Filter for upcoming events — session may be 1-2 hours old
-    const tavilyRemaining = filterUpcomingEvents(
-      (session.tavilyEvents || []).filter(e => !allShownIds.has(e.id))
-    );
-
-    if (tavilyRemaining.length > 0) {
-      const composeEvents = tavilyRemaining.slice(0, 8);
-      trace.events.candidates_count = tavilyRemaining.length;
-      trace.events.candidate_ids = tavilyRemaining.map(e => e.id);
-      const result = await composeAndSend(composeEvents, hood, route.filters, 'more');
-      const newAllPicks = [...(session.allPicks || session.lastPicks || []), ...(result.picks || [])];
-      setSession(phone, {
-        ...session,
-        lastPicks: result.picks || [],
-        allPicks: newAllPicks,
-        lastNeighborhood: hood,
-      });
-      await sendSMS(phone, result.sms_text);
-      console.log(`More (tavily cache) sent to ${masked}`);
-      finalizeTrace(result.sms_text, 'more');
-      return;
-    }
-
-    if (!session.tavilySearched) {
-      // First time exhausting cache — try Tavily
-      await sendSMS(phone, `Digging deeper for ${hood} events, one sec...`);
-
-      try {
-        const tavilyEvents = await searchTavilyEvents(hood);
-
-        // Filter out any events we've already shown
-        const fresh = tavilyEvents.filter(e => !allShownIds.has(e.id));
-
-        if (fresh.length > 0) {
-          const composeEvents = fresh.slice(0, 8);
-          trace.events.candidates_count = fresh.length;
-          trace.events.candidate_ids = fresh.map(e => e.id);
-          const result = await composeAndSend(composeEvents, hood, route.filters, 'more');
-          const tavilyEventMap = {};
-          for (const e of tavilyEvents) tavilyEventMap[e.id] = e;
-          const newAllPicks = [...(session.allPicks || session.lastPicks || []), ...(result.picks || [])];
-          setSession(phone, {
-            ...session,
-            lastPicks: result.picks || [],
-            allPicks: newAllPicks,
-            lastEvents: { ...session.lastEvents, ...tavilyEventMap },
-            tavilyEvents: tavilyEvents,
-            tavilySearched: true,
-            lastNeighborhood: hood,
-          });
-          await sendSMS(phone, result.sms_text);
-          console.log(`Tavily results sent to ${masked}`);
-          finalizeTrace(result.sms_text, 'more');
-          return;
-        }
-      } catch (err) {
-        console.error('Tavily fallback error:', err.message);
-      }
-
-      // Tavily failed or found nothing
-      session.tavilySearched = true;
-      setSession(phone, { ...session, tavilySearched: true });
-    }
-
-    // Truly exhausted — all sources + Tavily done
+    // All cached events exhausted
     const nearby = getAdjacentNeighborhoods(hood, 2);
     const suggestion = nearby.length > 0 ? ` Try ${nearby.join(' or ')} — they're close by.` : ' Try a different neighborhood or check back later!';
     const sms = `That's all I could find near ${hood}.${suggestion}`;
@@ -653,55 +587,10 @@ async function handleMessageAI(phone, message) {
     }
     const hood = neighborhood || session.lastNeighborhood;
     const events = await getEvents(hood);
-    let freeEvents = events.filter(e => e.is_free);
-
-    // If cached free events can't fill at least 2 picks, supplement with Tavily
-    // But skip if we already searched Tavily this session (avoid re-searching on repeated "free" turns)
-    const alreadySearched = session?.tavilySearched;
-    if (freeEvents.length < 2 && !alreadySearched) {
-      await sendSMS(phone, freeEvents.length > 0
-        ? `Let me see what else is free near ${hood}...`
-        : `Checking what's free near ${hood}...`);
-
-      try {
-        const tavilyResults = await searchTavilyEvents(hood, {
-          query: `free events tonight ${hood} NYC ${new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'long', day: 'numeric', year: 'numeric' })} no cover free entry`,
-        });
-
-        if (tavilyResults.length > 0) {
-          // Merge Tavily results with cached free events, deduped
-          const seen = new Set(freeEvents.map(e => e.id));
-          for (const e of tavilyResults) {
-            if (!seen.has(e.id)) {
-              seen.add(e.id);
-              freeEvents.push(e);
-            }
-          }
-
-          // Cache Tavily results in session for "more" follow-ups
-          session = session || {};
-          session.tavilyEvents = tavilyResults;
-          session.tavilySearched = true;
-        }
-      } catch (err) {
-        console.error('Tavily free search error:', err.message);
-      }
-    } else if (freeEvents.length < 2 && alreadySearched) {
-      // Reuse previously searched Tavily events instead of re-searching
-      const tavilyFree = filterUpcomingEvents(
-        (session.tavilyEvents || []).filter(e => e.is_free !== false)
-      );
-      const seen = new Set(freeEvents.map(e => e.id));
-      for (const e of tavilyFree) {
-        if (!seen.has(e.id)) {
-          seen.add(e.id);
-          freeEvents.push(e);
-        }
-      }
-    }
+    const freeEvents = events.filter(e => e.is_free);
 
     if (freeEvents.length === 0) {
-      const sms = `Not finding free stuff near ${hood} tonight — text "${hood}" for everything or try a different neighborhood.`;
+      const sms = `Nothing free near ${hood} tonight that meets our standards — text "${hood}" for all events or try a different neighborhood.`;
       await sendSMS(phone, sms);
       finalizeTrace(sms, 'free');
       return;
@@ -718,8 +607,6 @@ async function handleMessageAI(phone, message) {
       allPicks: result.picks || [],
       lastEvents: eventMap,
       lastNeighborhood: hood,
-      tavilyEvents: session?.tavilyEvents || [],
-      tavilySearched: session?.tavilySearched || false,
     });
     await sendSMS(phone, result.sms_text);
     console.log(`Free events sent to ${masked}`);
