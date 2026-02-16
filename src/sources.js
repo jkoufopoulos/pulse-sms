@@ -663,6 +663,7 @@ function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
     subcategory: e.subcategory || null,
     confidence: e.confidence || 0.5,
     ticket_url: e.ticket_url || null,
+    source_url: e.source_url || null,
     map_url: null,
     map_hint: e.map_hint || null,
   };

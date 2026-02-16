@@ -164,6 +164,9 @@ function formatEventDetails(event) {
   if (event.venue_address) detail += `\n${event.venue_address}`;
   if (event.ticket_url) detail += `\n${cleanUrl(event.ticket_url)}`;
 
+  // Show source URL for search-sourced events (Tavily) so users can verify
+  if (!event.ticket_url && event.source_url) detail += `\n${cleanUrl(event.source_url)}`;
+
   // Only show map_hint if it adds info beyond the address
   if (event.map_hint && (!event.venue_address || !event.venue_address.includes(event.map_hint))) {
     detail += `\nNear ${event.map_hint}`;
