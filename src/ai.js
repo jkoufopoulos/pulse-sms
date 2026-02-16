@@ -289,11 +289,24 @@ Compose the SMS now. Remember: 480 char hard limit, end with CTA.`;
     }
   }
 
+  // Sanitize neighborhood_used — Claude sometimes adds parenthetical notes
+  // e.g. "East Village (with nearby Flatiron)" → "East Village"
+  let neighborhoodUsed = parsed.neighborhood_used || neighborhood;
+  if (neighborhoodUsed) {
+    const cleaned = neighborhoodUsed.replace(/\s*\(.*\)$/, '').trim();
+    const validNames = events.map(e => e.neighborhood).filter(Boolean);
+    if (validNames.includes(cleaned) || cleaned === neighborhood) {
+      neighborhoodUsed = cleaned;
+    } else {
+      neighborhoodUsed = neighborhood; // fall back to requested neighborhood
+    }
+  }
+
   return {
     sms_text: parsed.sms_text.slice(0, 480),
     picks: validPicks,
     not_picked_reason: parsed.not_picked_reason || null,
-    neighborhood_used: parsed.neighborhood_used || neighborhood,
+    neighborhood_used: neighborhoodUsed,
     _raw: text,
   };
 }

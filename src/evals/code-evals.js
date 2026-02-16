@@ -87,6 +87,12 @@ const evals = {
       return { name: 'off_topic_redirect', pass: true, detail: 'not conversational' };
     }
     const sms = (trace.output_sms || '').toLowerCase();
+    const input = (trace.input_message || '').toLowerCase();
+    // Goodbyes and thanks don't need a redirect — they're natural conversation endings
+    const isFarewell = /^(bye|later|peace|gn|good night|night|see ya|cya|deuces|thanks|thank you|thx|ty|appreciate it|cheers)$/i.test(input.trim());
+    if (isFarewell) {
+      return { name: 'off_topic_redirect', pass: true, detail: 'farewell/thanks (no redirect needed)' };
+    }
     // Check that the response contains a redirect to neighborhoods/events
     const hasRedirect = /neighborhood|text me|text a|go out|tonight|picks/.test(sms);
     return {

@@ -97,12 +97,14 @@ if (process.env.PULSE_TEST_MODE === 'true') {
   });
 
   // API: session injection for eval runner
-  const { setSession } = require('./handler');
+  const { setSession, clearSession } = require('./handler');
   app.post('/api/eval/session', (req, res) => {
     const { phone, session } = req.body;
     if (!phone) return res.status(400).json({ error: 'Missing phone' });
     if (session) {
       setSession(phone, session);
+    } else {
+      clearSession(phone);
     }
     res.json({ ok: true });
   });

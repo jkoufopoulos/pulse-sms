@@ -250,6 +250,10 @@ function setSession(phone, data) {
   sessions.set(phone, { ...data, timestamp: Date.now() });
 }
 
+function clearSession(phone) {
+  sessions.delete(phone);
+}
+
 // Clean stale sessions every 10 minutes
 const sessionInterval = setInterval(() => {
   try {
@@ -734,3 +738,4 @@ function clearSmsIntervals() {
 module.exports = router;
 module.exports.clearSmsIntervals = clearSmsIntervals;
 module.exports.setSession = setSession;
+module.exports.clearSession = clearSession;

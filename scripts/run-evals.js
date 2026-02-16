@@ -63,14 +63,12 @@ async function main() {
     process.stdout.write(`${testCase.id} "${testCase.message.slice(0, 40)}"... `);
 
     try {
-      // Step 1: Inject session if needed
-      if (testCase.session) {
-        await fetch(`${BASE}/api/eval/session`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: '+10000000000', session: testCase.session }),
-        });
-      }
+      // Step 1: Reset session, then inject if test case specifies one
+      await fetch(`${BASE}/api/eval/session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: '+10000000000', session: testCase.session || null }),
+      });
 
       // Step 2: Send message through pipeline
       const smsRes = await fetch(`${BASE}/api/sms/test`, {
