@@ -303,10 +303,16 @@ function updateClock() {
 updateClock();
 setInterval(updateClock, 10000);
 
+function linkify(text) {
+  // Escape HTML first to prevent XSS, then linkify URLs
+  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return escaped.replace(/https?:\/\/[^\s)]+/g, url => `<a href="${url}" target="_blank" style="color:#5ac8fa;text-decoration:underline">${url}</a>`);
+}
+
 function addMessage(text, type, meta) {
   const div = document.createElement('div');
   div.className = 'msg ' + type;
-  div.textContent = text;
+  div.innerHTML = linkify(text);
   if (meta) {
     const metaEl = document.createElement('div');
     metaEl.className = 'meta';
