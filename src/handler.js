@@ -183,6 +183,23 @@ function formatEventDetails(event) {
   return detail.slice(0, 480);
 }
 
+// --- Send compose result + follow-up link messages ---
+// Sends the main sms_text, then each picked event's URL as a separate message
+// so that iMessage/Android unfurls a rich link preview with venue images.
+async function sendComposeWithLinks(phone, result, eventSource) {
+  await sendSMS(phone, result.sms_text);
+
+  const picks = result.picks || [];
+  for (const pick of picks) {
+    const event = eventSource[pick.event_id];
+    if (!event) continue;
+    const url = [event.ticket_url, event.source_url].find(u => u && !isSearchUrl(u));
+    if (url) {
+      await sendSMS(phone, cleanUrl(url));
+    }
+  }
+}
+
 // --- Deterministic pre-router (skips Claude for obvious intents) ---
 function preRoute(message, session) {
   const msg = message.trim();
@@ -552,7 +569,7 @@ async function handleMessageAI(phone, message) {
         const result = await composeAndSend(composeRemaining, hood, route.filters, 'more');
         const newAllPicks = [...(session.allPicks || session.lastPicks || []), ...(result.picks || [])];
         setSession(phone, { lastPicks: result.picks || [], allPicks: newAllPicks, lastEvents: session.lastEvents, lastNeighborhood: hood });
-        await sendSMS(phone, result.sms_text);
+        await sendComposeWithLinks(phone, result, session.lastEvents);
         console.log(`More sent to ${masked}`);
         finalizeTrace(result.sms_text, 'more');
         return;
@@ -608,7 +625,7 @@ async function handleMessageAI(phone, message) {
       lastEvents: eventMap,
       lastNeighborhood: hood,
     });
-    await sendSMS(phone, result.sms_text);
+    await sendComposeWithLinks(phone, result, eventMap);
     console.log(`Free events sent to ${masked}`);
     finalizeTrace(result.sms_text, 'free');
     return;
@@ -663,7 +680,7 @@ async function handleMessageAI(phone, message) {
 
   setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: result.neighborhood_used || hood });
 
-  await sendSMS(phone, result.sms_text);
+  await sendComposeWithLinks(phone, result, eventMap);
   console.log(`AI response sent to ${masked}`);
   finalizeTrace(result.sms_text, 'events');
 }
