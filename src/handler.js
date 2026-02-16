@@ -169,7 +169,8 @@ function formatEventDetails(event) {
 
   // Only show map_hint if it adds info beyond the address
   if (event.map_hint && (!event.venue_address || !event.venue_address.includes(event.map_hint))) {
-    detail += `\nNear ${event.map_hint}`;
+    const hint = event.map_hint.replace(/^near\s+/i, '');
+    detail += `\nNear ${hint}`;
   }
 
   return detail.slice(0, 480);
