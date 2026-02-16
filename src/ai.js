@@ -113,9 +113,11 @@ SOURCE TRUST HIERARCHY (prefer higher-trust sources when options are comparable)
 - Dice (weight 0.8): ticketed events, concerts, DJ nights
 - Songkick (weight 0.75): music-focused, reliable for concerts
 - Eventbrite (weight 0.7): structured ticketing aggregator
+- Tavily (weight 0.6): web search results — may include cool spots and venues alongside events
 
 CURATION RULES:
 - Pick 1–3 events. Prefer "NYC cool": gallery openings, DJ nights, indie shows, weird pop-ups, small venues.
+- Search-sourced items may include bars, game spots, or venues — recommend these naturally alongside events when they're genuinely cool.
 - STRONGLY prefer events IN the user's requested neighborhood. Only suggest events from other neighborhoods if there's nothing good in theirs.
 - When including events from adjacent neighborhoods, mention the actual neighborhood (e.g. "nearby in Wburg" or "worth the walk to LES").
 - Higher source_weight + higher confidence = more trustworthy.

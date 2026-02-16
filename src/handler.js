@@ -611,20 +611,62 @@ async function handleMessageAI(phone, message) {
     }
     const hood = neighborhood || session.lastNeighborhood;
     const events = await getEvents(hood);
-    const freeEvents = events.filter(e => e.is_free);
+    let freeEvents = events.filter(e => e.is_free);
+
+    // If cached free events are thin, supplement with Tavily
+    if (freeEvents.length <= 2) {
+      await sendSMS(phone, freeEvents.length > 0
+        ? `Let me see what else is free near ${hood}...`
+        : `Checking what's free near ${hood}...`);
+
+      try {
+        const today = new Date().toLocaleDateString('en-US', {
+          timeZone: 'America/New_York', month: 'long', day: 'numeric', year: 'numeric',
+        });
+        const tavilyResults = await searchTavilyEvents(hood, {
+          query: `free things to do tonight ${hood} NYC ${today} bars games cool spots`,
+        });
+
+        if (tavilyResults.length > 0) {
+          // Merge Tavily results with cached free events, deduped
+          const seen = new Set(freeEvents.map(e => e.id));
+          for (const e of tavilyResults) {
+            if (!seen.has(e.id)) {
+              seen.add(e.id);
+              freeEvents.push(e);
+            }
+          }
+
+          // Cache Tavily results in session for "more" follow-ups
+          session = session || {};
+          session.tavilyEvents = tavilyResults;
+          session.tavilySearched = true;
+        }
+      } catch (err) {
+        console.error('Tavily free search error:', err.message);
+      }
+    }
+
     if (freeEvents.length === 0) {
-      const sms = `Not seeing any free stuff near ${hood} right now — want everything instead? Just text "${hood}" again.`;
+      const sms = `Not finding free stuff near ${hood} tonight — text "${hood}" for everything or try a different neighborhood.`;
       await sendSMS(phone, sms);
       finalizeTrace(sms, 'free');
       return;
     }
+
     trace.events.cache_size = events.length;
     trace.events.candidates_count = freeEvents.length;
     trace.events.candidate_ids = freeEvents.map(e => e.id);
-    const result = await composeAndSend(freeEvents, hood, route.filters, 'free');
+    const result = await composeAndSend(freeEvents.slice(0, 8), hood, route.filters, 'free');
     const eventMap = {};
     for (const e of freeEvents) eventMap[e.id] = e;
-    setSession(phone, { lastPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: hood });
+    setSession(phone, {
+      lastPicks: result.picks || [],
+      lastEvents: eventMap,
+      lastNeighborhood: hood,
+      tavilyEvents: session?.tavilyEvents || [],
+      tavilySearched: session?.tavilySearched || false,
+    });
     await sendSMS(phone, result.sms_text);
     console.log(`Free events sent to ${masked}`);
     finalizeTrace(result.sms_text, 'free');

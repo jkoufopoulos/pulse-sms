@@ -668,6 +668,62 @@ function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
   };
 }
 
+// ============================================================
+// Tavily web search fallback (on-demand, not in daily scrape)
+// ============================================================
+
+async function searchTavilyEvents(neighborhood, { query: customQuery } = {}) {
+  const apiKey = process.env.TAVILY_API_KEY;
+  if (!apiKey) return [];
+
+  const today = new Date().toLocaleDateString('en-US', {
+    timeZone: 'America/New_York',
+    month: 'long', day: 'numeric', year: 'numeric',
+  });
+  const query = customQuery || `events tonight ${neighborhood} NYC ${today}`;
+
+  try {
+    const res = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: apiKey,
+        query,
+        search_depth: 'basic',
+        max_results: 5,
+        include_answer: false,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!res.ok) {
+      console.error(`Tavily search failed: ${res.status}`);
+      return [];
+    }
+
+    const data = await res.json();
+    const results = data.results || [];
+
+    // Combine result content into a single text block for Claude extraction
+    const rawText = results
+      .map(r => `[Source: ${r.url}]\n${r.title}\n${r.content}`)
+      .join('\n\n---\n\n');
+
+    if (!rawText.trim()) return [];
+
+    const extracted = await extractEvents(rawText, 'tavily', query);
+    const events = (extracted.events || [])
+      .map(raw => normalizeExtractedEvent(raw, 'tavily', 'search', 0.6))
+      .filter(e => e.name && e.confidence >= 0.4);
+
+    console.log(`Tavily: ${events.length} events for ${neighborhood}`);
+    return events;
+  } catch (err) {
+    console.error('Tavily search error:', err.message);
+    return [];
+  }
+}
+
 module.exports = {
   fetchSkintEvents,
   fetchEventbriteEvents,
@@ -676,4 +732,5 @@ module.exports = {
   fetchRAEvents,
   normalizeExtractedEvent,
   makeEventId,
+  searchTavilyEvents,
 };
