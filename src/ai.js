@@ -410,4 +410,97 @@ function parseJsonFromResponse(text) {
   return null;
 }
 
-module.exports = { routeMessage, composeResponse, extractEvents };
+/**
+ * Compose a conversational details response about a specific venue/event.
+ * Used when user asks for more info on a pick (e.g. "what is last resort").
+ * Returns { sms_text }
+ */
+async function composeDetails(event, pickReason) {
+  const now = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
+
+  // Build a Google Maps URL as fallback
+  const venueName = event.venue_name || event.name || '';
+  const hood = event.neighborhood || '';
+  const mapsQuery = encodeURIComponent(`${venueName} ${hood} NYC`.trim());
+  const mapsUrl = `https://www.google.com/maps/search/${mapsQuery}`;
+
+  // Pick the best URL: ticket_url > source_url > Google Maps
+  // But NEVER use search pages (Yelp search, Google search, etc.)
+  let bestUrl = null;
+  for (const url of [event.ticket_url, event.source_url]) {
+    if (url && !isSearchUrl(url)) {
+      bestUrl = url;
+      break;
+    }
+  }
+  if (!bestUrl) bestUrl = mapsUrl;
+
+  const eventData = {
+    name: event.name,
+    venue_name: event.venue_name,
+    neighborhood: event.neighborhood,
+    category: event.category,
+    description: event.description_short || event.short_detail,
+    start_time_local: event.start_time_local,
+    end_time_local: event.end_time_local,
+    is_free: event.is_free,
+    price_display: event.price_display,
+    venue_address: event.venue_address,
+    best_url: bestUrl,
+  };
+
+  const userPrompt = `Current time (NYC): ${now}
+
+The user asked for more info about this place you recommended:
+${JSON.stringify(eventData, null, 2)}
+
+Why you recommended it: ${pickReason || 'solid pick for the neighborhood'}
+
+Write a short, conversational SMS (under 320 chars) that:
+1. Describes what makes this place worth going to — the vibe, what they're known for, what to expect
+2. Include practical info: time, price/free, address if available
+3. Include this URL at the end: ${bestUrl}
+4. Sound like a friend who's been there, not a directory listing`;
+
+  const response = await getClient().messages.create({
+    model: MODELS.compose,
+    max_tokens: 256,
+    system: `You are Pulse: an NYC "plugged-in friend" texting about a spot you recommended. Write like a real person — warm, opinionated, concise. Never robotic. Never list format. Just a natural text about the place. HARD LIMIT: 320 characters. NEVER include Yelp URLs of any kind.`,
+    messages: [{ role: 'user', content: userPrompt }],
+  }, { timeout: 8000 });
+
+  const text = response.content?.[0]?.text || '';
+
+  // Claude might return JSON or plain text — handle both
+  let smsText;
+  try {
+    const parsed = JSON.parse(text);
+    smsText = parsed.sms_text || parsed.text || parsed.message || text;
+  } catch {
+    // Plain text response — use directly, strip any leading/trailing quotes
+    smsText = text.replace(/^["']|["']$/g, '').trim();
+  }
+
+  return { sms_text: smsText.slice(0, 480), _raw: text };
+}
+
+/**
+ * Check if a URL is a search/directory page rather than a direct venue/event link.
+ */
+function isSearchUrl(url) {
+  if (!url) return true;
+  try {
+    const u = new URL(url);
+    // Yelp search pages
+    if (u.hostname.includes('yelp.com') && u.pathname.startsWith('/search')) return true;
+    // Google search pages
+    if (u.hostname.includes('google.com') && (u.pathname === '/search' || u.pathname.startsWith('/search'))) return true;
+    // Generic search query indicators
+    if (u.searchParams.has('find_desc') || u.searchParams.has('q') && u.pathname.includes('search')) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+module.exports = { routeMessage, composeResponse, composeDetails, extractEvents, isSearchUrl };

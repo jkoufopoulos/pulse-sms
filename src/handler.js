@@ -2,7 +2,7 @@ const express = require('express');
 const twilio = require('twilio');
 const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
 const { getEvents } = require('./events');
-const { routeMessage, composeResponse } = require('./ai');
+const { routeMessage, composeResponse, composeDetails, isSearchUrl } = require('./ai');
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
 const { parseAsNycTime } = require('./geo');
 const { searchTavilyEvents } = require('./sources');
@@ -162,10 +162,18 @@ function formatEventDetails(event) {
   else if (event.price_display) detail += `\n${event.price_display}`;
 
   if (event.venue_address) detail += `\n${event.venue_address}`;
-  if (event.ticket_url) detail += `\n${cleanUrl(event.ticket_url)}`;
-
-  // Show source URL for search-sourced events (Tavily) so users can verify
-  if (!event.ticket_url && event.source_url) detail += `\n${cleanUrl(event.source_url)}`;
+  // URL: prefer ticket_url > source_url, but never search pages. Fallback to Google Maps.
+  const directUrl = [event.ticket_url, event.source_url].find(u => u && !isSearchUrl(u));
+  if (directUrl) {
+    detail += `\n${cleanUrl(directUrl)}`;
+  } else {
+    // Google Maps fallback
+    const venueName = event.venue_name || event.name || '';
+    const hood = event.neighborhood || '';
+    if (venueName) {
+      detail += `\nhttps://www.google.com/maps/search/${encodeURIComponent(`${venueName} ${hood} NYC`.trim())}`;
+    }
+  }
 
   // Only show map_hint if it adds info beyond the address
   if (event.map_hint && (!event.venue_address || !event.venue_address.includes(event.map_hint))) {
@@ -207,7 +215,10 @@ function preRoute(message, session) {
     for (let i = 0; i < session.lastPicks.length; i++) {
       const event = session.lastEvents[session.lastPicks[i].event_id];
       if (!event?.name) continue;
-      if (event.name.toLowerCase().includes(lower)) {
+      const eventNameLower = event.name.toLowerCase();
+      // Match if event name contains user message OR user message contains event name
+      const eventNameClean = eventNameLower.replace(/^(the|a|an)\s+/i, '');
+      if (eventNameLower.includes(lower) || (eventNameClean.length >= 3 && lower.includes(eventNameClean))) {
         return { ...base, intent: 'details', neighborhood: null, event_reference: String(i + 1) };
       }
     }
@@ -450,16 +461,25 @@ async function handleMessageAI(phone, message) {
         return;
       }
 
-      // Specific pick number requested
+      // Specific pick number requested — use Claude for a conversational description
       const pickIndex = Math.min(ref - 1, picks.length - 1);
       const pick = picks[Math.max(0, pickIndex)];
       const event = session.lastEvents[pick.event_id];
       if (event) {
-        const sms = formatEventDetails(event);
-        await sendSMS(phone, sms);
-        console.log(`Details ${ref} sent to ${masked}`);
-        finalizeTrace(sms, 'details');
-        return;
+        try {
+          const result = await composeDetails(event, pick.why);
+          const sms = result.sms_text;
+          await sendSMS(phone, sms);
+          console.log(`Details ${ref} sent to ${masked}`);
+          finalizeTrace(sms, 'details');
+          return;
+        } catch (err) {
+          console.error('composeDetails error, falling back:', err.message);
+          const sms = formatEventDetails(event);
+          await sendSMS(phone, sms);
+          finalizeTrace(sms, 'details');
+          return;
+        }
       }
     }
     const sms = "I don't have any recent picks to pull up — text me a neighborhood and let's start fresh!";
