@@ -28,6 +28,13 @@ FLAG TYPES (include all that apply):
 - "vague" — name or details too ambiguous to recommend confidently
 - "duplicate" — appears to be the same as another event in this batch
 
+EXAMPLE:
+Input event:
+{ "id": "evt_jazz_smalls", "name": "Jazz Night", "venue_name": "Smalls Jazz Club", "neighborhood": "West Village", "start_time_local": "2026-02-15T21:30:00", "date_local": "2026-02-15", "category": "live_music", "is_free": false, "price_display": "$20", "source_name": "theskint", "confidence": 0.9, "description_short": "Live jazz with rotating musicians" }
+
+Output:
+[{ "event_id": "evt_jazz_smalls", "score": 9, "flags": [], "note": "Named venue, specific time, well-known spot, tonight — strong pick" }]
+
 Return STRICT JSON array — one object per event, in the same order as input:
 [
   {

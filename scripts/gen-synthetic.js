@@ -62,6 +62,15 @@ function makeCase(message, expected, tags, session) {
   return c;
 }
 
+function makeMultiTurnCase(turns, tags) {
+  caseId++;
+  return {
+    id: `syn-${String(caseId).padStart(3, '0')}`,
+    turns,  // [{message, expected}, ...]
+    tags,
+  };
+}
+
 const cases = [];
 
 // --- EVENTS intent: direct neighborhood names ---
@@ -327,6 +336,313 @@ cases.push(makeCase(
   { intent: 'events', neighborhood: 'Chelsea' },
   ['filter', 'vibe'],
 ));
+
+// =============================================
+// NEW SINGLE-TURN CASES
+// =============================================
+
+// --- Off-topic variations ---
+cases.push(makeCase(
+  'what time is it',
+  { intent: 'conversational', must_not: [] },
+  ['conversational', 'off_topic'],
+));
+cases.push(makeCase(
+  'recommend a restaurant',
+  { intent: 'conversational', must_not: [] },
+  ['conversational', 'off_topic'],
+));
+cases.push(makeCase(
+  "what's your name",
+  { intent: 'conversational', must_not: [] },
+  ['conversational', 'off_topic'],
+));
+cases.push(makeCase(
+  'can you order me food',
+  { intent: 'conversational', must_not: [] },
+  ['conversational', 'off_topic'],
+));
+
+// --- Greeting variations ---
+cases.push(makeCase(
+  'yo',
+  { intent: 'conversational' },
+  ['conversational', 'greeting'],
+));
+cases.push(makeCase(
+  'sup',
+  { intent: 'conversational' },
+  ['conversational', 'greeting'],
+));
+cases.push(makeCase(
+  'hola',
+  { intent: 'conversational' },
+  ['conversational', 'greeting'],
+));
+
+// --- More neighborhood slang ---
+cases.push(makeCase(
+  'the village',
+  { intent: 'events' },  // could resolve to East Village or West Village
+  ['events', 'slang'],
+));
+cases.push(makeCase(
+  'west village',
+  { intent: 'events' },
+  ['events', 'slang'],
+));
+cases.push(makeCase(
+  'flatiron',
+  { intent: 'events' },
+  ['events', 'slang'],
+));
+cases.push(makeCase(
+  'midtown',
+  { intent: 'events' },
+  ['events', 'slang'],
+));
+cases.push(makeCase(
+  'greenpoint',
+  { intent: 'events' },
+  ['events', 'slang'],
+));
+
+// --- Vibe filters ---
+cases.push(makeCase(
+  'something wild in bushwick',
+  { intent: 'events', neighborhood: 'Bushwick' },
+  ['filter', 'vibe'],
+));
+cases.push(makeCase(
+  'romantic spot chelsea',
+  { intent: 'events', neighborhood: 'Chelsea' },
+  ['filter', 'vibe'],
+));
+cases.push(makeCase(
+  'weird stuff in east village',
+  { intent: 'events', neighborhood: 'East Village' },
+  ['filter', 'vibe'],
+));
+
+// --- Category filters ---
+cases.push(makeCase(
+  'art in chelsea',
+  { intent: 'events', neighborhood: 'Chelsea' },
+  ['filter', 'category'],
+));
+cases.push(makeCase(
+  'theater tonight',
+  { intent: 'events' },
+  ['filter', 'category'],
+));
+cases.push(makeCase(
+  'jazz in harlem',
+  { intent: 'events', neighborhood: 'Harlem' },
+  ['filter', 'category'],
+));
+
+// --- Free with hood ---
+cases.push(makeCase(
+  'free in williamsburg',
+  { neighborhood: 'Williamsburg' },  // intent can be 'free' or 'events' with free_only
+  ['free', 'with_hood'],
+));
+cases.push(makeCase(
+  'free bushwick events',
+  { neighborhood: 'Bushwick' },
+  ['free', 'with_hood'],
+));
+
+// --- Edge cases ---
+cases.push(makeCase(
+  'a',
+  { intent: 'conversational' },
+  ['edge', 'single_char'],
+));
+cases.push(makeCase(
+  '...',
+  { intent: 'conversational' },
+  ['edge', 'punctuation'],
+));
+cases.push(makeCase(
+  'NYC tonight',
+  { intent: 'events' },  // no specific neighborhood — should still attempt events
+  ['edge', 'city_wide'],
+));
+cases.push(makeCase(
+  'ev',
+  { intent: 'events', neighborhood: 'East Village' },
+  ['events', 'slang', 'east_village'],
+));
+cases.push(makeCase(
+  'anything fun tonight',
+  { intent: 'events' },
+  ['events', 'no_hood'],
+));
+
+// =============================================
+// MULTI-TURN CASES
+// =============================================
+
+// 1. events → details by number
+cases.push(makeMultiTurnCase([
+  { message: 'East Village', expected: { intent: 'events', neighborhood: 'East Village' } },
+  { message: '1', expected: { intent: 'details' } },
+], ['multi_turn', 'events_then_details']));
+
+// 2. events → details pick 2
+cases.push(makeMultiTurnCase([
+  { message: 'East Village', expected: { intent: 'events', neighborhood: 'East Village' } },
+  { message: '2', expected: { intent: 'details' } },
+], ['multi_turn', 'events_then_details']));
+
+// 3. events → more
+cases.push(makeMultiTurnCase([
+  { message: 'Williamsburg', expected: { intent: 'events', neighborhood: 'Williamsburg' } },
+  { message: 'more', expected: { intent: 'more' } },
+], ['multi_turn', 'events_then_more']));
+
+// 4. events → more → more (cache exhaustion)
+cases.push(makeMultiTurnCase([
+  { message: 'Bushwick', expected: { intent: 'events', neighborhood: 'Bushwick' } },
+  { message: 'more', expected: { intent: 'more' } },
+  { message: 'more', expected: { intent: 'more' } },
+], ['multi_turn', 'events_more_more']));
+
+// 5. events (slang) → more (phrased)
+cases.push(makeMultiTurnCase([
+  { message: 'les', expected: { intent: 'events', neighborhood: 'Lower East Side' } },
+  { message: 'what else', expected: { intent: 'more' } },
+], ['multi_turn', 'events_then_more']));
+
+// 6. events → more (vague phrasing)
+cases.push(makeMultiTurnCase([
+  { message: 'Bushwick', expected: { intent: 'events', neighborhood: 'Bushwick' } },
+  { message: 'anything else tonight', expected: { intent: 'more' } },
+], ['multi_turn', 'events_then_more']));
+
+// 7. events → free same hood
+cases.push(makeMultiTurnCase([
+  { message: 'East Village', expected: { intent: 'events', neighborhood: 'East Village' } },
+  { message: 'free', expected: { intent: 'free' } },
+], ['multi_turn', 'events_then_free']));
+
+// 8. greeting → events
+cases.push(makeMultiTurnCase([
+  { message: 'hey', expected: { intent: 'conversational' } },
+  { message: 'east village', expected: { intent: 'events', neighborhood: 'East Village' } },
+], ['multi_turn', 'greeting_then_events']));
+
+// 9. help → events
+cases.push(makeMultiTurnCase([
+  { message: 'help', expected: { intent: 'help' } },
+  { message: 'bushwick', expected: { intent: 'events', neighborhood: 'Bushwick' } },
+], ['multi_turn', 'help_then_events']));
+
+// 10. events → farewell
+cases.push(makeMultiTurnCase([
+  { message: 'East Village', expected: { intent: 'events', neighborhood: 'East Village' } },
+  { message: 'thanks', expected: { intent: 'conversational' } },
+], ['multi_turn', 'events_then_farewell']));
+
+// 11. events → details → more (3-turn)
+cases.push(makeMultiTurnCase([
+  { message: 'les', expected: { intent: 'events', neighborhood: 'Lower East Side' } },
+  { message: '1', expected: { intent: 'details' } },
+  { message: 'more', expected: { intent: 'more' } },
+], ['multi_turn', 'events_details_more']));
+
+// 12. neighborhood switch
+cases.push(makeMultiTurnCase([
+  { message: 'Chelsea', expected: { intent: 'events', neighborhood: 'Chelsea' } },
+  { message: 'williamsburg', expected: { intent: 'events', neighborhood: 'Williamsburg' } },
+], ['multi_turn', 'hood_switch']));
+
+// 13. events → more → details (3-turn)
+cases.push(makeMultiTurnCase([
+  { message: 'soho', expected: { intent: 'events', neighborhood: 'SoHo' } },
+  { message: 'more', expected: { intent: 'more' } },
+  { message: '1', expected: { intent: 'details' } },
+], ['multi_turn', 'events_more_details']));
+
+// 14. events → off-topic (should redirect)
+cases.push(makeMultiTurnCase([
+  { message: 'East Village', expected: { intent: 'events', neighborhood: 'East Village' } },
+  { message: 'who won the knicks game?', expected: { intent: 'conversational', must_not: ['knicks won', 'score', 'points'] } },
+], ['multi_turn', 'events_then_offtopic']));
+
+// 15. events → details → farewell (3-turn)
+cases.push(makeMultiTurnCase([
+  { message: 'Harlem', expected: { intent: 'events', neighborhood: 'Harlem' } },
+  { message: '2', expected: { intent: 'details' } },
+  { message: 'thanks', expected: { intent: 'conversational' } },
+], ['multi_turn', 'events_details_farewell']));
+
+// 16. events → more → switch hood (3-turn)
+cases.push(makeMultiTurnCase([
+  { message: 'ev', expected: { intent: 'events', neighborhood: 'East Village' } },
+  { message: 'more', expected: { intent: 'more' } },
+  { message: 'williamsburg', expected: { intent: 'events', neighborhood: 'Williamsburg' } },
+], ['multi_turn', 'events_more_switch']));
+
+// 17. events → more (phrased)
+cases.push(makeMultiTurnCase([
+  { message: 'Crown Heights', expected: { intent: 'events', neighborhood: 'Crown Heights' } },
+  { message: 'show me more', expected: { intent: 'more' } },
+], ['multi_turn', 'events_then_more']));
+
+// 18. events → free
+cases.push(makeMultiTurnCase([
+  { message: 'Williamsburg', expected: { intent: 'events', neighborhood: 'Williamsburg' } },
+  { message: 'free stuff', expected: { intent: 'free' } },
+], ['multi_turn', 'events_then_free']));
+
+// 19. events → farewell (bye)
+cases.push(makeMultiTurnCase([
+  { message: 'Bushwick', expected: { intent: 'events', neighborhood: 'Bushwick' } },
+  { message: 'bye', expected: { intent: 'conversational' } },
+], ['multi_turn', 'events_then_farewell']));
+
+// 20. events → more → details (3-turn, phrased)
+cases.push(makeMultiTurnCase([
+  { message: 'East Village', expected: { intent: 'events', neighborhood: 'East Village' } },
+  { message: 'what else you got', expected: { intent: 'more' } },
+  { message: '1', expected: { intent: 'details' } },
+], ['multi_turn', 'events_more_details']));
+
+// 21. free → free again (push for more free, should hit Tavily path)
+cases.push(makeMultiTurnCase([
+  { message: 'free in east village', expected: { neighborhood: 'East Village' } },
+  { message: 'free', expected: { intent: 'free' } },
+], ['multi_turn', 'free_then_free']));
+
+// 22. free → free → free (3-turn free exhaustion, Tavily path)
+cases.push(makeMultiTurnCase([
+  { message: 'free stuff', expected: { intent: 'free' } },
+  { message: 'more free stuff', expected: {} },  // could be more or free — both valid
+  { message: 'anything else free', expected: {} },
+], ['multi_turn', 'free_exhaustion']));
+
+// 23. events → free → more free (cross-intent into free then push)
+cases.push(makeMultiTurnCase([
+  { message: 'Williamsburg', expected: { intent: 'events', neighborhood: 'Williamsburg' } },
+  { message: 'actually anything free?', expected: { intent: 'free' } },
+  { message: 'more free stuff', expected: {} },
+], ['multi_turn', 'events_free_morefree']));
+
+// 24. free with hood → free again → details
+cases.push(makeMultiTurnCase([
+  { message: 'free in bushwick', expected: { neighborhood: 'Bushwick' } },
+  { message: 'free', expected: { intent: 'free' } },
+  { message: '1', expected: { intent: 'details' } },
+], ['multi_turn', 'free_free_details']));
+
+// 25. free → more → free (alternating)
+cases.push(makeMultiTurnCase([
+  { message: 'free east village', expected: { neighborhood: 'East Village' } },
+  { message: 'more', expected: { intent: 'more' } },
+  { message: 'just the free ones', expected: { intent: 'free' } },
+], ['multi_turn', 'free_more_free']));
 
 // Write output
 const outputDir = path.join(__dirname, '..', 'data', 'fixtures');

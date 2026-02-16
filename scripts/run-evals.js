@@ -60,79 +60,131 @@ async function main() {
   };
 
   for (const testCase of cases) {
-    process.stdout.write(`${testCase.id} "${testCase.message.slice(0, 40)}"... `);
+    const isMultiTurn = Array.isArray(testCase.turns);
+    const turns = isMultiTurn
+      ? testCase.turns
+      : [{ message: testCase.message, expected: testCase.expected, session: testCase.session }];
+
+    const label = isMultiTurn
+      ? `${testCase.id} [${turns.length} turns]`
+      : `${testCase.id} "${testCase.message.slice(0, 40)}"`;
 
     try {
-      // Step 1: Reset session, then inject if test case specifies one
-      await fetch(`${BASE}/api/eval/session`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: '+10000000000', session: testCase.session || null }),
-      });
-
-      // Step 2: Send message through pipeline
-      const smsRes = await fetch(`${BASE}/api/sms/test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ Body: testCase.message, From: '+10000000000' }),
-      });
-      const smsData = await smsRes.json();
-
-      if (!smsRes.ok) {
-        throw new Error(smsData.error || `HTTP ${smsRes.status}`);
+      // Clear session at start — for multi-turn, always clear (no pre-seeded session);
+      // for single-turn, inject session if provided (existing behavior)
+      if (isMultiTurn) {
+        await fetch(`${BASE}/api/eval/session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: '+10000000000', session: null }),
+        });
+      } else {
+        await fetch(`${BASE}/api/eval/session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: '+10000000000', session: testCase.session || null }),
+        });
       }
 
-      // Step 3: Wait briefly, then fetch most recent trace
-      await new Promise(r => setTimeout(r, 500));
-      const tracesRes = await fetch(`${BASE}/api/eval/traces?limit=1`);
-      const traces = await tracesRes.json();
-      const trace = traces[0];
+      const turnResults = [];
+      let caseFailed = false;
+      let caseError = null;
 
-      if (!trace) {
-        throw new Error('No trace found after sending message');
+      for (let t = 0; t < turns.length; t++) {
+        const turn = turns[t];
+        const turnLabel = isMultiTurn
+          ? `${testCase.id} turn ${t + 1}/${turns.length} "${turn.message.slice(0, 30)}"`
+          : label;
+
+        process.stdout.write(`${turnLabel}... `);
+
+        // Send message through pipeline
+        const smsRes = await fetch(`${BASE}/api/sms/test`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ Body: turn.message, From: '+10000000000' }),
+        });
+        const smsData = await smsRes.json();
+
+        if (!smsRes.ok) {
+          throw new Error(smsData.error || `HTTP ${smsRes.status}`);
+        }
+
+        // Wait briefly, then fetch most recent trace
+        await new Promise(r => setTimeout(r, 500));
+        const tracesRes = await fetch(`${BASE}/api/eval/traces?limit=1`);
+        const traces = await tracesRes.json();
+        const trace = traces[0];
+
+        if (!trace) {
+          throw new Error('No trace found after sending message');
+        }
+
+        // Run code evals
+        const codeResults = runCodeEvals(trace);
+
+        // Run expectation evals
+        const expResults = turn.expected
+          ? runExpectationEvals(trace, turn.expected)
+          : [];
+
+        // Optionally run judge evals
+        let judgeResults = [];
+        if (runJudgeEvals && trace.output_intent === 'events') {
+          judgeResults = await runJudgeEvals(trace);
+        }
+
+        const allTurnResults = [...codeResults, ...expResults, ...judgeResults];
+        const turnPassed = allTurnResults.every(r => r.pass);
+        const failures = allTurnResults.filter(r => !r.pass);
+
+        if (turnPassed) {
+          console.log('\x1b[32mPASS\x1b[0m');
+        } else {
+          caseFailed = true;
+          console.log(`\x1b[31mFAIL\x1b[0m  ${failures.map(f => `${f.name}: ${f.detail}`).join(' | ')}`);
+        }
+
+        turnResults.push({
+          turn: t + 1,
+          message: turn.message,
+          pass: turnPassed,
+          trace_id: trace.id,
+          results: allTurnResults,
+          sms_response: (smsData.messages || []).map(m => m.body).join(' | '),
+        });
+
+        // Do NOT reset session between turns — let it build naturally
       }
 
-      // Step 4: Run code evals
-      const codeResults = runCodeEvals(trace);
-
-      // Step 5: Run expectation evals
-      const expResults = testCase.expected
-        ? runExpectationEvals(trace, testCase.expected)
-        : [];
-
-      // Step 6: Optionally run judge evals
-      let judgeResults = [];
-      if (runJudgeEvals && trace.output_intent === 'events') {
-        judgeResults = await runJudgeEvals(trace);
-      }
-
-      const allResults = [...codeResults, ...expResults, ...judgeResults];
-      const allPassed = allResults.every(r => r.pass);
-      const failures = allResults.filter(r => !r.pass);
-
+      const allPassed = !caseFailed;
       if (allPassed) {
         report.passed++;
-        console.log('\x1b[32mPASS\x1b[0m');
       } else {
         report.failed++;
-        console.log(`\x1b[31mFAIL\x1b[0m  ${failures.map(f => `${f.name}: ${f.detail}`).join(' | ')}`);
       }
 
-      report.cases.push({
+      // Report entry: multi-turn cases include turnResults array
+      const caseReport = {
         id: testCase.id,
-        message: testCase.message,
         pass: allPassed,
-        trace_id: trace.id,
-        results: allResults,
-        sms_response: (smsData.messages || []).map(m => m.body).join(' | '),
-      });
+      };
+      if (isMultiTurn) {
+        caseReport.turns = turnResults;
+        caseReport.results = turnResults.flatMap(tr => tr.results);
+      } else {
+        caseReport.message = testCase.message;
+        caseReport.trace_id = turnResults[0].trace_id;
+        caseReport.results = turnResults[0].results;
+        caseReport.sms_response = turnResults[0].sms_response;
+      }
+      report.cases.push(caseReport);
 
     } catch (err) {
       report.errors++;
       console.log(`\x1b[33mERROR\x1b[0m  ${err.message}`);
       report.cases.push({
         id: testCase.id,
-        message: testCase.message,
         pass: false,
         error: err.message,
         results: [],

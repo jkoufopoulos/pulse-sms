@@ -71,8 +71,9 @@ check('picked_events_exist passes', findEval(goodResults, 'picked_events_exist')
 check('valid_urls passes', findEval(goodResults, 'valid_urls').pass === true);
 check('off_topic_redirect passes (not conversational)', findEval(goodResults, 'off_topic_redirect').pass === true);
 check('response_not_empty passes', findEval(goodResults, 'response_not_empty').pass === true);
-check('latency_under_15s passes', findEval(goodResults, 'latency_under_15s').pass === true);
-check('returns 8 eval results', goodResults.length === 8);
+check('latency_under_10s passes', findEval(goodResults, 'latency_under_10s').pass === true);
+check('day_label_accuracy passes', findEval(goodResults, 'day_label_accuracy').pass === true);
+check('returns 9 eval results', goodResults.length === 9);
 
 // ---- Mock trace: bad trace (over char limit, hallucinated pick, broken URL) ----
 const badTrace = {
@@ -96,7 +97,7 @@ check('char_limit fails for 525 chars', findEval(badResults, 'char_limit').pass 
 check('valid_intent fails for "banana"', findEval(badResults, 'valid_intent').pass === false);
 check('valid_neighborhood fails for "Narnia"', findEval(badResults, 'valid_neighborhood').pass === false);
 check('picked_events_exist fails for hallucinated ID', findEval(badResults, 'picked_events_exist').pass === false);
-check('latency_under_15s fails for 20s', findEval(badResults, 'latency_under_15s').pass === false);
+check('latency_under_10s fails for 20s', findEval(badResults, 'latency_under_10s').pass === false);
 
 // ---- Mock trace: empty response ----
 const emptyTrace = {
@@ -189,6 +190,101 @@ check('must_not detects banned word', expResults3[0].pass === false);
 const expected4 = { must_not: ['bitcoin'] };
 const expResults4 = runExpectationEvals(goodTrace, expected4);
 check('must_not passes when word absent', expResults4[0].pass === true);
+
+// ---- char_limit exemption for details multi-SMS ----
+console.log('\nCode evals (char_limit details exemption):');
+
+const detailsLongTrace = {
+  ...goodTrace,
+  id: 'test-details-long',
+  output_intent: 'details',
+  output_sms: 'x'.repeat(600),
+  output_sms_length: 600,
+};
+const detailsLongResults = runCodeEvals(detailsLongTrace);
+check('char_limit passes for details intent over 480', findEval(detailsLongResults, 'char_limit').pass === true);
+check('char_limit detail mentions multi-SMS exempt', findEval(detailsLongResults, 'char_limit').detail.includes('multi-SMS'));
+
+const eventsLongTrace = {
+  ...goodTrace,
+  id: 'test-events-long',
+  output_intent: 'events',
+  output_sms: 'x'.repeat(500),
+  output_sms_length: 500,
+};
+const eventsLongResults = runCodeEvals(eventsLongTrace);
+check('char_limit fails for events intent over 480', findEval(eventsLongResults, 'char_limit').pass === false);
+
+// ---- off_topic_redirect tighter matching ----
+console.log('\nCode evals (off_topic_redirect tighter matching):');
+
+const convTonightOnly = {
+  ...goodTrace,
+  id: 'test-conv-tonight',
+  input_message: 'who won the knicks game?',
+  output_intent: 'conversational',
+  output_sms: 'The Knicks play tonight at MSG — should be a great game!',
+};
+const convTonightResults = runCodeEvals(convTonightOnly);
+check('off_topic_redirect fails when only "tonight" without redirect phrase', findEval(convTonightResults, 'off_topic_redirect').pass === false);
+
+const convWithRedirect = {
+  ...goodTrace,
+  id: 'test-conv-redirect',
+  input_message: 'who won the knicks game?',
+  output_intent: 'conversational',
+  output_sms: "Ha — I only know events. Text me a neighborhood and I'll hook you up.",
+};
+const convRedirectResults = runCodeEvals(convWithRedirect);
+check('off_topic_redirect passes with "text me a neighborhood"', findEval(convRedirectResults, 'off_topic_redirect').pass === true);
+
+// ---- day_label_accuracy eval ----
+console.log('\nCode evals (day_label_accuracy):');
+
+const todayNyc = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+const tomorrowNyc = new Date(Date.now() + 86400000).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+
+const dayLabelBadTrace = {
+  ...goodTrace,
+  id: 'test-day-bad',
+  output_sms: 'Check out Jazz Night tonight at Smalls — great vibe',
+  composition: {
+    ...goodTrace.composition,
+    picks: [
+      { rank: 1, event_id: 'e1', why: 'great show', date_local: tomorrowNyc },
+    ],
+  },
+};
+const dayLabelBadResults = runCodeEvals(dayLabelBadTrace);
+check('day_label_accuracy fails: says tonight but event is tomorrow', findEval(dayLabelBadResults, 'day_label_accuracy').pass === false);
+
+const dayLabelGoodTrace = {
+  ...goodTrace,
+  id: 'test-day-good',
+  output_sms: 'Check out Jazz Night tonight at Smalls — great vibe',
+  composition: {
+    ...goodTrace.composition,
+    picks: [
+      { rank: 1, event_id: 'e1', why: 'great show', date_local: todayNyc },
+    ],
+  },
+};
+const dayLabelGoodResults = runCodeEvals(dayLabelGoodTrace);
+check('day_label_accuracy passes: says tonight and event is today', findEval(dayLabelGoodResults, 'day_label_accuracy').pass === true);
+
+const dayLabelTmrwBadTrace = {
+  ...goodTrace,
+  id: 'test-day-tmrw-bad',
+  output_sms: 'Tomorrow night hit up the jazz show at Smalls',
+  composition: {
+    ...goodTrace.composition,
+    picks: [
+      { rank: 1, event_id: 'e1', why: 'great show', date_local: todayNyc },
+    ],
+  },
+};
+const dayLabelTmrwBadResults = runCodeEvals(dayLabelTmrwBadTrace);
+check('day_label_accuracy fails: says tomorrow but event is today', findEval(dayLabelTmrwBadResults, 'day_label_accuracy').pass === false);
 
 // ---- Summary ----
 console.log(`\n${pass} passed, ${fail} failed`);

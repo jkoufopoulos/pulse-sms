@@ -4,7 +4,7 @@ const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
 const { getEvents } = require('./events');
 const { routeMessage, composeResponse, composeDetails, isSearchUrl } = require('./ai');
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
-const { parseAsNycTime } = require('./geo');
+const { parseAsNycTime, filterUpcomingEvents } = require('./geo');
 const { searchTavilyEvents } = require('./sources');
 const { startTrace, saveTrace } = require('./traces');
 
@@ -467,7 +467,10 @@ async function handleMessageAI(phone, message) {
       const event = session.lastEvents[pick.event_id];
       if (event) {
         try {
+          const composeStart = Date.now();
           const result = await composeDetails(event, pick.why);
+          trace.composition.latency_ms = Date.now() - composeStart;
+          trace.composition.raw_response = result._raw || null;
           const sms = result.sms_text;
           await sendSMS(phone, sms);
           console.log(`Details ${ref} sent to ${masked}`);
@@ -525,7 +528,10 @@ async function handleMessageAI(phone, message) {
     const result = await composeResponse(message, composeEvents, hood, filters);
     trace.composition.latency_ms = Date.now() - composeStart;
     trace.composition.raw_response = result._raw || null;
-    trace.composition.picks = result.picks || [];
+    trace.composition.picks = (result.picks || []).map(p => {
+      const evt = composeEvents.find(e => e.id === p.event_id);
+      return { ...p, date_local: evt?.date_local || null };
+    });
     trace.composition.not_picked_reason = result.not_picked_reason || null;
     trace.composition.neighborhood_used = result.neighborhood_used || hood;
 
@@ -564,8 +570,10 @@ async function handleMessageAI(phone, message) {
     const hood = neighborhood || session.lastNeighborhood;
 
     // Check if we have unused Tavily events from a previous search
-    const tavilyRemaining = (session.tavilyEvents || [])
-      .filter(e => !allShownIds.has(e.id));
+    // Filter for upcoming events — session may be 1-2 hours old
+    const tavilyRemaining = filterUpcomingEvents(
+      (session.tavilyEvents || []).filter(e => !allShownIds.has(e.id))
+    );
 
     if (tavilyRemaining.length > 0) {
       const composeEvents = tavilyRemaining.slice(0, 8);
@@ -648,7 +656,9 @@ async function handleMessageAI(phone, message) {
     let freeEvents = events.filter(e => e.is_free);
 
     // If cached free events can't fill at least 2 picks, supplement with Tavily
-    if (freeEvents.length < 2) {
+    // But skip if we already searched Tavily this session (avoid re-searching on repeated "free" turns)
+    const alreadySearched = session?.tavilySearched;
+    if (freeEvents.length < 2 && !alreadySearched) {
       await sendSMS(phone, freeEvents.length > 0
         ? `Let me see what else is free near ${hood}...`
         : `Checking what's free near ${hood}...`);
@@ -676,6 +686,18 @@ async function handleMessageAI(phone, message) {
       } catch (err) {
         console.error('Tavily free search error:', err.message);
       }
+    } else if (freeEvents.length < 2 && alreadySearched) {
+      // Reuse previously searched Tavily events instead of re-searching
+      const tavilyFree = filterUpcomingEvents(
+        (session.tavilyEvents || []).filter(e => e.is_free !== false)
+      );
+      const seen = new Set(freeEvents.map(e => e.id));
+      for (const e of tavilyFree) {
+        if (!seen.has(e.id)) {
+          seen.add(e.id);
+          freeEvents.push(e);
+        }
+      }
     }
 
     if (freeEvents.length === 0) {
@@ -693,6 +715,7 @@ async function handleMessageAI(phone, message) {
     for (const e of freeEvents) eventMap[e.id] = e;
     setSession(phone, {
       lastPicks: result.picks || [],
+      allPicks: result.picks || [],
       lastEvents: eventMap,
       lastNeighborhood: hood,
       tavilyEvents: session?.tavilyEvents || [],
@@ -751,7 +774,7 @@ async function handleMessageAI(phone, message) {
   const eventMap = {};
   for (const e of events) eventMap[e.id] = e;
 
-  setSession(phone, { lastPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: result.neighborhood_used || hood });
+  setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: result.neighborhood_used || hood });
 
   await sendSMS(phone, result.sms_text);
   console.log(`AI response sent to ${masked}`);
