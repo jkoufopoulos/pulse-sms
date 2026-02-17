@@ -8,6 +8,7 @@ const { fetchNYCParksEvents } = require('./nyc-parks');
 const { fetchBrooklynVeganEvents } = require('./brooklynvegan');
 const { fetchNonsenseNYC } = require('./nonsense');
 const { fetchOhMyRockness } = require('./ohmyrockness');
+const { fetchDoNYCEvents } = require('./donyc');
 const { searchTavilyEvents, fetchTavilyFreeEvents } = require('./tavily');
 
 module.exports = {
@@ -20,6 +21,7 @@ module.exports = {
   fetchBrooklynVeganEvents,
   fetchNonsenseNYC,
   fetchOhMyRockness,
+  fetchDoNYCEvents,
   fetchEventbriteComedy,
   fetchEventbriteArts,
   normalizeExtractedEvent,

@@ -9,13 +9,13 @@ Daily scrape (10am ET)     Incoming SMS
         │                       │
         ▼                       ▼
    sources/               handler.js
-   (12 scrapers:           (webhook, dedup,
+   (13 scrapers:           (webhook, dedup,
     Skint, RA, Dice,        rate limiter,
     Eventbrite, Songkick,   AI orchestrator)
     BrooklynVegan, NYC          │
     Parks, Nonsense NYC,   pre-router.js
     Oh My Rockness,        (deterministic
-    Tavily)                 intent matching)
+    DoNYC, Tavily)          intent matching)
         │                       │
         ├─► venues.js      session.js
         │   (auto-learn     (state store)
@@ -46,7 +46,7 @@ Daily scrape (10am ET)     Incoming SMS
 | `formatters.js` | SMS formatting — `formatTime`, `cleanUrl`, `formatEventDetails` (480-char cap) |
 | `ai.js` | 3 Claude calls: `routeMessage`, `composeResponse`, `extractEvents` |
 | `events.js` | Daily event cache, source health tracking, cross-source dedup, venue persistence, `getEvents()` |
-| `sources/` | 12 scrapers split into individual modules with barrel `index.js` |
+| `sources/` | 13 scrapers split into individual modules with barrel `index.js` |
 | `sources/shared.js` | `FETCH_HEADERS`, `makeEventId`, `normalizeExtractedEvent` |
 | `sources/skint.js` | Skint (HTML→Claude extraction) |
 | `sources/eventbrite.js` | Eventbrite (JSON-LD + __SERVER_DATA__), Comedy, Arts — 5 functions, 2 internal parsers |
@@ -57,6 +57,7 @@ Daily scrape (10am ET)     Incoming SMS
 | `sources/brooklynvegan.js` | BrooklynVegan (DoStuff JSON) |
 | `sources/nonsense.js` | Nonsense NYC (HTML→Claude extraction) |
 | `sources/ohmyrockness.js` | Oh My Rockness (HTML→Claude extraction) |
+| `sources/donyc.js` | DoNYC (Cheerio HTML scraping — music, comedy, theater) |
 | `sources/tavily.js` | Tavily (web search fallback) |
 | `perennial.js` | Perennial picks loader — `getPerennialPicks(hood, opts)`, caches JSON, filters by day, checks adjacent neighborhoods |
 | `venues.js` | Shared venue coord map, auto-learning from sources, Nominatim geocoding fallback, persistence (export/import learned venues) |
@@ -104,7 +105,7 @@ npm test               # runs smoke tests (pure functions only, no API calls)
 - **Two-call AI flow**: Call 1 routes intent + neighborhood. Call 2 picks events + writes the SMS. This keeps each call focused and fast.
 - **No Tavily in hot path**: Tavily was removed from the live request path. All event data comes from the daily scrape.
 - **Cross-source dedup**: Event IDs are hashed from name + venue + date (not source), so the same event from Dice and BrooklynVegan merges automatically. Sources are processed in weight order, so the higher-trust version wins.
-- **Source trust hierarchy**: Skint (0.9) = Nonsense NYC (0.9) > RA (0.85) = Oh My Rockness (0.85) > Dice (0.8) = BrooklynVegan (0.8) > NYC Parks (0.75) = Songkick (0.75) > Eventbrite (0.7) > Tavily (0.6). Claude is told to prefer higher-trust sources.
+- **Source trust hierarchy**: Skint (0.9) = Nonsense NYC (0.9) > RA (0.85) = Oh My Rockness (0.85) > Dice (0.8) = BrooklynVegan (0.8) > NYC Parks (0.75) = DoNYC (0.75) = Songkick (0.75) > Eventbrite (0.7) > Tavily (0.6). Claude is told to prefer higher-trust sources.
 - **Venue auto-learning**: Sources with lat/lng (BrooklynVegan, Dice, Songkick, Eventbrite) teach venue coords to the shared venue map at scrape time. This helps sources without geo data (RA, Skint, Nonsense NYC) resolve neighborhoods.
 - **Venue persistence**: Learned venues are saved to `data/venues-learned.json` after each scrape and loaded on boot, so knowledge compounds across restarts.
 - **480-char SMS limit**: All responses are capped at 480 chars. Claude is prompted to write concisely.

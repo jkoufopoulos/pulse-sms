@@ -425,6 +425,11 @@ console.log('\nfetchNYCParksEvents:');
 
 check('fetchNYCParksEvents exported', typeof require('../src/sources').fetchNYCParksEvents === 'function');
 
+// ---- fetchDoNYCEvents export ----
+console.log('\nfetchDoNYCEvents:');
+
+check('fetchDoNYCEvents exported', typeof require('../src/sources').fetchDoNYCEvents === 'function');
+
 // ---- fetchBrooklynVeganEvents + learnVenueCoords exports ----
 console.log('\nBrooklynVegan + venue auto-learning:');
 

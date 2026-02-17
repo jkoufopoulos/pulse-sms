@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchTavilyFreeEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents } = require('./sources');
+const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchTavilyFreeEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchDoNYCEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents } = require('./sources');
 const { rankEventsByProximity, filterUpcomingEvents } = require('./geo');
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues } = require('./venues');
 
@@ -30,6 +30,7 @@ const sourceHealth = {
   EventbriteArts: { consecutiveZeros: 0, lastCount: 0 },
   NYCParks: { consecutiveZeros: 0, lastCount: 0 },
   BrooklynVegan: { consecutiveZeros: 0, lastCount: 0 },
+  DoNYC: { consecutiveZeros: 0, lastCount: 0 },
 };
 const HEALTH_WARN_THRESHOLD = 3;
 
@@ -43,7 +44,7 @@ async function refreshCache() {
   refreshPromise = (async () => {
     console.log('Refreshing event cache (all sources)...');
 
-    const [skintEvents, eventbriteEvents, songkickEvents, raEvents, diceEvents, tavilyFreeEvents, nonsenseEvents, ohMyRocknessEvents, eventbriteComedyEvents, eventbriteArtsEvents, nycParksEvents, bvEvents] = await Promise.allSettled([
+    const [skintEvents, eventbriteEvents, songkickEvents, raEvents, diceEvents, tavilyFreeEvents, nonsenseEvents, ohMyRocknessEvents, donycEvents, eventbriteComedyEvents, eventbriteArtsEvents, nycParksEvents, bvEvents] = await Promise.allSettled([
       fetchSkintEvents(),
       fetchEventbriteEvents(),
       fetchSongkickEvents(),
@@ -52,6 +53,7 @@ async function refreshCache() {
       fetchTavilyFreeEvents(),
       fetchNonsenseNYC(),
       fetchOhMyRockness(),
+      fetchDoNYCEvents(),
       fetchEventbriteComedy(),
       fetchEventbriteArts(),
       fetchNYCParksEvents(),
@@ -70,6 +72,7 @@ async function refreshCache() {
       { result: diceEvents, label: 'Dice' },
       { result: bvEvents, label: 'BrooklynVegan' },
       { result: nycParksEvents, label: 'NYCParks' },
+      { result: donycEvents, label: 'DoNYC' },
       { result: songkickEvents, label: 'Songkick' },
       { result: eventbriteEvents, label: 'Eventbrite' },
       { result: eventbriteComedyEvents, label: 'EventbriteComedy' },
