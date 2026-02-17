@@ -1,5 +1,6 @@
 const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchTavilyFreeEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchEventbriteComedy, fetchEventbriteArts } = require('./sources');
 const { rankEventsByProximity, filterUpcomingEvents } = require('./geo');
+const { batchGeocodeEvents } = require('./venues');
 
 // --- Daily event cache ---
 let eventCache = [];
@@ -87,6 +88,9 @@ async function refreshCache() {
         }
       }
     }
+
+    // Geocode events that still have no neighborhood (venue map miss)
+    await batchGeocodeEvents(allEvents);
 
     eventCache = allEvents;
     cacheTimestamp = Date.now();

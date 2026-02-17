@@ -214,4 +214,66 @@ function lookupVenue(name) {
   return normalizedMap.get(key) || null;
 }
 
-module.exports = { VENUE_MAP, lookupVenue };
+// --- Nominatim geocoding fallback ---
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function geocodeVenue(name, address) {
+  const query = address
+    ? `${address}, New York`
+    : name
+      ? `${name}, New York, NY`
+      : null;
+  if (!query) return null;
+
+  try {
+    const params = new URLSearchParams({
+      q: query, format: 'json', limit: '1',
+      countrycodes: 'us', viewbox: '-74.26,40.49,-73.70,40.92', bounded: '1',
+    });
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
+      headers: { 'User-Agent': 'PulseSMS/1.0' },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.length) return null;
+
+    const coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    // Cache for future lookups within this process
+    if (name) normalizedMap.set(normalizeName(name), coords);
+    return coords;
+  } catch { return null; }
+}
+
+async function batchGeocodeEvents(events) {
+  const { resolveNeighborhood } = require('./geo');
+  const unresolved = events.filter(e => !e.neighborhood && (e.venue_name || e.venue_address));
+  if (unresolved.length === 0) return;
+
+  console.log(`Geocoding ${unresolved.length} events with missing neighborhoods...`);
+  let resolved = 0;
+
+  for (const e of unresolved) {
+    // Check cache first (may have been populated by an earlier iteration)
+    const cached = lookupVenue(e.venue_name);
+    if (cached) {
+      e.neighborhood = resolveNeighborhood(null, cached.lat, cached.lng);
+      if (e.neighborhood) resolved++;
+      continue;
+    }
+
+    await sleep(1100); // Nominatim rate limit: 1 req/sec
+    const coords = await geocodeVenue(e.venue_name, e.venue_address);
+    if (coords) {
+      e.neighborhood = resolveNeighborhood(null, coords.lat, coords.lng);
+      if (e.neighborhood) resolved++;
+    }
+  }
+
+  console.log(`Geocoding done: ${resolved}/${unresolved.length} resolved`);
+}
+
+module.exports = { VENUE_MAP, lookupVenue, geocodeVenue, batchGeocodeEvents };

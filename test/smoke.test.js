@@ -397,6 +397,30 @@ const leBainEvent = normalizeExtractedEvent({
 }, 'theskint', 'curated', 0.9);
 check('Le Bain → Chelsea (RA migration)', leBainEvent.neighborhood === 'Chelsea');
 
-// ---- Summary ----
-console.log(`\n${pass} passed, ${fail} failed`);
-if (fail > 0) process.exit(1);
+// ---- batchGeocodeEvents (mock test) ----
+console.log('\nbatchGeocodeEvents (mock):');
+
+const { batchGeocodeEvents } = require('../src/venues');
+
+// Create events that would need geocoding — but use events whose venues
+// are already in the VENUE_MAP cache (batchGeocodeEvents checks cache first)
+const geoEvents = [
+  { id: 'g1', neighborhood: null, venue_name: 'Nowadays', venue_address: null },
+  { id: 'g2', neighborhood: null, venue_name: 'Good Room', venue_address: null },
+  { id: 'g3', neighborhood: 'East Village', venue_name: 'Some Place', venue_address: null }, // already resolved, skip
+  { id: 'g4', neighborhood: null, venue_name: null, venue_address: null }, // no venue info, skip
+];
+
+// batchGeocodeEvents is async — run and check
+(async () => {
+  await batchGeocodeEvents(geoEvents);
+
+  check('cached venue resolves neighborhood (Nowadays → Bushwick)', geoEvents[0].neighborhood === 'Bushwick');
+  check('cached venue resolves neighborhood (Good Room → Greenpoint)', geoEvents[1].neighborhood === 'Greenpoint');
+  check('already-resolved event untouched', geoEvents[2].neighborhood === 'East Village');
+  check('no venue info event untouched', geoEvents[3].neighborhood === null);
+
+  // ---- Summary ----
+  console.log(`\n${pass} passed, ${fail} failed`);
+  if (fail > 0) process.exit(1);
+})();
