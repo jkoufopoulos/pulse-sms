@@ -327,6 +327,9 @@ VENUE ITEMS:
 - Search-sourced items (source_name "tavily") may include permanent venues like bars or game spots with no specific date/time. Frame these as "solid spots to check out" — not "tonight at 9pm".
 - Example: "The Last Resort is a solid low-key bar in EV if you want a chill hang."
 
+KIDS EVENTS:
+- Skip NYC Parks events that are clearly for children or parents (kids workshops, storytime, family days) unless the user asked for family-friendly activities.
+
 HONESTY:
 - Only use events from the provided list. Do not invent events.
 - If nothing is worth recommending, say so honestly and suggest an adjacent neighborhood.
@@ -480,7 +483,7 @@ VALID_NEIGHBORHOODS: ${neighborhoodNames.join(', ')}`;
  * Compose an SMS response by picking events and writing the message in one Claude call.
  * Returns { sms_text, picks, neighborhood_used }
  */
-async function composeResponse(message, events, neighborhood, filters, { excludeIds } = {}) {
+async function composeResponse(message, events, neighborhood, filters, { excludeIds, extraContext } = {}) {
   const now = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   const todayNyc = getNycDateString(0);
@@ -513,11 +516,13 @@ async function composeResponse(message, events, neighborhood, filters, { exclude
     ? `\nEXCLUDED (already shown to user — do NOT pick these): ${excludeIds.join(', ')}`
     : '';
 
+  const extraNote = extraContext || '';
+
   const userPrompt = `Current time (NYC): ${now}
 User message: "${message}"
 Neighborhood: ${neighborhood || 'not specified'}
 User preferences: category=${filters?.category || 'any'}, vibe=${filters?.vibe || 'any'}, free_only=${filters?.free_only ? 'yes' : 'no'}
-${excludeNote}
+${excludeNote}${extraNote}
 EVENT_LIST:
 ${eventListStr}
 

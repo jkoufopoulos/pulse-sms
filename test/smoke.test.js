@@ -42,11 +42,16 @@ check('manhattan returns null', extractNeighborhood('manhattan') === null);
 check('queens returns null', extractNeighborhood('queens') === null);
 check('nyc returns null', extractNeighborhood('nyc tonight') === null);
 // detectBorough tests
-const { detectBorough } = require('../src/neighborhoods');
+const { detectBorough, detectUnsupported } = require('../src/neighborhoods');
 check('detectBorough bk', detectBorough('anything in bk')?.borough === 'brooklyn');
 check('detectBorough queens', detectBorough('queens')?.borough === 'queens');
 check('detectBorough brooklyn has hoods', detectBorough('brooklyn tonight')?.neighborhoods?.includes('Williamsburg'));
 check('detectBorough non-borough', detectBorough('east village') === null);
+// detectUnsupported tests
+check('detectUnsupported bay ridge', detectUnsupported('bay ridge')?.name === 'Bay Ridge');
+check('detectUnsupported bay ridge has nearby', detectUnsupported('bay ridge')?.nearby?.includes('Sunset Park'));
+check('detectUnsupported known hood returns null', detectUnsupported('east village') === null);
+check('detectUnsupported gibberish returns null', detectUnsupported('asdfjkl') === null);
 // New aliases
 check('union sq', extractNeighborhood('union sq tonight') === 'Flatiron');
 check('nolita', extractNeighborhood('nolita drinks') === 'SoHo');
@@ -396,6 +401,11 @@ const leBainEvent = normalizeExtractedEvent({
   confidence: 0.8,
 }, 'theskint', 'curated', 0.9);
 check('Le Bain → Chelsea (RA migration)', leBainEvent.neighborhood === 'Chelsea');
+
+// ---- fetchNYCParksEvents export ----
+console.log('\nfetchNYCParksEvents:');
+
+check('fetchNYCParksEvents exported', typeof require('../src/sources').fetchNYCParksEvents === 'function');
 
 // ---- batchGeocodeEvents (mock test) ----
 console.log('\nbatchGeocodeEvents (mock):');
