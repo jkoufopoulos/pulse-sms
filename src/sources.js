@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const cheerio = require('cheerio');
 const { extractEvents } = require('./ai');
 const { resolveNeighborhood, getNycDateString, inferCategory, filterUpcomingEvents } = require('./geo');
+const { lookupVenue } = require('./venues');
 
 const FETCH_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
@@ -450,57 +451,6 @@ async function fetchDiceEvents() {
 
 const RA_NYC_AREA_ID = 8;
 
-// Hardcoded venue coordinates for neighborhood resolution (RA doesn't return geo data in listings)
-const RA_VENUE_MAP = {
-  'Nowadays': { lat: 40.7061, lng: -73.9212 },
-  'Elsewhere': { lat: 40.7013, lng: -73.9225 },
-  'Good Room': { lat: 40.7268, lng: -73.9516 },
-  'Basement': { lat: 40.7127, lng: -73.9570 },
-  'Knockdown Center': { lat: 40.7150, lng: -73.9135 },
-  'Brooklyn Mirage': { lat: 40.7060, lng: -73.9225 },
-  'Avant Gardner': { lat: 40.7060, lng: -73.9225 },
-  'The Brooklyn Mirage': { lat: 40.7060, lng: -73.9225 },
-  'Public Records': { lat: 40.6807, lng: -73.9576 },
-  'Jupiter Disco': { lat: 40.7013, lng: -73.9207 },
-  'Bossa Nova Civic Club': { lat: 40.7065, lng: -73.9214 },
-  'Le Bain': { lat: 40.7408, lng: -74.0078 },
-  'Paragon': { lat: 40.7187, lng: -73.9904 },
-  'House of Yes': { lat: 40.7048, lng: -73.9230 },
-  'Mood Ring': { lat: 40.7053, lng: -73.9211 },
-  'Mansions': { lat: 40.7112, lng: -73.9565 },
-  'Baby\'s All Right': { lat: 40.7095, lng: -73.9591 },
-  'Market Hotel': { lat: 40.7058, lng: -73.9216 },
-  'Superior Ingredients': { lat: 40.7119, lng: -73.9538 },
-  'Sustain': { lat: 40.7028, lng: -73.9273 },
-  'Lot Radio': { lat: 40.7116, lng: -73.9383 },
-  'The Lot Radio': { lat: 40.7116, lng: -73.9383 },
-  'H0L0': { lat: 40.7087, lng: -73.9246 },
-  'Rubulad': { lat: 40.6960, lng: -73.9270 },
-  'Purgatory': { lat: 40.7099, lng: -73.9428 },
-  'Quantum Brooklyn': { lat: 40.6888, lng: -73.9785 },
-  'Under the K Bridge Park': { lat: 40.7032, lng: -73.9887 },
-  'The Sultan Room': { lat: 40.7058, lng: -73.9216 },
-  'Brooklyn Steel': { lat: 40.7115, lng: -73.9505 },
-  'Webster Hall': { lat: 40.7318, lng: -73.9897 },
-  'Bowery Ballroom': { lat: 40.7203, lng: -73.9935 },
-  'Terminal 5': { lat: 40.7690, lng: -73.9930 },
-  'Cielo': { lat: 40.7410, lng: -74.0056 },
-  'Schimanski': { lat: 40.7115, lng: -73.9618 },
-  'Brooklyn Hangar': { lat: 40.6780, lng: -73.9980 },
-  'The Meadows': { lat: 40.7058, lng: -73.9216 },
-  'Rumi': { lat: 40.7243, lng: -73.9543 },
-  'Signal': { lat: 40.7058, lng: -73.9216 },
-  'The Parkside Lounge': { lat: 40.7228, lng: -73.9845 },
-  'Green Room NYC': { lat: 40.7424, lng: -73.9927 },
-  'Outer Heaven': { lat: 40.7058, lng: -73.9216 },
-  // Lowercase fallbacks for common mismatches
-  'public records': { lat: 40.6807, lng: -73.9576 },
-  'good room': { lat: 40.7268, lng: -73.9516 },
-  'elsewhere': { lat: 40.7013, lng: -73.9225 },
-  'nowadays': { lat: 40.7061, lng: -73.9212 },
-  'house of yes': { lat: 40.7048, lng: -73.9230 },
-  'le bain': { lat: 40.7408, lng: -74.0078 },
-};
 
 const RA_QUERY = `query GET_EVENT_LISTINGS($filters: FilterInputDtoInput, $filterOptions: FilterOptionsInputDtoInput, $page: Int, $pageSize: Int) {
   eventListings(filters: $filters, filterOptions: $filterOptions, pageSize: $pageSize, page: $page) {
@@ -579,9 +529,7 @@ async function fetchRAEvents() {
       if (dateLocal && dateLocal !== today && dateLocal !== tomorrow) continue;
 
       const venueName = e.venue?.name;
-      const venueCoords = venueName
-        ? (RA_VENUE_MAP[venueName] || RA_VENUE_MAP[venueName.toLowerCase()])
-        : null;
+      const venueCoords = lookupVenue(venueName);
       const neighborhood = venueCoords
         ? resolveNeighborhood(null, venueCoords.lat, venueCoords.lng)
         : null;
@@ -639,8 +587,21 @@ async function fetchRAEvents() {
 function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
   const id = makeEventId(e.name, e.venue_name, e.date_local || e.start_time_local || '', sourceName);
 
+  // Try venue lookup for coords when Claude didn't extract lat/lng
+  let lat = parseFloat(e.latitude);
+  let lng = parseFloat(e.longitude);
+  let neighborhoodHint = e.neighborhood;
+  if ((isNaN(lat) || isNaN(lng)) && e.venue_name) {
+    const coords = lookupVenue(e.venue_name);
+    if (coords) {
+      lat = coords.lat;
+      lng = coords.lng;
+      neighborhoodHint = null; // trust venue coords over Claude's text guess
+    }
+  }
+
   // Validate Claude-extracted neighborhood against known neighborhoods, then fall back to geo
-  const neighborhood = resolveNeighborhood(e.neighborhood, parseFloat(e.latitude), parseFloat(e.longitude));
+  const neighborhood = resolveNeighborhood(neighborhoodHint, lat, lng);
 
   return {
     id,

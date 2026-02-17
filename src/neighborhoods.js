@@ -119,6 +119,10 @@ const NEIGHBORHOODS = {
     lat: 40.6734, lng: -74.0080, radius_km: 0.8,
     aliases: ['red hook']
   },
+  'Brooklyn Heights': {
+    lat: 40.6958, lng: -73.9936, radius_km: 0.7,
+    aliases: ['brooklyn heights', 'bk heights']
+  },
   'Sunset Park': {
     lat: 40.6514, lng: -74.0027, radius_km: 1.2,
     aliases: ['sunset park', 'industry city']
@@ -159,7 +163,7 @@ function escapeRegex(s) {
 
 // Boroughs → list of neighborhoods (for "narrow it down" flow)
 const BOROUGHS = {
-  'brooklyn': ['Williamsburg', 'Bushwick', 'Park Slope', 'DUMBO', 'Crown Heights', 'Bed-Stuy', 'Fort Greene', 'Prospect Heights', 'Cobble Hill', 'Gowanus', 'Red Hook', 'Greenpoint', 'Downtown Brooklyn', 'Sunset Park'],
+  'brooklyn': ['Williamsburg', 'Bushwick', 'Park Slope', 'DUMBO', 'Crown Heights', 'Bed-Stuy', 'Fort Greene', 'Prospect Heights', 'Cobble Hill', 'Brooklyn Heights', 'Gowanus', 'Red Hook', 'Greenpoint', 'Downtown Brooklyn', 'Sunset Park'],
   'queens': ['Astoria', 'Long Island City', 'Jackson Heights', 'Flushing'],
   'manhattan': ['East Village', 'West Village', 'Lower East Side', 'Chelsea', 'SoHo', 'NoHo', 'Tribeca', 'Midtown', 'Upper West Side', 'Upper East Side', 'Harlem', "Hell's Kitchen", 'Greenwich Village', 'Flatiron', 'Financial District', 'East Harlem', 'Washington Heights'],
 };
@@ -223,6 +227,9 @@ const BOROUGH_MAP = {
   'atlantic ave': 'Downtown Brooklyn',
   'atlantic terminal': 'Downtown Brooklyn',
   'dekalb': 'Downtown Brooklyn',
+  'bam': 'Fort Greene',
+  'brooklyn heights promenade': 'Brooklyn Heights',
+  'industry city': 'Sunset Park',
 };
 
 // Combine neighborhood aliases + borough shortcuts, sorted longest-first

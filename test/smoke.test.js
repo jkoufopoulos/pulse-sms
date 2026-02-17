@@ -4,8 +4,9 @@
  */
 
 const { extractNeighborhood } = require('../src/neighborhoods');
-const { makeEventId } = require('../src/sources');
+const { makeEventId, normalizeExtractedEvent } = require('../src/sources');
 const { resolveNeighborhood, inferCategory, haversine, getNycDateString, rankEventsByProximity, filterUpcomingEvents } = require('../src/geo');
+const { lookupVenue } = require('../src/venues');
 
 let pass = 0;
 let fail = 0;
@@ -229,6 +230,172 @@ const emptyComposeOutput = {
 };
 check('composeResponse allows empty picks', Array.isArray(emptyComposeOutput.picks) && emptyComposeOutput.picks.length === 0);
 check('composeResponse empty still has sms_text', typeof emptyComposeOutput.sms_text === 'string' && emptyComposeOutput.sms_text.length > 0);
+
+// ---- lookupVenue ----
+console.log('\nlookupVenue:');
+
+check('exact match', lookupVenue('Nowadays')?.lat === 40.7061);
+check('case insensitive', lookupVenue('nowadays')?.lat === 40.7061);
+check('punctuation normalization', lookupVenue('Babys All Right')?.lat === 40.7095);
+check('apostrophe variant', lookupVenue("Baby's All Right")?.lat === 40.7095);
+check('null for unknown', lookupVenue('Nonexistent Venue') === null);
+check('null for empty', lookupVenue(null) === null);
+check('null for empty string', lookupVenue('') === null);
+check('Good Room → Greenpoint coords', lookupVenue('Good Room')?.lat === 40.7268);
+check('Le Bain → Chelsea coords', lookupVenue('Le Bain')?.lat === 40.7408);
+check('Smalls Jazz Club found', lookupVenue('Smalls Jazz Club')?.lat === 40.7346);
+
+// ---- Brooklyn Heights ----
+console.log('\nBrooklyn Heights:');
+
+check('resolveNeighborhood Brooklyn Heights', resolveNeighborhood('Brooklyn Heights', null, null) === 'Brooklyn Heights');
+check('alias bk heights', resolveNeighborhood('bk heights', null, null) === 'Brooklyn Heights');
+check('extractNeighborhood brooklyn heights', extractNeighborhood('brooklyn heights tonight') === 'Brooklyn Heights');
+check('extractNeighborhood bk heights', extractNeighborhood('bk heights tonight') === 'Brooklyn Heights');
+check('borough landmark bam', extractNeighborhood('near bam tonight') === 'Fort Greene');
+check('borough landmark brooklyn heights promenade', extractNeighborhood('brooklyn heights promenade walk') === 'Brooklyn Heights');
+check('Brooklyn Heights in brooklyn borough', require('../src/neighborhoods').detectBorough('brooklyn')?.neighborhoods?.includes('Brooklyn Heights'));
+
+// ---- normalizeExtractedEvent: venue lookup integration ----
+console.log('\nnormalizeExtractedEvent (venue → neighborhood):');
+
+// Core scenario: Skint event at known venue, no lat/lng, Claude guessed wrong neighborhood
+const smallsEvent = normalizeExtractedEvent({
+  name: 'Late Night Jazz Session',
+  venue_name: 'Smalls Jazz Club',
+  neighborhood: 'SoHo', // Claude's wrong guess
+  confidence: 0.8,
+}, 'theskint', 'curated', 0.9);
+check('Smalls Jazz Club → West Village (overrides Claude SoHo guess)', smallsEvent.neighborhood === 'West Village');
+
+// Known venue, no lat/lng, Claude gave no neighborhood at all
+const goodRoomEvent = normalizeExtractedEvent({
+  name: 'House Night',
+  venue_name: 'Good Room',
+  neighborhood: null,
+  confidence: 0.8,
+}, 'nonsensenyc', 'curated', 0.9);
+check('Good Room + null neighborhood → Greenpoint', goodRoomEvent.neighborhood === 'Greenpoint');
+
+// Known venue, no lat/lng, Claude said "Brooklyn" (borough, not neighborhood)
+const publicRecordsEvent = normalizeExtractedEvent({
+  name: 'Ambient Night',
+  venue_name: 'Public Records',
+  neighborhood: 'Brooklyn',
+  confidence: 0.7,
+}, 'theskint', 'curated', 0.9);
+check('Public Records + "Brooklyn" → resolves via coords not borough fallback',
+  publicRecordsEvent.neighborhood !== null && publicRecordsEvent.neighborhood !== 'Williamsburg');
+
+// Venue with punctuation mismatch (Claude strips apostrophe)
+const babysEvent = normalizeExtractedEvent({
+  name: 'Indie Rock Show',
+  venue_name: 'Babys All Right',  // missing apostrophe
+  neighborhood: null,
+  confidence: 0.8,
+}, 'ohmyrockness', 'curated', 0.85);
+check('Babys All Right (no apostrophe) → Williamsburg', babysEvent.neighborhood === 'Williamsburg');
+
+// Unknown venue, no lat/lng — falls back to Claude's text neighborhood
+const unknownVenueEvent = normalizeExtractedEvent({
+  name: 'Pop-up Party',
+  venue_name: 'Some Random Bar',
+  neighborhood: 'East Village',
+  confidence: 0.6,
+}, 'theskint', 'curated', 0.9);
+check('unknown venue + valid Claude neighborhood → keeps Claude guess', unknownVenueEvent.neighborhood === 'East Village');
+
+// Unknown venue, no lat/lng, bad Claude neighborhood → null
+const unknownBothEvent = normalizeExtractedEvent({
+  name: 'Mystery Event',
+  venue_name: 'Totally Made Up Place',
+  neighborhood: 'Narnia',
+  confidence: 0.5,
+}, 'theskint', 'curated', 0.9);
+check('unknown venue + unknown neighborhood → null', unknownBothEvent.neighborhood === null);
+
+// Event WITH lat/lng already — venue lookup should NOT override
+const eventWithCoords = normalizeExtractedEvent({
+  name: 'Rooftop Party',
+  venue_name: 'Le Bain',  // Chelsea venue
+  neighborhood: null,
+  latitude: '40.7264',  // East Village coords
+  longitude: '-73.9818',
+  confidence: 0.8,
+}, 'theskint', 'curated', 0.9);
+check('event with existing lat/lng → uses those coords, not venue lookup', eventWithCoords.neighborhood === 'East Village');
+
+// Bed-Stuy venue (thin neighborhood that was missing coverage)
+const bedStuyEvent = normalizeExtractedEvent({
+  name: 'DJ Set',
+  venue_name: 'Ode to Babel',
+  neighborhood: 'Williamsburg', // Claude wrong guess
+  confidence: 0.7,
+}, 'nonsensenyc', 'curated', 0.9);
+check('Ode to Babel → Bed-Stuy (not Williamsburg)', bedStuyEvent.neighborhood === 'Bed-Stuy');
+
+// UWS venue
+const beaconEvent = normalizeExtractedEvent({
+  name: 'Big Concert',
+  venue_name: 'Beacon Theatre',
+  neighborhood: 'Midtown', // Claude wrong guess
+  confidence: 0.8,
+}, 'theskint', 'curated', 0.9);
+check('Beacon Theatre → Upper West Side (not Midtown)', beaconEvent.neighborhood === 'Upper West Side');
+
+// West Village venue via Nonsense NYC
+const villageVanguardEvent = normalizeExtractedEvent({
+  name: 'Jazz Night',
+  venue_name: 'Village Vanguard',
+  neighborhood: null,
+  confidence: 0.7,
+}, 'nonsensenyc', 'curated', 0.9);
+check('Village Vanguard → West Village', villageVanguardEvent.neighborhood === 'West Village');
+
+// Fort Greene venue (BAM)
+const bamEvent = normalizeExtractedEvent({
+  name: 'Film Screening',
+  venue_name: 'BAM',
+  neighborhood: 'Downtown Brooklyn', // close but wrong
+  confidence: 0.7,
+}, 'theskint', 'curated', 0.9);
+check('BAM → Fort Greene (not Downtown Brooklyn)', bamEvent.neighborhood === 'Fort Greene');
+
+// Gowanus venue
+const bellHouseEvent = normalizeExtractedEvent({
+  name: 'Comedy Show',
+  venue_name: 'The Bell House',
+  neighborhood: 'Park Slope', // close but wrong
+  confidence: 0.7,
+}, 'theskint', 'curated', 0.9);
+check('The Bell House → Gowanus', bellHouseEvent.neighborhood === 'Gowanus');
+
+// RA migration: verify old RA_VENUE_MAP venues still work via lookupVenue
+console.log('\nnormalizeExtractedEvent (RA migration sanity):');
+
+const nowadaysEvent = normalizeExtractedEvent({
+  name: 'Day Party',
+  venue_name: 'Nowadays',
+  neighborhood: null,
+  confidence: 0.8,
+}, 'theskint', 'curated', 0.9);
+check('Nowadays → Bushwick (RA migration)', nowadaysEvent.neighborhood === 'Bushwick');
+
+const houseOfYesEvent = normalizeExtractedEvent({
+  name: 'Circus Party',
+  venue_name: 'House of Yes',
+  neighborhood: null,
+  confidence: 0.8,
+}, 'theskint', 'curated', 0.9);
+check('House of Yes → Bushwick (RA migration)', houseOfYesEvent.neighborhood === 'Bushwick');
+
+const leBainEvent = normalizeExtractedEvent({
+  name: 'Rooftop Night',
+  venue_name: 'Le Bain',
+  neighborhood: null,
+  confidence: 0.8,
+}, 'theskint', 'curated', 0.9);
+check('Le Bain → Chelsea (RA migration)', leBainEvent.neighborhood === 'Chelsea');
 
 // ---- Summary ----
 console.log(`\n${pass} passed, ${fail} failed`);
