@@ -361,6 +361,28 @@ async function handleMessageAI(phone, message) {
         trace.events.candidates_count = allRemaining.length;
         trace.events.candidate_ids = allRemaining.map(e => e.id);
         const result = await composeAndSend(composeRemaining, hood, route.filters, 'more', { excludeIds: [...allShownIds], extraContext });
+
+        // Name-based dedup: filter out picks that share a name with previously shown events
+        const prevPickNames = new Set(
+          (session.allPicks || session.lastPicks || [])
+            .map(p => session.lastEvents[p.event_id]?.name?.toLowerCase())
+            .filter(Boolean)
+        );
+        result.picks = (result.picks || []).filter(p => {
+          const evt = session.lastEvents[p.event_id];
+          return !evt || !prevPickNames.has(evt.name?.toLowerCase());
+        });
+
+        // Post-process: strip MORE references from SMS when it's the last batch
+        if (isLastBatch) {
+          result.sms_text = result.sms_text
+            .replace(/,?\s*MORE for extra picks/gi, '')
+            .replace(/,?\s*or MORE for more/gi, '')
+            .replace(/,?\s*MORE for more picks/gi, '')
+            .replace(/\s*Reply MORE[^.!\n]*/gi, '')
+            .replace(/,?\s*MORE for more/gi, '');
+        }
+
         const newAllPicks = [...(session.allPicks || session.lastPicks || []), ...(result.picks || [])];
         const newAllOfferedIds = [...allOfferedIds, ...composeRemaining.map(e => e.id)];
 
@@ -650,6 +672,85 @@ async function handleMessageAI(phone, message) {
     return;
   }
 
+  // Check if any events are actually in the requested neighborhood
+  const inHood = events.filter(e => e.neighborhood === hood);
+  const todayNyc = getNycDateString(0);
+
+  // If hood has events but ONLY for tomorrow — surface them proactively
+  if (inHood.length > 0 && !categoryApplied) {
+    const inHoodToday = inHood.filter(e => {
+      const d = getEventDate(e);
+      return d === todayNyc || !d; // today or no date = treat as today
+    });
+    if (inHoodToday.length === 0) {
+      // Nothing tonight in the hood, but tomorrow events exist — serve those
+      const extraContext = `\nIMPORTANT: There is NOTHING tonight in ${hood}. All events below are TOMORROW. Lead with "Nothing tonight in ${hood}, but tomorrow:" and use the tomorrow format.`;
+      const composeTomorrow = inHood.slice(0, 8);
+      const eventMap = {};
+      for (const e of inHood) eventMap[e.id] = e;
+      const result = await composeAndSend(composeTomorrow, hood, route.filters, 'events', { extraContext });
+      setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: hood });
+      await sendComposeWithLinks(phone, result, eventMap);
+      console.log(`Tomorrow events served for ${hood} to ${masked} (${inHood.length} tomorrow events)`);
+      finalizeTrace(result.sms_text, 'events');
+      return;
+    }
+  }
+
+  // If NO events are in the hood, check raw cache for tomorrow events before nudging
+  if (inHood.length === 0 && !categoryApplied) {
+    const tomorrowNyc2 = getNycDateString(1);
+    const { events: rawCache2 } = getRawCache();
+    const tomorrowInHood2 = rawCache2.filter(e => {
+      const d = getEventDate(e);
+      return d === tomorrowNyc2 && e.neighborhood === hood;
+    });
+    if (tomorrowInHood2.length > 0) {
+      const composeTomorrow = tomorrowInHood2.slice(0, 8);
+      const eventMap = {};
+      for (const e of tomorrowInHood2) eventMap[e.id] = e;
+      const extraContext = `\nIMPORTANT: There is NOTHING tonight in ${hood}. All events below are TOMORROW. Lead with "Nothing tonight in ${hood}, but tomorrow:" and use the tomorrow format.`;
+      const result = await composeAndSend(composeTomorrow, hood, route.filters, 'events', { extraContext });
+      setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: hood });
+      await sendComposeWithLinks(phone, result, eventMap);
+      console.log(`Tomorrow events (raw cache) served for ${hood} to ${masked} (${tomorrowInHood2.length} events)`);
+      finalizeTrace(result.sms_text, 'events');
+      return;
+    }
+  }
+
+  // If NO events are in the requested hood, offer a travel nudge
+  // Skip when: category filter was applied, already nudged, or too few events to justify travel
+  if (inHood.length === 0 && !alreadyNudged && !categoryApplied && events.length >= 3) {
+    // Find the dominant nearby neighborhood in the results
+    const hoodCounts = {};
+    for (const e of events) {
+      if (e.neighborhood && e.neighborhood !== hood) {
+        hoodCounts[e.neighborhood] = (hoodCounts[e.neighborhood] || 0) + 1;
+      }
+    }
+    const nearbyWithEvents = Object.entries(hoodCounts)
+      .sort((a, b) => b[1] - a[1])
+      .filter(([, count]) => count >= 1);
+
+    if (nearbyWithEvents.length > 0) {
+      const nearbyHood = nearbyWithEvents[0][0];
+      const nearbyEvents = events.filter(e => e.neighborhood === nearbyHood);
+      const cats = {};
+      for (const e of nearbyEvents) { const c = e.category || 'events'; cats[c] = (cats[c] || 0) + 1; }
+      const topCat = Object.entries(cats).sort((a, b) => b[1] - a[1])[0]?.[0] || 'events';
+      const vibeWord = { live_music: 'some music', nightlife: 'some nightlife', comedy: 'some comedy', art: 'some art', community: 'something cool', food_drink: 'some food & drinks', theater: 'some theater' }[topCat] || 'some stuff going on';
+      const sms = `Hey not much going on in ${hood}... would you travel to ${nearbyHood} for ${vibeWord}?`;
+      const eventMap = {};
+      for (const e of nearbyEvents) eventMap[e.id] = e;
+      setSession(phone, { pendingNearby: nearbyHood, pendingNearbyEvents: eventMap });
+      await sendSMS(phone, sms);
+      console.log(`Nudge sent to ${masked}: ${hood} → ${nearbyHood} (${nearbyEvents.length} events)`);
+      finalizeTrace(sms, 'events');
+      return;
+    }
+  }
+
   // Pre-filter to top 8 by proximity to reduce token cost
   const composeEvents = events.slice(0, 8);
 
@@ -665,7 +766,7 @@ async function handleMessageAI(phone, message) {
   const eventMap = {};
   for (const e of events) eventMap[e.id] = e;
 
-  setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: result.neighborhood_used || hood, visitedHoods: [hood] });
+  setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], allOfferedIds: composeEvents.map(e => e.id), lastEvents: eventMap, lastNeighborhood: result.neighborhood_used || hood, visitedHoods: [hood] });
 
   await sendComposeWithLinks(phone, result, eventMap);
   console.log(`AI response sent to ${masked}`);

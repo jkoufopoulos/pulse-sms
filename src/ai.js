@@ -10,7 +10,7 @@ function getClient() {
 const MODELS = {
   route: process.env.PULSE_MODEL_ROUTE || 'claude-haiku-4-5-20251001',
   compose: process.env.PULSE_MODEL_COMPOSE || 'claude-sonnet-4-5-20250929',
-  extract: process.env.PULSE_MODEL_EXTRACT || 'claude-sonnet-4-5-20250929',
+  extract: process.env.PULSE_MODEL_EXTRACT || 'claude-haiku-4-5-20251001',
 };
 
 const EXTRACTION_PROMPT = `<role>
