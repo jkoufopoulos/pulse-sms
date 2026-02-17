@@ -1,28 +1,17 @@
 const express = require('express');
 const twilio = require('twilio');
-const { extractNeighborhood, detectBorough, NEIGHBORHOODS } = require('./neighborhoods');
-const { getEvents } = require('./events');
+const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
+const { getEvents, getRawCache } = require('./events');
+const { getNycDateString, getEventDate } = require('./geo');
 const { routeMessage, composeResponse, composeDetails, isSearchUrl } = require('./ai');
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
-const { parseAsNycTime } = require('./geo');
 const { startTrace, saveTrace } = require('./traces');
+const { getSession, setSession, clearSession, clearSessionInterval } = require('./session');
+const { formatEventDetails, cleanUrl } = require('./formatters');
+const { getAdjacentNeighborhoods, preRoute } = require('./pre-router');
+const { getPerennialPicks } = require('./perennial');
 
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
-
-// --- Adjacent neighborhood helper (Euclidean approx, fine for NYC scale) ---
-function getAdjacentNeighborhoods(hood, count = 3) {
-  const target = NEIGHBORHOODS[hood];
-  if (!target) return [];
-  return Object.entries(NEIGHBORHOODS)
-    .filter(([name]) => name !== hood)
-    .map(([name, data]) => ({
-      name,
-      dist: Math.sqrt(Math.pow(target.lat - data.lat, 2) + Math.pow(target.lng - data.lng, 2)),
-    }))
-    .sort((a, b) => a.dist - b.dist)
-    .slice(0, count)
-    .map(d => d.name);
-}
 
 const router = express.Router();
 
@@ -73,116 +62,6 @@ const rateLimitInterval = setInterval(() => {
   } catch (e) { console.error('Rate limit cleanup error:', e); }
 }, 10 * 60 * 1000);
 
-// --- Event detail formatting ---
-function formatTime(isoStr) {
-  // Bare date (no time component) — parse as local to avoid UTC midnight shift
-  if (!/T|:/.test(isoStr)) {
-    try {
-      const [y, m, d] = isoStr.split('-').map(Number);
-      if (y && m && d) {
-        return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-      }
-    } catch {}
-    return isoStr;
-  }
-  try {
-    // Use parseAsNycTime to correctly handle offset-less ISO strings
-    // (e.g. Eventbrite's "2026-02-15T19:00:00" which is NYC local, not UTC)
-    const ms = parseAsNycTime(isoStr);
-    if (isNaN(ms)) return isoStr;
-    return new Date(ms).toLocaleString('en-US', {
-      timeZone: 'America/New_York',
-      weekday: 'short', month: 'short', day: 'numeric',
-      hour: 'numeric', minute: '2-digit',
-    });
-  } catch { return isoStr; }
-}
-
-function cleanUrl(url) {
-  try {
-    const u = new URL(url);
-    // Strip UTM and tracking params
-    for (const key of [...u.searchParams.keys()]) {
-      if (key.startsWith('utm_') || key === 'ref' || key === 'fbclid' || key === 'aff') {
-        u.searchParams.delete(key);
-      }
-    }
-    let clean = u.toString().replace(/\?$/, '');
-
-    // Shorten Eventbrite: extract trailing numeric ID → eventbrite.com/e/<id>
-    const ebMatch = clean.match(/eventbrite\.com\/e\/.*?(\d{10,})$/);
-    if (ebMatch) return `https://www.eventbrite.com/e/${ebMatch[1]}`;
-
-    // Shorten Dice: extract hash prefix → dice.fm/event/<hash>
-    const diceMatch = clean.match(/dice\.fm\/event\/([a-z0-9]+)-/);
-    if (diceMatch) return `https://dice.fm/event/${diceMatch[1]}`;
-
-    // Shorten Songkick: strip slug after concert ID
-    const skMatch = clean.match(/(songkick\.com\/concerts\/\d+)/);
-    if (skMatch) return `https://www.${skMatch[1]}`;
-
-    return clean;
-  } catch { return url; }
-}
-
-function formatEventDetails(event) {
-  const venue = event.venue_name && event.venue_name !== 'TBA' ? event.venue_name : null;
-
-  // Dedupe: skip "at Venue" if event name already contains venue
-  let detail = event.name || '';
-  if (venue && !detail.toLowerCase().includes(venue.toLowerCase())) {
-    detail += ` at ${venue}`;
-  }
-
-  // Time — show end time compactly if same day
-  if (event.start_time_local) {
-    detail += `\n${formatTime(event.start_time_local)}`;
-    if (event.end_time_local) {
-      try {
-        const startMs = parseAsNycTime(event.start_time_local);
-        const endMs = parseAsNycTime(event.end_time_local);
-        const start = new Date(startMs);
-        const end = new Date(endMs);
-        // Compare dates in NYC timezone
-        const startDate = start.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-        const endDate = end.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-        if (startDate === endDate) {
-          detail += ` – ${end.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' })}`;
-        } else {
-          detail += ` – ${formatTime(event.end_time_local)}`;
-        }
-      } catch {
-        detail += ` – ${formatTime(event.end_time_local)}`;
-      }
-    }
-  }
-
-  if (event.is_free) detail += `\nFree!`;
-  else if (event.price_display) detail += `\n${event.price_display}`;
-
-  if (event.venue_address) detail += `\n${event.venue_address}`;
-  // URL: prefer ticket_url > source_url, but never search pages. Fallback to Google Maps.
-  const directUrl = [event.ticket_url, event.source_url].find(u => u && !isSearchUrl(u));
-  if (directUrl) {
-    detail += `\n${cleanUrl(directUrl)}`;
-  } else {
-    // Google Maps fallback
-    const venueName = event.venue_name || event.name || '';
-    const hood = event.neighborhood || '';
-    if (venueName) {
-      detail += `\nhttps://www.google.com/maps/search/${encodeURIComponent(`${venueName} ${hood} NYC`.trim())}`;
-    }
-  }
-
-  // Only show map_hint if it adds info beyond the address
-  if (event.map_hint && (!event.venue_address || !event.venue_address.includes(event.map_hint))) {
-    const hint = event.map_hint.replace(/^near\s+/i, '');
-    detail += `\nNear ${hint}`;
-  }
-
-  return detail.slice(0, 480);
-}
-
 // --- Send compose result + follow-up link messages ---
 // Sends the main sms_text, then each picked event's URL as a separate message
 // so that iMessage/Android unfurls a rich link preview with venue images.
@@ -199,113 +78,6 @@ async function sendComposeWithLinks(phone, result, eventSource) {
     }
   }
 }
-
-// --- Deterministic pre-router (skips Claude for obvious intents) ---
-function preRoute(message, session) {
-  const msg = message.trim();
-  const lower = msg.toLowerCase();
-  const base = { filters: { free_only: false, category: null, vibe: null }, event_reference: null, reply: null, confidence: 1.0 };
-
-  // Help
-  if (/^(help|\?)$/i.test(msg)) {
-    return { ...base, intent: 'help', neighborhood: null };
-  }
-
-  // Bare numbers → details (only if session has picks)
-  if (/^[1-3]$/.test(msg) && session?.lastPicks?.length > 0) {
-    return { ...base, intent: 'details', neighborhood: null, event_reference: msg };
-  }
-
-  // Affirmative reply to "would you travel to X?" nudge
-  if (/^(yes|yeah|ya|yea|yep|yup|sure|ok|okay|down|let's go|lets go|bet|absolutely|definitely|why not|i'm down|im down)$/i.test(msg) && session?.pendingNearby) {
-    return { ...base, intent: 'nudge_accept', neighborhood: session.pendingNearby };
-  }
-
-  // More
-  if (/^(more|show me more|what else|anything else|what else you got|next|what's next)$/i.test(msg)) {
-    return { ...base, intent: 'more', neighborhood: session?.lastNeighborhood || null };
-  }
-
-  // Free
-  if (/^(free|free stuff|free events|free tonight|anything free)$/i.test(msg)) {
-    return { ...base, intent: 'free', neighborhood: session?.lastNeighborhood || null, filters: { free_only: true, category: null, vibe: null } };
-  }
-
-  // Event name match from session picks (e.g. "vince anderson" matches "Rev. Vince Anderson @ Union Pool")
-  if (session?.lastPicks && session?.lastEvents && lower.length >= 3) {
-    for (let i = 0; i < session.lastPicks.length; i++) {
-      const event = session.lastEvents[session.lastPicks[i].event_id];
-      if (!event?.name) continue;
-      const eventNameLower = event.name.toLowerCase();
-      // Match if event name contains user message OR user message contains event name
-      const eventNameClean = eventNameLower.replace(/^(the|a|an)\s+/i, '');
-      if (eventNameLower.includes(lower) || (eventNameClean.length >= 3 && lower.includes(eventNameClean))) {
-        return { ...base, intent: 'details', neighborhood: null, event_reference: String(i + 1) };
-      }
-    }
-  }
-
-  // Greetings
-  if (/^(hey|hi|hello|yo|sup|what's up|wassup|hola|howdy)$/i.test(msg)) {
-    return { ...base, intent: 'conversational', neighborhood: null, reply: "Hey! Text me a neighborhood and I'll find you something good tonight." };
-  }
-
-  // Thanks
-  if (/^(thanks|thank you|thx|ty|appreciate it|cheers)$/i.test(msg)) {
-    return { ...base, intent: 'conversational', neighborhood: null, reply: "Anytime! Text a neighborhood when you're ready to go out again." };
-  }
-
-  // Bye
-  if (/^(bye|later|peace|gn|good night|night|see ya|cya|deuces)$/i.test(msg)) {
-    return { ...base, intent: 'conversational', neighborhood: null, reply: "Later! Hit me up whenever." };
-  }
-
-  // Borough detection — ask user to narrow down
-  const borough = detectBorough(msg);
-  if (borough) {
-    const name = borough.borough.charAt(0).toUpperCase() + borough.borough.slice(1);
-    return { ...base, intent: 'conversational', neighborhood: null, reply: `${name}'s a big place! Which neighborhood?\n\n${borough.neighborhoods.join(', ')}` };
-  }
-
-  // Bare neighborhood (short messages only — longer ones need Claude for intent/filters)
-  if (msg.length <= 25) {
-    const hood = extractNeighborhood(msg);
-    if (hood) {
-      return { ...base, intent: 'events', neighborhood: hood };
-    }
-  }
-
-  return null; // Fall through to Claude
-}
-
-// --- Session store for DETAILS/MORE/FREE ---
-// Maps phone → { lastPicks, lastEvents, lastNeighborhood, timestamp }
-const sessions = new Map();
-const SESSION_TTL = 2 * 60 * 60 * 1000; // 2 hours
-
-function getSession(phone) {
-  const s = sessions.get(phone);
-  if (s && Date.now() - s.timestamp < SESSION_TTL) return s;
-  return null;
-}
-
-function setSession(phone, data) {
-  sessions.set(phone, { ...data, timestamp: Date.now() });
-}
-
-function clearSession(phone) {
-  sessions.delete(phone);
-}
-
-// Clean stale sessions every 10 minutes
-const sessionInterval = setInterval(() => {
-  try {
-    const cutoff = Date.now() - SESSION_TTL;
-    for (const [phone, data] of sessions) {
-      if (data.timestamp < cutoff) sessions.delete(phone);
-    }
-  } catch (e) { console.error('Session cleanup error:', e); }
-}, 10 * 60 * 1000);
 
 // =======================================================
 // Test endpoint — runs full pipeline, returns response over HTTP
@@ -548,12 +320,12 @@ async function handleMessageAI(phone, message) {
   }
 
   // Helper: capture compose trace data and finalize
-  async function composeAndSend(composeEvents, hood, filters, intentLabel, { excludeIds } = {}) {
+  async function composeAndSend(composeEvents, hood, filters, intentLabel, { excludeIds, extraContext } = {}) {
     trace.events.sent_to_claude = composeEvents.length;
     trace.events.sent_ids = composeEvents.map(e => e.id);
 
     const composeStart = Date.now();
-    const result = await composeResponse(message, composeEvents, hood, filters, { excludeIds });
+    const result = await composeResponse(message, composeEvents, hood, filters, { excludeIds, extraContext });
     trace.composition.latency_ms = Date.now() - composeStart;
     trace.composition.raw_response = result._raw || null;
     trace.composition.picks = (result.picks || []).map(p => {
@@ -568,21 +340,35 @@ async function handleMessageAI(phone, message) {
 
   // --- More ---
   if (route.intent === 'more') {
-    const allShownIds = new Set((session?.allPicks || session?.lastPicks || []).map(p => p.event_id));
+    // Track events ever offered to Claude (not just picks) to prevent recycling
+    const allOfferedIds = new Set(session?.allOfferedIds || []);
+    const allPickIds = new Set((session?.allPicks || session?.lastPicks || []).map(p => p.event_id));
+    const allShownIds = new Set([...allOfferedIds, ...allPickIds]);
+    const hood = neighborhood || session?.lastNeighborhood;
 
     if (session && session.lastEvents) {
-      const remaining = Object.values(session.lastEvents).filter(e => !allShownIds.has(e.id));
-      if (remaining.length > 0) {
-        const hood = neighborhood || session.lastNeighborhood;
-        const composeRemaining = remaining.slice(0, 8);
+      const allRemaining = Object.values(session.lastEvents).filter(e => !allShownIds.has(e.id));
+
+      if (allRemaining.length > 0) {
+        const composeRemaining = allRemaining.slice(0, 8);
+        // If this is the last batch (all remaining fit in one compose), hint to Claude
+        const isLastBatch = allRemaining.length <= 8;
+        const extraContext = isLastBatch
+          ? `\nNOTE: This is the LAST batch of events I have.\nOVERRIDE CLOSING LINE: Instead of "Reply 1-N for details, MORE for extra picks", use "Reply 1-N for details" (no MORE option). Then add "That's everything I've got in ${hood}! Try a different neighborhood for more."`
+          : '';
+
         trace.events.cache_size = Object.keys(session.lastEvents).length;
-        trace.events.candidates_count = remaining.length;
-        trace.events.candidate_ids = remaining.map(e => e.id);
-        const result = await composeAndSend(composeRemaining, hood, route.filters, 'more', { excludeIds: [...allShownIds] });
+        trace.events.candidates_count = allRemaining.length;
+        trace.events.candidate_ids = allRemaining.map(e => e.id);
+        const result = await composeAndSend(composeRemaining, hood, route.filters, 'more', { excludeIds: [...allShownIds], extraContext });
         const newAllPicks = [...(session.allPicks || session.lastPicks || []), ...(result.picks || [])];
-        setSession(phone, { lastPicks: result.picks || [], allPicks: newAllPicks, lastEvents: session.lastEvents, lastNeighborhood: hood });
+        const newAllOfferedIds = [...allOfferedIds, ...composeRemaining.map(e => e.id)];
+
+        const visitedHoods = new Set([...(session.visitedHoods || []), hood]);
+        setSession(phone, { lastPicks: result.picks || [], allPicks: newAllPicks, allOfferedIds: newAllOfferedIds, lastEvents: session.lastEvents, lastNeighborhood: hood, visitedHoods: [...visitedHoods] });
         await sendComposeWithLinks(phone, result, session.lastEvents);
-        console.log(`More sent to ${masked}`);
+
+        console.log(`More sent to ${masked} (${allRemaining.length} remaining${isLastBatch ? ', last batch' : ''})`);
         finalizeTrace(result.sms_text, 'more');
         return;
       }
@@ -595,12 +381,11 @@ async function handleMessageAI(phone, message) {
       return;
     }
 
-    const hood = neighborhood || session.lastNeighborhood;
-
-    // All cached events exhausted
-    const nearby = getAdjacentNeighborhoods(hood, 2);
-    const suggestion = nearby.length > 0 ? ` Try ${nearby.join(' or ')} — they're close by.` : ' Try a different neighborhood or check back later!';
-    const sms = `That's all I could find near ${hood}.${suggestion}`;
+    // All events exhausted — suggest nearby, excluding already-visited neighborhoods
+    const visited = new Set(session?.visitedHoods || [hood]);
+    const nearby = getAdjacentNeighborhoods(hood, 4).filter(n => !visited.has(n));
+    const suggestion = nearby.length > 0 ? ` Want to try ${nearby[0]}? It's right nearby.` : ' Try a different neighborhood or check back later!';
+    const sms = `That's all I've got in ${hood} tonight!${suggestion}`;
     await sendSMS(phone, sms);
     finalizeTrace(sms, 'more');
     return;
@@ -619,7 +404,26 @@ async function handleMessageAI(phone, message) {
     const freeEvents = events.filter(e => e.is_free);
 
     if (freeEvents.length === 0) {
-      const sms = `Nothing free near ${hood} tonight that meets our standards — text "${hood}" for all events or try a different neighborhood.`;
+      // Search nearby neighborhoods for free events
+      const nearbyHoods = getAdjacentNeighborhoods(hood, 3);
+      for (const nearbyHood of nearbyHoods) {
+        const nearbyEvents = await getEvents(nearbyHood);
+        const nearbyFree = nearbyEvents.filter(e => e.is_free);
+        if (nearbyFree.length > 0) {
+          trace.events.cache_size = nearbyEvents.length;
+          trace.events.candidates_count = nearbyFree.length;
+          trace.events.candidate_ids = nearbyFree.map(e => e.id);
+          const eventMap = {};
+          for (const e of nearbyFree) eventMap[e.id] = e;
+          const result = await composeAndSend(nearbyFree.slice(0, 8), nearbyHood, { ...route.filters, free_only: true }, 'free');
+          setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: nearbyHood });
+          await sendComposeWithLinks(phone, result, eventMap);
+          console.log(`Free events from nearby ${nearbyHood} sent to ${masked}`);
+          finalizeTrace(result.sms_text, 'free');
+          return;
+        }
+      }
+      const sms = `Nothing free near ${hood} tonight — text "${hood}" for all events or try a different neighborhood.`;
       await sendSMS(phone, sms);
       finalizeTrace(sms, 'free');
       return;
@@ -645,19 +449,54 @@ async function handleMessageAI(phone, message) {
 
   // --- Nudge accept (user said yes to travel suggestion) ---
   if (route.intent === 'nudge_accept') {
-    const nearbyHood = session?.pendingNearby;
-    const nearbyEvents = session?.pendingNearbyEvents;
-    if (nearbyHood && nearbyEvents && Object.keys(nearbyEvents).length > 0) {
+    const acceptedHood = route.neighborhood;
+    // If user accepted the suggested neighborhood and we have pre-fetched events, serve them
+    if (acceptedHood === session?.pendingNearby && session?.pendingNearbyEvents && Object.keys(session.pendingNearbyEvents).length > 0) {
+      const nearbyEvents = session.pendingNearbyEvents;
       const composeEvents = Object.values(nearbyEvents).slice(0, 8);
       trace.events.cache_size = Object.keys(nearbyEvents).length;
       trace.events.candidates_count = composeEvents.length;
       trace.events.candidate_ids = composeEvents.map(e => e.id);
-      const result = await composeAndSend(composeEvents, nearbyHood, route.filters, 'nudge_accept');
-      setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: nearbyEvents, lastNeighborhood: nearbyHood });
+      const result = await composeAndSend(composeEvents, acceptedHood, route.filters, 'nudge_accept');
+      setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: nearbyEvents, lastNeighborhood: acceptedHood });
       await sendComposeWithLinks(phone, result, nearbyEvents);
-      console.log(`Nudge accept: served ${nearbyHood} picks to ${masked}`);
+      console.log(`Nudge accept: served ${acceptedHood} picks to ${masked}`);
       finalizeTrace(result.sms_text, 'nudge_accept');
       return;
+    }
+    // User counter-suggested a different neighborhood — fetch events for that one
+    if (acceptedHood) {
+      const counterEvents = await getEvents(acceptedHood);
+      if (counterEvents.length > 0) {
+        const composeEvents = counterEvents.slice(0, 8);
+        trace.events.cache_size = counterEvents.length;
+        trace.events.candidates_count = composeEvents.length;
+        trace.events.candidate_ids = composeEvents.map(e => e.id);
+        const eventMap = {};
+        for (const e of counterEvents) eventMap[e.id] = e;
+        const result = await composeAndSend(composeEvents, acceptedHood, route.filters, 'nudge_accept');
+        setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: acceptedHood });
+        await sendComposeWithLinks(phone, result, eventMap);
+        console.log(`Nudge accept (counter-suggestion): served ${acceptedHood} picks to ${masked}`);
+        finalizeTrace(result.sms_text, 'nudge_accept');
+        return;
+      }
+      // Counter-suggestion also has no events — find nearest with events, no more loops
+      const nearby2 = getAdjacentNeighborhoods(acceptedHood, 5);
+      for (const nearbyHood of nearby2) {
+        const nearbyEvents = await getEvents(nearbyHood);
+        if (nearbyEvents.length > 0) {
+          const composeEvents = nearbyEvents.slice(0, 8);
+          const eventMap = {};
+          for (const e of nearbyEvents) eventMap[e.id] = e;
+          const result = await composeAndSend(composeEvents, nearbyHood, route.filters, 'nudge_accept');
+          setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: nearbyHood });
+          await sendComposeWithLinks(phone, result, eventMap);
+          console.log(`Nudge accept (nearby fallback): served ${nearbyHood} picks to ${masked}`);
+          finalizeTrace(result.sms_text, 'nudge_accept');
+          return;
+        }
+      }
     }
     // Fallback: treat as regular events request
     console.warn('Nudge accept but no saved events, falling through to events');
@@ -677,7 +516,7 @@ async function handleMessageAI(phone, message) {
   }
 
   // --- Events (default) ---
-  const hood = neighborhood;
+  let hood = neighborhood;
   let events = await getEvents(hood);
   console.log(`Found ${events.length} events near ${hood}`);
 
@@ -686,52 +525,129 @@ async function handleMessageAI(phone, message) {
     events = events.filter(e => e.is_free);
   }
 
-  if (events.length === 0) {
-    const nearby = getAdjacentNeighborhoods(hood, 2);
-    const suggestion = nearby.length > 0 ? ` Try ${nearby.join(' or ')}?` : ' Check back later!';
-    const sms = `Quiet night in ${hood} — not seeing much right now.${suggestion}`;
-    await sendSMS(phone, sms);
-    finalizeTrace(sms, 'events');
-    return;
-  }
-
-  // Check if any events are actually in the requested neighborhood
-  const inHood = events.filter(e => e.neighborhood === hood);
-  if (inHood.length === 0) {
-    // Find nearby neighborhoods that actually have events
-    const hoodCounts = {};
-    for (const e of events) {
-      if (e.neighborhood && e.neighborhood !== hood) {
-        hoodCounts[e.neighborhood] = (hoodCounts[e.neighborhood] || 0) + 1;
+  // Apply category filter (e.g. comedy, art, live_music)
+  let categoryApplied = false;
+  if (route.filters?.category) {
+    const catEvents = events.filter(e => e.category === route.filters.category);
+    if (catEvents.length > 0) {
+      events = catEvents;
+      categoryApplied = true;
+    } else {
+      // No local matches — search nearby neighborhoods for this category
+      const nearbyHoods = getAdjacentNeighborhoods(hood, 5);
+      let catFoundNearby = false;
+      for (const nearbyHood of nearbyHoods) {
+        const nearbyEvents = await getEvents(nearbyHood);
+        const nearbyCat = nearbyEvents.filter(e => e.category === route.filters.category);
+        if (nearbyCat.length > 0) {
+          events = nearbyCat;
+          console.log(`Category ${route.filters.category}: found ${nearbyCat.length} in ${nearbyHood} (not in ${hood})`);
+          hood = nearbyHood;  // Update hood so compose and inHood check reference the right place
+          catFoundNearby = true;
+          categoryApplied = true;
+          break;
+        }
+      }
+      if (events.filter(e => e.category === route.filters.category).length === 0) {
+        const catName = route.filters.category.replace(/_/g, ' ');
+        const sms = `Not seeing any ${catName} near ${hood} tonight. Text "${hood}" to see everything, or try a different neighborhood!`;
+        await sendSMS(phone, sms);
+        finalizeTrace(sms, 'events');
+        return;
       }
     }
-    // Sort by event count and pick the top one with at least 2 events
-    const nearbyWithEvents = Object.entries(hoodCounts)
-      .sort((a, b) => b[1] - a[1])
-      .filter(([, count]) => count >= 1);
+  }
 
-    if (nearbyWithEvents.length > 0) {
-      const nearbyHood = nearbyWithEvents[0][0];
-      const nearbyEvents = events.filter(e => e.neighborhood === nearbyHood);
-      // Describe what's there — grab the dominant category
-      const cats = {};
-      for (const e of nearbyEvents) {
-        const c = e.category || 'events';
-        cats[c] = (cats[c] || 0) + 1;
-      }
-      const topCat = Object.entries(cats).sort((a, b) => b[1] - a[1])[0]?.[0] || 'events';
-      const vibeWord = { live_music: 'some music', nightlife: 'some nightlife', comedy: 'some comedy', art: 'some art', community: 'something cool', food_drink: 'some food & drinks', theater: 'some theater' }[topCat] || 'some stuff going on';
+  // Perennial picks for thin cache — supplement when events exist but are sparse
+  const THIN_THRESHOLD = 3;
+  let perennialContext = '';
+  if (events.length > 0 && events.length < THIN_THRESHOLD) {
+    const picks = getPerennialPicks(hood);
+    if (picks.local.length > 0 || picks.nearby.length > 0) {
+      const lines = [];
+      for (const p of picks.local) lines.push(`- ${p.venue}: ${p.vibe}${p.url ? ' ' + p.url : ''}`);
+      for (const p of picks.nearby) lines.push(`- ${p.venue} (${p.neighborhood}): ${p.vibe}${p.url ? ' ' + p.url : ''}`);
+      perennialContext = `\nPERENNIAL PICKS (reliable standing venues — mention as "usually has something going on" if the event list is thin):\n${lines.join('\n')}`;
+    }
+  }
 
-      const sms = `Hey not much going on in ${hood}... would you travel to ${nearbyHood} for ${vibeWord}?`;
-      // Save nearby hood + events so an affirmative reply can serve events immediately
+  // Prevent redirect loops: if user already got a travel nudge, serve nearby events directly
+  const alreadyNudged = !!session?.pendingNearby;
+
+  if (events.length === 0) {
+
+    // Check for tomorrow events before nudging to nearby neighborhoods
+    const tomorrowNyc = getNycDateString(1);
+    const { events: rawCache } = getRawCache();
+    const tomorrowInHood = rawCache.filter(e => {
+      const d = getEventDate(e);
+      return d === tomorrowNyc && e.neighborhood === hood;
+    });
+    if (tomorrowInHood.length > 0) {
+      const composeTomorrow = tomorrowInHood.slice(0, 8);
       const eventMap = {};
-      for (const e of nearbyEvents) eventMap[e.id] = e;
-      setSession(phone, { lastNeighborhood: hood, pendingNearby: nearbyHood, pendingNearbyEvents: eventMap });
+      for (const e of tomorrowInHood) eventMap[e.id] = e;
+      const extraContext = `\nIMPORTANT: There is NOTHING tonight in ${hood}. All events below are TOMORROW. Lead with "Nothing tonight in ${hood}, but tomorrow:" and use the tomorrow format.`;
+      const result = await composeAndSend(composeTomorrow, hood, route.filters, 'events', { extraContext });
+      setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: hood });
+      await sendComposeWithLinks(phone, result, eventMap);
+      console.log(`Tomorrow events served for ${hood} to ${masked} (${tomorrowInHood.length} events)`);
+      finalizeTrace(result.sms_text, 'events');
+      return;
+    }
+
+    // Check perennial picks before nudging to a nearby neighborhood
+    const zeroPicks = getPerennialPicks(hood);
+    if (zeroPicks.local.length > 0) {
+      const pickLines = zeroPicks.local.map(p =>
+        `${p.venue} — ${p.vibe}${p.url ? '\n' + p.url : ''}`
+      );
+      const sms = `Not much listed in ${hood} tonight, but these spots usually have something going on:\n\n${pickLines.join('\n\n')}`.slice(0, 480);
       await sendSMS(phone, sms);
-      console.log(`Nudge sent to ${masked}: ${hood} → ${nearbyHood} (${nearbyEvents.length} events)`);
       finalizeTrace(sms, 'events');
       return;
     }
+
+    // Find nearby neighborhoods WITH events for a proper travel nudge
+    const nearbyHoods = getAdjacentNeighborhoods(hood, 5);
+    for (const nearbyHood of nearbyHoods) {
+      const nearbyEvents = await getEvents(nearbyHood);
+      if (nearbyEvents.length > 0) {
+        if (alreadyNudged) {
+          // Skip the nudge question — serve events directly to break the loop
+          const composeEvents = nearbyEvents.slice(0, 8);
+          const eventMap = {};
+          for (const e of nearbyEvents) eventMap[e.id] = e;
+          trace.events.cache_size = nearbyEvents.length;
+          trace.events.candidates_count = composeEvents.length;
+          trace.events.candidate_ids = composeEvents.map(e => e.id);
+          const result = await composeAndSend(composeEvents, nearbyHood, route.filters, 'events');
+          setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: nearbyHood });
+          await sendComposeWithLinks(phone, result, eventMap);
+          console.log(`Loop prevention: served ${nearbyHood} picks to ${masked} (skipped nudge)`);
+          finalizeTrace(result.sms_text, 'events');
+          return;
+        }
+        const cats = {};
+        for (const e of nearbyEvents) cats[e.category || 'events'] = (cats[e.category || 'events'] || 0) + 1;
+        const topCat = Object.entries(cats).sort((a, b) => b[1] - a[1])[0]?.[0] || 'events';
+        const vibeWord = { live_music: 'some music', nightlife: 'some nightlife', comedy: 'some comedy', art: 'some art', community: 'something cool', food_drink: 'some food & drinks', theater: 'some theater' }[topCat] || 'some stuff going on';
+        const eventMap = {};
+        for (const e of nearbyEvents) eventMap[e.id] = e;
+        // Don't set lastNeighborhood — user hasn't committed to a neighborhood yet
+        setSession(phone, { pendingNearby: nearbyHood, pendingNearbyEvents: eventMap });
+        const sms = `Hey not much going on in ${hood}... would you travel to ${nearbyHood} for ${vibeWord}?`;
+        await sendSMS(phone, sms);
+        console.log(`Nudge sent to ${masked}: ${hood} → ${nearbyHood} (${nearbyEvents.length} events)`);
+        finalizeTrace(sms, 'events');
+        return;
+      }
+    }
+    // No nearby neighborhoods with events either
+    const sms = `Quiet night in ${hood} — not seeing much right now. Check back later!`;
+    await sendSMS(phone, sms);
+    finalizeTrace(sms, 'events');
+    return;
   }
 
   // Pre-filter to top 8 by proximity to reduce token cost
@@ -743,13 +659,13 @@ async function handleMessageAI(phone, message) {
   trace.events.candidate_ids = events.map(e => e.id);
 
   // CALL 2: Compose response
-  const result = await composeAndSend(composeEvents, hood, route.filters, 'events');
+  const result = await composeAndSend(composeEvents, hood, route.filters, 'events', { extraContext: perennialContext });
 
   // Keep full event map in session so MORE can access remaining events
   const eventMap = {};
   for (const e of events) eventMap[e.id] = e;
 
-  setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: result.neighborhood_used || hood });
+  setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: result.neighborhood_used || hood, visitedHoods: [hood] });
 
   await sendComposeWithLinks(phone, result, eventMap);
   console.log(`AI response sent to ${masked}`);
@@ -760,7 +676,7 @@ async function handleMessageAI(phone, message) {
 function clearSmsIntervals() {
   clearInterval(dedupInterval);
   clearInterval(rateLimitInterval);
-  clearInterval(sessionInterval);
+  clearSessionInterval();
 }
 
 module.exports = router;

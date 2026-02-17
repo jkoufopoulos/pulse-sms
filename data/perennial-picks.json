@@ -1,0 +1,148 @@
+{
+  "Bed-Stuy": [
+    {
+      "venue": "Ode to Babel",
+      "vibe": "Wine bar with live music & DJs on weekends — great Franklin Ave hangout",
+      "days": ["fri", "sat"],
+      "category": "live_music",
+      "address": "772 Dean St",
+      "is_free": false,
+      "url": "https://www.odetobabel.com"
+    },
+    {
+      "venue": "Pearl's Social & Billy Club",
+      "vibe": "Cocktail bar with DJs — Bed-Stuy staple",
+      "days": ["fri", "sat"],
+      "category": "nightlife",
+      "address": "40 St Felix St",
+      "is_free": false
+    },
+    {
+      "venue": "Lovers Rock",
+      "vibe": "Caribbean cocktail bar with DJs on weekends — vibey and intimate",
+      "days": ["fri", "sat"],
+      "category": "nightlife",
+      "address": "419 Tompkins Ave",
+      "is_free": false,
+      "url": "https://www.loversrockbar.com"
+    }
+  ],
+  "Upper West Side": [
+    {
+      "venue": "Smoke Jazz & Supper Club",
+      "vibe": "Live jazz every night — one of the best jazz rooms in the city",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "2751 Broadway",
+      "is_free": false,
+      "url": "https://www.smokejazz.com"
+    },
+    {
+      "venue": "Symphony Space",
+      "vibe": "Performances most nights — theater, music, film, literary events",
+      "days": ["any"],
+      "category": "theater",
+      "address": "2537 Broadway",
+      "is_free": false,
+      "url": "https://www.symphonyspace.org"
+    }
+  ],
+  "West Village": [
+    {
+      "venue": "Smalls Jazz Club",
+      "vibe": "Live jazz every night — legendary basement spot, incredible players",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "183 W 10th St",
+      "is_free": false,
+      "url": "https://www.smallslive.com"
+    },
+    {
+      "venue": "Comedy Cellar",
+      "vibe": "Standup every night — NYC's most famous comedy club, surprise drop-ins",
+      "days": ["any"],
+      "category": "comedy",
+      "address": "117 MacDougal St",
+      "is_free": false,
+      "url": "https://www.comedycellar.com"
+    },
+    {
+      "venue": "Village Vanguard",
+      "vibe": "Live jazz every night — the gold standard, been going since 1935",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "178 7th Ave S",
+      "is_free": false,
+      "url": "https://villagevanguard.com"
+    },
+    {
+      "venue": "Le Poisson Rouge",
+      "vibe": "Shows most nights — eclectic mix of indie, electronic, classical",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "158 Bleecker St",
+      "is_free": false,
+      "url": "https://lpr.com"
+    }
+  ],
+  "Greenpoint": [
+    {
+      "venue": "Good Room",
+      "vibe": "DJs on weekends — two rooms, great sound, always a good crowd",
+      "days": ["fri", "sat"],
+      "category": "nightlife",
+      "address": "98 Meserole Ave",
+      "is_free": false,
+      "url": "https://www.goodroombk.com"
+    },
+    {
+      "venue": "Warsaw",
+      "vibe": "Shows on event nights — historic Polish National Home turned concert venue",
+      "days": ["thu", "fri", "sat"],
+      "category": "live_music",
+      "address": "261 Driggs Ave",
+      "is_free": false
+    }
+  ],
+  "Cobble Hill": [
+    {
+      "venue": "Jalopy Theatre",
+      "vibe": "Folk and roots music most nights — tiny, charming, one-of-a-kind",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "315 Columbia St",
+      "is_free": false,
+      "url": "https://www.jalopy.biz"
+    },
+    {
+      "venue": "Roulette",
+      "vibe": "Experimental music and performance — adventurous programming",
+      "days": ["thu", "fri", "sat"],
+      "category": "live_music",
+      "address": "509 Atlantic Ave",
+      "is_free": false,
+      "url": "https://rfroulette.org"
+    }
+  ],
+  "Chelsea": [
+    {
+      "venue": "Le Bain",
+      "vibe": "Rooftop DJs on weekends — Standard Hotel, great views and vibes",
+      "days": ["fri", "sat"],
+      "category": "nightlife",
+      "address": "848 Washington St",
+      "is_free": false
+    }
+  ],
+  "Fort Greene": [
+    {
+      "venue": "BAM",
+      "vibe": "Performances most nights — film, theater, music, dance at Brooklyn Academy of Music",
+      "days": ["any"],
+      "category": "theater",
+      "address": "30 Lafayette Ave",
+      "is_free": false,
+      "url": "https://www.bam.org"
+    }
+  ]
+}

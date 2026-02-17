@@ -162,8 +162,15 @@ check('no target returns all', noTarget.length === events.length);
 // ---- filterUpcomingEvents ----
 console.log('\nfilterUpcomingEvents:');
 
+// Pin reference time to 2pm EST to avoid flakiness near midnight
+const REF_TIME = (() => {
+  const d = new Date();
+  d.setUTCHours(19, 0, 0, 0); // 2pm EST = 7pm UTC
+  return d.getTime();
+})();
+
 function makeTime(hoursFromNow) {
-  return new Date(Date.now() + hoursFromNow * 60 * 60 * 1000).toISOString();
+  return new Date(REF_TIME + hoursFromNow * 60 * 60 * 1000).toISOString();
 }
 
 const timeEvents = [
@@ -171,11 +178,11 @@ const timeEvents = [
   { id: 't2', start_time_local: makeTime(-1) },       // 1hr ago (within window)
   { id: 't3', start_time_local: makeTime(-5) },       // 5hrs ago (should be filtered)
   { id: 't4', start_time_local: null },                // no time
-  { id: 't5', start_time_local: getNycDateString(1) }, // date-only (tomorrow)
+  { id: 't5', start_time_local: getNycDateString(1, REF_TIME) }, // date-only (tomorrow)
   { id: 't6', start_time_local: makeTime(-4), end_time_local: makeTime(1) },  // ended but end in future
   { id: 't7', start_time_local: '2020-01-01' },       // date-only past
 ];
-const upcoming = filterUpcomingEvents(timeEvents);
+const upcoming = filterUpcomingEvents(timeEvents, { refTimeMs: REF_TIME });
 const upIds = upcoming.map(e => e.id);
 
 check('keeps future', upIds.includes('t1'));
@@ -402,6 +409,17 @@ const leBainEvent = normalizeExtractedEvent({
 }, 'theskint', 'curated', 0.9);
 check('Le Bain → Chelsea (RA migration)', leBainEvent.neighborhood === 'Chelsea');
 
+// ---- cross-source dedup ----
+console.log('\ncross-source dedup:');
+
+check('cross-source dedup', makeEventId('Show', 'Venue', '2026-02-14', 'dice') === makeEventId('Show', 'Venue', '2026-02-14', 'brooklynvegan'));
+
+// ---- venue persistence exports ----
+console.log('\nvenue persistence:');
+
+check('exportLearnedVenues exported', typeof require('../src/venues').exportLearnedVenues === 'function');
+check('importLearnedVenues exported', typeof require('../src/venues').importLearnedVenues === 'function');
+
 // ---- fetchNYCParksEvents export ----
 console.log('\nfetchNYCParksEvents:');
 
@@ -429,6 +447,36 @@ check('learnVenueCoords ignores NaN coords', (() => {
   learnVenueCoords('Bad Coords Venue', NaN, -73.9);
   return lookupVenue('Bad Coords Venue') === null;
 })());
+
+// ---- getPerennialPicks ----
+console.log('\ngetPerennialPicks:');
+
+const { getPerennialPicks, _resetCache } = require('../src/perennial');
+
+// Basic: known neighborhood returns local picks
+const wvPicks = getPerennialPicks('West Village', { dayOfWeek: 'fri' });
+check('West Village has local picks', wvPicks.local.length > 0);
+check('West Village picks include Smalls', wvPicks.local.some(p => p.venue === 'Smalls Jazz Club'));
+check('returns { local, nearby } shape', Array.isArray(wvPicks.local) && Array.isArray(wvPicks.nearby));
+
+// Day filtering: Bed-Stuy only has fri/sat picks
+const bedStuyMon = getPerennialPicks('Bed-Stuy', { dayOfWeek: 'mon' });
+check('Bed-Stuy empty on Monday (only fri/sat)', bedStuyMon.local.length === 0);
+const bedStuyFri = getPerennialPicks('Bed-Stuy', { dayOfWeek: 'fri' });
+check('Bed-Stuy has picks on Friday', bedStuyFri.local.length > 0);
+
+// "any" day always matches
+const uwsPicks = getPerennialPicks('Upper West Side', { dayOfWeek: 'tue' });
+check('UWS "any" day picks show on Tuesday', uwsPicks.local.length > 0);
+
+// Adjacent neighborhoods show up as nearby
+const chelseaPicks = getPerennialPicks('Chelsea', { dayOfWeek: 'fri' });
+check('Chelsea has nearby picks from adjacent hoods', chelseaPicks.nearby.length > 0);
+check('nearby picks have neighborhood tag', chelseaPicks.nearby.every(p => typeof p.neighborhood === 'string'));
+
+// Unknown neighborhood returns empty
+const unknownPicks = getPerennialPicks('Mars', { dayOfWeek: 'fri' });
+check('unknown neighborhood returns empty local', unknownPicks.local.length === 0);
 
 // ---- batchGeocodeEvents (mock test) ----
 console.log('\nbatchGeocodeEvents (mock):');
