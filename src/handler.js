@@ -1,6 +1,6 @@
 const express = require('express');
 const twilio = require('twilio');
-const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
+const { extractNeighborhood, detectBorough, NEIGHBORHOODS } = require('./neighborhoods');
 const { getEvents } = require('./events');
 const { routeMessage, composeResponse, composeDetails, isSearchUrl } = require('./ai');
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
@@ -218,7 +218,7 @@ function preRoute(message, session) {
 
   // Affirmative reply to "would you travel to X?" nudge
   if (/^(yes|yeah|ya|yea|yep|yup|sure|ok|okay|down|let's go|lets go|bet|absolutely|definitely|why not|i'm down|im down)$/i.test(msg) && session?.pendingNearby) {
-    return { ...base, intent: 'events', neighborhood: session.pendingNearby };
+    return { ...base, intent: 'nudge_accept', neighborhood: session.pendingNearby };
   }
 
   // More
@@ -258,6 +258,13 @@ function preRoute(message, session) {
   // Bye
   if (/^(bye|later|peace|gn|good night|night|see ya|cya|deuces)$/i.test(msg)) {
     return { ...base, intent: 'conversational', neighborhood: null, reply: "Later! Hit me up whenever." };
+  }
+
+  // Borough detection — ask user to narrow down
+  const borough = detectBorough(msg);
+  if (borough) {
+    const name = borough.borough.charAt(0).toUpperCase() + borough.borough.slice(1);
+    return { ...base, intent: 'conversational', neighborhood: null, reply: `${name}'s a big place! Which neighborhood?\n\n${borough.neighborhoods.join(', ')}` };
   }
 
   // Bare neighborhood (short messages only — longer ones need Claude for intent/filters)
@@ -541,12 +548,12 @@ async function handleMessageAI(phone, message) {
   }
 
   // Helper: capture compose trace data and finalize
-  async function composeAndSend(composeEvents, hood, filters, intentLabel) {
+  async function composeAndSend(composeEvents, hood, filters, intentLabel, { excludeIds } = {}) {
     trace.events.sent_to_claude = composeEvents.length;
     trace.events.sent_ids = composeEvents.map(e => e.id);
 
     const composeStart = Date.now();
-    const result = await composeResponse(message, composeEvents, hood, filters);
+    const result = await composeResponse(message, composeEvents, hood, filters, { excludeIds });
     trace.composition.latency_ms = Date.now() - composeStart;
     trace.composition.raw_response = result._raw || null;
     trace.composition.picks = (result.picks || []).map(p => {
@@ -571,7 +578,7 @@ async function handleMessageAI(phone, message) {
         trace.events.cache_size = Object.keys(session.lastEvents).length;
         trace.events.candidates_count = remaining.length;
         trace.events.candidate_ids = remaining.map(e => e.id);
-        const result = await composeAndSend(composeRemaining, hood, route.filters, 'more');
+        const result = await composeAndSend(composeRemaining, hood, route.filters, 'more', { excludeIds: [...allShownIds] });
         const newAllPicks = [...(session.allPicks || session.lastPicks || []), ...(result.picks || [])];
         setSession(phone, { lastPicks: result.picks || [], allPicks: newAllPicks, lastEvents: session.lastEvents, lastNeighborhood: hood });
         await sendComposeWithLinks(phone, result, session.lastEvents);
@@ -636,8 +643,28 @@ async function handleMessageAI(phone, message) {
     return;
   }
 
+  // --- Nudge accept (user said yes to travel suggestion) ---
+  if (route.intent === 'nudge_accept') {
+    const nearbyHood = session?.pendingNearby;
+    const nearbyEvents = session?.pendingNearbyEvents;
+    if (nearbyHood && nearbyEvents && Object.keys(nearbyEvents).length > 0) {
+      const composeEvents = Object.values(nearbyEvents).slice(0, 8);
+      trace.events.cache_size = Object.keys(nearbyEvents).length;
+      trace.events.candidates_count = composeEvents.length;
+      trace.events.candidate_ids = composeEvents.map(e => e.id);
+      const result = await composeAndSend(composeEvents, nearbyHood, route.filters, 'nudge_accept');
+      setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: nearbyEvents, lastNeighborhood: nearbyHood });
+      await sendComposeWithLinks(phone, result, nearbyEvents);
+      console.log(`Nudge accept: served ${nearbyHood} picks to ${masked}`);
+      finalizeTrace(result.sms_text, 'nudge_accept');
+      return;
+    }
+    // Fallback: treat as regular events request
+    console.warn('Nudge accept but no saved events, falling through to events');
+  }
+
   // --- Unknown intent guard ---
-  if (!['events', 'free', 'more', 'details', 'help', 'conversational'].includes(route.intent)) {
+  if (!['events', 'free', 'more', 'details', 'help', 'conversational', 'nudge_accept'].includes(route.intent)) {
     console.warn(`Unknown intent "${route.intent}", treating as events`);
   }
 
@@ -671,14 +698,20 @@ async function handleMessageAI(phone, message) {
   // Check if any events are actually in the requested neighborhood
   const inHood = events.filter(e => e.neighborhood === hood);
   if (inHood.length === 0) {
-    // Find the most common nearby neighborhood and what's there
+    // Find nearby neighborhoods that actually have events
     const hoodCounts = {};
     for (const e of events) {
-      if (e.neighborhood) hoodCounts[e.neighborhood] = (hoodCounts[e.neighborhood] || 0) + 1;
+      if (e.neighborhood && e.neighborhood !== hood) {
+        hoodCounts[e.neighborhood] = (hoodCounts[e.neighborhood] || 0) + 1;
+      }
     }
-    const topNearby = Object.entries(hoodCounts).sort((a, b) => b[1] - a[1])[0];
-    if (topNearby) {
-      const nearbyHood = topNearby[0];
+    // Sort by event count and pick the top one with at least 2 events
+    const nearbyWithEvents = Object.entries(hoodCounts)
+      .sort((a, b) => b[1] - a[1])
+      .filter(([, count]) => count >= 1);
+
+    if (nearbyWithEvents.length > 0) {
+      const nearbyHood = nearbyWithEvents[0][0];
       const nearbyEvents = events.filter(e => e.neighborhood === nearbyHood);
       // Describe what's there — grab the dominant category
       const cats = {};
@@ -690,12 +723,12 @@ async function handleMessageAI(phone, message) {
       const vibeWord = { live_music: 'some music', nightlife: 'some nightlife', comedy: 'some comedy', art: 'some art', community: 'something cool', food_drink: 'some food & drinks', theater: 'some theater' }[topCat] || 'some stuff going on';
 
       const sms = `Hey not much going on in ${hood}... would you travel to ${nearbyHood} for ${vibeWord}?`;
-      // Save nearby hood + events so an affirmative reply can pick up
+      // Save nearby hood + events so an affirmative reply can serve events immediately
       const eventMap = {};
-      for (const e of events) eventMap[e.id] = e;
-      setSession(phone, { lastNeighborhood: hood, pendingNearby: nearbyHood, lastEvents: eventMap });
+      for (const e of nearbyEvents) eventMap[e.id] = e;
+      setSession(phone, { lastNeighborhood: hood, pendingNearby: nearbyHood, pendingNearbyEvents: eventMap });
       await sendSMS(phone, sms);
-      console.log(`Nudge sent to ${masked}: ${hood} → ${nearbyHood}`);
+      console.log(`Nudge sent to ${masked}: ${hood} → ${nearbyHood} (${nearbyEvents.length} events)`);
       finalizeTrace(sms, 'events');
       return;
     }

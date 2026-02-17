@@ -24,7 +24,9 @@ const categoryFilter = args.find(a => a.startsWith('--category='))?.split('=')[1
   || (args.includes('--category') ? args[args.indexOf('--category') + 1] : null);
 const nameFilter = args.find(a => a.startsWith('--name='))?.split('=')[1]
   || (args.includes('--name') ? args[args.indexOf('--name') + 1] : null);
-const BASE = args.find(a => a.startsWith('--url='))?.split('=')[1] || 'http://localhost:3000';
+const BASE = args.find(a => a.startsWith('--url='))?.split('=')[1]
+  || (args.includes('--url') ? args[args.indexOf('--url') + 1] : null)
+  || 'http://localhost:3000';
 const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-sonnet-4-5-20250929';
 
 const client = new Anthropic();

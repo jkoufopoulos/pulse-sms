@@ -152,15 +152,43 @@ for (const [name, data] of Object.entries(NEIGHBORHOODS)) {
 // Sort aliases longest-first so "east village" matches before "east"
 const SORTED_ALIASES = [...ALIAS_MAP.keys()].sort((a, b) => b.length - a.length);
 
-// Borough/shorthand map — used only for SMS input extraction, not for resolveNeighborhood
-// (resolveNeighborhood has its own borough fallback with geo priority)
+// Precompile word-boundary regexes to prevent false positives
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Boroughs → list of neighborhoods (for "narrow it down" flow)
+const BOROUGHS = {
+  'brooklyn': ['Williamsburg', 'Bushwick', 'Park Slope', 'DUMBO', 'Crown Heights', 'Bed-Stuy', 'Fort Greene', 'Prospect Heights', 'Cobble Hill', 'Gowanus', 'Red Hook', 'Greenpoint', 'Downtown Brooklyn', 'Sunset Park'],
+  'queens': ['Astoria', 'Long Island City', 'Jackson Heights', 'Flushing'],
+  'manhattan': ['East Village', 'West Village', 'Lower East Side', 'Chelsea', 'SoHo', 'NoHo', 'Tribeca', 'Midtown', 'Upper West Side', 'Upper East Side', 'Harlem', "Hell's Kitchen", 'Greenwich Village', 'Flatiron', 'Financial District', 'East Harlem', 'Washington Heights'],
+};
+
+// Borough aliases
+const BOROUGH_ALIASES = {
+  'brooklyn': 'brooklyn', 'bk': 'brooklyn', 'bklyn': 'brooklyn',
+  'queens': 'queens', 'qns': 'queens',
+  'manhattan': 'manhattan', 'nyc': 'manhattan', 'the city': 'manhattan',
+};
+
+/**
+ * Detect if a message refers to a borough (not a specific neighborhood).
+ * Returns { borough, neighborhoods } or null.
+ */
+function detectBorough(message) {
+  const lower = message.toLowerCase().trim();
+  // Check against borough aliases using word boundaries
+  for (const [alias, borough] of Object.entries(BOROUGH_ALIASES)) {
+    const regex = new RegExp(`(?<!\\w)${escapeRegex(alias)}(?!\\w)`);
+    if (regex.test(lower)) {
+      return { borough, neighborhoods: BOROUGHS[borough] };
+    }
+  }
+  return null;
+}
+
+// Landmark and subway stop map — maps to specific neighborhoods
 const BOROUGH_MAP = {
-  'brooklyn': 'Williamsburg',
-  'bk': 'Williamsburg',
-  'manhattan': 'Midtown',
-  'nyc': 'Midtown',
-  'new york': 'Midtown',
-  'queens': 'Astoria',
   // Landmarks
   'prospect park': 'Park Slope',
   'central park': 'Midtown',
@@ -197,12 +225,6 @@ const BOROUGH_MAP = {
   'dekalb': 'Downtown Brooklyn',
 };
 
-// Precompile word-boundary regexes to prevent false positives
-// (e.g. "ev" matching inside "events", "every", "never")
-function escapeRegex(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 // Combine neighborhood aliases + borough shortcuts, sorted longest-first
 const ALL_ENTRIES = [
   ...SORTED_ALIASES.map(alias => ({ key: alias, value: ALIAS_MAP.get(alias) })),
@@ -230,4 +252,4 @@ function getNeighborhoodCoords(name) {
   return { lat: data.lat, lng: data.lng, radius_km: data.radius_km };
 }
 
-module.exports = { NEIGHBORHOODS, extractNeighborhood, getNeighborhoodCoords };
+module.exports = { NEIGHBORHOODS, extractNeighborhood, detectBorough, getNeighborhoodCoords };

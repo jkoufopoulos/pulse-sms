@@ -34,16 +34,22 @@ check('ev not in events', extractNeighborhood('any events tonight') === null);
 check('ev not in every', extractNeighborhood('every bar nearby') === null);
 check('ev not in never', extractNeighborhood('never mind') === null);
 check('ev standalone works', extractNeighborhood('ev tonight') === 'East Village');
-// Borough shortcuts
-check('brooklyn', extractNeighborhood('brooklyn tonight') === 'Williamsburg');
-check('bk', extractNeighborhood('anything in bk') === 'Williamsburg');
-check('manhattan', extractNeighborhood('manhattan') === 'Midtown');
-check('queens', extractNeighborhood('queens') === 'Astoria');
+// Borough shortcuts — boroughs now go through detectBorough, not extractNeighborhood
+check('brooklyn returns null', extractNeighborhood('brooklyn tonight') === null);
+check('bk returns null', extractNeighborhood('anything in bk') === null);
+check('manhattan returns null', extractNeighborhood('manhattan') === null);
+check('queens returns null', extractNeighborhood('queens') === null);
+check('nyc returns null', extractNeighborhood('nyc tonight') === null);
+// detectBorough tests
+const { detectBorough } = require('../src/neighborhoods');
+check('detectBorough bk', detectBorough('anything in bk')?.borough === 'brooklyn');
+check('detectBorough queens', detectBorough('queens')?.borough === 'queens');
+check('detectBorough brooklyn has hoods', detectBorough('brooklyn tonight')?.neighborhoods?.includes('Williamsburg'));
+check('detectBorough non-borough', detectBorough('east village') === null);
 // New aliases
 check('union sq', extractNeighborhood('union sq tonight') === 'Flatiron');
 check('nolita', extractNeighborhood('nolita drinks') === 'SoHo');
 check('e.v.', extractNeighborhood('E.V. tonight') === 'East Village');
-check('nyc', extractNeighborhood('nyc tonight') === 'Midtown');
 
 // ---- extractNeighborhood: landmarks ----
 console.log('\nextractNeighborhood (landmarks):');
