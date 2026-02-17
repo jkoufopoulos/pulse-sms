@@ -407,6 +407,29 @@ console.log('\nfetchNYCParksEvents:');
 
 check('fetchNYCParksEvents exported', typeof require('../src/sources').fetchNYCParksEvents === 'function');
 
+// ---- fetchBrooklynVeganEvents + learnVenueCoords exports ----
+console.log('\nBrooklynVegan + venue auto-learning:');
+
+check('fetchBrooklynVeganEvents exported', typeof require('../src/sources').fetchBrooklynVeganEvents === 'function');
+check('learnVenueCoords exported', typeof require('../src/venues').learnVenueCoords === 'function');
+
+// Test learnVenueCoords: learn a new venue, then look it up
+const { learnVenueCoords } = require('../src/venues');
+learnVenueCoords('Test Venue BV Eval', 40.7128, -73.9500);
+check('learnVenueCoords populates venue map', lookupVenue('Test Venue BV Eval')?.lat === 40.7128);
+check('learnVenueCoords does not overwrite existing', (() => {
+  learnVenueCoords('Nowadays', 0, 0); // should NOT overwrite
+  return lookupVenue('Nowadays')?.lat === 40.7061;
+})());
+check('learnVenueCoords ignores null name', (() => {
+  learnVenueCoords(null, 40.7, -73.9);
+  return true; // no crash
+})());
+check('learnVenueCoords ignores NaN coords', (() => {
+  learnVenueCoords('Bad Coords Venue', NaN, -73.9);
+  return lookupVenue('Bad Coords Venue') === null;
+})());
+
 // ---- batchGeocodeEvents (mock test) ----
 console.log('\nbatchGeocodeEvents (mock):');
 

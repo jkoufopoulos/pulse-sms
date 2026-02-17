@@ -214,6 +214,14 @@ function lookupVenue(name) {
   return normalizedMap.get(key) || null;
 }
 
+function learnVenueCoords(name, lat, lng) {
+  if (!name || isNaN(lat) || isNaN(lng)) return;
+  const key = normalizeName(name);
+  if (!normalizedMap.has(key)) {
+    normalizedMap.set(key, { lat, lng });
+  }
+}
+
 // --- Nominatim geocoding fallback ---
 
 function sleep(ms) {
@@ -276,4 +284,4 @@ async function batchGeocodeEvents(events) {
   console.log(`Geocoding done: ${resolved}/${unresolved.length} resolved`);
 }
 
-module.exports = { VENUE_MAP, lookupVenue, geocodeVenue, batchGeocodeEvents };
+module.exports = { VENUE_MAP, lookupVenue, learnVenueCoords, geocodeVenue, batchGeocodeEvents };

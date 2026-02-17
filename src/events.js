@@ -1,4 +1,4 @@
-const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchTavilyFreeEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents } = require('./sources');
+const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchTavilyFreeEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents } = require('./sources');
 const { rankEventsByProximity, filterUpcomingEvents } = require('./geo');
 const { batchGeocodeEvents } = require('./venues');
 
@@ -20,6 +20,7 @@ const sourceHealth = {
   EventbriteComedy: { consecutiveZeros: 0, lastCount: 0 },
   EventbriteArts: { consecutiveZeros: 0, lastCount: 0 },
   NYCParks: { consecutiveZeros: 0, lastCount: 0 },
+  BrooklynVegan: { consecutiveZeros: 0, lastCount: 0 },
 };
 const HEALTH_WARN_THRESHOLD = 3;
 
@@ -33,7 +34,7 @@ async function refreshCache() {
   refreshPromise = (async () => {
     console.log('Refreshing event cache (all sources)...');
 
-    const [skintEvents, eventbriteEvents, songkickEvents, raEvents, diceEvents, tavilyFreeEvents, nonsenseEvents, ohMyRocknessEvents, eventbriteComedyEvents, eventbriteArtsEvents, nycParksEvents] = await Promise.allSettled([
+    const [skintEvents, eventbriteEvents, songkickEvents, raEvents, diceEvents, tavilyFreeEvents, nonsenseEvents, ohMyRocknessEvents, eventbriteComedyEvents, eventbriteArtsEvents, nycParksEvents, bvEvents] = await Promise.allSettled([
       fetchSkintEvents(),
       fetchEventbriteEvents(),
       fetchSongkickEvents(),
@@ -45,6 +46,7 @@ async function refreshCache() {
       fetchEventbriteComedy(),
       fetchEventbriteArts(),
       fetchNYCParksEvents(),
+      fetchBrooklynVeganEvents(),
     ]);
 
     const allEvents = [];
@@ -57,6 +59,7 @@ async function refreshCache() {
       { result: raEvents, label: 'RA' },
       { result: ohMyRocknessEvents, label: 'OhMyRockness' },
       { result: diceEvents, label: 'Dice' },
+      { result: bvEvents, label: 'BrooklynVegan' },
       { result: nycParksEvents, label: 'NYCParks' },
       { result: songkickEvents, label: 'Songkick' },
       { result: eventbriteEvents, label: 'Eventbrite' },
