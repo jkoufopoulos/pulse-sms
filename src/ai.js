@@ -639,7 +639,13 @@ function parseJsonFromResponse(text) {
   if (fenceMatch) {
     try {
       return JSON.parse(fenceMatch[1].trim());
-    } catch { /* fall through */ }
+    } catch {
+      // Claude often puts literal newlines inside JSON strings (especially sms_text).
+      // Fix by escaping raw newlines inside string values.
+      try {
+        return JSON.parse(fixJsonNewlines(fenceMatch[1].trim()));
+      } catch { /* fall through */ }
+    }
   }
 
   // Find the first { and try progressively larger substrings until valid JSON
@@ -650,10 +656,52 @@ function parseJsonFromResponse(text) {
   for (let end = text.lastIndexOf('}'); end > start; end = text.lastIndexOf('}', end - 1)) {
     try {
       return JSON.parse(text.slice(start, end + 1));
-    } catch { /* try shorter */ }
+    } catch {
+      // Try fixing newlines inside string values
+      try {
+        return JSON.parse(fixJsonNewlines(text.slice(start, end + 1)));
+      } catch { /* try shorter */ }
+    }
   }
 
   return null;
+}
+
+/**
+ * Fix raw newlines inside JSON string values that make JSON.parse fail.
+ * Walks character-by-character, only escaping newlines inside quoted strings.
+ */
+function fixJsonNewlines(text) {
+  let result = '';
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (escaped) {
+      result += ch;
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\' && inString) {
+      result += ch;
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      result += ch;
+      continue;
+    }
+    if (ch === '\n' && inString) {
+      result += '\\n';
+      continue;
+    }
+    if (ch === '\r' && inString) {
+      continue; // skip carriage returns
+    }
+    result += ch;
+  }
+  return result;
 }
 
 /**
