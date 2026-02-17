@@ -222,6 +222,31 @@ function learnVenueCoords(name, lat, lng) {
   }
 }
 
+// --- Persistence helpers ---
+
+const staticKeys = new Set();
+for (const name of Object.keys(VENUE_MAP)) {
+  staticKeys.add(normalizeName(name));
+}
+
+function exportLearnedVenues() {
+  const learned = {};
+  for (const [key, coords] of normalizedMap) {
+    if (!staticKeys.has(key)) {
+      learned[key] = coords;
+    }
+  }
+  return learned;
+}
+
+function importLearnedVenues(map) {
+  for (const [key, coords] of Object.entries(map)) {
+    if (!normalizedMap.has(key)) {
+      normalizedMap.set(key, coords);
+    }
+  }
+}
+
 // --- Nominatim geocoding fallback ---
 
 function sleep(ms) {
@@ -284,4 +309,4 @@ async function batchGeocodeEvents(events) {
   console.log(`Geocoding done: ${resolved}/${unresolved.length} resolved`);
 }
 
-module.exports = { VENUE_MAP, lookupVenue, learnVenueCoords, geocodeVenue, batchGeocodeEvents };
+module.exports = { VENUE_MAP, lookupVenue, learnVenueCoords, geocodeVenue, batchGeocodeEvents, exportLearnedVenues, importLearnedVenues };

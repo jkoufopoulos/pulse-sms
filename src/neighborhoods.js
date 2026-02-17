@@ -192,7 +192,7 @@ function detectBorough(message) {
 }
 
 // Landmark and subway stop map — maps to specific neighborhoods
-const BOROUGH_MAP = {
+const LANDMARK_MAP = {
   // Landmarks
   'prospect park': 'Park Slope',
   'central park': 'Midtown',
@@ -235,7 +235,7 @@ const BOROUGH_MAP = {
 // Combine neighborhood aliases + borough shortcuts, sorted longest-first
 const ALL_ENTRIES = [
   ...SORTED_ALIASES.map(alias => ({ key: alias, value: ALIAS_MAP.get(alias) })),
-  ...Object.entries(BOROUGH_MAP).map(([key, value]) => ({ key, value })),
+  ...Object.entries(LANDMARK_MAP).map(([key, value]) => ({ key, value })),
 ].sort((a, b) => b.key.length - a.key.length);
 
 const EXTRACT_PATTERNS = ALL_ENTRIES.map(({ key, value }) => ({
@@ -259,4 +259,43 @@ function getNeighborhoodCoords(name) {
   return { lat: data.lat, lng: data.lng, radius_km: data.radius_km };
 }
 
-module.exports = { NEIGHBORHOODS, extractNeighborhood, detectBorough, getNeighborhoodCoords };
+// Known NYC neighborhoods we don't cover yet — map to nearest supported alternatives
+const UNSUPPORTED_HOODS = {
+  'bay ridge': ['Sunset Park', 'Park Slope'],
+  'bensonhurst': ['Sunset Park'],
+  'brighton beach': ['Sunset Park'],
+  'coney island': ['Sunset Park'],
+  'ditmas park': ['Park Slope', 'Prospect Heights'],
+  'flatbush': ['Crown Heights', 'Prospect Heights'],
+  'kensington': ['Park Slope'],
+  'sheepshead bay': ['Sunset Park'],
+  'borough park': ['Sunset Park', 'Park Slope'],
+  'woodside': ['Astoria', 'Long Island City'],
+  'sunnyside': ['Long Island City', 'Astoria'],
+  'forest hills': ['Jackson Heights', 'Flushing'],
+  'mott haven': ['Harlem', 'East Harlem'],
+  'south bronx': ['Harlem', 'East Harlem'],
+  'roosevelt island': ['Upper East Side', 'Astoria'],
+  'staten island': [],
+  'st george': [],
+  'hoboken': [],
+  'jersey city': [],
+};
+
+/**
+ * Detect if a message refers to a real NYC place we don't support yet.
+ * Returns { name, nearby } or null.
+ */
+function detectUnsupported(message) {
+  const lower = message.toLowerCase().trim();
+  for (const [name, nearby] of Object.entries(UNSUPPORTED_HOODS)) {
+    const regex = new RegExp(`(?<!\\w)${escapeRegex(name)}(?!\\w)`);
+    if (regex.test(lower)) {
+      const title = name.split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+      return { name: title, nearby };
+    }
+  }
+  return null;
+}
+
+module.exports = { NEIGHBORHOODS, extractNeighborhood, detectBorough, detectUnsupported, getNeighborhoodCoords };

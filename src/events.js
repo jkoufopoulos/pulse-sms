@@ -1,6 +1,15 @@
+const fs = require('fs');
+const path = require('path');
 const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchTavilyFreeEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents } = require('./sources');
 const { rankEventsByProximity, filterUpcomingEvents } = require('./geo');
-const { batchGeocodeEvents } = require('./venues');
+const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues } = require('./venues');
+
+// Load persisted learned venues on boot
+try {
+  const data = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/venues-learned.json'), 'utf8'));
+  importLearnedVenues(data);
+  console.log(`Loaded ${Object.keys(data).length} persisted venues`);
+} catch { /* file doesn't exist yet */ }
 
 // --- Daily event cache ---
 let eventCache = [];
@@ -97,6 +106,16 @@ async function refreshCache() {
 
     // Geocode events that still have no neighborhood (venue map miss)
     await batchGeocodeEvents(allEvents);
+
+    // Persist learned venues to disk for next restart
+    const learned = exportLearnedVenues();
+    const learnedCount = Object.keys(learned).length;
+    if (learnedCount > 0) {
+      try {
+        fs.writeFileSync(path.join(__dirname, '../data/venues-learned.json'), JSON.stringify(learned, null, 2));
+        console.log(`Persisted ${learnedCount} learned venues`);
+      } catch (err) { console.error('Failed to persist venues:', err.message); }
+    }
 
     eventCache = allEvents;
     cacheTimestamp = Date.now();

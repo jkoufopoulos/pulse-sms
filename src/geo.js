@@ -1,7 +1,7 @@
 const { NEIGHBORHOODS } = require('./neighborhoods');
 
 // Borough-level fallback map (L8: moved to module scope)
-const BOROUGH_MAP = {
+const BOROUGH_FALLBACK_MAP = {
   'brooklyn': 'Williamsburg',
   'manhattan': 'Midtown',
   'queens': 'Astoria',
@@ -48,7 +48,7 @@ function resolveNeighborhood(locality, lat, lng) {
   // Borough-level fallback — only used when no coordinates available
   if (locality) {
     const lower = locality.toLowerCase();
-    if (BOROUGH_MAP[lower] !== undefined) return BOROUGH_MAP[lower];
+    if (BOROUGH_FALLBACK_MAP[lower] !== undefined) return BOROUGH_FALLBACK_MAP[lower];
   }
 
   return null;
@@ -78,14 +78,15 @@ function getEventDate(event) {
  * Filter: include everything within ~3km.
  * Sort: today > tomorrow > future, then closest first within each tier.
  */
-function rankEventsByProximity(events, targetNeighborhood) {
+function rankEventsByProximity(events, targetNeighborhood, { refTimeMs } = {}) {
   if (!targetNeighborhood) return events;
 
   const targetData = NEIGHBORHOODS[targetNeighborhood];
   if (!targetData) return events;
 
-  const todayNyc = getNycDateString(0);
-  const tomorrowNyc = getNycDateString(1);
+  const now = refTimeMs || Date.now();
+  const todayNyc = getNycDateString(0, now);
+  const tomorrowNyc = getNycDateString(1, now);
 
   const scored = events.map(e => {
     // Distance
@@ -127,8 +128,8 @@ function rankEventsByProximity(events, targetNeighborhood) {
 /**
  * Get today's (or today+offset) date string in NYC timezone as YYYY-MM-DD.
  */
-function getNycDateString(dayOffset = 0) {
-  const d = new Date(Date.now() + dayOffset * 86400000);
+function getNycDateString(dayOffset = 0, refTimeMs = Date.now()) {
+  const d = new Date(refTimeMs + dayOffset * 86400000);
   return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 }
 
@@ -185,34 +186,37 @@ function parseAsNycTime(dtString) {
  * - Haven't started yet
  * - Have an end_time that's still in the future
  */
-function filterUpcomingEvents(events) {
-  const now = Date.now();
+function filterUpcomingEvents(events, { refTimeMs } = {}) {
+  const now = refTimeMs || Date.now();
   const twoHoursAgo = now - 2 * 60 * 60 * 1000;
-  const todayNyc = getNycDateString(0);
+  const todayNyc = getNycDateString(0, now);
 
   return events.filter(e => {
-    // Filter out events whose date is in the past (derived from any available field)
+    // Check end_time FIRST — late-night events that span midnight are still happening
+    if (e.end_time_local && /T\d{2}:/.test(e.end_time_local)) {
+      try {
+        const endMs = parseAsNycTime(e.end_time_local);
+        if (!isNaN(endMs) && endMs > now) return true;
+      } catch {}
+    }
+
+    // Check start_time — events within last 2 hours or in future are live regardless of date
+    if (e.start_time_local && /T\d{2}:/.test(e.start_time_local)) {
+      try {
+        const eventMs = parseAsNycTime(e.start_time_local);
+        if (!isNaN(eventMs)) {
+          if (eventMs > twoHoursAgo) return true;
+          return false; // has specific time and it's too old
+        }
+      } catch {}
+    }
+
+    // Filter out events whose date is in the past
     const eventDate = getEventDate(e);
     if (eventDate && eventDate < todayNyc) return false;
 
-    if (!e.start_time_local) return true;
-    if (!/T\d{2}:/.test(e.start_time_local)) return true;
-
-    try {
-      const eventMs = parseAsNycTime(e.start_time_local);
-      if (isNaN(eventMs)) return true;
-
-      // If event has an end time still in the future, include it regardless of start
-      if (e.end_time_local && /T\d{2}:/.test(e.end_time_local)) {
-        const endMs = parseAsNycTime(e.end_time_local);
-        if (!isNaN(endMs) && endMs > now) return true;
-      }
-
-      // Include if started within last 2 hours or hasn't started yet
-      return eventMs > twoHoursAgo;
-    } catch {
-      return true;
-    }
+    // No time info — keep if date is today or missing
+    return true;
   });
 }
 
