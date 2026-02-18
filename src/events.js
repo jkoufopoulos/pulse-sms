@@ -322,7 +322,7 @@ function msUntilNextScrape() {
 
   // Calculate ms until next SCRAPE_HOUR
   let hoursUntil = SCRAPE_HOUR - hour;
-  if (hoursUntil <= 0) hoursUntil += 24; // already past today, schedule for tomorrow
+  if (hoursUntil < 0) hoursUntil += 24; // already past today, schedule for tomorrow
 
   const msUntil = (hoursUntil * 3600 - minute * 60 - second) * 1000;
   return msUntil;

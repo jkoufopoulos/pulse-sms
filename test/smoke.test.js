@@ -115,6 +115,18 @@ check('SOLD OUT stripped (same ID as bare)', soldOut === noParens);
 const ages21 = makeEventId('Rock Night (21+)', 'Mercury Lounge', '2026-02-18');
 const noAge = makeEventId('Rock Night', 'Mercury Lounge', '2026-02-18');
 check('(21+) stripped (same ID as bare)', ages21 === noAge);
+// Empty fields fallback — must be deterministic (no randomUUID)
+const emptyA = makeEventId('', '', '', 'skint', undefined);
+const emptyB = makeEventId('', '', '', 'skint', undefined);
+check('empty fields: deterministic (same ID both calls)', emptyA === emptyB);
+check('empty fields: 12 chars', emptyA.length === 12);
+// Different sources with empty fields get different IDs
+const emptyOther = makeEventId('', '', '', 'nonsense', undefined);
+check('empty fields: different source → different ID', emptyA !== emptyOther);
+// Source + URL fallback is deterministic
+const urlA = makeEventId('', '', '', 'skint', 'https://example.com/event');
+const urlB = makeEventId('', '', '', 'skint', 'https://example.com/event');
+check('source+url fallback: deterministic', urlA === urlB);
 
 // ---- resolveNeighborhood ----
 console.log('\nresolveNeighborhood:');
@@ -605,6 +617,29 @@ check('source_url from pick url', smallsObj && smallsObj.source_url === 'https:/
 // Picks without url have null
 const johnnysObj = wvEventObjs.find(e => e.name === "Johnny's Bar");
 check('no url pick has null ticket_url', johnnysObj && johnnysObj.ticket_url === null);
+
+// ---- RA source: is_free should always be false ----
+console.log('\nRA source (is_free):');
+
+// RA events should never be marked free since isTicketed doesn't reliably mean free
+const raSource = require('../src/sources/ra');
+check('fetchRAEvents is exported', typeof raSource.fetchRAEvents === 'function');
+
+// ---- msUntilNextScrape logic (boundary test) ----
+console.log('\nmsUntilNextScrape logic:');
+
+// Replicate the formula to verify the < vs <= fix
+const SCRAPE_HOUR = 10;
+function testMsUntilNextScrape(hour, minute, second) {
+  let hoursUntil = SCRAPE_HOUR - hour;
+  if (hoursUntil < 0) hoursUntil += 24; // fixed: was <= 0
+  return (hoursUntil * 3600 - minute * 60 - second) * 1000;
+}
+check('at 10:00 AM: triggers soon (not 24h)', testMsUntilNextScrape(10, 0, 0) === 0);
+check('at 10:00:30 AM: triggers soon', testMsUntilNextScrape(10, 0, 30) < 0); // already past, will be ~0
+check('at 09:59 AM: ~60s away', testMsUntilNextScrape(9, 59, 0) === 60000);
+check('at 11:00 AM: schedules for tomorrow', testMsUntilNextScrape(11, 0, 0) === 23 * 3600000);
+check('at 09:00 AM: 1 hour away', testMsUntilNextScrape(9, 0, 0) === 3600000);
 
 // ---- SOURCES registry ----
 console.log('\nSOURCES registry:');

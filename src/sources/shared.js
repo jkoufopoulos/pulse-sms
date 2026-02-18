@@ -32,7 +32,7 @@ function makeEventId(name, venue, date, source, sourceUrl) {
 
   // If all three core fields are empty, use source + url as fallback
   if (!norm && !v && !d) {
-    const fallback = `${source || 'unknown'}|${sourceUrl || crypto.randomUUID()}`;
+    const fallback = `${source || 'unknown'}|${sourceUrl || 'no-url'}`;
     return crypto.createHash('md5').update(fallback).digest('hex').slice(0, 12);
   }
 
