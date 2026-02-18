@@ -5,7 +5,7 @@
 
 const { extractNeighborhood } = require('../src/neighborhoods');
 const { makeEventId, normalizeExtractedEvent, normalizeEventName } = require('../src/sources');
-const { resolveNeighborhood, inferCategory, haversine, getNycDateString, rankEventsByProximity, filterUpcomingEvents, parseAsNycTime, getEventDate } = require('../src/geo');
+const { resolveNeighborhood, inferCategory, haversine, getNycDateString, getNycUtcOffset, rankEventsByProximity, filterUpcomingEvents, parseAsNycTime, getEventDate } = require('../src/geo');
 const { lookupVenue } = require('../src/venues');
 const { preRoute, getAdjacentNeighborhoods } = require('../src/pre-router');
 const { formatTime, cleanUrl, formatEventDetails } = require('../src/formatters');
@@ -153,6 +153,35 @@ const today = getNycDateString(0);
 check('YYYY-MM-DD format', /^\d{4}-\d{2}-\d{2}$/.test(today));
 const tomorrow = getNycDateString(1);
 check('tomorrow is after today', tomorrow > today);
+
+// DST fall-back: 12:30 AM EDT on Nov 2 2025 = 4:30 AM UTC Nov 2
+// Adding 86400000ms (old approach) would land on 4:30 AM UTC Nov 3 = 11:30 PM EST Nov 2 (wrong!)
+// Calendar-day arithmetic should correctly return Nov 3
+const dstFallbackUtc = Date.UTC(2025, 10, 2, 4, 30); // Nov 2, 2025 4:30 AM UTC = 12:30 AM EDT
+check('DST fall-back: today is Nov 2', getNycDateString(0, dstFallbackUtc) === '2025-11-02');
+check('DST fall-back: tomorrow is Nov 3 (not Nov 2)', getNycDateString(1, dstFallbackUtc) === '2025-11-03');
+
+// DST spring-forward: 2:30 AM EDT on Mar 9 2025 = 7:30 AM UTC Mar 9
+// Clocks spring forward at 2 AM → skip an hour. Calendar day should still be correct.
+const dstSpringUtc = Date.UTC(2025, 2, 9, 7, 30); // Mar 9, 2025 7:30 AM UTC = 2:30 AM EDT
+check('DST spring-forward: today is Mar 9', getNycDateString(0, dstSpringUtc) === '2025-03-09');
+check('DST spring-forward: tomorrow is Mar 10', getNycDateString(1, dstSpringUtc) === '2025-03-10');
+
+// Month/year rollover
+check('month rollover: Dec 31 + 1 = Jan 1', getNycDateString(1, Date.UTC(2025, 11, 31, 12, 0)) === '2026-01-01');
+
+// getNycUtcOffset returns valid format
+const offset = getNycUtcOffset();
+check('getNycUtcOffset format', /^[+-]\d{2}:00$/.test(offset));
+check('getNycUtcOffset is EST or EDT', offset === '-05:00' || offset === '-04:00');
+
+// parseAsNycTime with no timezone appends NYC offset
+const parsedNoTz = parseAsNycTime('2025-07-15T20:00:00');
+const parsedWithTz = parseAsNycTime('2025-07-15T20:00:00-04:00');
+// In July (EDT), these should produce the same result since offset is -04:00
+// We can't test exact equality without mocking time, but both should be valid numbers
+check('parseAsNycTime no-tz returns valid ms', !isNaN(parsedNoTz));
+check('parseAsNycTime with-tz returns valid ms', !isNaN(parsedWithTz));
 
 // ---- rankEventsByProximity ----
 console.log('\nrankEventsByProximity:');

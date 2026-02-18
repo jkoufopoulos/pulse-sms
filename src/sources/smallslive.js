@@ -1,6 +1,6 @@
 const cheerio = require('cheerio');
 const { makeEventId, FETCH_HEADERS } = require('./shared');
-const { getNycDateString } = require('../geo');
+const { getNycDateString, getNycUtcOffset } = require('../geo');
 
 const VENUE_ADDRESSES = {
   'Smalls': '183 W 10th St, New York, NY',
@@ -30,7 +30,7 @@ function parseFirstTime(timeText, dateLocal) {
   const ampm = match[3].toUpperCase();
   if (ampm === 'PM' && hours !== 12) hours += 12;
   if (ampm === 'AM' && hours === 12) hours = 0;
-  return `${dateLocal}T${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00-05:00`;
+  return `${dateLocal}T${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00${getNycUtcOffset()}`;
 }
 
 async function fetchSmallsLiveEvents() {

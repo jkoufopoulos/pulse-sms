@@ -127,10 +127,24 @@ function rankEventsByProximity(events, targetNeighborhood, { refTimeMs } = {}) {
 
 /**
  * Get today's (or today+offset) date string in NYC timezone as YYYY-MM-DD.
+ * Uses calendar-day arithmetic instead of ms-arithmetic to avoid DST bugs
+ * (adding 86400000ms can land on the wrong calendar day during fall-back).
  */
 function getNycDateString(dayOffset = 0, refTimeMs = Date.now()) {
-  const d = new Date(refTimeMs + dayOffset * 86400000);
-  return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  const d = new Date(refTimeMs);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(d);
+  const year = parseInt(parts.find(p => p.type === 'year').value);
+  const month = parseInt(parts.find(p => p.type === 'month').value);
+  const day = parseInt(parts.find(p => p.type === 'day').value);
+  // Date constructor handles month/year rollover correctly
+  const result = new Date(year, month - 1, day + dayOffset);
+  const yyyy = result.getFullYear();
+  const mm = String(result.getMonth() + 1).padStart(2, '0');
+  const dd = String(result.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 /**
@@ -158,6 +172,24 @@ function haversine(lat1, lng1, lat2, lng2) {
 }
 
 /**
+ * Get the current NYC UTC offset string (e.g. "-05:00" for EST, "-04:00" for EDT).
+ * Uses Intl.DateTimeFormat which handles DST transitions correctly regardless of
+ * the server's local timezone.
+ */
+function getNycUtcOffset() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    timeZoneName: 'shortOffset',
+  }).formatToParts(new Date());
+  const tz = parts.find(p => p.type === 'timeZoneName')?.value || 'GMT-5';
+  const m = tz.match(/GMT([+-]?\d+)/);
+  if (!m) return '-05:00';
+  const h = parseInt(m[1], 10);
+  const sign = h <= 0 ? '-' : '+';
+  return `${sign}${String(Math.abs(h)).padStart(2, '0')}:00`;
+}
+
+/**
  * Parse a datetime string as NYC time. If the string has no timezone offset,
  * assume it's Eastern Time and append the current NYC UTC offset.
  */
@@ -167,15 +199,8 @@ function parseAsNycTime(dtString) {
   if (/[Z+-]\d{2}:?\d{2}$/.test(dtString) || dtString.endsWith('Z')) {
     return new Date(dtString).getTime();
   }
-  // Detect current NYC offset (handles EST/EDT automatically)
-  const nycNow = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
-  const nycMs = new Date(nycNow).getTime();
-  const utcMs = Date.now();
-  const offsetMs = Math.round((nycMs - utcMs) / 3600000) * 3600000; // round to nearest hour
-  const offsetHours = offsetMs / 3600000;
-  const sign = offsetHours >= 0 ? '+' : '-';
-  const absH = String(Math.abs(offsetHours)).padStart(2, '0');
-  return new Date(dtString + `${sign}${absH}:00`).getTime();
+  // Append current NYC UTC offset (handles EST/EDT automatically)
+  return new Date(dtString + getNycUtcOffset()).getTime();
 }
 
 /**
@@ -220,4 +245,4 @@ function filterUpcomingEvents(events, { refTimeMs } = {}) {
   });
 }
 
-module.exports = { resolveNeighborhood, rankEventsByProximity, getNycDateString, inferCategory, haversine, filterUpcomingEvents, getEventDate, parseAsNycTime };
+module.exports = { resolveNeighborhood, rankEventsByProximity, getNycDateString, getNycUtcOffset, inferCategory, haversine, filterUpcomingEvents, getEventDate, parseAsNycTime };
