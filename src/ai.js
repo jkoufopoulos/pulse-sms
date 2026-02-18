@@ -573,13 +573,15 @@ Compose the SMS now.`;
       }
       return null;
     }).filter(Boolean);
-    // Last resort: just use the first N events that Claude mentioned in sms_text
+    // Last resort: match events whose full name appears in sms_text
     if (validPicks.length === 0) {
-      validPicks = events.filter(e =>
-        parsed.sms_text.toLowerCase().includes((e.name || '').toLowerCase().slice(0, 20))
-      ).slice(0, 3).map((e, i) => ({ rank: i + 1, event_id: e.id }));
+      const smsLower = parsed.sms_text.toLowerCase();
+      validPicks = events.filter(e => {
+        const name = (e.name || '').toLowerCase();
+        return name.length >= 3 && smsLower.includes(name);
+      }).slice(0, 3).map((e, i) => ({ rank: i + 1, event_id: e.id }));
       if (validPicks.length > 0) {
-        console.log(`composeResponse: recovered ${validPicks.length} picks via sms_text name matching`);
+        console.warn(`composeResponse: [RECOVERED] ${validPicks.length} picks via full-name sms_text matching (IDs: ${validPicks.map(p => p.event_id).join(', ')})`);
       }
     }
   }

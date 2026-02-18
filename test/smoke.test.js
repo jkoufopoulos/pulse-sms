@@ -1108,6 +1108,20 @@ const geoEvents = [
   check('1-pick range: sends 1 message', msgs.length === 1);
   check('1-pick range: says "1 pick"', msgs[0]?.body.includes('1 pick') || msgs[0]?.body.includes('reply 1'));
 
+  // 14. dispatchWithFallback — "more" with events triggers Claude → fails without API key → intent-specific error
+  hClearSession(intPhone);
+  hSetSession(intPhone, {
+    lastNeighborhood: 'Williamsburg',
+    lastPicks: [{ event_id: 'fb_evt1', why: 'fun' }],
+    lastEvents: {
+      fb_evt1: { id: 'fb_evt1', name: 'Event Already Shown', venue_name: 'V1', neighborhood: 'Williamsburg' },
+      fb_evt2: { id: 'fb_evt2', name: 'Unseen Event', venue_name: 'V2', neighborhood: 'Williamsburg' },
+    },
+  });
+  msgs = await sendAndCapture(intPhone, 'more');
+  check('dispatchWithFallback: sends 1 message', msgs.length === 1);
+  check('dispatchWithFallback: intent-specific error', msgs[0]?.body.includes("Couldn't load more picks"));
+
   // Cleanup
   hClearSession(intPhone);
   clearSmsIntervals();

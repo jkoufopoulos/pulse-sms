@@ -237,7 +237,12 @@ async function refreshCache() {
     }
 
     // Geocode events that still have no neighborhood (venue map miss)
-    await batchGeocodeEvents(allEvents);
+    // Wrapped in try-catch so geocoding failure doesn't block cache update
+    try {
+      await batchGeocodeEvents(allEvents);
+    } catch (err) {
+      console.error('Geocoding failed, continuing with un-geocoded events:', err.message);
+    }
 
     // Persist learned venues to disk for next restart
     const learned = exportLearnedVenues();

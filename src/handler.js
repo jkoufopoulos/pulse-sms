@@ -376,7 +376,7 @@ async function handleMore(ctx) {
 async function handleFree(ctx) {
   const hood = ctx.neighborhood;
   if (!hood) {
-    setSession(ctx.phone, { pendingFilters: { ...ctx.route.filters, free_only: true } });
+    setSession(ctx.phone, { pendingFilters: { ...ctx.route.filters, free_only: true }, pendingMessage: ctx.message });
     const sms = "Where are you headed? Drop me a neighborhood like East Village, Williamsburg, or LES.";
     await sendSMS(ctx.phone, sms);
     ctx.finalizeTrace(sms, 'free');
@@ -408,7 +408,10 @@ async function handleFree(ctx) {
         ctx.trace.events.candidate_ids = nearbyFree.map(e => e.id);
         const eventMap = {};
         for (const e of nearbyFree) eventMap[e.id] = e;
-        const result = await ctx.composeAndSend(nearbyFree.slice(0, 8), nearbyHood, { ...ctx.route.filters, free_only: true }, 'free');
+        const nearbyFreeContext = ctx.pendingMessage
+          ? `\nUser's original request: "${ctx.pendingMessage}". Prioritize events matching that intent.`
+          : '';
+        const result = await ctx.composeAndSend(nearbyFree.slice(0, 8), nearbyHood, { ...ctx.route.filters, free_only: true }, 'free', { extraContext: nearbyFreeContext });
         setSession(ctx.phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: nearbyHood });
         await sendComposeWithLinks(ctx.phone, result, eventMap);
         console.log(`Free events from nearby ${nearbyHood} sent to ${ctx.masked}`);
@@ -426,7 +429,10 @@ async function handleFree(ctx) {
   ctx.trace.events.cache_size = events.length;
   ctx.trace.events.candidates_count = Math.min(filteredFree.length, 8);
   ctx.trace.events.candidate_ids = filteredFree.slice(0, 8).map(e => e.id);
-  const result = await ctx.composeAndSend(filteredFree.slice(0, 8), hood, ctx.route.filters, 'free');
+  const freeExtraContext = ctx.pendingMessage
+    ? `\nUser's original request: "${ctx.pendingMessage}". Prioritize events matching that intent.`
+    : '\nUser asked for free events. ALWAYS list them with numbers even if they seem niche — the user specifically wants free.';
+  const result = await ctx.composeAndSend(filteredFree.slice(0, 8), hood, ctx.route.filters, 'free', { extraContext: freeExtraContext });
   const eventMap = {};
   for (const e of filteredFree) eventMap[e.id] = e;
   setSession(ctx.phone, {
@@ -604,7 +610,7 @@ async function handleEventsDefault(ctx) {
 
   // Redirect to travel nudge when events are thin
   const thinWithNoPerennial = events.length <= 1 && localPerennials.length === 0;
-  const fewNearbyOnly = inHood.length === 0 && events.length <= 2;
+  const fewNearbyOnly = inHood.length === 0 && events.length <= 6;
   if ((fewNearbyOnly || thinWithNoPerennial) && !alreadyNudged && !categoryApplied) {
     const thinNearbyHoods = getAdjacentNeighborhoods(hood, 5);
     for (const nearbyHood of thinNearbyHoods) {
@@ -630,7 +636,8 @@ async function handleEventsDefault(ctx) {
   const result = await ctx.composeAndSend(composeEventsWithPerennials, hood, ctx.route.filters, 'events');
 
   const eventMap = {};
-  for (const e of events) eventMap[e.id] = e;
+  const moreBuffer = events.slice(0, 12); // cap for 1 MORE batch before exhaustion
+  for (const e of moreBuffer) eventMap[e.id] = e;
   for (const e of perennialEvents) eventMap[e.id] = e;
 
   // Validate picks — filter out any hallucinated event_ids not in event map
@@ -732,7 +739,7 @@ async function handleMessageAI(phone, message) {
   // No neighborhood for events intent — ask the user
   if (!neighborhood && route.intent === 'events') {
     if (route.filters?.free_only || route.filters?.category) {
-      setSession(phone, { pendingFilters: route.filters });
+      setSession(phone, { pendingFilters: route.filters, pendingMessage: message });
     }
     const sms = "Where are you headed? Drop me a neighborhood like East Village, Williamsburg, or LES.";
     await sendSMS(phone, sms);
@@ -741,8 +748,27 @@ async function handleMessageAI(phone, message) {
   }
 
   // --- Dispatch: more and free run before pending filters (matches original order) ---
-  if (route.intent === 'more') return handleMore(ctx);
-  if (route.intent === 'free') return handleFree(ctx);
+  // Intent handlers that call Claude are wrapped so errors produce
+  // intent-specific messages instead of the generic "Pulse hit a snag".
+  const INTENT_ERROR_MSGS = {
+    more: "Couldn't load more picks right now — try again in a sec!",
+    free: "Couldn't find free events right now — try again in a sec!",
+    events: "Couldn't load events right now — try again in a sec!",
+  };
+
+  async function dispatchWithFallback(handler, intentLabel) {
+    try {
+      return await handler(ctx);
+    } catch (err) {
+      console.error(`${intentLabel} handler error:`, err.message);
+      const sms = INTENT_ERROR_MSGS[intentLabel] || "Pulse hit a snag — try again in a sec!";
+      await sendSMS(phone, sms);
+      finalizeTrace(sms, intentLabel);
+    }
+  }
+
+  if (route.intent === 'more') return dispatchWithFallback(handleMore, 'more');
+  if (route.intent === 'free') return dispatchWithFallback(handleFree, 'free');
 
   // --- Restore pending filters (only for events/nudge_accept) ---
   const pendingFilters = session?.pendingFilters;
@@ -753,18 +779,26 @@ async function handleMessageAI(phone, message) {
     if (pendingFilters.category && !route.filters?.category) {
       route.filters = { ...route.filters, category: pendingFilters.category };
     }
-    setSession(phone, { pendingFilters: null });
+    // Restore original message context for compose
+    if (session?.pendingMessage) {
+      ctx.pendingMessage = session.pendingMessage;
+    }
+    setSession(phone, { pendingFilters: null, pendingMessage: null });
   }
 
   // Pending filters may redirect events→free
   if (route.filters?.free_only && route.intent === 'events') {
-    return handleFree(ctx);
+    return dispatchWithFallback(handleFree, 'free');
   }
 
   if (route.intent === 'nudge_accept') {
-    const handled = await handleNudgeAccept(ctx);
-    if (handled) return;
-    // Fall through to events
+    try {
+      const handled = await handleNudgeAccept(ctx);
+      if (handled) return;
+    } catch (err) {
+      console.error('nudge_accept handler error:', err.message);
+      // Fall through to events on nudge error
+    }
   }
 
   // Unknown intent guard
@@ -780,7 +814,7 @@ async function handleMessageAI(phone, message) {
     return;
   }
 
-  return handleEventsDefault(ctx);
+  return dispatchWithFallback(handleEventsDefault, 'events');
 }
 
 // Cleanup intervals (for graceful shutdown)
