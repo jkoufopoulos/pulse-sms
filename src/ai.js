@@ -663,19 +663,33 @@ function parseJsonFromResponse(text) {
     }
   }
 
-  // Find the first { and try progressively larger substrings until valid JSON
+  // Find the first { and match its closing } by counting braces (not greedy lastIndexOf)
   const start = text.indexOf('{');
   if (start === -1) return null;
 
-  // Walk backwards from the end to find the matching closing brace
-  for (let end = text.lastIndexOf('}'); end > start; end = text.lastIndexOf('}', end - 1)) {
-    try {
-      return JSON.parse(text.slice(start, end + 1));
-    } catch {
-      // Try fixing newlines inside string values
-      try {
-        return JSON.parse(fixJsonNewlines(text.slice(start, end + 1)));
-      } catch { /* try shorter */ }
+  // Walk forward counting braces to find the balanced closing }, respecting string literals
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{') depth++;
+    if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        const candidate = text.slice(start, i + 1);
+        try {
+          return JSON.parse(candidate);
+        } catch {
+          try {
+            return JSON.parse(fixJsonNewlines(candidate));
+          } catch { return null; }
+        }
+      }
     }
   }
 

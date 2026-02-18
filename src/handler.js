@@ -140,7 +140,7 @@ router.post('/incoming', (req, res) => {
 // =======================================================
 
 // --- TCPA opt-out keywords — must not respond to these ---
-const OPT_OUT_KEYWORDS = /^(stop|unsubscribe|cancel|quit|end)$/i;
+const OPT_OUT_KEYWORDS = /\b(stop|unsubscribe|cancel|quit)\b/i;
 
 async function handleMessage(phone, message) {
   const masked = maskPhone(phone);
@@ -152,12 +152,11 @@ async function handleMessage(phone, message) {
     return;
   }
 
-  // Rate limiting (disabled for now — re-enable when ready)
-  // if (isRateLimited(phone)) {
-  //   console.warn(`Rate limited: ${masked}`);
-  //   await sendSMS(phone, "Easy there — give it a few minutes and try again!");
-  //   return;
-  // }
+  if (isRateLimited(phone)) {
+    console.warn(`Rate limited: ${masked}`);
+    await sendSMS(phone, "Easy there — give it a few minutes and try again!");
+    return;
+  }
 
   try {
     await handleMessageAI(phone, message);
@@ -166,7 +165,7 @@ async function handleMessage(phone, message) {
     try {
       await sendSMS(phone, "Pulse hit a snag — try again in a sec!");
     } catch (smsErr) {
-      console.error(`Failed to send error SMS to ${masked}:`, smsErr.message);
+      console.error(`[CRITICAL] Double failure for ${masked}: AI error="${err.message}", SMS error="${smsErr.message}" — user received nothing`);
     }
   }
 }
@@ -815,7 +814,13 @@ async function handleMessageAI(phone, message) {
   for (const e of events) eventMap[e.id] = e;
   for (const e of perennialEvents) eventMap[e.id] = e;
 
-  setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], allOfferedIds: composeEventsWithPerennials.map(e => e.id), lastEvents: eventMap, lastNeighborhood: result.neighborhood_used || hood, visitedHoods: [hood] });
+  // Validate picks — filter out any hallucinated event_ids not in event map
+  const validPicks = (result.picks || []).filter(p => eventMap[p.event_id]);
+  if (validPicks.length < (result.picks || []).length) {
+    console.warn(`Filtered ${(result.picks || []).length - validPicks.length} hallucinated pick IDs`);
+  }
+
+  setSession(phone, { lastPicks: validPicks, allPicks: validPicks, allOfferedIds: composeEventsWithPerennials.map(e => e.id), lastEvents: eventMap, lastNeighborhood: result.neighborhood_used || hood, visitedHoods: [hood] });
 
   await sendComposeWithLinks(phone, result, eventMap);
   console.log(`AI response sent to ${masked}`);
