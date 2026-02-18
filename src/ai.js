@@ -9,7 +9,7 @@ function getClient() {
 
 const MODELS = {
   route: process.env.PULSE_MODEL_ROUTE || 'claude-haiku-4-5-20251001',
-  compose: process.env.PULSE_MODEL_COMPOSE || 'claude-sonnet-4-5-20250929',
+  compose: process.env.PULSE_MODEL_COMPOSE || 'claude-haiku-4-5-20251001',
   extract: process.env.PULSE_MODEL_EXTRACT || 'claude-haiku-4-5-20251001',
 };
 
@@ -483,7 +483,7 @@ VALID_NEIGHBORHOODS: ${neighborhoodNames.join(', ')}`;
  * Compose an SMS response by picking events and writing the message in one Claude call.
  * Returns { sms_text, picks, neighborhood_used }
  */
-async function composeResponse(message, events, neighborhood, filters, { excludeIds, extraContext } = {}) {
+async function composeResponse(message, events, neighborhood, filters, { excludeIds, extraContext, model } = {}) {
   const now = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   const todayNyc = getNycDateString(0);
@@ -529,7 +529,7 @@ ${eventListStr}
 Compose the SMS now.`;
 
   const response = await getClient().messages.create({
-    model: MODELS.compose,
+    model: model || MODELS.compose,
     max_tokens: 512,
     system: COMPOSE_SYSTEM,
     messages: [{ role: 'user', content: userPrompt }],

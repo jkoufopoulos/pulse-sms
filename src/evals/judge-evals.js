@@ -31,9 +31,11 @@ SMS to evaluate:
 
 Does this SMS sound like a real friend texting you about things to do tonight? It should feel warm, natural, and concise — not robotic, not overly formal, not like a newsletter or marketing email.
 
-Red flags: numbered lists, bullet points, excessive exclamation marks, corporate language ("we recommend", "please visit"), overly structured format, hashtags.
+IMPORTANT: Pulse uses a numbered pick format ("1) Event at Venue — take. Time, price"). This is intentional and expected — do NOT penalize the numbered format itself. Judge the VOICE within that structure: does each pick sound opinionated and personal, or generic and robotic?
 
-Green flags: casual tone, NYC shorthand, personal opinion ("this one's sick", "worth checking out"), natural flow between recommendations.
+Red flags: bullet points, excessive exclamation marks, corporate language ("we recommend", "please visit", "don't miss"), marketing speak, hashtags, generic descriptions that could apply to any event ("a great time", "fun for everyone").
+
+Green flags: casual tone, NYC shorthand, personal opinion ("legendary spot", "always goes off", "worth every penny"), specific vibe cues ("tiny basement", "goes late"), concise but informative.
 
 Respond with EXACTLY one line:
 PASS: [one sentence explaining why it sounds natural]
@@ -123,4 +125,79 @@ async function runJudgeEvals(trace) {
   return [tone, relevance];
 }
 
-module.exports = { judgeTone, judgePickRelevance, runJudgeEvals };
+/**
+ * Judge: Head-to-head preference between two SMS responses to the same prompt.
+ * Randomly assigns position A/B to control for position bias.
+ * @param {string} userMessage - the user's original SMS
+ * @param {string} neighborhood - the target neighborhood
+ * @param {string} sms1 - first model's response
+ * @param {string} sms2 - second model's response
+ * @param {string} label1 - label for first model (e.g. 'sonnet')
+ * @param {string} label2 - label for second model (e.g. 'haiku')
+ * @returns {{ name: string, winner: string, confidence: string, detail: string, position_swapped: boolean }}
+ */
+async function judgePreference(userMessage, neighborhood, sms1, sms2, label1, label2) {
+  // Randomly swap positions to control for position bias
+  const swap = Math.random() < 0.5;
+  const responseA = swap ? sms2 : sms1;
+  const responseB = swap ? sms1 : sms2;
+
+  const prompt = `You are comparing two SMS responses from an NYC event recommendation bot called Pulse.
+Both responses were generated from the exact same event list and user request.
+
+User's message: "${userMessage}"
+Neighborhood: ${neighborhood || 'not specified'}
+
+<response_a>
+${responseA}
+</response_a>
+
+<response_b>
+${responseB}
+</response_b>
+
+Compare them on these criteria:
+1. TONE — Does it sound like a friend texting, not a bot? Warm, opinionated, NYC shorthand.
+2. CURATION — Did it pick the most interesting events? Good taste, not generic.
+3. FORMAT — Correct numbered format? Under 480 chars? Clean structure?
+4. HELPFULNESS — Enough context to decide without Googling (time, price, vibe)?
+5. HONESTY — Correct day labels (tonight vs tomorrow)? Honest about neighborhood mismatch?
+
+Respond with EXACTLY one line in this format:
+WINNER: A|B|TIE — [confidence: high|medium|low] — [one sentence explaining why]`;
+
+  try {
+    const response = await getClient().messages.create({
+      model: MODEL,
+      max_tokens: 150,
+      messages: [{ role: 'user', content: prompt }],
+    }, { timeout: 10000 });
+
+    const text = (response.content?.[0]?.text || '').trim();
+    const match = text.match(/WINNER:\s*(A|B|TIE)\s*[—-]\s*\[?confidence:\s*(high|medium|low)\]?\s*[—-]\s*(.*)/i);
+
+    if (!match) {
+      return { name: 'judge_preference', winner: 'error', confidence: 'low', detail: `unparseable: ${text}`, position_swapped: swap };
+    }
+
+    let rawWinner = match[1].toUpperCase();
+    const confidence = match[2].toLowerCase();
+    const reason = match[3].trim();
+
+    // Map position back to model label
+    let winner;
+    if (rawWinner === 'TIE') {
+      winner = 'tie';
+    } else if (rawWinner === 'A') {
+      winner = swap ? label2 : label1;
+    } else {
+      winner = swap ? label1 : label2;
+    }
+
+    return { name: 'judge_preference', winner, confidence, detail: reason, position_swapped: swap };
+  } catch (err) {
+    return { name: 'judge_preference', winner: 'error', confidence: 'low', detail: `judge error: ${err.message}`, position_swapped: swap };
+  }
+}
+
+module.exports = { judgeTone, judgePickRelevance, runJudgeEvals, judgePreference };

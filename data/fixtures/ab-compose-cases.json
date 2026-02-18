@@ -1,0 +1,214 @@
+[
+  {
+    "id": "ab-001",
+    "description": "Standard happy path — good mix of tonight events",
+    "message": "East Village tonight",
+    "neighborhood": "East Village",
+    "filters": { "free_only": false, "category": null, "vibe": null },
+    "tags": ["standard", "tonight"],
+    "events": [
+      { "id": "evt_001", "name": "Steve Lehman Trio", "venue_name": "Nublu", "neighborhood": "East Village", "date_local": "__TODAY__", "start_time_local": "__TODAY__T21:30:00", "is_free": false, "price_display": "$15", "category": "live_music", "source_name": "dice", "source_weight": 0.8, "confidence": 0.9, "description_short": "Avant-garde jazz trio", "ticket_url": "https://dice.fm/event/nublu-steve-lehman" },
+      { "id": "evt_002", "name": "DJ Honeypot", "venue_name": "Mood Ring", "neighborhood": "East Village", "date_local": "__TODAY__", "start_time_local": "__TODAY__T22:00:00", "is_free": true, "price_display": "free", "category": "nightlife", "source_name": "ra", "source_weight": 0.85, "confidence": 0.9, "description_short": "House and disco party, no cover", "ticket_url": "https://ra.co/events/1234" },
+      { "id": "evt_003", "name": "Open Mic Comedy", "venue_name": "Eastville Comedy Club", "neighborhood": "East Village", "date_local": "__TODAY__", "start_time_local": "__TODAY__T20:00:00", "is_free": false, "price_display": "$10", "category": "comedy", "source_name": "eventbrite", "source_weight": 0.7, "confidence": 0.8, "description_short": "Weekly open mic with surprise headliners", "ticket_url": "https://eventbrite.com/e/123" },
+      { "id": "evt_004", "name": "Gallery Opening: New Abstractions", "venue_name": "Hole Gallery", "neighborhood": "East Village", "date_local": "__TODAY__", "start_time_local": "__TODAY__T18:00:00", "is_free": true, "price_display": "free", "category": "art", "source_name": "theskint", "source_weight": 0.9, "confidence": 0.85, "description_short": "Group show featuring 5 emerging painters", "ticket_url": null },
+      { "id": "evt_005", "name": "Punk Night", "venue_name": "Bowery Electric", "neighborhood": "East Village", "date_local": "__TODAY__", "start_time_local": "__TODAY__T21:00:00", "is_free": false, "price_display": "$12", "category": "live_music", "source_name": "ohmyrockness", "source_weight": 0.85, "confidence": 0.88, "description_short": "Three-band punk bill with local acts", "ticket_url": "https://boweryelectric.com/events" },
+      { "id": "evt_006", "name": "Techno Tuesday", "venue_name": "Webster Hall", "neighborhood": "East Village", "date_local": "__TOMORROW__", "start_time_local": "__TOMORROW__T23:00:00", "is_free": false, "price_display": "$25", "category": "nightlife", "source_name": "ra", "source_weight": 0.85, "confidence": 0.85, "description_short": "Deep techno with rotating DJs", "ticket_url": "https://ra.co/events/5678" }
+    ]
+  },
+  {
+    "id": "ab-002",
+    "description": "Comedy category filter — should pick only comedy events",
+    "message": "comedy in midtown",
+    "neighborhood": "Midtown",
+    "filters": { "free_only": false, "category": "comedy", "vibe": null },
+    "tags": ["category_filter", "comedy"],
+    "events": [
+      { "id": "evt_010", "name": "Stand-Up On The Spot", "venue_name": "NY Comedy Club", "neighborhood": "Midtown", "date_local": "__TODAY__", "start_time_local": "__TODAY__T21:00:00", "is_free": false, "price_display": "$20", "category": "comedy", "source_name": "donyc", "source_weight": 0.75, "confidence": 0.85, "description_short": "Improv comedy battle with audience suggestions", "ticket_url": "https://nycomedyclub.com/events" },
+      { "id": "evt_011", "name": "Late Night Comedy", "venue_name": "Gotham Comedy Club", "neighborhood": "Midtown", "date_local": "__TODAY__", "start_time_local": "__TODAY__T23:00:00", "is_free": false, "price_display": "$25 + 2 drink min", "category": "comedy", "source_name": "eventbrite", "source_weight": 0.7, "confidence": 0.8, "description_short": "Late-night standup showcase", "ticket_url": "https://gothamcomedyclub.com" },
+      { "id": "evt_012", "name": "The Funny Bus Tour", "venue_name": "Times Square Meeting Point", "neighborhood": "Midtown", "date_local": "__TODAY__", "start_time_local": "__TODAY__T19:00:00", "is_free": false, "price_display": "$45", "category": "comedy", "source_name": "eventbrite", "source_weight": 0.7, "confidence": 0.7, "description_short": "Comedy bus tour of Manhattan landmarks", "ticket_url": "https://eventbrite.com/e/456" }
+    ]
+  },
+  {
+    "id": "ab-003",
+    "description": "Free events filter — should highlight free options",
+    "message": "free stuff in williamsburg",
+    "neighborhood": "Williamsburg",
+    "filters": { "free_only": true, "category": null, "vibe": null },
+    "tags": ["free_filter"],
+    "events": [
+      { "id": "evt_020", "name": "Gun Outfit", "venue_name": "Union Pool", "neighborhood": "Williamsburg", "date_local": "__TODAY__", "start_time_local": "__TODAY__T21:00:00", "is_free": true, "price_display": "free", "category": "live_music", "source_name": "ohmyrockness", "source_weight": 0.85, "confidence": 0.9, "description_short": "Post-punk California band, free show", "ticket_url": "https://unionpool.com/events" },
+      { "id": "evt_021", "name": "Open Studios", "venue_name": "56 Bogart", "neighborhood": "Williamsburg", "date_local": "__TODAY__", "start_time_local": "__TODAY__T17:00:00", "is_free": true, "price_display": "free", "category": "art", "source_name": "theskint", "source_weight": 0.9, "confidence": 0.85, "description_short": "Artists open their studios for public viewing", "ticket_url": null },
+      { "id": "evt_022", "name": "Jazz Jam Session", "venue_name": "Pete's Candy Store", "neighborhood": "Williamsburg", "date_local": "__TODAY__", "start_time_local": "__TODAY__T20:00:00", "is_free": true, "price_display": "free", "category": "live_music", "source_name": "brooklynvegan", "source_weight": 0.8, "confidence": 0.85, "description_short": "Weekly jazz jam, all musicians welcome", "ticket_url": "https://petescandystore.com" },
+      { "id": "evt_023", "name": "Karaoke Night", "venue_name": "Trash Bar", "neighborhood": "Williamsburg", "date_local": "__TODAY__", "start_time_local": "__TODAY__T22:00:00", "is_free": true, "price_display": "free", "category": "nightlife", "source_name": "eventbrite", "source_weight": 0.7, "confidence": 0.75, "description_short": "No-judgment karaoke in a divey bar", "ticket_url": null }
+    ]
+  },
+  {
+    "id": "ab-004",
+    "description": "Vibe filter — subjective curation test",
+    "message": "something chill in chelsea",
+    "neighborhood": "Chelsea",
+    "filters": { "free_only": false, "category": null, "vibe": "chill" },
+    "tags": ["vibe_filter", "subjective"],
+    "events": [
+      { "id": "evt_030", "name": "Ambient Night", "venue_name": "Le Poisson Rouge", "neighborhood": "Chelsea", "date_local": "__TODAY__", "start_time_local": "__TODAY__T20:00:00", "is_free": false, "price_display": "$18", "category": "live_music", "source_name": "dice", "source_weight": 0.8, "confidence": 0.88, "description_short": "Ambient electronic set with visuals", "ticket_url": "https://dice.fm/event/lpr-ambient" },
+      { "id": "evt_031", "name": "RAVE WAREHOUSE PARTY", "venue_name": "Secret Location", "neighborhood": "Chelsea", "date_local": "__TODAY__", "start_time_local": "__TODAY__T23:00:00", "is_free": false, "price_display": "$35", "category": "nightlife", "source_name": "ra", "source_weight": 0.85, "confidence": 0.82, "description_short": "Hard techno warehouse party til 6am", "ticket_url": "https://ra.co/events/9999" },
+      { "id": "evt_032", "name": "Wine & Paint Night", "venue_name": "Chelsea Market Gallery", "neighborhood": "Chelsea", "date_local": "__TODAY__", "start_time_local": "__TODAY__T19:00:00", "is_free": false, "price_display": "$40", "category": "art", "source_name": "eventbrite", "source_weight": 0.7, "confidence": 0.75, "description_short": "Guided painting with wine included", "ticket_url": "https://eventbrite.com/e/789" },
+      { "id": "evt_033", "name": "Jazz at the Gallery", "venue_name": "Gagosian", "neighborhood": "Chelsea", "date_local": "__TODAY__", "start_time_local": "__TODAY__T18:30:00", "is_free": true, "price_display": "free", "category": "art", "source_name": "theskint", "source_weight": 0.9, "confidence": 0.9, "description_short": "Live jazz during gallery opening reception", "ticket_url": null },
+      { "id": "evt_034", "name": "Acoustic Singer-Songwriter", "venue_name": "Rockwood Music Hall", "neighborhood": "Chelsea", "date_local": "__TODAY__", "start_time_local": "__TODAY__T19:30:00", "is_free": true, "price_display": "free", "category": "live_music", "source_name": "ohmyrockness", "source_weight": 0.85, "confidence": 0.87, "description_short": "Intimate acoustic set, BYOB-friendly venue", "ticket_url": "https://rockwoodmusichall.com" }
+    ]
+  },
+  {
+    "id": "ab-005",
+    "description": "Thin event list — only 2 events, tests honest framing",
+    "message": "park slope tonight",
+    "neighborhood": "Park Slope",
+    "filters": { "free_only": false, "category": null, "vibe": null },
+    "tags": ["thin", "honest"],
+    "events": [
+      { "id": "evt_040", "name": "Trivia Night", "venue_name": "Union Hall", "neighborhood": "Park Slope", "date_local": "__TODAY__", "start_time_local": "__TODAY__T19:30:00", "is_free": true, "price_display": "free", "category": "community", "source_name": "eventbrite", "source_weight": 0.7, "confidence": 0.8, "description_short": "Weekly pub trivia with prizes", "ticket_url": "https://unionhallny.com" },
+      { "id": "evt_041", "name": "Bluegrass Monday", "venue_name": "Barbès", "neighborhood": "Park Slope", "date_local": "__TODAY__", "start_time_local": "__TODAY__T21:00:00", "is_free": false, "price_display": "$10 suggested", "category": "live_music", "source_name": "ohmyrockness", "source_weight": 0.85, "confidence": 0.9, "description_short": "Weekly bluegrass night, legendary house band", "ticket_url": "https://barbesbrooklyn.com" }
+    ]
+  },
+  {
+    "id": "ab-006",
+    "description": "Mixed today/tomorrow — tests correct day labeling",
+    "message": "what's happening in bushwick",
+    "neighborhood": "Bushwick",
+    "filters": { "free_only": false, "category": null, "vibe": null },
+    "tags": ["day_labels", "mixed_dates"],
+    "events": [
+      { "id": "evt_050", "name": "House of Yes: Cirque Night", "venue_name": "House of Yes", "neighborhood": "Bushwick", "date_local": "__TODAY__", "start_time_local": "__TODAY__T22:00:00", "is_free": false, "price_display": "$20-30", "category": "nightlife", "source_name": "ra", "source_weight": 0.85, "confidence": 0.92, "description_short": "Circus-themed dance party with aerial performers", "ticket_url": "https://houseofyes.org" },
+      { "id": "evt_051", "name": "Roberta's Pizza Pop-Up", "venue_name": "Roberta's", "neighborhood": "Bushwick", "date_local": "__TOMORROW__", "start_time_local": "__TOMORROW__T18:00:00", "is_free": false, "price_display": "$15", "category": "food_drink", "source_name": "eventbrite", "source_weight": 0.7, "confidence": 0.75, "description_short": "Special pizza tasting with guest chef", "ticket_url": null },
+      { "id": "evt_052", "name": "Elsewhere Rooftop DJ", "venue_name": "Elsewhere", "neighborhood": "Bushwick", "date_local": "__TODAY__", "start_time_local": "__TODAY__T23:00:00", "is_free": false, "price_display": "$15", "category": "nightlife", "source_name": "ra", "source_weight": 0.85, "confidence": 0.9, "description_short": "Rooftop house music set with skyline views", "ticket_url": "https://elsewhere.zone" },
+      { "id": "evt_053", "name": "Drag Bingo", "venue_name": "3 Dollar Bill", "neighborhood": "Bushwick", "date_local": "__TOMORROW__", "start_time_local": "__TOMORROW__T19:00:00", "is_free": false, "price_display": "$10", "category": "nightlife", "source_name": "eventbrite", "source_weight": 0.7, "confidence": 0.82, "description_short": "Bingo hosted by drag queens with prizes", "ticket_url": "https://3dollarbill.com" },
+      { "id": "evt_054", "name": "Warehouse Gallery Show", "venue_name": "Clearing Gallery", "neighborhood": "Bushwick", "date_local": "__TODAY__", "start_time_local": "__TODAY__T17:00:00", "is_free": true, "price_display": "free", "category": "art", "source_name": "theskint", "source_weight": 0.9, "confidence": 0.85, "description_short": "New sculpture installation, opening reception", "ticket_url": null }
+    ]
+  },
+  {
+    "id": "ab-007",
+    "description": "Only tomorrow events — needs honest 'nothing tonight' framing",
+    "message": "lower east side",
+    "neighborhood": "Lower East Side",
+    "filters": { "free_only": false, "category": null, "vibe": null },
+    "tags": ["tomorrow_only", "honest"],
+    "extraContext": "\nIMPORTANT: There is NOTHING tonight in Lower East Side. All events below are TOMORROW. Lead with \"Nothing tonight in LES, but tomorrow:\" and use the tomorrow format.",
+    "events": [
+      { "id": "evt_060", "name": "Indie Rock Night", "venue_name": "Mercury Lounge", "neighborhood": "Lower East Side", "date_local": "__TOMORROW__", "start_time_local": "__TOMORROW__T20:00:00", "is_free": false, "price_display": "$18", "category": "live_music", "source_name": "dice", "source_weight": 0.8, "confidence": 0.88, "description_short": "Three-band indie rock bill", "ticket_url": "https://mercuryloungenyc.com" },
+      { "id": "evt_061", "name": "Jazz at Smalls", "venue_name": "Smalls Jazz Club", "neighborhood": "Lower East Side", "date_local": "__TOMORROW__", "start_time_local": "__TOMORROW__T21:30:00", "is_free": false, "price_display": "$20", "category": "live_music", "source_name": "songkick", "source_weight": 0.75, "confidence": 0.9, "description_short": "Classic jazz in intimate basement venue", "ticket_url": "https://smallslive.com" },
+      { "id": "evt_062", "name": "Free Comedy Open Mic", "venue_name": "Slipper Room", "neighborhood": "Lower East Side", "date_local": "__TOMORROW__", "start_time_local": "__TOMORROW__T19:00:00", "is_free": true, "price_display": "free", "category": "comedy", "source_name": "donyc", "source_weight": 0.75, "confidence": 0.8, "description_short": "Drop-in comedy open mic, all welcome", "ticket_url": null }
+    ]
+  },
+  {
+    "id": "ab-008",
+    "description": "Live music specific — tests music curation taste",
+    "message": "live music williamsburg",
+    "neighborhood": "Williamsburg",
+    "filters": { "free_only": false, "category": "live_music", "vibe": null },
+    "tags": ["category_filter", "music", "curation"],
+    "events": [
+      { "id": "evt_070", "name": "Why Bonnie", "venue_name": "Music Hall of Williamsburg", "neighborhood": "Williamsburg", "date_local": "__TODAY__", "start_time_local": "__TODAY__T20:00:00", "is_free": false, "price_display": "$22", "category": "live_music", "source_name": "brooklynvegan", "source_weight": 0.8, "confidence": 0.92, "description_short": "Dreamy shoegaze/indie from Austin", "ticket_url": "https://musichallofwilliamsburg.com" },
+      { "id": "evt_071", "name": "Cumbia Night", "venue_name": "Baby's All Right", "neighborhood": "Williamsburg", "date_local": "__TODAY__", "start_time_local": "__TODAY__T21:30:00", "is_free": false, "price_display": "$15", "category": "live_music", "source_name": "dice", "source_weight": 0.8, "confidence": 0.88, "description_short": "Live cumbia band with dance floor", "ticket_url": "https://babysallright.com" },
+      { "id": "evt_072", "name": "Karaoke & Cover Band", "venue_name": "Arlene's Grocery", "neighborhood": "Williamsburg", "date_local": "__TODAY__", "start_time_local": "__TODAY__T22:00:00", "is_free": true, "price_display": "free", "category": "live_music", "source_name": "eventbrite", "source_weight": 0.7, "confidence": 0.7, "description_short": "Open karaoke with a live backing band", "ticket_url": null },
+      { "id": "evt_073", "name": "Punk Matinee", "venue_name": "Knitting Factory", "neighborhood": "Williamsburg", "date_local": "__TODAY__", "start_time_local": "__TODAY__T16:00:00", "is_free": false, "price_display": "$10", "category": "live_music", "source_name": "ohmyrockness", "source_weight": 0.85, "confidence": 0.85, "description_short": "All-ages afternoon punk show", "ticket_url": "https://knittingfactory.com" },
+      { "id": "evt_074", "name": "Corporate Jazz Brunch", "venue_name": "Williamsburg Hotel", "neighborhood": "Williamsburg", "date_local": "__TODAY__", "start_time_local": "__TODAY__T11:00:00", "is_free": false, "price_display": "$65", "category": "live_music", "source_name": "eventbrite", "source_weight": 0.7, "confidence": 0.7, "description_short": "Jazz brunch at hotel rooftop", "ticket_url": "https://eventbrite.com/e/999" }
+    ]
+  },
+  {
+    "id": "ab-009",
+    "description": "Wild/weird vibe — tests personality and taste matching",
+    "message": "something weird in east village",
+    "neighborhood": "East Village",
+    "filters": { "free_only": false, "category": null, "vibe": "weird" },
+    "tags": ["vibe_filter", "weird", "personality"],
+    "events": [
+      { "id": "evt_080", "name": "Experimental Noise Night", "venue_name": "Trans-Pecos", "neighborhood": "East Village", "date_local": "__TODAY__", "start_time_local": "__TODAY__T21:00:00", "is_free": false, "price_display": "$12", "category": "live_music", "source_name": "nonsensenyc", "source_weight": 0.9, "confidence": 0.88, "description_short": "Harsh noise and experimental electronics", "ticket_url": null },
+      { "id": "evt_081", "name": "Immersive Theater: The Forgotten Room", "venue_name": "A Secret Loft", "neighborhood": "East Village", "date_local": "__TODAY__", "start_time_local": "__TODAY__T20:00:00", "is_free": false, "price_display": "$35", "category": "theater", "source_name": "donyc", "source_weight": 0.75, "confidence": 0.82, "description_short": "Walk-through immersive theater experience", "ticket_url": "https://donyc.com/events/the-forgotten-room" },
+      { "id": "evt_082", "name": "Competitive Speed Puzzling", "venue_name": "Nowadays", "neighborhood": "East Village", "date_local": "__TODAY__", "start_time_local": "__TODAY__T19:00:00", "is_free": true, "price_display": "free", "category": "community", "source_name": "theskint", "source_weight": 0.9, "confidence": 0.85, "description_short": "Teams race to finish a 500-piece puzzle. Free beer for winners.", "ticket_url": null },
+      { "id": "evt_083", "name": "Standard Jazz Night", "venue_name": "Smalls", "neighborhood": "East Village", "date_local": "__TODAY__", "start_time_local": "__TODAY__T21:30:00", "is_free": false, "price_display": "$20", "category": "live_music", "source_name": "songkick", "source_weight": 0.75, "confidence": 0.9, "description_short": "Classic jazz trio", "ticket_url": "https://smallslive.com" },
+      { "id": "evt_084", "name": "Silent Disco in the Park", "venue_name": "Tompkins Square Park", "neighborhood": "East Village", "date_local": "__TODAY__", "start_time_local": "__TODAY__T20:00:00", "is_free": true, "price_display": "free", "category": "nightlife", "source_name": "nonsensenyc", "source_weight": 0.9, "confidence": 0.9, "description_short": "BYOH silent disco in the park, 3 DJ channels", "ticket_url": null }
+    ]
+  },
+  {
+    "id": "ab-010",
+    "description": "Adjacent neighborhood events — needs honest framing",
+    "message": "crown heights",
+    "neighborhood": "Crown Heights",
+    "filters": { "free_only": false, "category": null, "vibe": null },
+    "tags": ["adjacent", "honest"],
+    "events": [
+      { "id": "evt_090", "name": "Caribbean Jazz Night", "venue_name": "Bar Lunatico", "neighborhood": "Crown Heights", "date_local": "__TODAY__", "start_time_local": "__TODAY__T21:00:00", "is_free": false, "price_display": "$10", "category": "live_music", "source_name": "ohmyrockness", "source_weight": 0.85, "confidence": 0.88, "description_short": "Afro-Caribbean jazz fusion", "ticket_url": "https://barlunatico.com" },
+      { "id": "evt_091", "name": "Reggae Night", "venue_name": "Lovers Rock", "neighborhood": "Crown Heights", "date_local": "__TODAY__", "start_time_local": "__TODAY__T22:00:00", "is_free": true, "price_display": "free", "category": "nightlife", "source_name": "theskint", "source_weight": 0.9, "confidence": 0.85, "description_short": "Reggae and dancehall, no cover", "ticket_url": null },
+      { "id": "evt_092", "name": "Brooklyn Museum First Saturday", "venue_name": "Brooklyn Museum", "neighborhood": "Prospect Heights", "date_local": "__TODAY__", "start_time_local": "__TODAY__T17:00:00", "is_free": true, "price_display": "free", "category": "art", "source_name": "nycparks", "source_weight": 0.75, "confidence": 0.9, "description_short": "Free admission with live music and art activities", "ticket_url": "https://brooklynmuseum.org" }
+    ]
+  },
+  {
+    "id": "ab-011",
+    "description": "Last batch MORE — tests following extraContext about exhaustion",
+    "message": "more",
+    "neighborhood": "East Village",
+    "filters": { "free_only": false, "category": null, "vibe": null },
+    "tags": ["more", "last_batch"],
+    "extraContext": "\nNOTE: This is the LAST batch of events I have.\nOVERRIDE CLOSING LINE: Instead of \"Reply 1-N for details, MORE for extra picks\", use \"Reply 1-N for details\" (no MORE option). Then add \"That's everything I've got in East Village! Try a different neighborhood for more.\"",
+    "excludeIds": ["evt_001", "evt_002"],
+    "events": [
+      { "id": "evt_100", "name": "Experimental Film Screening", "venue_name": "Anthology Film Archives", "neighborhood": "East Village", "date_local": "__TODAY__", "start_time_local": "__TODAY__T19:30:00", "is_free": false, "price_display": "$12", "category": "art", "source_name": "theskint", "source_weight": 0.9, "confidence": 0.85, "description_short": "Curated experimental short films from 1970s NYC", "ticket_url": "https://anthologyfilmarchives.org" },
+      { "id": "evt_101", "name": "Salsa Social", "venue_name": "Gonzalez y Gonzalez", "neighborhood": "East Village", "date_local": "__TODAY__", "start_time_local": "__TODAY__T20:00:00", "is_free": false, "price_display": "$15", "category": "nightlife", "source_name": "eventbrite", "source_weight": 0.7, "confidence": 0.8, "description_short": "Salsa dancing with live band, all levels welcome", "ticket_url": null }
+    ]
+  },
+  {
+    "id": "ab-012",
+    "description": "Harlem — tests a neighborhood with diverse cultural events",
+    "message": "harlem tonight",
+    "neighborhood": "Harlem",
+    "filters": { "free_only": false, "category": null, "vibe": null },
+    "tags": ["standard", "harlem"],
+    "events": [
+      { "id": "evt_110", "name": "Amateur Night at the Apollo", "venue_name": "Apollo Theater", "neighborhood": "Harlem", "date_local": "__TODAY__", "start_time_local": "__TODAY__T19:30:00", "is_free": false, "price_display": "$22-38", "category": "live_music", "source_name": "songkick", "source_weight": 0.75, "confidence": 0.95, "description_short": "Legendary amateur night — audience votes on new talent", "ticket_url": "https://apollotheater.org" },
+      { "id": "evt_111", "name": "Spoken Word Open Mic", "venue_name": "Silvana", "neighborhood": "Harlem", "date_local": "__TODAY__", "start_time_local": "__TODAY__T20:00:00", "is_free": true, "price_display": "free", "category": "community", "source_name": "theskint", "source_weight": 0.9, "confidence": 0.85, "description_short": "Poetry and spoken word, sign up at 7:30", "ticket_url": null },
+      { "id": "evt_112", "name": "Minton's Jazz Night", "venue_name": "Minton's Playhouse", "neighborhood": "Harlem", "date_local": "__TODAY__", "start_time_local": "__TODAY__T21:00:00", "is_free": false, "price_display": "$20 + food minimum", "category": "live_music", "source_name": "dice", "source_weight": 0.8, "confidence": 0.9, "description_short": "Historic jazz club, birthplace of bebop", "ticket_url": "https://mintonsharlem.com" },
+      { "id": "evt_113", "name": "Gospel Brunch", "venue_name": "Red Rooster", "neighborhood": "Harlem", "date_local": "__TOMORROW__", "start_time_local": "__TOMORROW__T11:00:00", "is_free": false, "price_display": "$55", "category": "food_drink", "source_name": "eventbrite", "source_weight": 0.7, "confidence": 0.8, "description_short": "Live gospel music with Southern brunch", "ticket_url": "https://redroosterharlem.com" }
+    ]
+  },
+  {
+    "id": "ab-013",
+    "description": "SoHo art focus — tests curation of gallery/art events",
+    "message": "art in soho",
+    "neighborhood": "SoHo",
+    "filters": { "free_only": false, "category": "art", "vibe": null },
+    "tags": ["category_filter", "art"],
+    "events": [
+      { "id": "evt_120", "name": "New Exhibition Opening", "venue_name": "Team Gallery", "neighborhood": "SoHo", "date_local": "__TODAY__", "start_time_local": "__TODAY__T18:00:00", "is_free": true, "price_display": "free", "category": "art", "source_name": "theskint", "source_weight": 0.9, "confidence": 0.9, "description_short": "Solo show by emerging sculptor, opening reception with wine", "ticket_url": null },
+      { "id": "evt_121", "name": "Immersive Van Gogh", "venue_name": "SoHo Exhibition Space", "neighborhood": "SoHo", "date_local": "__TODAY__", "start_time_local": "__TODAY__T10:00:00", "is_free": false, "price_display": "$40", "category": "art", "source_name": "eventbrite", "source_weight": 0.7, "confidence": 0.7, "description_short": "Immersive projected Van Gogh experience", "ticket_url": "https://vangoghnyc.com" },
+      { "id": "evt_122", "name": "Street Photography Walk", "venue_name": "Prince St starting point", "neighborhood": "SoHo", "date_local": "__TODAY__", "start_time_local": "__TODAY__T16:00:00", "is_free": true, "price_display": "free", "category": "art", "source_name": "nycparks", "source_weight": 0.75, "confidence": 0.8, "description_short": "Guided photo walk through SoHo's cast-iron architecture", "ticket_url": null },
+      { "id": "evt_123", "name": "Abstract Painting Workshop", "venue_name": "Paint Party Studio", "neighborhood": "SoHo", "date_local": "__TODAY__", "start_time_local": "__TODAY__T19:00:00", "is_free": false, "price_display": "$55", "category": "art", "source_name": "eventbrite", "source_weight": 0.7, "confidence": 0.7, "description_short": "Corporate team building painting activity", "ticket_url": "https://eventbrite.com/e/5555" }
+    ]
+  },
+  {
+    "id": "ab-014",
+    "description": "Lots of low-confidence events — tests picking through noise",
+    "message": "greenpoint",
+    "neighborhood": "Greenpoint",
+    "filters": { "free_only": false, "category": null, "vibe": null },
+    "tags": ["noisy", "low_confidence"],
+    "events": [
+      { "id": "evt_130", "name": "Warsaw Live", "venue_name": "Warsaw", "neighborhood": "Greenpoint", "date_local": "__TODAY__", "start_time_local": "__TODAY__T20:00:00", "is_free": false, "price_display": "$25", "category": "live_music", "source_name": "dice", "source_weight": 0.8, "confidence": 0.9, "description_short": "Indie rock headliner at the Polish concert hall", "ticket_url": "https://warsawconcerts.com" },
+      { "id": "evt_131", "name": "Event TBA", "venue_name": "TBA", "neighborhood": "Greenpoint", "date_local": "__TODAY__", "start_time_local": null, "is_free": null, "price_display": null, "category": "other", "source_name": "tavily", "source_weight": 0.6, "confidence": 0.3, "description_short": null, "ticket_url": null },
+      { "id": "evt_132", "name": "Brewery Tour", "venue_name": "Greenpoint Beer & Ale", "neighborhood": "Greenpoint", "date_local": "__TODAY__", "start_time_local": "__TODAY__T15:00:00", "is_free": false, "price_display": "$20", "category": "food_drink", "source_name": "eventbrite", "source_weight": 0.7, "confidence": 0.75, "description_short": "Behind-the-scenes brewery tour with tastings", "ticket_url": null },
+      { "id": "evt_133", "name": "Some Event Maybe", "venue_name": "Unknown Venue", "neighborhood": null, "date_local": null, "start_time_local": null, "is_free": null, "price_display": null, "category": "other", "source_name": "tavily", "source_weight": 0.6, "confidence": 0.2, "description_short": "Found a mention of something happening", "ticket_url": null },
+      { "id": "evt_134", "name": "Sunset Yoga", "venue_name": "Transmitter Park", "neighborhood": "Greenpoint", "date_local": "__TODAY__", "start_time_local": "__TODAY__T17:30:00", "is_free": true, "price_display": "free", "category": "community", "source_name": "nycparks", "source_weight": 0.75, "confidence": 0.85, "description_short": "Free outdoor yoga in the park at sunset", "ticket_url": null }
+    ]
+  },
+  {
+    "id": "ab-015",
+    "description": "Theater request — niche category",
+    "message": "theater tonight",
+    "neighborhood": "Midtown",
+    "filters": { "free_only": false, "category": "theater", "vibe": null },
+    "tags": ["category_filter", "theater"],
+    "events": [
+      { "id": "evt_140", "name": "Sleep No More", "venue_name": "McKittrick Hotel", "neighborhood": "Chelsea", "date_local": "__TODAY__", "start_time_local": "__TODAY__T19:00:00", "is_free": false, "price_display": "$120-180", "category": "theater", "source_name": "donyc", "source_weight": 0.75, "confidence": 0.92, "description_short": "Immersive theater experience based on Macbeth, 5 floors", "ticket_url": "https://mckittrickhotel.com/sleep-no-more" },
+      { "id": "evt_141", "name": "Off-Broadway: Teeth", "venue_name": "Playwrights Horizons", "neighborhood": "Midtown", "date_local": "__TODAY__", "start_time_local": "__TODAY__T19:30:00", "is_free": false, "price_display": "$45-89", "category": "theater", "source_name": "donyc", "source_weight": 0.75, "confidence": 0.88, "description_short": "New musical comedy, dark humor about dentistry", "ticket_url": "https://playwrightshorizons.org" },
+      { "id": "evt_142", "name": "Improv Show", "venue_name": "UCB Theatre", "neighborhood": "Midtown", "date_local": "__TODAY__", "start_time_local": "__TODAY__T21:00:00", "is_free": false, "price_display": "$12", "category": "comedy", "source_name": "donyc", "source_weight": 0.75, "confidence": 0.85, "description_short": "Long-form improv by house team", "ticket_url": "https://ucbtheatre.com" }
+    ]
+  }
+]

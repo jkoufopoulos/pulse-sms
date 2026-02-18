@@ -80,7 +80,7 @@ Optional:
 - `PULSE_TEST_MODE=true` — Enables `/test` simulator UI and `/api/sms/test` endpoint
 - `PULSE_AI_ROUTING=false` — Disable AI routing (unused now that legacy is removed)
 - `PULSE_MODEL_ROUTE` — Claude model for routing (default: claude-haiku-4-5-20251001)
-- `PULSE_MODEL_COMPOSE` — Claude model for composition (default: claude-sonnet-4-5-20250929)
+- `PULSE_MODEL_COMPOSE` — Claude model for composition (default: claude-haiku-4-5-20251001)
 - `PULSE_MODEL_EXTRACT` — Claude model for extraction (default: claude-sonnet-4-5-20250929)
 
 ## Running Locally
@@ -102,7 +102,7 @@ npm test               # runs smoke tests (pure functions only, no API calls)
 
 - **Conversational UX**: Claude routes all messages (no regex commands). Users text naturally; Claude figures out intent, neighborhood, and filters.
 - **Daily cache**: Events are scraped once at 10am ET and cached in memory. Incoming messages read from cache — no scraping in the hot path.
-- **Two-call AI flow**: Call 1 routes intent + neighborhood. Call 2 picks events + writes the SMS. This keeps each call focused and fast.
+- **Two-call AI flow**: Call 1 routes intent + neighborhood. Call 2 picks events + writes the SMS. This keeps each call focused and fast. Both calls use Haiku — A/B eval showed Haiku matches or beats Sonnet on compose quality (71% preference, 89% tone pass) at 73% lower cost.
 - **No Tavily in hot path**: Tavily was removed from the live request path. All event data comes from the daily scrape.
 - **Cross-source dedup**: Event IDs are hashed from name + venue + date (not source), so the same event from Dice and BrooklynVegan merges automatically. Sources are processed in weight order, so the higher-trust version wins.
 - **Source trust hierarchy**: Skint (0.9) = Nonsense NYC (0.9) > RA (0.85) = Oh My Rockness (0.85) > Dice (0.8) = BrooklynVegan (0.8) > NYC Parks (0.75) = DoNYC (0.75) = Songkick (0.75) > Eventbrite (0.7) > Tavily (0.6). Claude is told to prefer higher-trust sources.
