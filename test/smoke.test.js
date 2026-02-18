@@ -633,6 +633,32 @@ const geoEvents = [
   const emptyResult = await sendHealthAlert([], {});
   check('sendHealthAlert no-ops with empty failures', emptyResult === undefined);
 
+  // ---- TCPA opt-out regex ----
+  console.log('\nTCPA opt-out regex:');
+
+  const OPT_OUT_KEYWORDS = /^\s*(stop|unsubscribe|cancel|quit)\b/i;
+  check('STOP matches', OPT_OUT_KEYWORDS.test('STOP'));
+  check('"stop" matches', OPT_OUT_KEYWORDS.test('stop'));
+  check('"stop please" matches', OPT_OUT_KEYWORDS.test('stop please'));
+  check('"  quit" matches (leading whitespace)', OPT_OUT_KEYWORDS.test('  quit'));
+  check('"unsubscribe me" matches', OPT_OUT_KEYWORDS.test('unsubscribe me'));
+  check('"can\'t stop dancing" does NOT match', !OPT_OUT_KEYWORDS.test("can't stop dancing"));
+  check('"don\'t quit" does NOT match', !OPT_OUT_KEYWORDS.test("don't quit"));
+  check('"I want to cancel" does NOT match', !OPT_OUT_KEYWORDS.test("I want to cancel"));
+  check('"east village" does NOT match', !OPT_OUT_KEYWORDS.test('east village'));
+  check('"what\'s happening" does NOT match', !OPT_OUT_KEYWORDS.test("what's happening"));
+
+  // ---- smartTruncate ----
+  console.log('\nsmartTruncate:');
+  const { smartTruncate } = require('../src/formatters');
+  check('short text unchanged', smartTruncate('hello') === 'hello');
+  check('exact 480 unchanged', smartTruncate('a'.repeat(480)) === 'a'.repeat(480));
+  check('481 gets truncated', smartTruncate('a'.repeat(481)).length <= 481);
+  check('truncated ends with ellipsis', smartTruncate('word '.repeat(100)).endsWith('…'));
+  check('does not cut mid-word', !smartTruncate('word '.repeat(100)).endsWith('wor…'));
+  const urlText = 'Event name\nhttps://example.com/' + 'x'.repeat(500);
+  check('drops partial URL line', !smartTruncate(urlText).includes('https://'));
+
   // ---- Summary ----
   console.log(`\n${pass} passed, ${fail} failed`);
   if (fail > 0) process.exit(1);

@@ -140,7 +140,7 @@ router.post('/incoming', (req, res) => {
 // =======================================================
 
 // --- TCPA opt-out keywords — must not respond to these ---
-const OPT_OUT_KEYWORDS = /\b(stop|unsubscribe|cancel|quit)\b/i;
+const OPT_OUT_KEYWORDS = /^\s*(stop|unsubscribe|cancel|quit)\b/i;
 
 async function handleMessage(phone, message) {
   const masked = maskPhone(phone);

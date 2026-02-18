@@ -10,7 +10,7 @@ const VENUE_ADDRESSES = {
 function parseDate(dataDate) {
   // data-date="Feb. 17, 2026" → "2026-02-17"
   if (!dataDate) return null;
-  const d = new Date(dataDate.replace('.', ''));
+  const d = new Date(dataDate.replace(/\./g, ''));
   if (isNaN(d.getTime())) return null;
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');

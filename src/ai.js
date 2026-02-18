@@ -548,7 +548,7 @@ Compose the SMS now.`;
   const text = response.content?.[0]?.text || '';
   const parsed = parseJsonFromResponse(text);
 
-  if (!parsed || !parsed.sms_text) {
+  if (!parsed || !parsed.sms_text || typeof parsed.sms_text !== 'string') {
     console.error('composeResponse: invalid response:', text);
     return {
       sms_text: "Having a moment — try again in a sec!",
