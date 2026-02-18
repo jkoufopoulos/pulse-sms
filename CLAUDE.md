@@ -69,6 +69,7 @@ Daily scrape (10am ET)     Incoming SMS
 | `geo.js` | `resolveNeighborhood`, proximity ranking, haversine, time filtering |
 | `neighborhoods.js` | 36 NYC neighborhoods with coords, aliases, landmarks, subway stops |
 | `test-ui.html` | Browser-based SMS simulator for testing (served at `/test`) |
+| `health-ui.html` | Source health dashboard — per-source timing, status, history sparklines (served at `/health`) |
 
 ## Env Vars
 
@@ -101,6 +102,7 @@ npm test               # runs smoke tests (pure functions only, no API calls)
 - Simulator: `https://web-production-c8fdb.up.railway.app/test`
 - Test endpoint: `POST /api/sms/test` with `Body` and optional `From` params
 - Health check: `GET /` returns cache status and source health
+- Health dashboard: `GET /health` returns HTML dashboard (or JSON with `?json=1` / `Accept: application/json`)
 
 ## Key Design Decisions
 

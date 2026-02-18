@@ -545,6 +545,41 @@ check('source_url from pick url', smallsObj && smallsObj.source_url === 'https:/
 const johnnysObj = wvEventObjs.find(e => e.name === "Johnny's Bar");
 check('no url pick has null ticket_url', johnnysObj && johnnysObj.ticket_url === null);
 
+// ---- getHealthStatus shape ----
+console.log('\ngetHealthStatus:');
+
+const { getHealthStatus } = require('../src/events');
+check('getHealthStatus is a function', typeof getHealthStatus === 'function');
+
+const healthData = getHealthStatus();
+check('has status field', typeof healthData.status === 'string');
+check('status is ok|degraded|critical', ['ok', 'degraded', 'critical'].includes(healthData.status));
+check('has cache object', typeof healthData.cache === 'object' && healthData.cache !== null);
+check('cache has size', 'size' in healthData.cache);
+check('cache has age_minutes', 'age_minutes' in healthData.cache);
+check('cache has fresh', 'fresh' in healthData.cache);
+check('cache has last_refresh', 'last_refresh' in healthData.cache);
+check('has scrape object', typeof healthData.scrape === 'object' && healthData.scrape !== null);
+check('scrape has startedAt', 'startedAt' in healthData.scrape);
+check('scrape has totalDurationMs', 'totalDurationMs' in healthData.scrape);
+check('scrape has sourcesOk', 'sourcesOk' in healthData.scrape);
+check('scrape has sourcesFailed', 'sourcesFailed' in healthData.scrape);
+check('has sources object', typeof healthData.sources === 'object' && healthData.sources !== null);
+check('sources has Skint', 'Skint' in healthData.sources);
+check('sources has RA', 'RA' in healthData.sources);
+check('sources has 16 entries', Object.keys(healthData.sources).length === 16);
+
+const sampleSource = healthData.sources.Skint;
+check('source has status field', 'status' in sampleSource);
+check('source has last_count', 'last_count' in sampleSource);
+check('source has consecutive_zeros', 'consecutive_zeros' in sampleSource);
+check('source has duration_ms', 'duration_ms' in sampleSource);
+check('source has http_status', 'http_status' in sampleSource);
+check('source has last_error', 'last_error' in sampleSource);
+check('source has last_scrape', 'last_scrape' in sampleSource);
+check('source has success_rate', 'success_rate' in sampleSource);
+check('source has history array', Array.isArray(sampleSource.history));
+
 // ---- batchGeocodeEvents (mock test) ----
 console.log('\nbatchGeocodeEvents (mock):');
 

@@ -3,7 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const smsRoutes = require('./handler');
 const { clearSmsIntervals } = require('./handler');
-const { refreshCache, getCacheStatus, scheduleDailyScrape, clearSchedule } = require('./events');
+const { refreshCache, getCacheStatus, getHealthStatus, scheduleDailyScrape, clearSchedule } = require('./events');
 
 // Validate required env vars — exit if critical ones are missing
 const required = ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER', 'ANTHROPIC_API_KEY', 'TAVILY_API_KEY'];
@@ -23,6 +23,15 @@ app.use(express.json());
 // Health check with cache + source status
 app.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'pulse', ...getCacheStatus() });
+});
+
+// Health dashboard — JSON API or HTML UI
+app.get('/health', (req, res) => {
+  const acceptsHtml = (req.headers.accept || '').includes('text/html');
+  if (acceptsHtml && !req.query.json) {
+    return res.sendFile(require('path').join(__dirname, 'health-ui.html'));
+  }
+  res.json(getHealthStatus());
 });
 
 // SMS webhook
