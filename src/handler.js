@@ -780,3 +780,4 @@ module.exports.clearSmsIntervals = clearSmsIntervals;
 module.exports.setSession = setSession;
 module.exports.clearSession = clearSession;
 module.exports._handleMessage = handleMessage; // exported for integration tests
+module.exports.OPT_OUT_KEYWORDS = OPT_OUT_KEYWORDS;

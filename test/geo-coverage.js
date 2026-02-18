@@ -5,7 +5,7 @@
  * Run: node test/geo-coverage.js
  */
 
-const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents } = require('../src/sources');
+const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents, fetchDoNYCEvents, fetchBAMEvents, fetchSmallsLiveEvents, fetchNYPLEvents, searchTavilyEvents } = require('../src/sources');
 const { batchGeocodeEvents } = require('../src/venues');
 
 async function main() {
@@ -23,12 +23,18 @@ async function main() {
     fetchEventbriteArts(),
     fetchNYCParksEvents(),
     fetchBrooklynVeganEvents(),
+    fetchDoNYCEvents(),
+    fetchBAMEvents(),
+    fetchSmallsLiveEvents(),
+    fetchNYPLEvents(),
+    searchTavilyEvents('free events NYC tonight'),
   ]);
 
   const labels = [
     'Skint', 'Eventbrite', 'Songkick', 'RA', 'Dice',
     'NonsenseNYC', 'OhMyRockness', 'EB Comedy', 'EB Arts',
     'NYC Parks', 'BrooklynVegan',
+    'DoNYC', 'BAM', 'SmallsLIVE', 'NYPL', 'Tavily',
   ];
 
   const allEvents = [];

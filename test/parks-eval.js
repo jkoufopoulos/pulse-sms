@@ -16,7 +16,7 @@
 
 const { fetchNYCParksEvents, makeEventId } = require('../src/sources');
 const { composeResponse } = require('../src/ai');
-const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, inferCategory } = require('../src/geo');
+const { rankEventsByProximity, filterUpcomingEvents, getNycDateString } = require('../src/geo');
 
 let pass = 0;
 let fail = 0;
@@ -92,7 +92,7 @@ function makeFallbackParksEvents(dateLocal) {
       description_short: 'Fun low-impact full-body workout including cardio, strength and balance exercises',
       short_detail: 'Fun low-impact full-body workout including cardio, strength and balance exercises',
       venue_name: 'Prospect Park', venue_address: '95 Prospect Park West',
-      neighborhood: 'Williamsburg', date_local: dateLocal,
+      neighborhood: 'Park Slope', date_local: dateLocal,
       start_time_local: `${dateLocal}T08:00:00-05:00`, end_time_local: `${dateLocal}T09:00:00-05:00`,
       time_window: null, is_free: true, price_display: 'free',
       category: 'community', subcategory: 'fitness',
@@ -124,7 +124,7 @@ function makeFallbackParksEvents(dateLocal) {
       description_short: 'Multi-artist exhibit of works highlighting endangered local and global species in various media',
       short_detail: 'Multi-artist exhibit of works highlighting endangered local and global species in various media',
       venue_name: 'Conference House Park Visitor Center', venue_address: '298 Satterlee Street',
-      neighborhood: 'Midtown', date_local: dateLocal,
+      neighborhood: null, date_local: dateLocal,
       start_time_local: `${dateLocal}T10:00:00-05:00`, end_time_local: `${dateLocal}T16:00:00-05:00`,
       time_window: null, is_free: true, price_display: 'free',
       category: 'art', subcategory: 'nature',
@@ -140,7 +140,7 @@ function makeFallbackParksEvents(dateLocal) {
       description_short: 'Join our Urban Park Rangers for a winter bird watching walk through the park',
       short_detail: 'Join our Urban Park Rangers for a winter bird watching walk through the park',
       venue_name: 'Van Cortlandt Park', venue_address: 'Van Cortlandt Park South',
-      neighborhood: 'Midtown', date_local: dateLocal,
+      neighborhood: null, date_local: dateLocal,
       start_time_local: `${dateLocal}T10:00:00-05:00`, end_time_local: `${dateLocal}T12:00:00-05:00`,
       time_window: null, is_free: true, price_display: 'free',
       category: 'community', subcategory: 'nature',

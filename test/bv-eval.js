@@ -14,7 +14,7 @@
 
 const { fetchBrooklynVeganEvents, makeEventId } = require('../src/sources');
 const { composeResponse } = require('../src/ai');
-const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, inferCategory } = require('../src/geo');
+const { rankEventsByProximity, filterUpcomingEvents, getNycDateString } = require('../src/geo');
 const { lookupVenue, learnVenueCoords } = require('../src/venues');
 
 let pass = 0;
@@ -198,7 +198,7 @@ async function main() {
   check('all BV events have dates', bvEvents.every(e => e.date_local));
   check('all BV events have venue names', bvEvents.every(e => e.venue_name && e.venue_name !== 'TBA'));
   check('BV events have neighborhoods', bvEvents.filter(e => e.neighborhood).length > 0);
-  check('no sold_out events included', bvEvents.every(e => e.source_name === 'brooklynvegan'));
+  check('no sold_out events included', bvEvents.every(e => !/(sold out|canceled|cancelled)/i.test(e.name)));
 
   // Show sample events
   console.log(`\n  Sample events (first 5):\n`);
@@ -376,7 +376,7 @@ async function main() {
   check('BV events have source_type curated',
     bvInTop8.every(e => e.source_type === 'curated'));
   check('no sold_out events in BV results',
-    bvEvents.every(e => e.source_name === 'brooklynvegan'));
+    bvEvents.every(e => !/(sold out|canceled|cancelled)/i.test(e.name)));
 
   // URL checks
   const bvWithTicketUrl = bvEvents.filter(e => e.ticket_url);

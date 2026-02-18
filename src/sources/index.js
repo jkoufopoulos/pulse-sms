@@ -1,4 +1,4 @@
-const { makeEventId, normalizeExtractedEvent } = require('./shared');
+const { makeEventId, normalizeExtractedEvent, normalizeEventName } = require('./shared');
 const { fetchSkintEvents } = require('./skint');
 const { fetchEventbriteEvents, fetchEventbriteComedy, fetchEventbriteArts } = require('./eventbrite');
 const { fetchSongkickEvents } = require('./songkick');
@@ -31,6 +31,7 @@ module.exports = {
   fetchEventbriteComedy,
   fetchEventbriteArts,
   normalizeExtractedEvent,
+  normalizeEventName,
   makeEventId,
   searchTavilyEvents,
   fetchTavilyFreeEvents,

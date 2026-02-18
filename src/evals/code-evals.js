@@ -4,7 +4,6 @@
  */
 
 const { NEIGHBORHOODS } = require('../neighborhoods');
-const { getNycDateString } = require('../geo');
 
 const VALID_INTENTS = ['events', 'details', 'more', 'free', 'help', 'conversational'];
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);

@@ -10,6 +10,18 @@
 const fs = require('fs');
 const path = require('path');
 
+// Guard: don't overwrite the curated trimmed case set
+const guardPath = path.join(__dirname, '..', 'data', 'fixtures', 'synthetic-cases.json');
+if (fs.existsSync(guardPath)) {
+  const existing = JSON.parse(fs.readFileSync(guardPath, 'utf-8'));
+  if (existing.length < 100) {
+    console.error(`synthetic-cases.json already has ${existing.length} curated cases.`);
+    console.error('Running this script would overwrite them with ~105 generated cases.');
+    console.error('Delete the file first if you really want to regenerate.');
+    process.exit(1);
+  }
+}
+
 const NEIGHBORHOODS = [
   'East Village', 'Williamsburg', 'Bushwick', 'Lower East Side',
   'Chelsea', 'SoHo', 'Crown Heights', 'Harlem',

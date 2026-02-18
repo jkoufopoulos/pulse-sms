@@ -86,4 +86,4 @@ function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
   };
 }
 
-module.exports = { FETCH_HEADERS, makeEventId, normalizeExtractedEvent };
+module.exports = { FETCH_HEADERS, makeEventId, normalizeExtractedEvent, normalizeEventName };
