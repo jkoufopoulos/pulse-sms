@@ -10,7 +10,8 @@ function getSession(phone) {
 }
 
 function setSession(phone, data) {
-  sessions.set(phone, { ...data, timestamp: Date.now() });
+  const existing = sessions.get(phone);
+  sessions.set(phone, { ...existing, ...data, timestamp: Date.now() });
 }
 
 function clearSession(phone) {

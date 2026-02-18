@@ -102,6 +102,17 @@ check('stable (same input = same id)', id1 === id2);
 check('different for different events', id1 !== id3);
 check('12 chars', id1.length === 12);
 check('case insensitive', makeEventId('TEST EVENT', 'THE VENUE', '2026-02-14') === id1);
+// Parenthetical time info preserved — different set times should NOT collide
+const earlySet = makeEventId('DJ Cool (8 PM set)', 'Smalls', '2026-02-18');
+const lateSet = makeEventId('DJ Cool (10 PM set)', 'Smalls', '2026-02-18');
+check('different set times get different IDs', earlySet !== lateSet);
+// Noise parentheticals still stripped
+const soldOut = makeEventId('DJ Cool (SOLD OUT)', 'Smalls', '2026-02-18');
+const noParens = makeEventId('DJ Cool', 'Smalls', '2026-02-18');
+check('SOLD OUT stripped (same ID as bare)', soldOut === noParens);
+const ages21 = makeEventId('Rock Night (21+)', 'Mercury Lounge', '2026-02-18');
+const noAge = makeEventId('Rock Night', 'Mercury Lounge', '2026-02-18');
+check('(21+) stripped (same ID as bare)', ages21 === noAge);
 
 // ---- resolveNeighborhood ----
 console.log('\nresolveNeighborhood:');
@@ -632,6 +643,33 @@ const geoEvents = [
   // Empty failures list should no-op
   const emptyResult = await sendHealthAlert([], {});
   check('sendHealthAlert no-ops with empty failures', emptyResult === undefined);
+
+  // ---- Session merge semantics ----
+  console.log('\nSession merge:');
+
+  const { getSession, setSession, clearSession, clearSessionInterval } = require('../src/session');
+  const testPhone = '+15555550000';
+  clearSession(testPhone);
+  setSession(testPhone, { lastNeighborhood: 'Williamsburg', lastPicks: [{ event_id: 'abc' }] });
+  const s1 = getSession(testPhone);
+  check('initial session has neighborhood', s1.lastNeighborhood === 'Williamsburg');
+  check('initial session has picks', s1.lastPicks.length === 1);
+
+  // Partial update should preserve existing fields
+  setSession(testPhone, { pendingFilters: { free_only: true } });
+  const s2 = getSession(testPhone);
+  check('partial update preserves neighborhood', s2.lastNeighborhood === 'Williamsburg');
+  check('partial update preserves picks', s2.lastPicks.length === 1);
+  check('partial update adds new field', s2.pendingFilters.free_only === true);
+
+  // Full update overwrites
+  setSession(testPhone, { lastNeighborhood: 'Bushwick', lastPicks: [] });
+  const s3 = getSession(testPhone);
+  check('full update overwrites neighborhood', s3.lastNeighborhood === 'Bushwick');
+  check('full update overwrites picks', s3.lastPicks.length === 0);
+  check('full update preserves merged field', s3.pendingFilters.free_only === true);
+  clearSession(testPhone);
+  clearSessionInterval(); // prevent interval from keeping Node alive
 
   // ---- TCPA opt-out regex ----
   console.log('\nTCPA opt-out regex:');

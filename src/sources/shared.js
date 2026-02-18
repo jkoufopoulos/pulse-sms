@@ -13,7 +13,7 @@ const FETCH_HEADERS = {
 function normalizeEventName(name) {
   return (name || '')
     .toLowerCase()
-    .replace(/\s*\(.*?\)\s*/g, ' ')                          // strip parentheticals: (SOLD OUT), (Early Show)
+    .replace(/\s*\((sold out|ages?\s*\d+\+?|all ages|21\+|18\+|16\+|free|rsvp|canceled|cancelled|postponed)\)\s*/gi, ' ') // strip noise parentheticals only
     .replace(/\s*&\s*(friends|more|guests)\b.*/i, '')         // strip "& Friends", "& More"
     .replace(/\b(ft\.?|feat\.?|featuring|w\/|with)\b.*/i, '') // strip "ft." and everything after
     .replace(/[^\w\s]/g, '')                                  // strip punctuation
