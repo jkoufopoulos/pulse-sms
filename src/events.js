@@ -3,6 +3,7 @@ const path = require('path');
 const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchTavilyFreeEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchDoNYCEvents, fetchBAMEvents, fetchSmallsLiveEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents } = require('./sources');
 const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate } = require('./geo');
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues } = require('./venues');
+const { sendHealthAlert } = require('./alerts');
 
 // Load persisted learned venues on boot
 try {
@@ -32,11 +33,52 @@ function makeHealthEntry() {
   };
 }
 
-const SOURCE_LABELS = [
-  'Skint', 'Songkick', 'Eventbrite', 'RA', 'Dice', 'Tavily',
-  'NonsenseNYC', 'OhMyRockness', 'EventbriteComedy', 'EventbriteArts',
-  'NYCParks', 'BrooklynVegan', 'DoNYC', 'BAM', 'SmallsLIVE', 'NYPL',
+// ============================================================
+// Single source registry — everything derives from this array
+// ============================================================
+
+const SOURCES = [
+  { label: 'Skint',            fetch: fetchSkintEvents,         weight: 0.9,  mergeRank: 0, endpoint: 'https://theskint.com' },
+  { label: 'NonsenseNYC',      fetch: fetchNonsenseNYC,         weight: 0.9,  mergeRank: 1, endpoint: 'https://nonsensenyc.com' },
+  { label: 'RA',               fetch: fetchRAEvents,            weight: 0.85, mergeRank: 0, endpoint: 'https://ra.co' },
+  { label: 'OhMyRockness',     fetch: fetchOhMyRockness,        weight: 0.85, mergeRank: 1, endpoint: 'https://www.ohmyrockness.com/shows' },
+  { label: 'Dice',             fetch: fetchDiceEvents,          weight: 0.8,  mergeRank: 0, endpoint: 'https://dice.fm/browse/new-york' },
+  { label: 'BrooklynVegan',    fetch: fetchBrooklynVeganEvents, weight: 0.8,  mergeRank: 1, endpoint: 'https://www.brooklynvegan.com' },
+  { label: 'BAM',              fetch: fetchBAMEvents,           weight: 0.8,  mergeRank: 2, endpoint: 'https://www.bam.org/api/BAMApi/GetCalendarEventsByDayWithOnGoing' },
+  { label: 'SmallsLIVE',       fetch: fetchSmallsLiveEvents,    weight: 0.8,  mergeRank: 3, endpoint: 'https://www.smallslive.com/events/today' },
+  { label: 'NYCParks',         fetch: fetchNYCParksEvents,      weight: 0.75, mergeRank: 0, endpoint: 'https://www.nycgovparks.org/events' },
+  { label: 'DoNYC',            fetch: fetchDoNYCEvents,         weight: 0.75, mergeRank: 1, endpoint: 'https://donyc.com/events/today' },
+  { label: 'Songkick',         fetch: fetchSongkickEvents,      weight: 0.75, mergeRank: 2, endpoint: 'https://www.songkick.com/metro-areas/7644-us-new-york/today' },
+  { label: 'Eventbrite',       fetch: fetchEventbriteEvents,    weight: 0.7,  mergeRank: 0, endpoint: 'https://www.eventbrite.com/d/ny--new-york/events--today/' },
+  { label: 'NYPL',             fetch: fetchNYPLEvents,          weight: 0.7,  mergeRank: 1, endpoint: 'https://www.eventbrite.com/o/new-york-public-library-for-the-performing-arts-5993389089' },
+  { label: 'EventbriteComedy', fetch: fetchEventbriteComedy,    weight: 0.7,  mergeRank: 2, endpoint: null },
+  { label: 'EventbriteArts',   fetch: fetchEventbriteArts,      weight: 0.7,  mergeRank: 3, endpoint: null },
+  { label: 'Tavily',           fetch: fetchTavilyFreeEvents,    weight: 0.6,  mergeRank: 0, endpoint: null },
 ];
+
+// Boot-time validation — fail fast on config errors
+function validateSources(sources) {
+  const labels = new Set();
+  for (const s of sources) {
+    if (!s.label) throw new Error('Source missing label');
+    if (labels.has(s.label)) throw new Error(`Duplicate source label: ${s.label}`);
+    labels.add(s.label);
+    if (typeof s.fetch !== 'function') throw new Error(`${s.label}: fetch must be a function`);
+    if (typeof s.weight !== 'number' || s.weight < 0 || s.weight > 1) throw new Error(`${s.label}: weight must be 0-1`);
+  }
+}
+validateSources(SOURCES);
+
+// Derived — no manual sync needed
+const SOURCE_LABELS = SOURCES.map(s => s.label);
+
+const ENDPOINT_URLS = Object.fromEntries(
+  SOURCES.filter(s => s.endpoint).map(s => [s.label, s.endpoint])
+);
+
+const MERGE_ORDER = [...SOURCES]
+  .sort((a, b) => (b.weight - a.weight) || (a.mergeRank - b.mergeRank) || a.label.localeCompare(b.label))
+  .map(s => s.label);
 
 const sourceHealth = {};
 for (const label of SOURCE_LABELS) {
@@ -58,32 +100,17 @@ let lastScrapeStats = {
   sourcesEmpty: 0,
 };
 
-// --- Endpoint URLs for proactive checks ---
-const ENDPOINT_URLS = {
-  Skint: 'https://theskint.com',
-  Eventbrite: 'https://www.eventbrite.com/d/ny--new-york/events--today/',
-  Songkick: 'https://www.songkick.com/metro-areas/7644-us-new-york/today',
-  RA: 'https://ra.co',
-  Dice: 'https://dice.fm/browse/new-york',
-  NonsenseNYC: 'https://nonsensenyc.com',
-  OhMyRockness: 'https://www.ohmyrockness.com/shows',
-  DoNYC: 'https://donyc.com/events/today',
-  BAM: 'https://www.bam.org/api/BAMApi/GetCalendarEventsByDayWithOnGoing',
-  SmallsLIVE: 'https://www.smallslive.com/events/today',
-  NYPL: 'https://www.eventbrite.com/o/new-york-public-library-for-the-performing-arts-5993389089',
-  NYCParks: 'https://www.nycgovparks.org/events',
-  BrooklynVegan: 'https://www.brooklynvegan.com',
-};
-
 // ============================================================
 // Timed fetch wrapper — captures duration + status per source
 // ============================================================
 
-async function timedFetch(fetchFn, label) {
+async function timedFetch(fetchFn, label, weight) {
   const start = Date.now();
   try {
     const events = await fetchFn();
     const durationMs = Date.now() - start;
+    // Stamp canonical weight from registry (overrides whatever scrapers set)
+    for (const e of events) { e.source_weight = weight; }
     return { events, durationMs, status: events.length > 0 ? 'ok' : 'empty', error: null };
   } catch (err) {
     const durationMs = Date.now() - start;
@@ -132,24 +159,10 @@ async function refreshCache() {
     console.log('Refreshing event cache (all sources)...');
 
     // Run endpoint checks and source fetches in parallel
+    // SOURCES drives the fetch array — no positional coupling
     const [endpointResults, ...fetchResults] = await Promise.allSettled([
       checkEndpoints(),
-      timedFetch(fetchSkintEvents, 'Skint'),
-      timedFetch(fetchEventbriteEvents, 'Eventbrite'),
-      timedFetch(fetchSongkickEvents, 'Songkick'),
-      timedFetch(fetchRAEvents, 'RA'),
-      timedFetch(fetchDiceEvents, 'Dice'),
-      timedFetch(fetchTavilyFreeEvents, 'Tavily'),
-      timedFetch(fetchNonsenseNYC, 'NonsenseNYC'),
-      timedFetch(fetchOhMyRockness, 'OhMyRockness'),
-      timedFetch(fetchDoNYCEvents, 'DoNYC'),
-      timedFetch(fetchBAMEvents, 'BAM'),
-      timedFetch(fetchSmallsLiveEvents, 'SmallsLIVE'),
-      timedFetch(fetchNYPLEvents, 'NYPL'),
-      timedFetch(fetchEventbriteComedy, 'EventbriteComedy'),
-      timedFetch(fetchEventbriteArts, 'EventbriteArts'),
-      timedFetch(fetchNYCParksEvents, 'NYCParks'),
-      timedFetch(fetchBrooklynVeganEvents, 'BrooklynVegan'),
+      ...SOURCES.map(s => timedFetch(s.fetch, s.label, s.weight)),
     ]);
 
     // Store endpoint check results
@@ -163,32 +176,21 @@ async function refreshCache() {
     const allEvents = [];
     const seen = new Set();
 
-    // Map fetch results back to labels (same order as Promise.allSettled above)
-    const sourceOrder = [
-      'Skint', 'Eventbrite', 'Songkick', 'RA', 'Dice', 'Tavily',
-      'NonsenseNYC', 'OhMyRockness', 'DoNYC', 'BAM', 'SmallsLIVE',
-      'NYPL', 'EventbriteComedy', 'EventbriteArts', 'NYCParks', 'BrooklynVegan',
-    ];
-
+    // Map fetch results back to labels — SOURCES[i] corresponds to fetchResults[i]
     const fetchMap = {};
-    for (let i = 0; i < sourceOrder.length; i++) {
+    for (let i = 0; i < SOURCES.length; i++) {
       const settled = fetchResults[i];
-      // timedFetch never throws (catches internally), but Promise.allSettled wraps it
-      fetchMap[sourceOrder[i]] = settled.status === 'fulfilled' ? settled.value : { events: [], durationMs: 0, status: 'error', error: settled.reason?.message || 'unknown' };
+      fetchMap[SOURCES[i].label] = settled.status === 'fulfilled'
+        ? settled.value
+        : { events: [], durationMs: 0, status: 'error', error: settled.reason?.message || 'unknown' };
     }
-
-    // Merge in priority order (highest source_weight first)
-    const mergeOrder = [
-      'Skint', 'NonsenseNYC', 'RA', 'OhMyRockness', 'Dice', 'BrooklynVegan',
-      'BAM', 'SmallsLIVE', 'NYCParks', 'DoNYC', 'Songkick', 'NYPL',
-      'Eventbrite', 'EventbriteComedy', 'EventbriteArts', 'Tavily',
-    ];
 
     let sourcesOk = 0, sourcesFailed = 0, sourcesEmpty = 0;
     let totalRaw = 0;
     const now = new Date().toISOString();
 
-    for (const label of mergeOrder) {
+    // Merge in priority order (highest weight first, then mergeRank)
+    for (const label of MERGE_ORDER) {
       const { events, durationMs, status, error } = fetchMap[label];
       totalRaw += events.length;
 
@@ -262,6 +264,16 @@ async function refreshCache() {
       sourcesFailed,
       sourcesEmpty,
     };
+
+    // Alert on sources that have been failing for 3+ consecutive scrapes
+    const alertable = Object.entries(sourceHealth)
+      .filter(([_, h]) => h.consecutiveZeros >= HEALTH_WARN_THRESHOLD)
+      .map(([label, h]) => ({ label, consecutiveZeros: h.consecutiveZeros, lastError: h.lastError, lastStatus: h.lastStatus }));
+    if (alertable.length > 0) {
+      sendHealthAlert(alertable, lastScrapeStats).catch(err =>
+        console.error('[ALERT] Failed:', err.message)
+      );
+    }
 
     console.log(`Cache refreshed: ${allEvents.length} deduped events (${totalRaw} raw from ${sourcesOk} ok / ${sourcesFailed} failed / ${sourcesEmpty} empty sources)`);
     return eventCache;
@@ -385,4 +397,4 @@ function getRawCache() {
   return { events: [...eventCache], timestamp: cacheTimestamp };
 }
 
-module.exports = { refreshCache, getEvents, getCacheStatus, getHealthStatus, getRawCache, scheduleDailyScrape, clearSchedule };
+module.exports = { SOURCES, refreshCache, getEvents, getCacheStatus, getHealthStatus, getRawCache, scheduleDailyScrape, clearSchedule };

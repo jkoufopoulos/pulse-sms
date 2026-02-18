@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const helmet = require('helmet');
 const smsRoutes = require('./handler');
 const { clearSmsIntervals } = require('./handler');
 const { refreshCache, getCacheStatus, getHealthStatus, scheduleDailyScrape, clearSchedule } = require('./events');
@@ -16,17 +17,29 @@ if (missing.length > 0) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Security middleware (L11 fix)
+app.set('trust proxy', 1); // Railway runs behind a reverse proxy
+app.use(helmet());
+
 // Parse URL-encoded bodies (Twilio sends form data)
 app.use(express.urlencoded({ extended: false, limit: '5kb' }));
 app.use(express.json());
 
-// Health check with cache + source status
+// Public health check — no internal details (L10 fix)
 app.get('/', (req, res) => {
-  res.json({ status: 'ok', service: 'pulse', ...getCacheStatus() });
+  res.json({ status: 'ok', service: 'pulse' });
 });
 
-// Health dashboard — JSON API or HTML UI
+// Health dashboard — gated behind test mode or auth token
 app.get('/health', (req, res) => {
+  const authToken = process.env.HEALTH_AUTH_TOKEN;
+  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
+  const hasValidToken = authToken && req.query.token === authToken;
+
+  if (!isTestMode && !hasValidToken) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
   const acceptsHtml = (req.headers.accept || '').includes('text/html');
   if (acceptsHtml && !req.query.json) {
     return res.sendFile(require('path').join(__dirname, 'health-ui.html'));

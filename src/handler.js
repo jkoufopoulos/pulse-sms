@@ -120,17 +120,19 @@ router.post('/incoming', (req, res) => {
     res.type('text/xml').send('<Response></Response>');
     return;
   }
-  if (messageSid) {
-    processedMessages.set(messageSid, Date.now());
-  }
 
   // Respond to Twilio immediately — prevents timeout + retries
   res.type('text/xml').send('<Response></Response>');
 
-  // Process asynchronously
-  handleMessage(phone, message).catch(err => {
-    console.error('Async handler error:', err.message);
-  });
+  // Register MessageSid only after processing succeeds — if handler crashes,
+  // Twilio retries won't be permanently dropped (L13 fix)
+  handleMessage(phone, message)
+    .then(() => {
+      if (messageSid) processedMessages.set(messageSid, Date.now());
+    })
+    .catch(err => {
+      console.error('Async handler error:', err.message);
+    });
 });
 
 // =======================================================
@@ -310,8 +312,11 @@ async function handleMessageAI(phone, message) {
   // Capture the handler's resolved neighborhood in the trace
   trace.routing.resolved_neighborhood = neighborhood;
 
-  // Still no neighborhood — ask the user
+  // Still no neighborhood — ask the user (and store any pending filters for the follow-up)
   if (!neighborhood && route.intent === 'events') {
+    if (route.filters?.free_only || route.filters?.category) {
+      setSession(phone, { pendingFilters: route.filters });
+    }
     const sms = "Where are you headed? Drop me a neighborhood like East Village, Williamsburg, or LES.";
     await sendSMS(phone, sms);
     finalizeTrace(sms, 'events');
@@ -352,8 +357,12 @@ async function handleMessageAI(phone, message) {
         const composeRemaining = allRemaining.slice(0, 8);
         // If this is the last batch (all remaining fit in one compose), hint to Claude
         const isLastBatch = allRemaining.length <= 8;
+        const nearbyForExhaustion = isLastBatch ? getAdjacentNeighborhoods(hood, 3).filter(n => !(session?.visitedHoods || []).includes(n))[0] : null;
+        const exhaustionSuggestion = nearbyForExhaustion
+          ? `That's everything I've got in ${hood}! ${nearbyForExhaustion} is right nearby — want picks from there?`
+          : `That's everything I've got in ${hood}! Try a different neighborhood for more.`;
         const extraContext = isLastBatch
-          ? `\nNOTE: This is the LAST batch of events I have.\nOVERRIDE CLOSING LINE: Instead of "Reply 1-N for details, MORE for extra picks", use "Reply 1-N for details" (no MORE option). Then add "That's everything I've got in ${hood}! Try a different neighborhood for more."`
+          ? `\nNOTE: This is the LAST batch of events I have.\nOVERRIDE CLOSING LINE: Instead of "Reply 1-N for details, MORE for extra picks", use "Reply 1-N for details" (no MORE option). Then add "${exhaustionSuggestion}"`
           : '';
 
         trace.events.cache_size = Object.keys(session.lastEvents).length;
@@ -417,7 +426,11 @@ async function handleMessageAI(phone, message) {
       trace.events.cache_size = 0;
       trace.events.candidates_count = perennialBatch.length;
       trace.events.candidate_ids = perennialBatch.map(e => e.id);
-      const extraContext = `\nNOTE: This is the LAST batch of recommendations I have.\nOVERRIDE CLOSING LINE: Instead of "Reply 1-N for details, MORE for extra picks", use "Reply 1-N for details" (no MORE option). Then add "That's everything I've got in ${hood}! Try a different neighborhood for more."`;
+      const perennialNearby = getAdjacentNeighborhoods(hood, 3).filter(n => !(session?.visitedHoods || []).includes(n))[0];
+      const perennialSuggestion = perennialNearby
+        ? `That's everything I've got in ${hood}! ${perennialNearby} is right nearby — want picks from there?`
+        : `That's everything I've got in ${hood}! Try a different neighborhood for more.`;
+      const extraContext = `\nNOTE: This is the LAST batch of recommendations I have.\nOVERRIDE CLOSING LINE: Instead of "Reply 1-N for details, MORE for extra picks", use "Reply 1-N for details" (no MORE option). Then add "${perennialSuggestion}"`;
       const result = await composeAndSend(perennialBatch, hood, route.filters, 'more', { excludeIds: [...allShownMoreIds], extraContext });
       result.sms_text = result.sms_text
         .replace(/,?\s*MORE for extra picks/gi, '')
@@ -435,10 +448,10 @@ async function handleMessageAI(phone, message) {
       return;
     }
 
-    // All events and perennials exhausted — suggest nearby
+    // All events and perennials exhausted — suggest specific nearby neighborhood
     const visited = new Set(session?.visitedHoods || [hood]);
     const nearby = getAdjacentNeighborhoods(hood, 4).filter(n => !visited.has(n));
-    const suggestion = nearby.length > 0 ? ` Want to try ${nearby[0]}? It's right nearby.` : ' Try a different neighborhood or check back later!';
+    const suggestion = nearby.length > 0 ? ` ${nearby[0]} is right nearby — want picks from there?` : ' Try a different neighborhood or check back later!';
     const sms = `That's all I've got in ${hood} tonight!${suggestion}`;
     await sendSMS(phone, sms);
     finalizeTrace(sms, 'more');
@@ -448,6 +461,7 @@ async function handleMessageAI(phone, message) {
   // --- Free ---
   if (route.intent === 'free') {
     if (!neighborhood && !session?.lastNeighborhood) {
+      setSession(phone, { pendingFilters: { ...route.filters, free_only: true } });
       const sms = "Where are you headed? Drop me a neighborhood like East Village, Williamsburg, or LES.";
       await sendSMS(phone, sms);
       finalizeTrace(sms, 'free');
@@ -457,13 +471,8 @@ async function handleMessageAI(phone, message) {
     const events = await getEvents(hood);
     const freeEvents = events.filter(e => e.is_free);
 
-    // Add free perennial picks
-    const freePicks = getPerennialPicks(hood);
-    const freeLocalPerennials = toEventObjects(freePicks.local, hood).filter(e => e.is_free);
-    const freeNearbyPerennials = toEventObjects(freePicks.nearby, hood, { isNearby: true }).filter(e => e.is_free);
-    const freePerennials = [...freeLocalPerennials, ...freeNearbyPerennials];
-
-    if (freeEvents.length === 0 && freePerennials.length === 0) {
+    // Don't merge perennial picks for free searches — bars with no cover aren't "free events"
+    if (freeEvents.length === 0) {
       // Search nearby neighborhoods for free events
       const nearbyHoods = getAdjacentNeighborhoods(hood, 3);
       for (const nearbyHood of nearbyHoods) {
@@ -489,16 +498,13 @@ async function handleMessageAI(phone, message) {
       return;
     }
 
-    // Merge free scraped events + free perennial picks
-    const freePerennialCap = Math.min(4, 8 - Math.min(freeEvents.length, 8));
-    const freeCombined = [...freeEvents.slice(0, 8 - Math.min(freePerennials.length, freePerennialCap)), ...freePerennials.slice(0, freePerennialCap)];
+    // Compose with free scraped events only (no perennial bar picks)
     trace.events.cache_size = events.length;
-    trace.events.candidates_count = freeCombined.length;
-    trace.events.candidate_ids = freeCombined.map(e => e.id);
-    const result = await composeAndSend(freeCombined.slice(0, 8), hood, route.filters, 'free');
+    trace.events.candidates_count = Math.min(freeEvents.length, 8);
+    trace.events.candidate_ids = freeEvents.slice(0, 8).map(e => e.id);
+    const result = await composeAndSend(freeEvents.slice(0, 8), hood, route.filters, 'free');
     const eventMap = {};
     for (const e of freeEvents) eventMap[e.id] = e;
-    for (const e of freePerennials) eventMap[e.id] = e;
     setSession(phone, {
       lastPicks: result.picks || [],
       allPicks: result.picks || [],
@@ -581,6 +587,74 @@ async function handleMessageAI(phone, message) {
 
   // --- Events (default) ---
   let hood = neighborhood;
+
+  // Restore pending filters from a previous "where are you headed?" prompt
+  // (e.g. "free jazz tonight" → asks for hood → "east village" → apply free+jazz filters)
+  const pendingFilters = session?.pendingFilters;
+  if (pendingFilters) {
+    if (pendingFilters.free_only && !route.filters?.free_only) {
+      route.filters = { ...route.filters, free_only: true };
+    }
+    if (pendingFilters.category && !route.filters?.category) {
+      route.filters = { ...route.filters, category: pendingFilters.category };
+    }
+    // Clear pending filters so they don't persist beyond this request
+    setSession(phone, { pendingFilters: null });
+  }
+
+  // If pending filters redirect this to free intent, handle it there
+  if (route.filters?.free_only && route.intent === 'events') {
+    route.intent = 'free';
+    // Re-enter the free handler by recursing through the block above
+    const freeHood = hood;
+    const freeEvents = (await getEvents(freeHood)).filter(e => e.is_free);
+
+    // Apply category filter within free events
+    let freeCatEvents = freeEvents;
+    if (route.filters?.category) {
+      const catFiltered = freeEvents.filter(e => e.category === route.filters.category);
+      if (catFiltered.length > 0) freeCatEvents = catFiltered;
+    }
+
+    if (freeCatEvents.length === 0) {
+      // Search nearby for free events (with category if specified)
+      const nearbyHoods = getAdjacentNeighborhoods(freeHood, 3);
+      for (const nearbyHood of nearbyHoods) {
+        const nearbyEvents = await getEvents(nearbyHood);
+        let nearbyFree = nearbyEvents.filter(e => e.is_free);
+        if (route.filters?.category) {
+          const nearbyCat = nearbyFree.filter(e => e.category === route.filters.category);
+          if (nearbyCat.length > 0) nearbyFree = nearbyCat;
+        }
+        if (nearbyFree.length > 0) {
+          const eventMap = {};
+          for (const e of nearbyFree) eventMap[e.id] = e;
+          const result = await composeAndSend(nearbyFree.slice(0, 8), nearbyHood, route.filters, 'free');
+          setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: nearbyHood });
+          await sendComposeWithLinks(phone, result, eventMap);
+          finalizeTrace(result.sms_text, 'free');
+          return;
+        }
+      }
+      const catLabel = route.filters?.category ? route.filters.category.replace(/_/g, ' ') + ' ' : '';
+      const sms = `Nothing free ${catLabel}near ${freeHood} tonight — text "${freeHood}" for all events or try a different neighborhood!`;
+      await sendSMS(phone, sms);
+      finalizeTrace(sms, 'free');
+      return;
+    }
+
+    trace.events.cache_size = freeCatEvents.length;
+    trace.events.candidates_count = Math.min(freeCatEvents.length, 8);
+    trace.events.candidate_ids = freeCatEvents.slice(0, 8).map(e => e.id);
+    const result = await composeAndSend(freeCatEvents.slice(0, 8), freeHood, route.filters, 'free');
+    const eventMap = {};
+    for (const e of freeCatEvents) eventMap[e.id] = e;
+    setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: freeHood });
+    await sendComposeWithLinks(phone, result, eventMap);
+    finalizeTrace(result.sms_text, 'free');
+    return;
+  }
+
   let events = await getEvents(hood);
   console.log(`Found ${events.length} events near ${hood}`);
 
@@ -699,12 +773,14 @@ async function handleMessageAI(phone, message) {
   // Check if any events are actually in the requested neighborhood
   const inHood = events.filter(e => e.neighborhood === hood);
 
-  // Redirect to travel nudge when:
-  // 1) No events are in the requested hood (e.g. Astoria gets only UES events via proximity)
-  // 2) Very thin cache (≤1 event) with no local perennial picks to supplement
+  // Redirect to travel nudge when events are thin:
+  // 1) No in-hood events AND only 1-2 nearby events (e.g. Astoria gets 2 UES events)
+  //    When there are 3+ nearby events, let Claude compose — it handles neighborhood mismatch naturally.
+  // 2) Very thin cache (≤1 event) with no local perennial picks to supplement (e.g. Washington Heights)
   // Uses getAdjacentNeighborhoods (borough-aware) instead of event density
   const thinWithNoPerennial = events.length <= 1 && localPerennials.length === 0;
-  if ((inHood.length === 0 || thinWithNoPerennial) && !alreadyNudged && !categoryApplied) {
+  const fewNearbyOnly = inHood.length === 0 && events.length <= 2;
+  if ((fewNearbyOnly || thinWithNoPerennial) && !alreadyNudged && !categoryApplied) {
     const thinNearbyHoods = getAdjacentNeighborhoods(hood, 5);
     for (const nearbyHood of thinNearbyHoods) {
       const nearbyEvents = await getEvents(nearbyHood);

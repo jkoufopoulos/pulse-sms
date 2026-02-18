@@ -545,6 +545,19 @@ check('source_url from pick url', smallsObj && smallsObj.source_url === 'https:/
 const johnnysObj = wvEventObjs.find(e => e.name === "Johnny's Bar");
 check('no url pick has null ticket_url', johnnysObj && johnnysObj.ticket_url === null);
 
+// ---- SOURCES registry ----
+console.log('\nSOURCES registry:');
+
+const { SOURCES } = require('../src/events');
+check('SOURCES has 16 entries', SOURCES.length === 16);
+check('SOURCES labels are unique', new Set(SOURCES.map(s => s.label)).size === SOURCES.length);
+check('all SOURCES have fetch functions', SOURCES.every(s => typeof s.fetch === 'function'));
+check('all SOURCES have valid weights', SOURCES.every(s => s.weight > 0 && s.weight <= 1));
+check('SOURCES includes Skint', SOURCES.some(s => s.label === 'Skint'));
+check('SOURCES includes Tavily', SOURCES.some(s => s.label === 'Tavily'));
+check('Skint weight is 0.9', SOURCES.find(s => s.label === 'Skint').weight === 0.9);
+check('Tavily weight is 0.6', SOURCES.find(s => s.label === 'Tavily').weight === 0.6);
+
 // ---- getHealthStatus shape ----
 console.log('\ngetHealthStatus:');
 
@@ -602,6 +615,23 @@ const geoEvents = [
   check('cached venue resolves neighborhood (Good Room → Greenpoint)', geoEvents[1].neighborhood === 'Greenpoint');
   check('already-resolved event untouched', geoEvents[2].neighborhood === 'East Village');
   check('no venue info event untouched', geoEvents[3].neighborhood === null);
+
+  // ---- alerts module ----
+  console.log('\nalerts module:');
+
+  const { sendHealthAlert } = require('../src/alerts');
+  check('sendHealthAlert is a function', typeof sendHealthAlert === 'function');
+
+  // Should no-op gracefully without RESEND_API_KEY (no env var set in tests)
+  const alertResult = await sendHealthAlert(
+    [{ label: 'TestSource', consecutiveZeros: 3, lastError: 'timeout', lastStatus: 'timeout' }],
+    { dedupedEvents: 100, sourcesOk: 14, sourcesFailed: 1, sourcesEmpty: 1, totalDurationMs: 5000, completedAt: new Date().toISOString() }
+  );
+  check('sendHealthAlert no-ops without API key (returns undefined)', alertResult === undefined);
+
+  // Empty failures list should no-op
+  const emptyResult = await sendHealthAlert([], {});
+  check('sendHealthAlert no-ops with empty failures', emptyResult === undefined);
 
   // ---- Summary ----
   console.log(`\n${pass} passed, ${fail} failed`);

@@ -23,14 +23,25 @@ function normalizeEventName(name) {
 
 /**
  * Generate a stable event ID from name + venue + date.
+ * Falls back to source + url hash when core fields are empty to avoid collisions.
  */
-function makeEventId(name, venue, date, source) {
-  const raw = `${normalizeEventName(name)}|${(venue || '').toLowerCase().trim()}|${(date || '').trim()}`;
+function makeEventId(name, venue, date, source, sourceUrl) {
+  const norm = normalizeEventName(name);
+  const v = (venue || '').toLowerCase().trim();
+  const d = (date || '').trim();
+
+  // If all three core fields are empty, use source + url as fallback
+  if (!norm && !v && !d) {
+    const fallback = `${source || 'unknown'}|${sourceUrl || crypto.randomUUID()}`;
+    return crypto.createHash('md5').update(fallback).digest('hex').slice(0, 12);
+  }
+
+  const raw = `${norm}|${v}|${d}`;
   return crypto.createHash('md5').update(raw).digest('hex').slice(0, 12);
 }
 
 function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
-  const id = makeEventId(e.name, e.venue_name, e.date_local || e.start_time_local || '', sourceName);
+  const id = makeEventId(e.name, e.venue_name, e.date_local || e.start_time_local || '', sourceName, e.source_url);
 
   // Try venue lookup for coords when Claude didn't extract lat/lng
   let lat = parseFloat(e.latitude);
