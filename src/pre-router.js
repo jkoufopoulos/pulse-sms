@@ -1,15 +1,25 @@
-const { extractNeighborhood, detectBorough, detectUnsupported, NEIGHBORHOODS } = require('./neighborhoods');
+const { extractNeighborhood, detectBorough, detectUnsupported, NEIGHBORHOODS, BOROUGHS } = require('./neighborhoods');
 
-// --- Adjacent neighborhood helper (Euclidean approx, fine for NYC scale) ---
+// Build reverse map: neighborhood → borough
+const HOOD_TO_BOROUGH = {};
+for (const [borough, hoods] of Object.entries(BOROUGHS)) {
+  for (const h of hoods) HOOD_TO_BOROUGH[h] = borough;
+}
+
+// --- Adjacent neighborhood helper (Euclidean approx, borough-aware) ---
+// Same-borough neighbors are preferred; cross-borough gets a 3x distance penalty
+// to account for rivers/bridges making them less accessible by transit.
 function getAdjacentNeighborhoods(hood, count = 3) {
   const target = NEIGHBORHOODS[hood];
   if (!target) return [];
+  const sourceBoro = HOOD_TO_BOROUGH[hood] || null;
   return Object.entries(NEIGHBORHOODS)
     .filter(([name]) => name !== hood)
-    .map(([name, data]) => ({
-      name,
-      dist: Math.sqrt(Math.pow(target.lat - data.lat, 2) + Math.pow(target.lng - data.lng, 2)),
-    }))
+    .map(([name, data]) => {
+      const rawDist = Math.sqrt(Math.pow(target.lat - data.lat, 2) + Math.pow(target.lng - data.lng, 2));
+      const sameBoro = sourceBoro && HOOD_TO_BOROUGH[name] === sourceBoro;
+      return { name, dist: sameBoro ? rawDist : rawDist * 3 };
+    })
     .sort((a, b) => a.dist - b.dist)
     .slice(0, count)
     .map(d => d.name);

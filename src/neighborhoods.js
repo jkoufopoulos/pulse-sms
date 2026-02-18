@@ -298,4 +298,4 @@ function detectUnsupported(message) {
   return null;
 }
 
-module.exports = { NEIGHBORHOODS, extractNeighborhood, detectBorough, detectUnsupported, getNeighborhoodCoords };
+module.exports = { NEIGHBORHOODS, BOROUGHS, extractNeighborhood, detectBorough, detectUnsupported, getNeighborhoodCoords };

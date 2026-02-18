@@ -622,12 +622,12 @@ async function handleMessageAI(phone, message) {
     }
   }
 
-  // Perennial picks — merge as event objects for compose
+  // Perennial picks — merge LOCAL picks only as event objects for compose
+  // (nearby perennial picks caused Claude to mention wrong neighborhoods, e.g. UWS for Washington Heights)
   const perennialPicks = getPerennialPicks(hood);
   const localPerennials = toEventObjects(perennialPicks.local, hood);
-  const nearbyPerennials = toEventObjects(perennialPicks.nearby, hood, { isNearby: true });
   const perennialCap = Math.min(4, 8 - Math.min(events.length, 8));
-  const perennialEvents = [...localPerennials, ...nearbyPerennials].slice(0, perennialCap);
+  const perennialEvents = localPerennials.slice(0, perennialCap);
   const composeEventsWithPerennials = [...events.slice(0, 8 - perennialEvents.length), ...perennialEvents];
 
   // Prevent redirect loops: if user already got a travel nudge, serve nearby events directly
@@ -635,11 +635,11 @@ async function handleMessageAI(phone, message) {
 
   if (events.length === 0) {
 
-    // Check perennial picks before nudging to a nearby neighborhood
+    // Check LOCAL perennial picks before nudging to a nearby neighborhood
+    // (nearby perennial picks caused wrong-neighborhood mentions, e.g. UWS for Washington Heights)
     const zeroPicks = getPerennialPicks(hood);
     const zeroLocal = toEventObjects(zeroPicks.local, hood);
-    const zeroNearby = toEventObjects(zeroPicks.nearby, hood, { isNearby: true });
-    const zeroPerennials = [...zeroLocal, ...zeroNearby].slice(0, 4);
+    const zeroPerennials = zeroLocal.slice(0, 4);
     if (zeroPerennials.length > 0) {
       const eventMap = {};
       for (const e of zeroPerennials) eventMap[e.id] = e;
@@ -699,36 +699,31 @@ async function handleMessageAI(phone, message) {
   // Check if any events are actually in the requested neighborhood
   const inHood = events.filter(e => e.neighborhood === hood);
 
-  // If NO events are in the requested hood, offer a travel nudge
-  // Skip when: category filter was applied, already nudged, or too few events to justify travel
-  if (inHood.length === 0 && !alreadyNudged && !categoryApplied && events.length >= 3) {
-    // Find the dominant nearby neighborhood in the results
-    const hoodCounts = {};
-    for (const e of events) {
-      if (e.neighborhood && e.neighborhood !== hood) {
-        hoodCounts[e.neighborhood] = (hoodCounts[e.neighborhood] || 0) + 1;
+  // Redirect to travel nudge when:
+  // 1) No events are in the requested hood (e.g. Astoria gets only UES events via proximity)
+  // 2) Very thin cache (≤1 event) with no local perennial picks to supplement
+  // Uses getAdjacentNeighborhoods (borough-aware) instead of event density
+  const thinWithNoPerennial = events.length <= 1 && localPerennials.length === 0;
+  if ((inHood.length === 0 || thinWithNoPerennial) && !alreadyNudged && !categoryApplied) {
+    const thinNearbyHoods = getAdjacentNeighborhoods(hood, 5);
+    for (const nearbyHood of thinNearbyHoods) {
+      const nearbyEvents = await getEvents(nearbyHood);
+      if (nearbyEvents.length > 0) {
+        const cats = {};
+        for (const e of nearbyEvents) cats[e.category || 'events'] = (cats[e.category || 'events'] || 0) + 1;
+        const topCat = Object.entries(cats).sort((a, b) => b[1] - a[1])[0]?.[0] || 'events';
+        const vibeWord = { live_music: 'some music', nightlife: 'some nightlife', comedy: 'some comedy', art: 'some art', community: 'something cool', food_drink: 'some food & drinks', theater: 'some theater' }[topCat] || 'some stuff going on';
+        const eventMap = {};
+        for (const e of nearbyEvents) eventMap[e.id] = e;
+        setSession(phone, { pendingNearby: nearbyHood, pendingNearbyEvents: eventMap });
+        const sms = `Hey not much going on in ${hood}... would you travel to ${nearbyHood} for ${vibeWord}?`;
+        await sendSMS(phone, sms);
+        console.log(`Thin nudge to ${masked}: ${hood} → ${nearbyHood} (inHood=${inHood.length}, events=${events.length})`);
+        finalizeTrace(sms, 'events');
+        return;
       }
     }
-    const nearbyWithEvents = Object.entries(hoodCounts)
-      .sort((a, b) => b[1] - a[1])
-      .filter(([, count]) => count >= 1);
-
-    if (nearbyWithEvents.length > 0) {
-      const nearbyHood = nearbyWithEvents[0][0];
-      const nearbyEvents = events.filter(e => e.neighborhood === nearbyHood);
-      const cats = {};
-      for (const e of nearbyEvents) { const c = e.category || 'events'; cats[c] = (cats[c] || 0) + 1; }
-      const topCat = Object.entries(cats).sort((a, b) => b[1] - a[1])[0]?.[0] || 'events';
-      const vibeWord = { live_music: 'some music', nightlife: 'some nightlife', comedy: 'some comedy', art: 'some art', community: 'something cool', food_drink: 'some food & drinks', theater: 'some theater' }[topCat] || 'some stuff going on';
-      const sms = `Hey not much going on in ${hood}... would you travel to ${nearbyHood} for ${vibeWord}?`;
-      const eventMap = {};
-      for (const e of nearbyEvents) eventMap[e.id] = e;
-      setSession(phone, { pendingNearby: nearbyHood, pendingNearbyEvents: eventMap });
-      await sendSMS(phone, sms);
-      console.log(`Nudge sent to ${masked}: ${hood} → ${nearbyHood} (${nearbyEvents.length} events)`);
-      finalizeTrace(sms, 'events');
-      return;
-    }
+    // No nearby hoods with events either — fall through to compose with what we have
   }
 
   // Capture event funnel data

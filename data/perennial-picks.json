@@ -25,6 +25,55 @@
       "address": "419 Tompkins Ave",
       "is_free": false,
       "url": "https://www.loversrockbar.com"
+    },
+    {
+      "venue": "Do or Dive",
+      "vibe": "Retro dive bar — shuffleboard, frozen coffee, back garden, open 12pm-4am",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "1108 Bedford Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Tip Top Bar & Grill",
+      "vibe": "Bed-Stuy's oldest bar — friendly, $4 bottles, funky backyard",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "432 Franklin Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Dynaco",
+      "vibe": "Hidden candlelit cocktail bar — wood-burning stove, cash only, intimate vibes",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "1112 Bedford Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Frog",
+      "vibe": "BKMAG 2025 Best Bar in Brooklyn — natural wine, pool table, hidden garden",
+      "days": ["thu", "fri", "sat", "sun", "mon"],
+      "category": "nightlife",
+      "address": "569 Myrtle Ave",
+      "is_free": true
+    },
+    {
+      "venue": "C'mon Everybody",
+      "vibe": "Queer-owned live music venue — drag, burlesque, comedy, and live acts nightly",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "325 Franklin Ave",
+      "is_free": false,
+      "url": "https://www.cmoneverybody.com"
+    },
+    {
+      "venue": "All Night Skate",
+      "vibe": "90s roller rink theme — arcade room, themed party nights on weekends",
+      "days": ["fri", "sat"],
+      "category": "nightlife",
+      "address": "1 Knickerbocker Ave",
+      "is_free": false
     }
   ],
   "Upper West Side": [
@@ -45,6 +94,47 @@
       "address": "2537 Broadway",
       "is_free": false,
       "url": "https://www.symphonyspace.org"
+    },
+    {
+      "venue": "The Dead Poet",
+      "vibe": "Literary Irish pub — outstanding Guinness, book library, writer portraits on the walls",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "450 Amsterdam Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Dive 75",
+      "vibe": "True neighborhood dive — board games, couches, affordable drinks",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "101 W 75th St",
+      "is_free": true
+    },
+    {
+      "venue": "Jake's Dilemma",
+      "vibe": "Beer pong, foosball, trivia weekdays — DJ and dance floor on weekends",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "430 Amsterdam Ave",
+      "is_free": true
+    },
+    {
+      "venue": "e's BAR",
+      "vibe": "Board games, trivia Tuesdays, good food, daily happy hour",
+      "days": ["tue"],
+      "category": "nightlife",
+      "address": "511 Amsterdam Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Prohibition",
+      "vibe": "Live music every night for 25 years — quality drinks, speakeasy feel",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "503 Columbus Ave",
+      "is_free": false,
+      "url": "https://www.prohibitionnyc.com"
     }
   ],
   "West Village": [
@@ -83,6 +173,46 @@
       "address": "158 Bleecker St",
       "is_free": false,
       "url": "https://lpr.com"
+    },
+    {
+      "venue": "Johnny's Bar",
+      "vibe": "Postcard-sized dive — jukebox, cold beer, make-friends energy",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "90 Greenwich Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Julius'",
+      "vibe": "NYC's oldest gay bar (1860s) — historic landmark, great burgers, friendly crowd",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "159 W 10th St",
+      "is_free": true
+    },
+    {
+      "venue": "Marie's Crisis Cafe",
+      "vibe": "Basement piano bar — show tune sing-alongs, Christmas lights year-round",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "59 Grove St",
+      "is_free": true
+    },
+    {
+      "venue": "WXOU Radio Bar",
+      "vibe": "Cash-only dive — tin ceilings, honest prices in a pricey neighborhood",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "558 Hudson St",
+      "is_free": true
+    },
+    {
+      "venue": "Blind Tiger Ale House",
+      "vibe": "30 taps, 50+ bottles, dark wood — 20+ year rep, open till 4am",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "281 Bleecker St",
+      "is_free": true
     }
   ],
   "Greenpoint": [
@@ -102,6 +232,46 @@
       "category": "live_music",
       "address": "261 Driggs Ave",
       "is_free": false
+    },
+    {
+      "venue": "Black Rabbit",
+      "vibe": "Village Voice-best trivia Tuesdays 8pm — deep booths, fireplace, back garden",
+      "days": ["tue"],
+      "category": "nightlife",
+      "address": "91 Greenpoint Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Turkey's Nest Tavern",
+      "vibe": "Historic cash-only dive — pool table, jukebox, 8 TVs, strong frozen margs",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "94 Bedford Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Torst",
+      "vibe": "Brooklyn's best beer bar — 21 taps, Danish-owned, serious craft selection",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "615 Manhattan Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Grace & Ruby's",
+      "vibe": "Queer haven — live music and DJs on weekends, poetry readings",
+      "days": ["fri", "sat"],
+      "category": "live_music",
+      "address": "129 Franklin St",
+      "is_free": false
+    },
+    {
+      "venue": "Good Bar",
+      "vibe": "Japanese listening bar — vinyl sessions Wed/Fri/Sat/Sun, curated cocktails",
+      "days": ["wed", "fri", "sat", "sun"],
+      "category": "nightlife",
+      "address": "1082 Manhattan Ave",
+      "is_free": true
     }
   ],
   "Cobble Hill": [
@@ -122,6 +292,38 @@
       "address": "509 Atlantic Ave",
       "is_free": false,
       "url": "https://rfroulette.org"
+    },
+    {
+      "venue": "Montero's Bar",
+      "vibe": "1939 dive — nautical decor, karaoke Thu-Sat, longshoreman history",
+      "days": ["thu", "fri", "sat"],
+      "category": "nightlife",
+      "address": "73 Atlantic Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Long Island Bar",
+      "vibe": "Restored 1950s art deco — pristine cocktails, comfort food, gorgeous room",
+      "days": ["tue", "wed", "thu", "fri", "sat", "sun"],
+      "category": "nightlife",
+      "address": "110 Atlantic Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Henry Public",
+      "vibe": "Old-time Brooklyn saloon — tin ceilings, dark wood, great burgers",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "329 Henry St",
+      "is_free": true
+    },
+    {
+      "venue": "Brooklyn Social",
+      "vibe": "Former Italian social club — cash only, vintage saloon vibes, backyard",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "335 Smith St",
+      "is_free": true
     }
   ],
   "Chelsea": [
