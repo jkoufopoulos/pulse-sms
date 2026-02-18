@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchTavilyFreeEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchDoNYCEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents } = require('./sources');
-const { rankEventsByProximity, filterUpcomingEvents } = require('./geo');
+const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchTavilyFreeEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchDoNYCEvents, fetchBAMEvents, fetchSmallsLiveEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents } = require('./sources');
+const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate } = require('./geo');
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues } = require('./venues');
 
 // Load persisted learned venues on boot
@@ -31,6 +31,9 @@ const sourceHealth = {
   NYCParks: { consecutiveZeros: 0, lastCount: 0 },
   BrooklynVegan: { consecutiveZeros: 0, lastCount: 0 },
   DoNYC: { consecutiveZeros: 0, lastCount: 0 },
+  BAM: { consecutiveZeros: 0, lastCount: 0 },
+  SmallsLIVE: { consecutiveZeros: 0, lastCount: 0 },
+  NYPL: { consecutiveZeros: 0, lastCount: 0 },
 };
 const HEALTH_WARN_THRESHOLD = 3;
 
@@ -44,7 +47,7 @@ async function refreshCache() {
   refreshPromise = (async () => {
     console.log('Refreshing event cache (all sources)...');
 
-    const [skintEvents, eventbriteEvents, songkickEvents, raEvents, diceEvents, tavilyFreeEvents, nonsenseEvents, ohMyRocknessEvents, donycEvents, eventbriteComedyEvents, eventbriteArtsEvents, nycParksEvents, bvEvents] = await Promise.allSettled([
+    const [skintEvents, eventbriteEvents, songkickEvents, raEvents, diceEvents, tavilyFreeEvents, nonsenseEvents, ohMyRocknessEvents, donycEvents, bamEvents, smallsLiveEvents, nyplEvents, eventbriteComedyEvents, eventbriteArtsEvents, nycParksEvents, bvEvents] = await Promise.allSettled([
       fetchSkintEvents(),
       fetchEventbriteEvents(),
       fetchSongkickEvents(),
@@ -54,6 +57,9 @@ async function refreshCache() {
       fetchNonsenseNYC(),
       fetchOhMyRockness(),
       fetchDoNYCEvents(),
+      fetchBAMEvents(),
+      fetchSmallsLiveEvents(),
+      fetchNYPLEvents(),
       fetchEventbriteComedy(),
       fetchEventbriteArts(),
       fetchNYCParksEvents(),
@@ -71,9 +77,12 @@ async function refreshCache() {
       { result: ohMyRocknessEvents, label: 'OhMyRockness' },
       { result: diceEvents, label: 'Dice' },
       { result: bvEvents, label: 'BrooklynVegan' },
+      { result: bamEvents, label: 'BAM' },
+      { result: smallsLiveEvents, label: 'SmallsLIVE' },
       { result: nycParksEvents, label: 'NYCParks' },
       { result: donycEvents, label: 'DoNYC' },
       { result: songkickEvents, label: 'Songkick' },
+      { result: nyplEvents, label: 'NYPL' },
       { result: eventbriteEvents, label: 'Eventbrite' },
       { result: eventbriteComedyEvents, label: 'EventbriteComedy' },
       { result: eventbriteArtsEvents, label: 'EventbriteArts' },
@@ -143,8 +152,15 @@ async function getEvents(neighborhood) {
   const upcoming = filterUpcomingEvents(eventCache);
   const ranked = rankEventsByProximity(upcoming, neighborhood);
 
-  console.log(`${ranked.length} upcoming events near ${neighborhood} (cache: ${eventCache.length} total)`);
-  return ranked.slice(0, 20);
+  // Only return tonight's events — tomorrow events should only surface if the user asks
+  const todayNyc = getNycDateString(0);
+  const tonightOnly = ranked.filter(e => {
+    const d = getEventDate(e);
+    return !d || d === todayNyc;
+  });
+
+  console.log(`${tonightOnly.length} tonight events near ${neighborhood} (${ranked.length} total upcoming, cache: ${eventCache.length})`);
+  return tonightOnly.slice(0, 20);
 }
 
 // ============================================================

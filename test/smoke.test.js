@@ -440,6 +440,11 @@ console.log('\nfetchSmallsLiveEvents:');
 
 check('fetchSmallsLiveEvents exported', typeof require('../src/sources').fetchSmallsLiveEvents === 'function');
 
+// ---- fetchNYPLEvents export ----
+console.log('\nfetchNYPLEvents:');
+
+check('fetchNYPLEvents exported', typeof require('../src/sources').fetchNYPLEvents === 'function');
+
 // ---- fetchBrooklynVeganEvents + learnVenueCoords exports ----
 console.log('\nBrooklynVegan + venue auto-learning:');
 
