@@ -76,15 +76,15 @@ All high-priority issues resolved.
 
 | ID | Issue | Impact | LOE | Notes |
 |----|-------|--------|-----|-------|
-| L18 | `.slice(0, 480)` can cut mid-word or mid-URL | 4 instances of naive truncation (ai.js:602, ai.js:791, handler.js:220, handler.js:237). Garbled SMS on edge cases. | ~15 min | Word-boundary-aware truncation helper |
-| L15 | HELP message lacks examples | Doesn't mention landmarks, subway stops, categories, numbered details | ~5 min | Expand help text with concrete examples |
-| L19 | Long event names (200+ chars) consume SMS budget | Event names pass to Claude untruncated in compose input (ai.js:507). 480-char output cap mitigates but wastes budget. | ~5 min | Truncate event name to ~80 chars in compose input |
 | NEW | Scraper `source_weight` hardcoded in 14 files | Individual scrapers still set `source_weight` but it's now overridden by the SOURCES registry in events.js. Dead code. | ~20 min | Remove hardcoded weights from all scraper files |
 
 ### Resolved (removed from prior version)
 
 | ID | Issue | Finding |
 |----|-------|---------|
+| ~~L18~~ | `.slice(0, 480)` can cut mid-word or mid-URL | Fixed — `smartTruncate()` helper in formatters.js, word-boundary-aware, protects URLs. Applied in ai.js, handler.js, formatters.js. |
+| ~~L15~~ | HELP message lacks examples | Fixed — mentions landmarks ("prospect park"), subway stops ("bedford ave"), categories, and numbered details. |
+| ~~L19~~ | Long event names consume SMS budget | Fixed — event names truncated to 80 chars in compose input (`ai.js`). |
 | ~~M15~~ | `makeEventId` collisions for null/empty fields | Fixed — falls back to `source + source_url` hash when core fields are empty (`sources/shared.js`) |
 | ~~L13~~ | Dedup registers MessageSid before processing | Fixed — registration moved to `.then()` after `handleMessage` succeeds (`handler.js`) |
 | ~~L10~~ | Health check exposes source health without auth | Fixed — `/` returns only `{ status: 'ok' }`, `/health` gated behind test mode or auth token (`server.js`) |

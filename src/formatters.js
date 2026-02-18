@@ -106,7 +106,38 @@ function formatEventDetails(event) {
     detail += `\nNear ${hint}`;
   }
 
-  return detail.slice(0, 480);
+  return smartTruncate(detail);
 }
 
-module.exports = { formatTime, cleanUrl, formatEventDetails };
+/**
+ * Truncate text to maxLen without cutting mid-word or mid-URL.
+ * Walks back to the last whitespace before maxLen, then appends "…".
+ * If truncation would land inside a URL (line starting with http), drops the entire URL line.
+ */
+function smartTruncate(text, maxLen = 480) {
+  if (text.length <= maxLen) return text;
+
+  // Find a safe cut point — prefer a newline or space boundary
+  let cut = text.lastIndexOf('\n', maxLen);
+  if (cut < maxLen * 0.6) {
+    // Newline too far back — try word boundary instead
+    cut = text.lastIndexOf(' ', maxLen - 1);
+  }
+  if (cut < maxLen * 0.5) {
+    // Fallback: hard cut (very long unbroken string)
+    cut = maxLen - 1;
+  }
+
+  let truncated = text.slice(0, cut).trimEnd();
+
+  // If we cut inside a URL line, drop the partial URL entirely
+  const lastNewline = truncated.lastIndexOf('\n');
+  const lastLine = truncated.slice(lastNewline + 1);
+  if (lastLine.startsWith('http')) {
+    truncated = truncated.slice(0, lastNewline).trimEnd();
+  }
+
+  return truncated + '…';
+}
+
+module.exports = { formatTime, cleanUrl, formatEventDetails, smartTruncate };

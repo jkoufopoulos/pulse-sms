@@ -6,7 +6,7 @@ const { routeMessage, composeResponse, composeDetails, isSearchUrl } = require('
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
 const { startTrace, saveTrace } = require('./traces');
 const { getSession, setSession, clearSession, clearSessionInterval } = require('./session');
-const { formatEventDetails, cleanUrl } = require('./formatters');
+const { formatEventDetails, cleanUrl, smartTruncate } = require('./formatters');
 const { getAdjacentNeighborhoods, preRoute } = require('./pre-router');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
 
@@ -217,8 +217,8 @@ async function handleMessageAI(phone, message) {
 
   // --- Help ---
   if (route.intent === 'help') {
-    const reply = route.reply || "Hey! I'm Pulse — text me a neighborhood and I'll send you tonight's best picks. Try \"East Village\" or \"Williamsburg\" to start. You can ask for free events, specific vibes like comedy or live music, or reply \"more\" after any rec to keep exploring.";
-    const sms = reply.slice(0, 480);
+    const reply = route.reply || "Hey! I'm Pulse — text me a neighborhood and I'll find tonight's best events.\n\nTry: \"East Village\", \"prospect park\", \"bedford ave\"\n\nYou can ask for comedy, jazz, free events, or any vibe. Reply a number for details on a pick, or \"more\" for more options.";
+    const sms = smartTruncate(reply);
     await sendSMS(phone, sms);
     console.log(`Help sent to ${masked}`);
     finalizeTrace(sms, 'help');
@@ -235,7 +235,7 @@ async function handleMessageAI(phone, message) {
         `say "more" for more ${session.lastNeighborhood} picks, or text a different neighborhood`
       );
     }
-    const sms = reply.slice(0, 480);
+    const sms = smartTruncate(reply);
     await sendSMS(phone, sms);
     console.log(`Conversational reply sent to ${masked}`);
     finalizeTrace(sms, 'conversational');

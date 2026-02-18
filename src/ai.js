@@ -504,7 +504,7 @@ async function composeResponse(message, events, neighborhood, filters, { exclude
     const dayLabel = eventDate === todayNyc ? 'TODAY' : eventDate === tomorrowNyc ? 'TOMORROW' : eventDate;
     return JSON.stringify({
       id: e.id,
-      name: e.name,
+      name: e.name && e.name.length > 80 ? e.name.slice(0, 77) + '...' : e.name,
       venue_name: e.venue_name,
       neighborhood: e.neighborhood,
       date_local: eventDate,
@@ -599,7 +599,7 @@ Compose the SMS now.`;
   }
 
   return {
-    sms_text: parsed.sms_text.slice(0, 480),
+    sms_text: require('./formatters').smartTruncate(parsed.sms_text),
     picks: validPicks,
     not_picked_reason: parsed.not_picked_reason || null,
     neighborhood_used: neighborhoodUsed,
@@ -802,7 +802,7 @@ Write the details text. Include this URL: ${bestUrl}`;
     smsText = text.replace(/^["']|["']$/g, '').trim();
   }
 
-  return { sms_text: smsText.slice(0, 480), _raw: text };
+  return { sms_text: require('./formatters').smartTruncate(smsText), _raw: text };
 }
 
 /**
