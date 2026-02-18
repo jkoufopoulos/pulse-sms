@@ -227,15 +227,24 @@ async function handleDetails(ctx) {
         const event = ctx.session.lastEvents[pick.event_id];
         return event ? `${i + 1}. ${formatEventDetails(event)}` : null;
       }).filter(Boolean);
-      const sms = details.join('\n\n').slice(0, 1500);
+      const allText = details.join('\n\n');
+      const sms = smartTruncate(allText);
       await sendSMS(ctx.phone, sms);
       console.log(`All details sent to ${ctx.masked}`);
       ctx.finalizeTrace(sms, 'details');
       return;
     }
 
-    const pickIndex = Math.min(ref - 1, picks.length - 1);
-    const pick = picks[Math.max(0, pickIndex)];
+    if (ref > picks.length) {
+      const sms = picks.length === 1
+        ? "I only showed you 1 pick — reply 1 for details."
+        : `I only showed you ${picks.length} picks — reply 1-${picks.length} for details.`;
+      await sendSMS(ctx.phone, sms);
+      ctx.finalizeTrace(sms, 'details');
+      return;
+    }
+    const pickIndex = Math.max(0, ref - 1);
+    const pick = picks[pickIndex];
     const event = ctx.session.lastEvents[pick.event_id];
     if (event) {
       try {
@@ -697,6 +706,12 @@ async function handleMessageAI(phone, message) {
   }
 
   const ctx = { phone, message, masked, session, trace, route, finalizeTrace, composeAndSend };
+
+  // Clear stale nudge state when intent isn't a nudge response —
+  // prevents "yeah" in unrelated messages from triggering old nearby redirect
+  if (route.intent !== 'nudge_accept' && session?.pendingNearby) {
+    setSession(phone, { pendingNearby: null });
+  }
 
   // --- Simple intents (no neighborhood needed) ---
   if (route.intent === 'help') return handleHelp(ctx);

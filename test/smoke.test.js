@@ -1064,6 +1064,50 @@ const geoEvents = [
   msgs = await sendAndCapture(intPhone, 'hey');
   check('greeting (active session): mentions more', msgs[0]?.body.includes('more'));
 
+  // 11. Out-of-range pick number — helpful error instead of silent clamp
+  // Pre-router matches 1-3, so use "3" with only 2 picks to test out-of-range
+  hClearSession(intPhone);
+  hSetSession(intPhone, {
+    lastPicks: [
+      { event_id: 'oor_evt1', why: 'great' },
+      { event_id: 'oor_evt2', why: 'fun' },
+    ],
+    lastEvents: {
+      oor_evt1: { id: 'oor_evt1', name: 'Event A', venue_name: 'Venue A' },
+      oor_evt2: { id: 'oor_evt2', name: 'Event B', venue_name: 'Venue B' },
+    },
+    lastNeighborhood: 'East Village',
+  });
+  msgs = await sendAndCapture(intPhone, '3');
+  check('out-of-range pick: sends 1 message', msgs.length === 1);
+  check('out-of-range pick: mentions valid range', msgs[0]?.body.includes('1-2'));
+
+  // 12. Stale pendingNearby cleared on non-nudge intent
+  hClearSession(intPhone);
+  hSetSession(intPhone, {
+    pendingNearby: 'Flatiron',
+    lastNeighborhood: 'East Village',
+    lastPicks: [{ event_id: 'pn_evt1', why: 'vibe' }],
+    lastEvents: { pn_evt1: { id: 'pn_evt1', name: 'Test Event' } },
+  });
+  // Send "help" — not a nudge response. pendingNearby should be cleared.
+  msgs = await sendAndCapture(intPhone, 'help');
+  check('stale nudge: help still works', msgs.length === 1);
+  const { getSession: hGetSession } = require('../src/session');
+  const sessionAfter = hGetSession(intPhone);
+  check('stale nudge: pendingNearby cleared', sessionAfter?.pendingNearby === null || sessionAfter?.pendingNearby === undefined);
+
+  // 13. Pick number "3" with only 1 pick — range message
+  hClearSession(intPhone);
+  hSetSession(intPhone, {
+    lastPicks: [{ event_id: 'one_evt', why: 'cool' }],
+    lastEvents: { one_evt: { id: 'one_evt', name: 'Solo Event' } },
+    lastNeighborhood: 'LES',
+  });
+  msgs = await sendAndCapture(intPhone, '3');
+  check('1-pick range: sends 1 message', msgs.length === 1);
+  check('1-pick range: says "1 pick"', msgs[0]?.body.includes('1 pick') || msgs[0]?.body.includes('reply 1'));
+
   // Cleanup
   hClearSession(intPhone);
   clearSmsIntervals();
