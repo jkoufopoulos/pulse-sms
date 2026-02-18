@@ -5,8 +5,10 @@
 
 const { extractNeighborhood } = require('../src/neighborhoods');
 const { makeEventId, normalizeExtractedEvent } = require('../src/sources');
-const { resolveNeighborhood, inferCategory, haversine, getNycDateString, rankEventsByProximity, filterUpcomingEvents } = require('../src/geo');
+const { resolveNeighborhood, inferCategory, haversine, getNycDateString, rankEventsByProximity, filterUpcomingEvents, parseAsNycTime, getEventDate } = require('../src/geo');
 const { lookupVenue } = require('../src/venues');
+const { preRoute, getAdjacentNeighborhoods } = require('../src/pre-router');
+const { formatTime, cleanUrl, formatEventDetails } = require('../src/formatters');
 
 let pass = 0;
 let fail = 0;
@@ -604,6 +606,194 @@ check('source has last_scrape', 'last_scrape' in sampleSource);
 check('source has success_rate', 'success_rate' in sampleSource);
 check('source has history array', Array.isArray(sampleSource.history));
 
+// ---- preRoute ----
+console.log('\npreRoute:');
+
+// Help
+check('help → help', preRoute('help', null)?.intent === 'help');
+check('? → help', preRoute('?', null)?.intent === 'help');
+
+// Bare numbers with session
+const preMockSession = { lastPicks: [{ event_id: 'e1' }, { event_id: 'e2' }], lastEvents: { e1: { name: 'Jazz Night' }, e2: { name: 'Comedy Show' } }, lastNeighborhood: 'East Village' };
+check('1 with session → details', preRoute('1', preMockSession)?.intent === 'details');
+check('1 with session → event_reference "1"', preRoute('1', preMockSession)?.event_reference === '1');
+check('2 with session → details', preRoute('2', preMockSession)?.intent === 'details');
+check('3 with session → details', preRoute('3', preMockSession)?.intent === 'details');
+
+// Bare numbers without session
+check('1 without session → conversational', preRoute('1', null)?.intent === 'conversational');
+check('1 without session has reply', preRoute('1', null)?.reply !== null);
+check('5 falls through → null', preRoute('5', null) === null);
+
+// Nudge accept
+const nudgeSession = { pendingNearby: 'Williamsburg' };
+check('yes with pendingNearby → nudge_accept', preRoute('yes', nudgeSession)?.intent === 'nudge_accept');
+check('yeah → nudge_accept', preRoute('yeah', nudgeSession)?.intent === 'nudge_accept');
+check('bet → nudge_accept', preRoute('bet', nudgeSession)?.intent === 'nudge_accept');
+check("i'm down → nudge_accept", preRoute("i'm down", nudgeSession)?.intent === 'nudge_accept');
+check('nudge_accept uses pendingNearby hood', preRoute('sure', nudgeSession)?.neighborhood === 'Williamsburg');
+check('counter-suggestion extracts hood', preRoute('sure but how about bushwick', nudgeSession)?.neighborhood === 'Bushwick');
+
+// More
+check('more → more', preRoute('more', null)?.intent === 'more');
+check('show me more → more', preRoute('show me more', null)?.intent === 'more');
+check('what else → more', preRoute('what else', null)?.intent === 'more');
+check("what's next → more", preRoute("what's next", null)?.intent === 'more');
+check('more uses session hood', preRoute('more', { lastNeighborhood: 'Bushwick' })?.neighborhood === 'Bushwick');
+
+// Free
+check('free → free', preRoute('free', null)?.intent === 'free');
+check('free stuff → free', preRoute('free stuff', null)?.intent === 'free');
+check('free events → free', preRoute('free events', null)?.intent === 'free');
+check('free has free_only filter', preRoute('free', null)?.filters?.free_only === true);
+
+// Event name match from session
+const nameMatchSession = {
+  lastPicks: [{ event_id: 'e1' }, { event_id: 'e2' }],
+  lastEvents: { e1: { name: 'Jazz at Smalls' }, e2: { name: 'The Comedy Show' } },
+  lastNeighborhood: 'East Village',
+};
+check('event name match → details', preRoute('smalls', nameMatchSession)?.intent === 'details');
+check('event name match → correct ref', preRoute('smalls', nameMatchSession)?.event_reference === '1');
+
+// Greetings
+check('hey → conversational', preRoute('hey', null)?.intent === 'conversational');
+check('hi → conversational', preRoute('hi', null)?.intent === 'conversational');
+check('hello → conversational', preRoute('hello', null)?.intent === 'conversational');
+check('yo → conversational', preRoute('yo', null)?.intent === 'conversational');
+check('greeting has reply', preRoute('hey', null)?.reply !== null);
+
+// Thanks
+check('thanks → conversational', preRoute('thanks', null)?.intent === 'conversational');
+check('thx → conversational', preRoute('thx', null)?.intent === 'conversational');
+
+// Bye
+check('bye → conversational', preRoute('bye', null)?.intent === 'conversational');
+check('peace → conversational', preRoute('peace', null)?.intent === 'conversational');
+
+// Impatient
+check('hello?? with session → conversational', preRoute('hello??', preMockSession)?.intent === 'conversational');
+check('??? → conversational', preRoute('???', preMockSession)?.intent === 'conversational');
+check('hello?? without session → conversational', preRoute('hello??', null)?.intent === 'conversational');
+
+// Off-topic: sports
+check('sports → conversational', preRoute('whats the score of the knicks game', null)?.intent === 'conversational');
+check('sports reply mentions nightlife', preRoute('whats the score of the knicks game', null)?.reply?.includes('nightlife'));
+check('sports watching exception → null', preRoute('where to watch the knicks game at a bar', null) === null);
+
+// Off-topic: food
+check('food → conversational', preRoute('where should i get dinner in soho', null)?.intent === 'conversational');
+check('food event exception → null', preRoute('food festival in bushwick', null) === null);
+
+// Off-topic: weather
+check('weather → conversational', preRoute('whats the weather like tonight', null)?.intent === 'conversational');
+
+// Bare neighborhood
+check('east village → events', preRoute('east village', null)?.intent === 'events');
+check('east village → East Village', preRoute('east village', null)?.neighborhood === 'East Village');
+check('williamsburg → events', preRoute('williamsburg', null)?.intent === 'events');
+check('les → events', preRoute('les', null)?.intent === 'events');
+check('ev → events', preRoute('ev', null)?.intent === 'events');
+check('wburg → events', preRoute('wburg', null)?.intent === 'events');
+
+// Bare neighborhood with category keywords → falls through to Claude
+check('comedy in midtown → null', preRoute('comedy in midtown', null) === null);
+
+// Borough
+check('brooklyn → conversational', preRoute('brooklyn', null)?.intent === 'conversational');
+check('brooklyn asks which neighborhood', preRoute('brooklyn', null)?.reply?.includes('neighborhood'));
+check('bk → conversational', preRoute('bk', null)?.intent === 'conversational');
+
+// Unsupported
+check('bay ridge → conversational', preRoute('bay ridge', null)?.intent === 'conversational');
+check('bay ridge suggests Sunset Park', preRoute('bay ridge', null)?.reply?.includes('Sunset Park'));
+
+// Fall-through
+check('something wild tonight → null', preRoute('something wild tonight', null) === null);
+check('complex request → null', preRoute('any good jazz shows in williamsburg tonight', null) === null);
+
+// ---- getAdjacentNeighborhoods ----
+console.log('\ngetAdjacentNeighborhoods:');
+
+const evAdjacent = getAdjacentNeighborhoods('East Village', 3);
+check('EV returns 3 neighbors', evAdjacent.length === 3);
+check('EV neighbors exclude cross-borough Wburg', !evAdjacent.includes('Williamsburg'));
+check('EV does not include itself', !evAdjacent.includes('East Village'));
+
+const astoriaAdjacent = getAdjacentNeighborhoods('Astoria', 3);
+check('Astoria returns 3 neighbors', astoriaAdjacent.length === 3);
+check('Astoria first neighbor not UES (cross-borough penalty)', astoriaAdjacent[0] !== 'Upper East Side');
+
+const ftGreeneAdjacent = getAdjacentNeighborhoods('Fort Greene', 5);
+check('Fort Greene count=5 returns 5', ftGreeneAdjacent.length === 5);
+
+check('count=1 returns 1', getAdjacentNeighborhoods('East Village', 1).length === 1);
+check('unknown neighborhood → empty', getAdjacentNeighborhoods('Narnia', 3).length === 0);
+
+// ---- formatTime ----
+console.log('\nformatTime:');
+
+check('bare date includes month', formatTime('2026-02-18').includes('Feb'));
+const ftIso = formatTime('2026-02-18T21:00:00');
+check('ISO datetime includes month', ftIso.includes('Feb'));
+check('ISO datetime includes time', /\d:\d{2}/.test(ftIso));
+check('ISO with Z includes time', /\d:\d{2}/.test(formatTime('2026-02-18T21:00:00Z')));
+check('ISO with offset includes time', /\d:\d{2}/.test(formatTime('2026-02-18T21:00:00-05:00')));
+check('null returns null', formatTime(null) === null);
+check('invalid string passes through', formatTime('not-a-date') === 'not-a-date');
+
+// ---- cleanUrl ----
+console.log('\ncleanUrl:');
+
+check('strips UTM params', !cleanUrl('https://example.com/event?utm_source=fb&utm_medium=social').includes('utm_'));
+check('strips fbclid', !cleanUrl('https://example.com/event?fbclid=abc123').includes('fbclid'));
+check('shortens Eventbrite', cleanUrl('https://www.eventbrite.com/e/some-event-slug-1234567890').includes('/e/1234567890'));
+check('shortens Dice', cleanUrl('https://dice.fm/event/abc123-some-event-name').includes('/event/abc123'));
+check('shortens Songkick', cleanUrl('https://www.songkick.com/concerts/12345-artist-name').includes('/concerts/12345'));
+check('clean URL unchanged', cleanUrl('https://example.com/events') === 'https://example.com/events');
+check('null returns null', cleanUrl(null) === null);
+check('invalid URL returns as-is', cleanUrl('not-a-url') === 'not-a-url');
+
+// ---- formatEventDetails ----
+console.log('\nformatEventDetails:');
+
+check('minimal event has name', formatEventDetails({ name: 'Jazz Night' }).includes('Jazz Night'));
+const fullEvt = {
+  name: 'Jazz Night',
+  venue_name: 'Smalls Jazz Club',
+  start_time_local: '2026-02-18T21:00:00',
+  is_free: false,
+  price_display: '$20',
+  venue_address: '183 W 10th St',
+  source_url: 'https://example.com/jazz',
+};
+const fullDetail = formatEventDetails(fullEvt);
+check('full event has venue', fullDetail.includes('Smalls Jazz Club'));
+check('full event has time', /\d:\d{2}/.test(fullDetail));
+check('full event has price', fullDetail.includes('$20'));
+check('full event has URL', fullDetail.includes('example.com'));
+check('free event shows Free!', formatEventDetails({ name: 'Free Show', is_free: true }).includes('Free!'));
+check('venue-in-name dedup', !formatEventDetails({ name: 'Jazz at Smalls Jazz Club', venue_name: 'Smalls Jazz Club' }).includes('Club at Smalls'));
+check('result under 480 chars', fullDetail.length <= 480);
+
+// ---- parseAsNycTime ----
+console.log('\nparseAsNycTime:');
+
+check('ISO with Z parses', !isNaN(parseAsNycTime('2026-02-18T21:00:00Z')));
+check('ISO with offset parses', !isNaN(parseAsNycTime('2026-02-18T21:00:00-05:00')));
+check('ISO without tz parses (assumes NYC)', !isNaN(parseAsNycTime('2026-02-18T21:00:00')));
+check('null → NaN', isNaN(parseAsNycTime(null)));
+check('undefined → NaN', isNaN(parseAsNycTime(undefined)));
+check('Z and -05:00 differ by offset', Math.abs(parseAsNycTime('2026-02-18T21:00:00Z') - parseAsNycTime('2026-02-18T21:00:00-05:00')) === 5 * 3600 * 1000);
+
+// ---- getEventDate ----
+console.log('\ngetEventDate:');
+
+check('event with date_local', getEventDate({ date_local: '2026-02-18' }) === '2026-02-18');
+check('event with start_time_local', /^\d{4}-\d{2}-\d{2}$/.test(getEventDate({ start_time_local: '2026-02-18T21:00:00' })));
+check('event with neither → null', getEventDate({}) === null);
+check('prefers date_local', getEventDate({ date_local: '2026-02-18', start_time_local: '2026-02-19T10:00:00' }) === '2026-02-18');
+
 // ---- batchGeocodeEvents (mock test) ----
 console.log('\nbatchGeocodeEvents (mock):');
 
@@ -696,6 +886,91 @@ const geoEvents = [
   check('does not cut mid-word', !smartTruncate('word '.repeat(100)).endsWith('wor…'));
   const urlText = 'Event name\nhttps://example.com/' + 'x'.repeat(500);
   check('drops partial URL line', !smartTruncate(urlText).includes('https://'));
+
+  // ---- Integration: SMS hot path (pre-routed intents, no AI API calls) ----
+  console.log('\nIntegration: SMS hot path:');
+
+  const { _handleMessage, setSession: hSetSession, clearSession: hClearSession, clearSmsIntervals } = require('../src/handler');
+  const { enableTestCapture, disableTestCapture } = require('../src/twilio');
+  const intPhone = '+10000000099';
+
+  // Helper: send message, capture SMS output
+  async function sendAndCapture(phone, message) {
+    enableTestCapture(phone);
+    await _handleMessage(phone, message);
+    return disableTestCapture(phone);
+  }
+
+  // 1. Help flow — static response, no AI
+  hClearSession(intPhone);
+  let msgs = await sendAndCapture(intPhone, 'help');
+  check('help: sends 1 message', msgs.length === 1);
+  check('help: mentions neighborhoods', msgs[0]?.body.includes('East Village'));
+  check('help: mentions details', msgs[0]?.body.includes('details'));
+
+  // 2. Greeting flow — static response, no AI
+  hClearSession(intPhone);
+  msgs = await sendAndCapture(intPhone, 'hey');
+  check('greeting: sends 1 message', msgs.length === 1);
+  check('greeting: mentions neighborhood', msgs[0]?.body.includes('neighborhood'));
+
+  // 3. Thanks flow — static response, no AI
+  hClearSession(intPhone);
+  msgs = await sendAndCapture(intPhone, 'thanks');
+  check('thanks: sends 1 message', msgs.length === 1);
+  check('thanks: friendly reply', msgs[0]?.body.includes('Anytime'));
+
+  // 4. More without session — asks for neighborhood, no AI
+  hClearSession(intPhone);
+  msgs = await sendAndCapture(intPhone, 'more');
+  check('more (no session): sends 1 message', msgs.length === 1);
+  check('more (no session): asks for neighborhood', msgs[0]?.body.includes('neighborhood'));
+
+  // 5. TCPA compliance — "STOP" gets no response
+  hClearSession(intPhone);
+  msgs = await sendAndCapture(intPhone, 'STOP');
+  check('TCPA: STOP sends 0 messages', msgs.length === 0);
+
+  // 6. Bare number without session — friendly redirect, no AI
+  hClearSession(intPhone);
+  msgs = await sendAndCapture(intPhone, '1');
+  check('number (no session): sends 1 message', msgs.length === 1);
+  check('number (no session): asks for neighborhood', msgs[0]?.body.includes('neighborhood'));
+
+  // 7. Bare number with seeded session — event details (AI fails → fallback to formatEventDetails)
+  hClearSession(intPhone);
+  hSetSession(intPhone, {
+    lastPicks: [{ event_id: 'int_evt1', why: 'great vibes' }],
+    lastEvents: {
+      int_evt1: { id: 'int_evt1', name: 'Jazz Night at Smalls', venue_name: 'Smalls Jazz Club', neighborhood: 'West Village', start_time_local: '2026-02-18T21:00:00', is_free: false, price_display: '$20', ticket_url: 'https://example.com/jazz', source_url: 'https://example.com/jazz' }
+    },
+    lastNeighborhood: 'West Village',
+  });
+  msgs = await sendAndCapture(intPhone, '1');
+  check('details (session): sends message', msgs.length >= 1);
+  check('details (session): contains event info', msgs[0]?.body.includes('Jazz Night') || msgs[0]?.body.includes('Smalls'));
+
+  // 8. Free without neighborhood — asks for neighborhood, no AI
+  hClearSession(intPhone);
+  msgs = await sendAndCapture(intPhone, 'free');
+  check('free (no hood): sends 1 message', msgs.length === 1);
+  check('free (no hood): asks for neighborhood', msgs[0]?.body.includes('neighborhood'));
+
+  // 9. Off-topic deflection — food question, no AI
+  hClearSession(intPhone);
+  msgs = await sendAndCapture(intPhone, 'best pizza near me');
+  check('off-topic food: sends 1 message', msgs.length === 1);
+  check('off-topic food: deflects to nightlife', msgs[0]?.body.includes('nightlife'));
+
+  // 10. Conversational with active session — mentions "more"
+  hClearSession(intPhone);
+  hSetSession(intPhone, { lastNeighborhood: 'Bushwick', lastPicks: [{ event_id: 'x' }] });
+  msgs = await sendAndCapture(intPhone, 'hey');
+  check('greeting (active session): mentions more', msgs[0]?.body.includes('more'));
+
+  // Cleanup
+  hClearSession(intPhone);
+  clearSmsIntervals();
 
   // ---- Summary ----
   console.log(`\n${pass} passed, ${fail} failed`);
