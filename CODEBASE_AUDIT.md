@@ -330,9 +330,10 @@ Session fields (`pendingNearby`, `lastPicks`, `visitedHoods`, `allOfferedIds`) a
 ### PR 5: Lower-priority improvements
 **Title:** Minor data quality, performance, and security improvements
 **Files:** `src/geo.js`, `src/pre-router.js`, `src/sources/donyc.js`, `src/ai.js`
-**Fixes:** ISSUE-010, ISSUE-013, ISSUE-015, ISSUE-016, ISSUE-017
+**Fixes:** ISSUE-010, ISSUE-013, ISSUE-015, ISSUE-016 (ISSUE-017 already fixed — brace-counting parser in place)
 **Acceptance:**
 - Borough-level fallback returns `null` instead of arbitrary neighborhood
 - Pre-router matches digits 1-5
 - DoNYC categories fetch in parallel
 - User messages wrapped in XML tags in Claude prompts
+- JSON parser handles `}` inside string values (confirmed via test)

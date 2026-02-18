@@ -2,14 +2,14 @@ const { NEIGHBORHOODS } = require('./neighborhoods');
 
 // Borough-level fallback map (L8: moved to module scope)
 const BOROUGH_FALLBACK_MAP = {
-  'brooklyn': 'Williamsburg',
-  'manhattan': 'Midtown',
-  'queens': 'Astoria',
+  'brooklyn': null,
+  'manhattan': null,
+  'queens': null,
   'bronx': null,
   'staten island': null,
-  'new york': 'Midtown',
-  'new york (nyc)': 'Midtown',
-  'new york city': 'Midtown',
+  'new york': null,
+  'new york (nyc)': null,
+  'new york city': null,
 };
 
 /**

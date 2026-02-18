@@ -135,7 +135,9 @@ check('direct name match', resolveNeighborhood('East Village', null, null) === '
 check('alias match', resolveNeighborhood('ev', null, null) === 'East Village');
 check('geo with borough string', resolveNeighborhood('Brooklyn', 40.7081, -73.9571) === 'Williamsburg');
 check('geo overrides borough', resolveNeighborhood('Brooklyn', 40.6934, -73.9867) === 'Downtown Brooklyn');
-check('borough fallback when no coords', resolveNeighborhood('Brooklyn', null, null) === 'Williamsburg');
+check('borough fallback when no coords', resolveNeighborhood('Brooklyn', null, null) === null);
+check('manhattan borough fallback null', resolveNeighborhood('Manhattan', null, null) === null);
+check('queens borough fallback null', resolveNeighborhood('Queens', null, null) === null);
 check('null for unknown', resolveNeighborhood('Mars', null, null) === null);
 check('null for empty', resolveNeighborhood(null, null, null) === null);
 
@@ -702,11 +704,14 @@ check('1 with session → details', preRoute('1', preMockSession)?.intent === 'd
 check('1 with session → event_reference "1"', preRoute('1', preMockSession)?.event_reference === '1');
 check('2 with session → details', preRoute('2', preMockSession)?.intent === 'details');
 check('3 with session → details', preRoute('3', preMockSession)?.intent === 'details');
+check('4 with session → details', preRoute('4', preMockSession)?.intent === 'details');
+check('5 with session → details', preRoute('5', preMockSession)?.intent === 'details');
 
 // Bare numbers without session
 check('1 without session → conversational', preRoute('1', null)?.intent === 'conversational');
 check('1 without session has reply', preRoute('1', null)?.reply !== null);
-check('5 falls through → null', preRoute('5', null) === null);
+check('5 without session → conversational', preRoute('5', null)?.intent === 'conversational');
+check('6 falls through → null', preRoute('6', null) === null);
 
 // Nudge accept
 const nudgeSession = { pendingNearby: 'Williamsburg' };
@@ -982,6 +987,27 @@ const geoEvents = [
   check('does not cut mid-word', !smartTruncate('word '.repeat(100)).endsWith('wor…'));
   const urlText = 'Event name\nhttps://example.com/' + 'x'.repeat(500);
   check('drops partial URL line', !smartTruncate(urlText).includes('https://'));
+
+  // ---- parseJsonFromResponse ----
+  console.log('\nparseJsonFromResponse:');
+  const { parseJsonFromResponse } = require('../src/ai');
+
+  // Fenced JSON
+  const fenced = '```json\n{"sms_text": "Tonight!", "picks": []}\n```';
+  check('fenced JSON parses', parseJsonFromResponse(fenced)?.sms_text === 'Tonight!');
+
+  // Bare JSON with } inside string value
+  const tricky = '{"sms_text": "Event at Venue} tonight", "picks": []}';
+  const trickyParsed = parseJsonFromResponse(tricky);
+  check('} inside string: parses correctly', trickyParsed?.sms_text === 'Event at Venue} tonight');
+  check('} inside string: picks array intact', Array.isArray(trickyParsed?.picks));
+
+  // No JSON at all
+  check('no JSON returns null', parseJsonFromResponse('just some text') === null);
+
+  // JSON with surrounding text
+  const wrapped = 'Here is the result: {"intent": "events", "neighborhood": "Bushwick"} done.';
+  check('JSON with surrounding text', parseJsonFromResponse(wrapped)?.intent === 'events');
 
   // ---- Integration: SMS hot path (pre-routed intents, no AI API calls) ----
   console.log('\nIntegration: SMS hot path:');

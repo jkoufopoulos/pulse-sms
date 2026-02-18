@@ -37,7 +37,7 @@ function preRoute(message, session) {
   }
 
   // Bare numbers → details
-  if (/^[1-3]$/.test(msg)) {
+  if (/^[1-5]$/.test(msg)) {
     if (session?.lastPicks?.length > 0) {
       return { ...base, intent: 'details', neighborhood: null, event_reference: msg };
     }

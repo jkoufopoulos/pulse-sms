@@ -184,7 +184,7 @@ OUTPUT:
 
 const ROUTE_SYSTEM = `<role>
 You are Pulse's message router. Pulse is an SMS bot that recommends NYC nightlife and events.
-Given an incoming SMS message, the user's session context, and a list of valid NYC neighborhoods, determine the user's intent and extract relevant parameters.
+Given an incoming SMS message (wrapped in <user_message> tags), the user's session context, and a list of valid NYC neighborhoods, determine the user's intent and extract relevant parameters.
 </role>
 
 <rules>
@@ -248,7 +248,7 @@ Use this tree to distinguish "more" from "events":
 
 <examples>
 INPUT:
-SMS message: "what's going on in bushwick"
+<user_message>what's going on in bushwick</user_message>
 Session context: Last neighborhood: East Village. Last picks: #1 "DJ Honeypot", #2 "Jazz at Smalls".
 
 OUTPUT:
@@ -263,7 +263,7 @@ OUTPUT:
 (Reason: new neighborhood mentioned → fresh "events" request, not "more")
 
 INPUT:
-SMS message: "anything else tonight"
+<user_message>anything else tonight</user_message>
 Session context: Last neighborhood: Bushwick. Last picks: #1 "DJ Honeypot", #2 "Art Opening at 56 Bogart".
 
 OUTPUT:
@@ -278,7 +278,7 @@ OUTPUT:
 (Reason: session has picks + no new neighborhood + "anything else" = wants more options)
 
 INPUT:
-SMS message: "who won the knicks game?"
+<user_message>who won the knicks game?</user_message>
 Session context: No prior session.
 
 OUTPUT:
@@ -449,7 +449,7 @@ async function routeMessage(message, session, neighborhoodNames) {
       }).join(', ') || 'none'}.`
     : 'No prior session.';
 
-  const userPrompt = `SMS message: "${message}"
+  const userPrompt = `<user_message>${message}</user_message>
 
 Session context: ${sessionContext}
 
@@ -529,7 +529,7 @@ async function composeResponse(message, events, neighborhood, filters, { exclude
   const extraNote = extraContext || '';
 
   const userPrompt = `Current time (NYC): ${now}
-User message: "${message}"
+<user_message>${message}</user_message>
 Neighborhood: ${neighborhood || 'not specified'}
 User preferences: category=${filters?.category || 'any'}, vibe=${filters?.vibe || 'any'}, free_only=${filters?.free_only ? 'yes' : 'no'}
 ${excludeNote}${extraNote}
@@ -826,4 +826,4 @@ function isSearchUrl(url) {
   }
 }
 
-module.exports = { routeMessage, composeResponse, composeDetails, extractEvents, isSearchUrl };
+module.exports = { routeMessage, composeResponse, composeDetails, extractEvents, isSearchUrl, parseJsonFromResponse };
