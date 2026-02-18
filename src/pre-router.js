@@ -96,6 +96,18 @@ function preRoute(message, session) {
     return { ...base, intent: 'conversational', neighborhood: null, reply: "Hey! Text me a neighborhood and I'll find you something good tonight." };
   }
 
+  // Off-topic deflection — catch common non-event questions before they reach Claude
+  // (Claude sometimes routes food/sports as events with a category filter)
+  if (/\b(score|knicks|yankees|mets|nets|rangers|giants|jets|nfl|nba|mlb|nhl|game score|who won|playoffs)\b/i.test(msg) && !(/\b(watch|viewing|bar|screen)\b/i.test(msg))) {
+    return { ...base, intent: 'conversational', neighborhood: null, reply: "Ha I wish I knew — I'm all about events and nightlife! Text me a neighborhood and I'll find you something fun tonight." };
+  }
+  if (/\b(restaurant|dinner|lunch|brunch|eat|food rec|where.*eat|where.*get (food|dinner|lunch|brunch)|best (food|pizza|tacos|sushi|ramen|burgers?))\b/i.test(msg) && !(/\b(event|show|fest|festival|pop.?up|tasting)\b/i.test(msg))) {
+    return { ...base, intent: 'conversational', neighborhood: null, reply: "I'm more of a nightlife expert than a food guide! But text me a neighborhood and I'll find you something fun to do after dinner." };
+  }
+  if (/\b(weather|forecast|temperature|degrees|rain|sunny|umbrella)\b/i.test(msg)) {
+    return { ...base, intent: 'conversational', neighborhood: null, reply: "No clue but I know what's happening indoors! Text me a neighborhood and I'll hook you up." };
+  }
+
   // Bare neighborhood — check BEFORE borough detection
   const CATEGORY_KEYWORDS = /\b(comedy|standup|stand-up|music|jazz|rock|techno|house|art|gallery|theater|theatre|dance|food|drink|free|cheap|underground|improv|hip hop|hip-hop|rap|r&b|soul|funk|punk|metal|folk|indie|electronic|dj)\b/i;
   if (msg.length <= 25 && !CATEGORY_KEYWORDS.test(msg)) {
