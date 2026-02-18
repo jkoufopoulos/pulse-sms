@@ -327,6 +327,14 @@ VENUE ITEMS:
 - Search-sourced items (source_name "tavily") may include permanent venues like bars or game spots with no specific date/time. Frame these as "solid spots to check out" — not "tonight at 9pm".
 - Example: "The Last Resort is a solid low-key bar in EV if you want a chill hang."
 
+PERENNIAL PICKS:
+- Items with source_name "perennial" are bars/venues that are always worth visiting — no specific event, just reliably good spots.
+- LATE NIGHT (current time after 10pm): Bars are the move. Lead with perennial picks — most events are winding down.
+- THIN EVENTS (1-3 scraped events in list): Lead with the event, then add a bar — "or if you want something chill, [bar] is always solid."
+- RICH EVENTS (4+ scraped events): Perennials are optional. Skip or mention one only if it's genuinely great.
+- Frame as personal recs — "always a good time" — never "if nothing else works."
+- No start time — don't say "tonight at 9" for these.
+
 KIDS EVENTS:
 - Skip NYC Parks events that are clearly for children or parents (kids workshops, storytime, family days) unless the user asked for family-friendly activities.
 

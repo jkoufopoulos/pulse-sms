@@ -1,15 +1,14 @@
 const express = require('express');
 const twilio = require('twilio');
 const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
-const { getEvents, getRawCache } = require('./events');
-const { getNycDateString, getEventDate } = require('./geo');
+const { getEvents } = require('./events');
 const { routeMessage, composeResponse, composeDetails, isSearchUrl } = require('./ai');
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
 const { startTrace, saveTrace } = require('./traces');
 const { getSession, setSession, clearSession, clearSessionInterval } = require('./session');
 const { formatEventDetails, cleanUrl } = require('./formatters');
 const { getAdjacentNeighborhoods, preRoute } = require('./pre-router');
-const { getPerennialPicks } = require('./perennial');
+const { getPerennialPicks, toEventObjects } = require('./perennial');
 
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
 
@@ -403,7 +402,40 @@ async function handleMessageAI(phone, message) {
       return;
     }
 
-    // All events exhausted — suggest nearby, excluding already-visited neighborhoods
+    // All scraped events exhausted — check for unshown perennial picks
+    const morePicks = getPerennialPicks(hood);
+    const moreLocalPerennials = toEventObjects(morePicks.local, hood);
+    const moreNearbyPerennials = toEventObjects(morePicks.nearby, hood, { isNearby: true });
+    const allMorePerennials = [...moreLocalPerennials, ...moreNearbyPerennials];
+    const allShownMoreIds = new Set([...(session?.allOfferedIds || []), ...(session?.allPicks || session?.lastPicks || []).map(p => p.event_id)]);
+    const unshownPerennials = allMorePerennials.filter(e => !allShownMoreIds.has(e.id));
+
+    if (unshownPerennials.length > 0) {
+      const perennialBatch = unshownPerennials.slice(0, 4);
+      const eventMap = { ...session.lastEvents };
+      for (const e of perennialBatch) eventMap[e.id] = e;
+      trace.events.cache_size = 0;
+      trace.events.candidates_count = perennialBatch.length;
+      trace.events.candidate_ids = perennialBatch.map(e => e.id);
+      const extraContext = `\nNOTE: This is the LAST batch of recommendations I have.\nOVERRIDE CLOSING LINE: Instead of "Reply 1-N for details, MORE for extra picks", use "Reply 1-N for details" (no MORE option). Then add "That's everything I've got in ${hood}! Try a different neighborhood for more."`;
+      const result = await composeAndSend(perennialBatch, hood, route.filters, 'more', { excludeIds: [...allShownMoreIds], extraContext });
+      result.sms_text = result.sms_text
+        .replace(/,?\s*MORE for extra picks/gi, '')
+        .replace(/,?\s*or MORE for more/gi, '')
+        .replace(/,?\s*MORE for more picks/gi, '')
+        .replace(/\s*Reply MORE[^.!\n]*/gi, '')
+        .replace(/,?\s*MORE for more/gi, '');
+      const newAllPicks = [...(session.allPicks || session.lastPicks || []), ...(result.picks || [])];
+      const newAllOfferedIds = [...(session.allOfferedIds || []), ...perennialBatch.map(e => e.id)];
+      const visitedHoods = new Set([...(session.visitedHoods || []), hood]);
+      setSession(phone, { lastPicks: result.picks || [], allPicks: newAllPicks, allOfferedIds: newAllOfferedIds, lastEvents: eventMap, lastNeighborhood: hood, visitedHoods: [...visitedHoods] });
+      await sendComposeWithLinks(phone, result, eventMap);
+      console.log(`Perennial picks sent to ${masked} after events exhausted in ${hood}`);
+      finalizeTrace(result.sms_text, 'more');
+      return;
+    }
+
+    // All events and perennials exhausted — suggest nearby
     const visited = new Set(session?.visitedHoods || [hood]);
     const nearby = getAdjacentNeighborhoods(hood, 4).filter(n => !visited.has(n));
     const suggestion = nearby.length > 0 ? ` Want to try ${nearby[0]}? It's right nearby.` : ' Try a different neighborhood or check back later!';
@@ -425,7 +457,13 @@ async function handleMessageAI(phone, message) {
     const events = await getEvents(hood);
     const freeEvents = events.filter(e => e.is_free);
 
-    if (freeEvents.length === 0) {
+    // Add free perennial picks
+    const freePicks = getPerennialPicks(hood);
+    const freeLocalPerennials = toEventObjects(freePicks.local, hood).filter(e => e.is_free);
+    const freeNearbyPerennials = toEventObjects(freePicks.nearby, hood, { isNearby: true }).filter(e => e.is_free);
+    const freePerennials = [...freeLocalPerennials, ...freeNearbyPerennials];
+
+    if (freeEvents.length === 0 && freePerennials.length === 0) {
       // Search nearby neighborhoods for free events
       const nearbyHoods = getAdjacentNeighborhoods(hood, 3);
       for (const nearbyHood of nearbyHoods) {
@@ -451,12 +489,16 @@ async function handleMessageAI(phone, message) {
       return;
     }
 
+    // Merge free scraped events + free perennial picks
+    const freePerennialCap = Math.min(4, 8 - Math.min(freeEvents.length, 8));
+    const freeCombined = [...freeEvents.slice(0, 8 - Math.min(freePerennials.length, freePerennialCap)), ...freePerennials.slice(0, freePerennialCap)];
     trace.events.cache_size = events.length;
-    trace.events.candidates_count = freeEvents.length;
-    trace.events.candidate_ids = freeEvents.map(e => e.id);
-    const result = await composeAndSend(freeEvents.slice(0, 8), hood, route.filters, 'free');
+    trace.events.candidates_count = freeCombined.length;
+    trace.events.candidate_ids = freeCombined.map(e => e.id);
+    const result = await composeAndSend(freeCombined.slice(0, 8), hood, route.filters, 'free');
     const eventMap = {};
     for (const e of freeEvents) eventMap[e.id] = e;
+    for (const e of freePerennials) eventMap[e.id] = e;
     setSession(phone, {
       lastPicks: result.picks || [],
       allPicks: result.picks || [],
@@ -580,53 +622,35 @@ async function handleMessageAI(phone, message) {
     }
   }
 
-  // Perennial picks for thin cache — supplement when events exist but are sparse
-  const THIN_THRESHOLD = 3;
-  let perennialContext = '';
-  if (events.length > 0 && events.length < THIN_THRESHOLD) {
-    const picks = getPerennialPicks(hood);
-    if (picks.local.length > 0 || picks.nearby.length > 0) {
-      const lines = [];
-      for (const p of picks.local) lines.push(`- ${p.venue}: ${p.vibe}${p.url ? ' ' + p.url : ''}`);
-      for (const p of picks.nearby) lines.push(`- ${p.venue} (${p.neighborhood}): ${p.vibe}${p.url ? ' ' + p.url : ''}`);
-      perennialContext = `\nPERENNIAL PICKS (reliable standing venues — mention as "usually has something going on" if the event list is thin):\n${lines.join('\n')}`;
-    }
-  }
+  // Perennial picks — merge as event objects for compose
+  const perennialPicks = getPerennialPicks(hood);
+  const localPerennials = toEventObjects(perennialPicks.local, hood);
+  const nearbyPerennials = toEventObjects(perennialPicks.nearby, hood, { isNearby: true });
+  const perennialCap = Math.min(4, 8 - Math.min(events.length, 8));
+  const perennialEvents = [...localPerennials, ...nearbyPerennials].slice(0, perennialCap);
+  const composeEventsWithPerennials = [...events.slice(0, 8 - perennialEvents.length), ...perennialEvents];
 
   // Prevent redirect loops: if user already got a travel nudge, serve nearby events directly
   const alreadyNudged = !!session?.pendingNearby;
 
   if (events.length === 0) {
 
-    // Check for tomorrow events before nudging to nearby neighborhoods
-    const tomorrowNyc = getNycDateString(1);
-    const { events: rawCache } = getRawCache();
-    const tomorrowInHood = rawCache.filter(e => {
-      const d = getEventDate(e);
-      return d === tomorrowNyc && e.neighborhood === hood;
-    });
-    if (tomorrowInHood.length > 0) {
-      const composeTomorrow = tomorrowInHood.slice(0, 8);
-      const eventMap = {};
-      for (const e of tomorrowInHood) eventMap[e.id] = e;
-      const extraContext = `\nIMPORTANT: There is NOTHING tonight in ${hood}. All events below are TOMORROW. Lead with "Nothing tonight in ${hood}, but tomorrow:" and use the tomorrow format.`;
-      const result = await composeAndSend(composeTomorrow, hood, route.filters, 'events', { extraContext });
-      setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: hood });
-      await sendComposeWithLinks(phone, result, eventMap);
-      console.log(`Tomorrow events served for ${hood} to ${masked} (${tomorrowInHood.length} events)`);
-      finalizeTrace(result.sms_text, 'events');
-      return;
-    }
-
     // Check perennial picks before nudging to a nearby neighborhood
     const zeroPicks = getPerennialPicks(hood);
-    if (zeroPicks.local.length > 0) {
-      const pickLines = zeroPicks.local.map(p =>
-        `${p.venue} — ${p.vibe}${p.url ? '\n' + p.url : ''}`
-      );
-      const sms = `Not much listed in ${hood} tonight, but these spots usually have something going on:\n\n${pickLines.join('\n\n')}`.slice(0, 480);
-      await sendSMS(phone, sms);
-      finalizeTrace(sms, 'events');
+    const zeroLocal = toEventObjects(zeroPicks.local, hood);
+    const zeroNearby = toEventObjects(zeroPicks.nearby, hood, { isNearby: true });
+    const zeroPerennials = [...zeroLocal, ...zeroNearby].slice(0, 4);
+    if (zeroPerennials.length > 0) {
+      const eventMap = {};
+      for (const e of zeroPerennials) eventMap[e.id] = e;
+      trace.events.cache_size = 0;
+      trace.events.candidates_count = zeroPerennials.length;
+      trace.events.candidate_ids = zeroPerennials.map(e => e.id);
+      const result = await composeAndSend(zeroPerennials, hood, route.filters, 'events');
+      setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: hood, visitedHoods: [hood] });
+      await sendComposeWithLinks(phone, result, eventMap);
+      console.log(`Perennial picks sent to ${masked} (zero scraped events in ${hood})`);
+      finalizeTrace(result.sms_text, 'events');
       return;
     }
 
@@ -674,50 +698,6 @@ async function handleMessageAI(phone, message) {
 
   // Check if any events are actually in the requested neighborhood
   const inHood = events.filter(e => e.neighborhood === hood);
-  const todayNyc = getNycDateString(0);
-
-  // If hood has events but ONLY for tomorrow — surface them proactively
-  if (inHood.length > 0 && !categoryApplied) {
-    const inHoodToday = inHood.filter(e => {
-      const d = getEventDate(e);
-      return d === todayNyc || !d; // today or no date = treat as today
-    });
-    if (inHoodToday.length === 0) {
-      // Nothing tonight in the hood, but tomorrow events exist — serve those
-      const extraContext = `\nIMPORTANT: There is NOTHING tonight in ${hood}. All events below are TOMORROW. Lead with "Nothing tonight in ${hood}, but tomorrow:" and use the tomorrow format.`;
-      const composeTomorrow = inHood.slice(0, 8);
-      const eventMap = {};
-      for (const e of inHood) eventMap[e.id] = e;
-      const result = await composeAndSend(composeTomorrow, hood, route.filters, 'events', { extraContext });
-      setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: hood });
-      await sendComposeWithLinks(phone, result, eventMap);
-      console.log(`Tomorrow events served for ${hood} to ${masked} (${inHood.length} tomorrow events)`);
-      finalizeTrace(result.sms_text, 'events');
-      return;
-    }
-  }
-
-  // If NO events are in the hood, check raw cache for tomorrow events before nudging
-  if (inHood.length === 0 && !categoryApplied) {
-    const tomorrowNyc2 = getNycDateString(1);
-    const { events: rawCache2 } = getRawCache();
-    const tomorrowInHood2 = rawCache2.filter(e => {
-      const d = getEventDate(e);
-      return d === tomorrowNyc2 && e.neighborhood === hood;
-    });
-    if (tomorrowInHood2.length > 0) {
-      const composeTomorrow = tomorrowInHood2.slice(0, 8);
-      const eventMap = {};
-      for (const e of tomorrowInHood2) eventMap[e.id] = e;
-      const extraContext = `\nIMPORTANT: There is NOTHING tonight in ${hood}. All events below are TOMORROW. Lead with "Nothing tonight in ${hood}, but tomorrow:" and use the tomorrow format.`;
-      const result = await composeAndSend(composeTomorrow, hood, route.filters, 'events', { extraContext });
-      setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: hood });
-      await sendComposeWithLinks(phone, result, eventMap);
-      console.log(`Tomorrow events (raw cache) served for ${hood} to ${masked} (${tomorrowInHood2.length} events)`);
-      finalizeTrace(result.sms_text, 'events');
-      return;
-    }
-  }
 
   // If NO events are in the requested hood, offer a travel nudge
   // Skip when: category filter was applied, already nudged, or too few events to justify travel
@@ -751,22 +731,20 @@ async function handleMessageAI(phone, message) {
     }
   }
 
-  // Pre-filter to top 8 by proximity to reduce token cost
-  const composeEvents = events.slice(0, 8);
-
   // Capture event funnel data
   trace.events.cache_size = events.length;
-  trace.events.candidates_count = events.length;
-  trace.events.candidate_ids = events.map(e => e.id);
+  trace.events.candidates_count = composeEventsWithPerennials.length;
+  trace.events.candidate_ids = composeEventsWithPerennials.map(e => e.id);
 
-  // CALL 2: Compose response
-  const result = await composeAndSend(composeEvents, hood, route.filters, 'events', { extraContext: perennialContext });
+  // CALL 2: Compose response (scraped events + perennial picks merged)
+  const result = await composeAndSend(composeEventsWithPerennials, hood, route.filters, 'events');
 
-  // Keep full event map in session so MORE can access remaining events
+  // Keep full event map in session so MORE can access remaining events + perennials
   const eventMap = {};
   for (const e of events) eventMap[e.id] = e;
+  for (const e of perennialEvents) eventMap[e.id] = e;
 
-  setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], allOfferedIds: composeEvents.map(e => e.id), lastEvents: eventMap, lastNeighborhood: result.neighborhood_used || hood, visitedHoods: [hood] });
+  setSession(phone, { lastPicks: result.picks || [], allPicks: result.picks || [], allOfferedIds: composeEventsWithPerennials.map(e => e.id), lastEvents: eventMap, lastNeighborhood: result.neighborhood_used || hood, visitedHoods: [hood] });
 
   await sendComposeWithLinks(phone, result, eventMap);
   console.log(`AI response sent to ${masked}`);

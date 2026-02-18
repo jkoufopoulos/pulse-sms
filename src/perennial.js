@@ -55,9 +55,48 @@ function getPerennialPicks(neighborhood, { dayOfWeek } = {}) {
   return { local, nearby };
 }
 
+/**
+ * Convert perennial picks into event-shaped objects for compose.
+ * @param {Array} picks - Array of perennial pick objects
+ * @param {string} neighborhood - The neighborhood these picks belong to
+ * @param {object} [opts]
+ * @param {boolean} [opts.isNearby] - If true, confidence is 0.6 instead of 0.7
+ * @returns {Array} Event-shaped objects
+ */
+function toEventObjects(picks, neighborhood, { isNearby } = {}) {
+  if (!picks || picks.length === 0) return [];
+
+  const hoodSlug = neighborhood.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/_+$/, '');
+
+  return picks.map(pick => {
+    const venueSlug = (pick.venue || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/_+$/, '');
+    return {
+      id: `perennial_${venueSlug}_${hoodSlug}`,
+      name: pick.venue,
+      venue_name: pick.venue,
+      neighborhood: pick.neighborhood || neighborhood,
+      category: pick.category || 'nightlife',
+      description_short: pick.vibe,
+      short_detail: pick.vibe,
+      source_name: 'perennial',
+      source_weight: 0.78,
+      confidence: isNearby ? 0.6 : 0.7,
+      day: null,
+      date_local: null,
+      start_time_local: null,
+      end_time_local: null,
+      is_free: pick.is_free || false,
+      price_display: null,
+      ticket_url: pick.url || null,
+      source_url: pick.url || null,
+      venue_address: pick.address || null,
+    };
+  });
+}
+
 // Allow cache reset for testing
 function _resetCache() {
   picksCache = null;
 }
 
-module.exports = { getPerennialPicks, _resetCache };
+module.exports = { getPerennialPicks, toEventObjects, _resetCache };
