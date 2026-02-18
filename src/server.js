@@ -42,6 +42,7 @@ app.get('/health', (req, res) => {
 
   const acceptsHtml = (req.headers.accept || '').includes('text/html');
   if (acceptsHtml && !req.query.json) {
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
     return res.sendFile(require('path').join(__dirname, 'health-ui.html'));
   }
   res.json(getHealthStatus());
@@ -53,11 +54,14 @@ app.use('/api/sms', smsRoutes);
 // SMS simulator UI + Eval dashboard (test mode only)
 if (process.env.PULSE_TEST_MODE === 'true') {
   app.get('/test', (req, res) => {
+    // Allow inline scripts for the simulator UI (gated behind PULSE_TEST_MODE)
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
     res.sendFile(require('path').join(__dirname, 'test-ui.html'));
   });
 
   // Eval dashboard UI
   app.get('/eval', (req, res) => {
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
     res.sendFile(require('path').join(__dirname, 'eval-ui.html'));
   });
 
