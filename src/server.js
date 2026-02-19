@@ -51,18 +51,18 @@ app.get('/health', (req, res) => {
 // SMS webhook
 app.use('/api/sms', smsRoutes);
 
+// Architecture explorer (read-only doc, always available)
+app.get('/architecture', (req, res) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
+  res.sendFile(require('path').join(__dirname, 'architecture.html'));
+});
+
 // SMS simulator UI + Eval dashboard (test mode only)
 if (process.env.PULSE_TEST_MODE === 'true') {
   app.get('/test', (req, res) => {
     // Allow inline scripts for the simulator UI (gated behind PULSE_TEST_MODE)
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
     res.sendFile(require('path').join(__dirname, 'test-ui.html'));
-  });
-
-  // Architecture explorer
-  app.get('/architecture', (req, res) => {
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
-    res.sendFile(require('path').join(__dirname, 'architecture.html'));
   });
 
   // Eval dashboard UI
