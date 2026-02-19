@@ -195,11 +195,11 @@ async function handleMessageAI(phone, message) {
   console.log(`${preRouted ? 'Pre' : 'AI'} route: intent=${route.intent}, neighborhood=${route.neighborhood}, confidence=${route.confidence}`);
 
   // Shared compose helper (closure over message + trace)
-  async function composeAndSend(composeEvents, hood, filters, intentLabel, { excludeIds, extraContext } = {}) {
+  async function composeAndSend(composeEvents, hood, filters, intentLabel, { excludeIds, skills } = {}) {
     trace.events.sent_to_claude = composeEvents.length;
     trace.events.sent_ids = composeEvents.map(e => e.id);
     const composeStart = Date.now();
-    const result = await composeResponse(message, composeEvents, hood, filters, { excludeIds, extraContext });
+    const result = await composeResponse(message, composeEvents, hood, filters, { excludeIds, skills });
     trace.composition.latency_ms = Date.now() - composeStart;
     trace.composition.raw_response = result._raw || null;
     trace.composition.picks = (result.picks || []).map(p => {

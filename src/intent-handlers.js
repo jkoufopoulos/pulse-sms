@@ -5,6 +5,7 @@ const { setSession } = require('./session');
 const { formatEventDetails, cleanUrl, smartTruncate } = require('./formatters');
 const { getAdjacentNeighborhoods } = require('./pre-router');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
+const { filterKidsEvents, validatePerennialActivity } = require('./curation');
 
 // --- Send compose result + follow-up link messages ---
 // Sends the main sms_text, then each picked event's URL as a separate message
@@ -137,14 +138,12 @@ async function handleMore(ctx) {
       const exhaustionSuggestion = nearbyForExhaustion
         ? `That's everything I've got in ${hood}! ${nearbyForExhaustion} is right nearby — want picks from there?`
         : `That's everything I've got in ${hood}! Try a different neighborhood for more.`;
-      const extraContext = isLastBatch
-        ? `\nNOTE: This is the LAST batch of events I have.\nOVERRIDE CLOSING LINE: Instead of "Reply 1-N for details, MORE for extra picks", use "Reply 1-N for details" (no MORE option). Then add "${exhaustionSuggestion}"`
-        : '';
 
       ctx.trace.events.cache_size = Object.keys(ctx.session.lastEvents).length;
       ctx.trace.events.candidates_count = allRemaining.length;
       ctx.trace.events.candidate_ids = allRemaining.map(e => e.id);
-      const result = await ctx.composeAndSend(composeRemaining, hood, ctx.route.filters, 'more', { excludeIds: [...allShownIds], extraContext });
+      const skills = isLastBatch ? { isLastBatch: true, exhaustionSuggestion } : {};
+      const result = await ctx.composeAndSend(composeRemaining, hood, ctx.route.filters, 'more', { excludeIds: [...allShownIds], skills });
 
       // Name-based dedup: filter out picks that share a name with previously shown events
       const prevPickNames = new Set(
@@ -182,8 +181,8 @@ async function handleMore(ctx) {
 
   // All scraped events exhausted — check for unshown perennial picks
   const morePicks = getPerennialPicks(hood);
-  const moreLocalPerennials = toEventObjects(morePicks.local, hood);
-  const moreNearbyPerennials = toEventObjects(morePicks.nearby, hood, { isNearby: true });
+  const moreLocalPerennials = validatePerennialActivity(toEventObjects(morePicks.local, hood));
+  const moreNearbyPerennials = validatePerennialActivity(toEventObjects(morePicks.nearby, hood, { isNearby: true }));
   const allMorePerennials = [...moreLocalPerennials, ...moreNearbyPerennials];
   const allShownMoreIds = new Set([...(ctx.session?.allOfferedIds || []), ...(ctx.session?.allPicks || ctx.session?.lastPicks || []).map(p => p.event_id)]);
   const unshownPerennials = allMorePerennials.filter(e => !allShownMoreIds.has(e.id));
@@ -199,8 +198,7 @@ async function handleMore(ctx) {
     const perennialSuggestion = perennialNearby
       ? `That's everything I've got in ${hood}! ${perennialNearby} is right nearby — want picks from there?`
       : `That's everything I've got in ${hood}! Try a different neighborhood for more.`;
-    const extraContext = `\nNOTE: This is the LAST batch of recommendations I have.\nOVERRIDE CLOSING LINE: Instead of "Reply 1-N for details, MORE for extra picks", use "Reply 1-N for details" (no MORE option). Then add "${perennialSuggestion}"`;
-    const result = await ctx.composeAndSend(perennialBatch, hood, ctx.route.filters, 'more', { excludeIds: [...allShownMoreIds], extraContext });
+    const result = await ctx.composeAndSend(perennialBatch, hood, ctx.route.filters, 'more', { excludeIds: [...allShownMoreIds], skills: { isLastBatch: true, exhaustionSuggestion: perennialSuggestion } });
     result.sms_text = stripMoreReferences(result.sms_text);
     const newAllPicks = [...(ctx.session.allPicks || ctx.session.lastPicks || []), ...(result.picks || [])];
     const newAllOfferedIds = [...(ctx.session.allOfferedIds || []), ...perennialBatch.map(e => e.id)];
@@ -257,10 +255,7 @@ async function handleFree(ctx) {
         ctx.trace.events.candidate_ids = nearbyFree.map(e => e.id);
         const eventMap = {};
         for (const e of nearbyFree) eventMap[e.id] = e;
-        const nearbyFreeContext = ctx.pendingMessage
-          ? `\nUser's original request: "${ctx.pendingMessage}". Prioritize events matching that intent.`
-          : '';
-        const result = await ctx.composeAndSend(nearbyFree.slice(0, 8), nearbyHood, { ...ctx.route.filters, free_only: true }, 'free', { extraContext: nearbyFreeContext });
+        const result = await ctx.composeAndSend(nearbyFree.slice(0, 8), nearbyHood, { ...ctx.route.filters, free_only: true }, 'free', { skills: { isFree: true, pendingMessage: ctx.pendingMessage || undefined } });
         setSession(ctx.phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: nearbyHood });
         await sendComposeWithLinks(ctx.phone, result, eventMap);
         console.log(`Free events from nearby ${nearbyHood} sent to ${ctx.masked}`);
@@ -278,10 +273,7 @@ async function handleFree(ctx) {
   ctx.trace.events.cache_size = events.length;
   ctx.trace.events.candidates_count = Math.min(filteredFree.length, 8);
   ctx.trace.events.candidate_ids = filteredFree.slice(0, 8).map(e => e.id);
-  const freeExtraContext = ctx.pendingMessage
-    ? `\nUser's original request: "${ctx.pendingMessage}". Prioritize events matching that intent.`
-    : '\nUser asked for free events. ALWAYS list them with numbers even if they seem niche — the user specifically wants free.';
-  const result = await ctx.composeAndSend(filteredFree.slice(0, 8), hood, ctx.route.filters, 'free', { extraContext: freeExtraContext });
+  const result = await ctx.composeAndSend(filteredFree.slice(0, 8), hood, ctx.route.filters, 'free', { skills: { isFree: true, pendingMessage: ctx.pendingMessage || undefined } });
   const eventMap = {};
   for (const e of filteredFree) eventMap[e.id] = e;
   setSession(ctx.phone, {
@@ -389,9 +381,12 @@ async function handleEventsDefault(ctx) {
     }
   }
 
+  // Pre-compose curation: remove kids events from NYC Parks
+  events = filterKidsEvents(events);
+
   // Perennial picks — merge LOCAL picks only as event objects for compose
   const perennialPicks = getPerennialPicks(hood);
-  const localPerennials = toEventObjects(perennialPicks.local, hood);
+  const localPerennials = validatePerennialActivity(toEventObjects(perennialPicks.local, hood));
   const perennialCap = Math.min(4, 8 - Math.min(events.length, 8));
   const perennialEvents = localPerennials.slice(0, perennialCap);
   const composeEventsWithPerennials = [...events.slice(0, 8 - perennialEvents.length), ...perennialEvents];
@@ -402,7 +397,7 @@ async function handleEventsDefault(ctx) {
   if (events.length === 0) {
     // Check LOCAL perennial picks before nudging to a nearby neighborhood
     const zeroPicks = getPerennialPicks(hood);
-    const zeroLocal = toEventObjects(zeroPicks.local, hood);
+    const zeroLocal = validatePerennialActivity(toEventObjects(zeroPicks.local, hood));
     const zeroPerennials = zeroLocal.slice(0, 4);
     if (zeroPerennials.length > 0) {
       const eventMap = {};

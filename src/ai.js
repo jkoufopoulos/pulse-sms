@@ -1,6 +1,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const { getEventDate, getNycDateString } = require('./geo');
 const { EXTRACTION_PROMPT, ROUTE_SYSTEM, COMPOSE_SYSTEM, DETAILS_SYSTEM } = require('./prompts');
+const { buildComposePrompt } = require('./skills/build-compose-prompt');
 
 let client = null;
 function getClient() {
@@ -70,7 +71,7 @@ VALID_NEIGHBORHOODS: ${neighborhoodNames.join(', ')}`;
  * Compose an SMS response by picking events and writing the message in one Claude call.
  * Returns { sms_text, picks, neighborhood_used }
  */
-async function composeResponse(message, events, neighborhood, filters, { excludeIds, extraContext, model } = {}) {
+async function composeResponse(message, events, neighborhood, filters, { excludeIds, skills, model } = {}) {
   const now = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   const todayNyc = getNycDateString(0);
@@ -103,22 +104,22 @@ async function composeResponse(message, events, neighborhood, filters, { exclude
     ? `\nEXCLUDED (already shown to user — do NOT pick these): ${excludeIds.join(', ')}`
     : '';
 
-  const extraNote = extraContext || '';
-
   const userPrompt = `Current time (NYC): ${now}
 <user_message>${message}</user_message>
 Neighborhood: ${neighborhood || 'not specified'}
 User preferences: category=${filters?.category || 'any'}, vibe=${filters?.vibe || 'any'}, free_only=${filters?.free_only ? 'yes' : 'no'}
-${excludeNote}${extraNote}
+${excludeNote}
 EVENT_LIST:
 ${eventListStr}
 
 Compose the SMS now.`;
 
+  const systemPrompt = buildComposePrompt(events, { ...skills, requestedNeighborhood: neighborhood });
+
   const response = await getClient().messages.create({
     model: model || MODELS.compose,
     max_tokens: 512,
-    system: COMPOSE_SYSTEM,
+    system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
   }, { timeout: 12000 });
 

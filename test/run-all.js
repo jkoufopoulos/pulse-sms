@@ -12,6 +12,8 @@ const venues = require('./unit/venues.test');
 require('./unit/pre-router.test');
 require('./unit/perennials.test');
 require('./unit/ai.test');
+require('./unit/curation.test');
+require('./unit/skills.test');
 const misc = require('./unit/misc.test');
 
 // Integration tests
