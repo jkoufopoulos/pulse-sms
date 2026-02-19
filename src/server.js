@@ -59,6 +59,12 @@ if (process.env.PULSE_TEST_MODE === 'true') {
     res.sendFile(require('path').join(__dirname, 'test-ui.html'));
   });
 
+  // Architecture explorer
+  app.get('/architecture', (req, res) => {
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
+    res.sendFile(require('path').join(__dirname, 'architecture.html'));
+  });
+
   // Eval dashboard UI
   app.get('/eval', (req, res) => {
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
