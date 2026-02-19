@@ -75,7 +75,7 @@ check('scrape has sourcesFailed', 'sourcesFailed' in healthData.scrape);
 check('has sources object', typeof healthData.sources === 'object' && healthData.sources !== null);
 check('sources has Skint', 'Skint' in healthData.sources);
 check('sources has RA', 'RA' in healthData.sources);
-check('sources has 16 entries', Object.keys(healthData.sources).length === 16);
+check('sources has 17 entries', Object.keys(healthData.sources).length === 17);
 
 const sampleSource = healthData.sources.Skint;
 check('source has status field', 'status' in sampleSource);
@@ -104,6 +104,21 @@ module.exports.runAsync = async function() {
 
   const emptyResult = await sendHealthAlert([], {});
   check('sendHealthAlert no-ops with empty failures', emptyResult === undefined);
+
+  // ---- sendRuntimeAlert ----
+  console.log('\nsendRuntimeAlert:');
+
+  const { sendRuntimeAlert, _runtimeCooldowns } = require('../../src/alerts');
+  check('sendRuntimeAlert is a function', typeof sendRuntimeAlert === 'function');
+
+  const runtimeResult = await sendRuntimeAlert('test_error', { phone_masked: '***1234', message: 'test', error: 'boom' });
+  check('sendRuntimeAlert no-ops without API key (returns undefined)', runtimeResult === undefined);
+
+  // Force a cooldown entry to test cooldown logic
+  _runtimeCooldowns.set('cooldown_test', Date.now());
+  const cooldownResult = await sendRuntimeAlert('cooldown_test', { phone_masked: '***1234', message: 'test', error: 'boom' });
+  check('sendRuntimeAlert no-ops on cooldown (returns undefined)', cooldownResult === undefined);
+  _runtimeCooldowns.delete('cooldown_test');
 
   // ---- Session merge semantics ----
   console.log('\nSession merge:');

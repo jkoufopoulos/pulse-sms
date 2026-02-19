@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchTavilyFreeEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchDoNYCEvents, fetchBAMEvents, fetchSmallsLiveEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents } = require('./sources');
+const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchTavilyFreeEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchDoNYCEvents, fetchBAMEvents, fetchSmallsLiveEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents, fetchTicketmasterEvents } = require('./sources');
 const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate } = require('./geo');
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues } = require('./venues');
 const { sendHealthAlert } = require('./alerts');
@@ -49,6 +49,7 @@ const SOURCES = [
   { label: 'NYCParks',         fetch: fetchNYCParksEvents,      weight: 0.75, mergeRank: 0, endpoint: 'https://www.nycgovparks.org/events' },
   { label: 'DoNYC',            fetch: fetchDoNYCEvents,         weight: 0.75, mergeRank: 1, endpoint: 'https://donyc.com/events/today' },
   { label: 'Songkick',         fetch: fetchSongkickEvents,      weight: 0.75, mergeRank: 2, endpoint: 'https://www.songkick.com/metro-areas/7644-us-new-york/today' },
+  { label: 'Ticketmaster',     fetch: fetchTicketmasterEvents,  weight: 0.75, mergeRank: 3, endpoint: 'https://app.ticketmaster.com' },
   { label: 'Eventbrite',       fetch: fetchEventbriteEvents,    weight: 0.7,  mergeRank: 0, endpoint: 'https://www.eventbrite.com/d/ny--new-york/events--today/' },
   { label: 'NYPL',             fetch: fetchNYPLEvents,          weight: 0.7,  mergeRank: 1, endpoint: 'https://www.eventbrite.com/o/new-york-public-library-for-the-performing-arts-5993389089' },
   { label: 'EventbriteComedy', fetch: fetchEventbriteComedy,    weight: 0.7,  mergeRank: 2, endpoint: null },

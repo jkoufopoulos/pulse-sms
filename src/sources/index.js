@@ -13,6 +13,7 @@ const { fetchBAMEvents } = require('./bam');
 const { fetchSmallsLiveEvents } = require('./smallslive');
 const { fetchNYPLEvents } = require('./nypl');
 const { searchTavilyEvents, fetchTavilyFreeEvents } = require('./tavily');
+const { fetchTicketmasterEvents } = require('./ticketmaster');
 
 module.exports = {
   fetchSkintEvents,
@@ -35,4 +36,5 @@ module.exports = {
   makeEventId,
   searchTavilyEvents,
   fetchTavilyFreeEvents,
+  fetchTicketmasterEvents,
 };
