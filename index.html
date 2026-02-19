@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse SMS — Architecture Explorer</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2333;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --accent3: #d2a8ff;
+    --accent4: #f0883e;
+    --accent5: #ff7b72;
+    --accent6: #79c0ff;
+    --code-bg: #0d1117;
+    --prompt-bg: #1a1e2e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* --- NAV --- */
+  .nav {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex; align-items: center; gap: 24px;
+    overflow-x: auto;
+  }
+  .nav-title {
+    font-weight: 700; font-size: 16px; white-space: nowrap;
+    color: var(--accent);
+  }
+  .nav a {
+    font-size: 13px; color: var(--text-muted); white-space: nowrap;
+    padding: 4px 8px; border-radius: 6px; transition: all 0.15s;
+  }
+  .nav a:hover { color: var(--text); background: var(--surface2); text-decoration: none; }
+  .nav a.active { color: var(--accent); background: rgba(88,166,255,0.1); }
+
+  /* --- MAIN --- */
+  .main { max-width: 1200px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { font-size: 28px; margin-bottom: 8px; }
+  h2 {
+    font-size: 22px; margin: 48px 0 16px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
+    color: var(--accent);
+  }
+  h3 { font-size: 17px; margin: 24px 0 8px; color: var(--accent3); }
+  h4 { font-size: 14px; margin: 16px 0 4px; color: var(--accent4); text-transform: uppercase; letter-spacing: 0.5px; }
+  p { margin-bottom: 12px; }
+  .subtitle { color: var(--text-muted); font-size: 15px; margin-bottom: 32px; }
+
+  /* --- CARDS --- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card-header {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 12px; cursor: pointer; user-select: none;
+  }
+  .card-header .arrow {
+    font-size: 12px; transition: transform 0.2s; color: var(--text-muted);
+  }
+  .card-header.collapsed .arrow { transform: rotate(-90deg); }
+  .card-header h3 { margin: 0; }
+  .card-body { }
+  .card-body.hidden { display: none; }
+
+  /* --- FLOW DIAGRAMS --- */
+  .flow {
+    display: flex; align-items: stretch; gap: 0;
+    overflow-x: auto; padding: 16px 0; margin: 16px 0;
+  }
+  .flow-step {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    min-width: 160px;
+    max-width: 220px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .flow-step.llm {
+    border-color: var(--accent3);
+    background: rgba(210,168,255,0.08);
+  }
+  .flow-step.data {
+    border-color: var(--accent2);
+    background: rgba(63,185,80,0.08);
+  }
+  .flow-step.logic {
+    border-color: var(--accent4);
+    background: rgba(240,136,62,0.08);
+  }
+  .flow-step .step-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--text-muted); margin-bottom: 4px;
+  }
+  .flow-step .step-title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  .flow-step .step-file { font-size: 11px; color: var(--text-muted); font-family: monospace; }
+  .flow-step .step-detail { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+  .flow-arrow {
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 4px; color: var(--text-muted); font-size: 18px; flex-shrink: 0;
+  }
+
+  /* --- PROMPT BLOCKS --- */
+  .prompt-block {
+    background: var(--prompt-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent3);
+    border-radius: 0 8px 8px 0;
+    margin: 12px 0;
+    overflow: hidden;
+  }
+  .prompt-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px;
+    background: rgba(210,168,255,0.06);
+    cursor: pointer; user-select: none;
+  }
+  .prompt-header .prompt-name { font-weight: 600; font-size: 14px; color: var(--accent3); }
+  .prompt-header .prompt-meta { font-size: 12px; color: var(--text-muted); }
+  .prompt-content {
+    padding: 16px;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text);
+    max-height: 600px;
+    overflow-y: auto;
+  }
+  .prompt-content.hidden { display: none; }
+
+  /* --- TABLES --- */
+  table {
+    width: 100%; border-collapse: collapse; margin: 12px 0;
+    font-size: 13px;
+  }
+  th, td {
+    padding: 8px 12px; text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--text-muted); background: var(--surface2);
+    position: sticky; top: 0;
+  }
+  td { color: var(--text); }
+  td code {
+    font-size: 12px; padding: 2px 6px;
+    background: var(--code-bg); border-radius: 3px;
+    border: 1px solid var(--border);
+  }
+  tr:hover td { background: rgba(88,166,255,0.04); }
+
+  /* --- BADGES --- */
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 12px;
+    font-size: 11px; font-weight: 600;
+  }
+  .badge-llm { background: rgba(210,168,255,0.15); color: var(--accent3); }
+  .badge-data { background: rgba(63,185,80,0.15); color: var(--accent2); }
+  .badge-logic { background: rgba(240,136,62,0.15); color: var(--accent4); }
+  .badge-io { background: rgba(88,166,255,0.15); color: var(--accent); }
+  .badge-error { background: rgba(255,123,114,0.15); color: var(--accent5); }
+
+  /* --- METRIC GRID --- */
+  .metrics {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px; margin: 16px 0;
+  }
+  .metric {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .metric-value { font-size: 28px; font-weight: 700; color: var(--accent); }
+  .metric-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+  /* --- INTENT TABLE --- */
+  .intent-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px; margin: 16px 0;
+  }
+  .intent-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .intent-card h4 { margin: 0 0 8px; color: var(--accent6); text-transform: none; letter-spacing: 0; font-size: 15px; }
+  .intent-card .route { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+  .intent-card .handler { font-size: 12px; color: var(--accent2); font-family: monospace; }
+  .intent-card .llm-calls { font-size: 12px; color: var(--accent3); margin-top: 4px; }
+  .intent-card p { font-size: 13px; margin-bottom: 4px; }
+
+  /* --- DEPENDENCY GRAPH --- */
+  .dep-graph {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin: 16px 0;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.8;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .dep-graph .file { color: var(--accent); }
+  .dep-graph .arrow { color: var(--text-muted); }
+  .dep-graph .llm { color: var(--accent3); }
+  .dep-graph .data { color: var(--accent2); }
+
+  /* --- SOURCE GRID --- */
+  .source-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 8px; margin: 16px 0;
+  }
+  .source-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .source-weight {
+    font-size: 20px; font-weight: 700; min-width: 40px; text-align: center;
+  }
+  .source-info { flex: 1; }
+  .source-info .name { font-weight: 600; font-size: 14px; }
+  .source-info .technique { font-size: 11px; color: var(--text-muted); }
+  .source-info .file { font-size: 11px; color: var(--accent); font-family: monospace; }
+  .w-high { color: var(--accent2); }
+  .w-med { color: var(--accent6); }
+  .w-low { color: var(--accent4); }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* --- SECTION ANCHORS --- */
+  section { scroll-margin-top: 60px; }
+
+  /* --- ANNOTATIONS --- */
+  .annotation {
+    background: rgba(88,166,255,0.06);
+    border-left: 3px solid var(--accent);
+    padding: 12px 16px;
+    margin: 12px 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 13px;
+  }
+  .annotation strong { color: var(--accent); }
+
+  .concern {
+    background: rgba(255,123,114,0.06);
+    border-left: 3px solid var(--accent5);
+    padding: 12px 16px;
+    margin: 12px 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 13px;
+  }
+  .concern strong { color: var(--accent5); }
+
+  .opportunity {
+    background: rgba(63,185,80,0.06);
+    border-left: 3px solid var(--accent2);
+    padding: 12px 16px;
+    margin: 12px 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 13px;
+  }
+  .opportunity strong { color: var(--accent2); }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <span class="nav-title">Pulse Architecture</span>
+  <a href="#overview">Overview</a>
+  <a href="#scrape-pipeline">Scrape Pipeline</a>
+  <a href="#sms-pipeline">SMS Pipeline</a>
+  <a href="#intents">Intents</a>
+  <a href="#llm-calls">LLM Calls</a>
+  <a href="#prompts">Prompts</a>
+  <a href="#sources">Sources</a>
+  <a href="#data-model">Data Model</a>
+  <a href="#files">Files</a>
+  <a href="#skills">Skills Analysis</a>
+</nav>
+
+<div class="main">
+
+<!-- ============================================================ -->
+<section id="overview">
+<h1>Pulse SMS Architecture</h1>
+<p class="subtitle">End-to-end map of the system — data flows, LLM calls, prompts, and modularization opportunities.</p>
+
+<div class="metrics">
+  <div class="metric"><div class="metric-value">4</div><div class="metric-label">LLM prompts (system messages)</div></div>
+  <div class="metric"><div class="metric-value">17</div><div class="metric-label">Event sources (scrapers)</div></div>
+  <div class="metric"><div class="metric-value">36</div><div class="metric-label">NYC neighborhoods</div></div>
+  <div class="metric"><div class="metric-value">7</div><div class="metric-label">Intent types</div></div>
+  <div class="metric"><div class="metric-value">2</div><div class="metric-label">LLM calls per SMS (max)</div></div>
+  <div class="metric"><div class="metric-value">3</div><div class="metric-label">LLM-powered scrapers</div></div>
+  <div class="metric"><div class="metric-value">480</div><div class="metric-label">SMS char limit</div></div>
+  <div class="metric"><div class="metric-value">20</div><div class="metric-label">Files in src/</div></div>
+</div>
+
+<h3>Two Pipelines</h3>
+<p>Pulse has two completely separate execution paths that never overlap in real-time:</p>
+
+<table>
+  <tr><th>Pipeline</th><th>When</th><th>LLM Usage</th><th>Duration</th><th>Frequency</th></tr>
+  <tr>
+    <td><strong>Scrape Pipeline</strong></td>
+    <td>10am ET daily + on boot</td>
+    <td>3 sources use Claude for extraction (Skint, Nonsense NYC, Oh My Rockness)</td>
+    <td>30-90 seconds</td>
+    <td>1-2x/day</td>
+  </tr>
+  <tr>
+    <td><strong>SMS Pipeline</strong></td>
+    <td>On each incoming text</td>
+    <td>Up to 2 calls: route (Haiku) + compose (Haiku). Zero scraping.</td>
+    <td>1-4 seconds</td>
+    <td>Per message</td>
+  </tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<section id="scrape-pipeline">
+<h2>Scrape Pipeline</h2>
+<p>Daily at 10am ET, all 17 sources are fetched in parallel. Events are deduped, geocoded, and cached in memory.</p>
+
+<div class="flow">
+  <div class="flow-step">
+    <div class="step-label">Trigger</div>
+    <div class="step-title">scheduleDailyScrape()</div>
+    <div class="step-file">events.js:339</div>
+    <div class="step-detail">setTimeout at 10am ET, also runs on boot</div>
+  </div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step data">
+    <div class="step-label">Fetch</div>
+    <div class="step-title">17 Sources (parallel)</div>
+    <div class="step-file">events.js:164</div>
+    <div class="step-detail">Promise.allSettled() — each wrapped in timedFetch()</div>
+  </div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step llm">
+    <div class="step-label">3 use Claude</div>
+    <div class="step-title">extractEvents()</div>
+    <div class="step-file">ai.js:193</div>
+    <div class="step-detail">Skint, Nonsense NYC, Oh My Rockness send raw HTML to Claude</div>
+  </div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step logic">
+    <div class="step-label">Normalize</div>
+    <div class="step-title">normalizeExtractedEvent()</div>
+    <div class="step-file">sources/shared.js:43</div>
+    <div class="step-detail">Venue lookup, geo resolve, ID generation</div>
+  </div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step logic">
+    <div class="step-label">Dedup</div>
+    <div class="step-title">Cross-source merge</div>
+    <div class="step-file">events.js:194</div>
+    <div class="step-detail">By weight order — first write wins per event ID</div>
+  </div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step data">
+    <div class="step-label">Geocode</div>
+    <div class="step-title">batchGeocodeEvents()</div>
+    <div class="step-file">venues.js:284</div>
+    <div class="step-detail">Nominatim fallback for unresolved neighborhoods</div>
+  </div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step data">
+    <div class="step-label">Store</div>
+    <div class="step-title">eventCache[]</div>
+    <div class="step-file">events.js:258</div>
+    <div class="step-detail">In-memory array, plus venues persisted to JSON</div>
+  </div>
+</div>
+
+<h3>Source Scraping Techniques</h3>
+<table>
+  <tr><th>Technique</th><th>Sources</th><th>LLM?</th><th>Description</th></tr>
+  <tr>
+    <td><span class="badge badge-llm">HTML → Claude</span></td>
+    <td>Skint, Nonsense NYC, Oh My Rockness</td>
+    <td>Yes — EXTRACTION_PROMPT</td>
+    <td>Fetch raw HTML, send to Claude with extraction prompt, parse JSON response</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-data">JSON-LD / Schema.org</span></td>
+    <td>Songkick, NYC Parks, Eventbrite</td>
+    <td>No</td>
+    <td>Parse structured data from &lt;script type="application/ld+json"&gt; tags</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-data">__NEXT_DATA__ JSON</span></td>
+    <td>Dice</td>
+    <td>No</td>
+    <td>Extract from Next.js page data blob</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-data">GraphQL API</span></td>
+    <td>RA (Resident Advisor)</td>
+    <td>No</td>
+    <td>Direct GraphQL queries to RA's event API</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-data">JSON API</span></td>
+    <td>BAM, Ticketmaster</td>
+    <td>No</td>
+    <td>REST API returning JSON</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-data">HTML Scraping</span></td>
+    <td>DoNYC, SmallsLIVE, BrooklynVegan, NYPL</td>
+    <td>No</td>
+    <td>Cheerio/regex parsing of HTML pages</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-data">Web Search</span></td>
+    <td>Tavily</td>
+    <td>No</td>
+    <td>Search API for free NYC events (fallback source)</td>
+  </tr>
+</table>
+
+<h3>Cross-Source Dedup</h3>
+<div class="annotation">
+  <strong>How it works:</strong> Event IDs are MD5 hashes of <code>normalizedName|venue|date</code>. The same event from Dice and BrooklynVegan gets the same ID. Sources are merged in weight order (Skint 0.9 first, Tavily 0.6 last), so the first write wins — higher-trust sources always take precedence.
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section id="sms-pipeline">
+<h2>SMS Request Pipeline</h2>
+<p>When a user texts Pulse, the message goes through this flow. At most 2 LLM calls happen.</p>
+
+<div class="flow">
+  <div class="flow-step">
+    <div class="step-label">Twilio</div>
+    <div class="step-title">Webhook POST</div>
+    <div class="step-file">handler.js:91</div>
+    <div class="step-detail">/api/sms/incoming — respond 200 immediately, process async</div>
+  </div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step logic">
+    <div class="step-label">Guard</div>
+    <div class="step-title">Dedup + Rate Limit</div>
+    <div class="step-file">handler.js:126</div>
+    <div class="step-detail">MessageSid dedup (5m), rate limit (15/hr/phone), TCPA opt-out</div>
+  </div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step logic">
+    <div class="step-label">Step 1</div>
+    <div class="step-title">Pre-Router (Regex)</div>
+    <div class="step-file">pre-router.js:29</div>
+    <div class="step-detail">14 regex patterns — skips Claude for obvious intents</div>
+  </div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step llm">
+    <div class="step-label">Step 2 (if needed)</div>
+    <div class="step-title">routeMessage()</div>
+    <div class="step-file">ai.js:21</div>
+    <div class="step-detail">Claude Haiku — intent + neighborhood + filters</div>
+  </div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step logic">
+    <div class="step-label">Step 3</div>
+    <div class="step-title">Intent Dispatch</div>
+    <div class="step-file">handler.js:222</div>
+    <div class="step-detail">Route to handler: help, conversational, details, more, free, events</div>
+  </div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step data">
+    <div class="step-label">Step 4</div>
+    <div class="step-title">getEvents(hood)</div>
+    <div class="step-file">events.js:295</div>
+    <div class="step-detail">Filter upcoming, rank by proximity, tonight only, top 20</div>
+  </div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step llm">
+    <div class="step-label">Step 5</div>
+    <div class="step-title">composeResponse()</div>
+    <div class="step-file">ai.js:73</div>
+    <div class="step-detail">Claude Haiku — pick 1-3 events + write the SMS</div>
+  </div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step">
+    <div class="step-label">Step 6</div>
+    <div class="step-title">sendSMS()</div>
+    <div class="step-file">twilio.js:23</div>
+    <div class="step-detail">Main SMS + link follow-ups (one per pick)</div>
+  </div>
+</div>
+
+<h3>Pre-Router Coverage</h3>
+<p>The pre-router handles ~60-70% of messages without any LLM call:</p>
+<table>
+  <tr><th>Pattern</th><th>Intent</th><th>Example</th></tr>
+  <tr><td><code>/^(help|\?)$/i</code></td><td>help</td><td>"help", "?"</td></tr>
+  <tr><td><code>/^[1-5]$/</code></td><td>details (with session)</td><td>"1", "2", "3"</td></tr>
+  <tr><td><code>/^(yes|yeah|sure|ok|...)$/i</code></td><td>nudge_accept (with pending)</td><td>"yeah", "sure", "let's go"</td></tr>
+  <tr><td><code>/^(more|show me more|...)$/i</code></td><td>more</td><td>"more", "what else"</td></tr>
+  <tr><td><code>/^(free|free stuff|...)$/i</code></td><td>free</td><td>"free", "free tonight"</td></tr>
+  <tr><td>Event name match</td><td>details</td><td>Session pick name substring</td></tr>
+  <tr><td><code>/^(hey|hi|hello|...)$/i</code></td><td>conversational</td><td>"hey", "hello"</td></tr>
+  <tr><td><code>/^(thanks|thank you|...)$/i</code></td><td>conversational</td><td>"thanks", "ty"</td></tr>
+  <tr><td><code>/^(bye|later|...)$/i</code></td><td>conversational</td><td>"bye", "peace"</td></tr>
+  <tr><td><code>/^(hello\?+|...)$/i</code></td><td>conversational</td><td>"hello??", "yo?"</td></tr>
+  <tr><td>Sports/food/weather regex</td><td>conversational</td><td>"who won the knicks game"</td></tr>
+  <tr><td>extractNeighborhood() match</td><td>events</td><td>"east village", "bedford ave"</td></tr>
+  <tr><td>detectBorough()</td><td>conversational</td><td>"brooklyn" → asks to narrow</td></tr>
+  <tr><td>detectUnsupported()</td><td>conversational</td><td>"bay ridge" → suggests nearby</td></tr>
+</table>
+
+<h3>Error Handling</h3>
+<table>
+  <tr><th>Error Path</th><th>User Impact</th><th>Code Location</th><th>Alerting</th></tr>
+  <tr>
+    <td><span class="badge badge-error">Double failure</span></td>
+    <td>User receives NOTHING</td>
+    <td><code>handler.js:144-151</code></td>
+    <td>sendRuntimeAlert('double_failure')</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-error">Handler error</span></td>
+    <td>User gets "Couldn't load X" fallback</td>
+    <td><code>handler.js:258-267</code></td>
+    <td>sendRuntimeAlert('handler_error')</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-error">Route parse failure</span></td>
+    <td>Falls back to conversational</td>
+    <td><code>ai.js:45-56</code></td>
+    <td>Console only</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-error">Compose parse failure</span></td>
+    <td>User gets "Having a moment"</td>
+    <td><code>ai.js:128-135</code></td>
+    <td>Console only</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-error">Details compose failure</span></td>
+    <td>Falls back to formatEventDetails()</td>
+    <td><code>intent-handlers.js:109</code></td>
+    <td>Console only</td>
+  </tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<section id="intents">
+<h2>Intent System</h2>
+<p>Every incoming message is classified into one of 7 intents. Each has a dedicated handler.</p>
+
+<div class="intent-grid">
+  <div class="intent-card">
+    <h4>events</h4>
+    <div class="route">Pre-router: bare neighborhood match | AI router</div>
+    <div class="handler">handleEventsDefault() — intent-handlers.js:352</div>
+    <div class="llm-calls">LLM calls: route (maybe) + compose (always)</div>
+    <p>Core flow. Gets events from cache, merges perennial picks, calls composeResponse(), sends SMS + link follow-ups. Handles thin-event nudges to nearby neighborhoods.</p>
+  </div>
+  <div class="intent-card">
+    <h4>more</h4>
+    <div class="route">Pre-router: "more", "what else" | AI router</div>
+    <div class="handler">handleMore() — intent-handlers.js:124</div>
+    <div class="llm-calls">LLM calls: compose (always)</div>
+    <p>Shows next batch from session's remaining events. Tracks allOfferedIds to avoid repeats. Falls back to perennial picks when scraped events exhausted.</p>
+  </div>
+  <div class="intent-card">
+    <h4>free</h4>
+    <div class="route">Pre-router: "free", "free stuff" | AI router</div>
+    <div class="handler">handleFree() — intent-handlers.js:225</div>
+    <div class="llm-calls">LLM calls: compose (always)</div>
+    <p>Filters events by is_free. Searches adjacent neighborhoods if none found locally. Respects category filters from pending state.</p>
+  </div>
+  <div class="intent-card">
+    <h4>details</h4>
+    <div class="route">Pre-router: "1"-"5", event name match | AI router</div>
+    <div class="handler">handleDetails() — intent-handlers.js:69</div>
+    <div class="llm-calls">LLM calls: composeDetails (1 call) or none (fallback)</div>
+    <p>Shows expanded info about a specific pick. Uses composeDetails() for natural language, falls back to formatEventDetails() if Claude fails.</p>
+  </div>
+  <div class="intent-card">
+    <h4>help</h4>
+    <div class="route">Pre-router: "help", "?"</div>
+    <div class="handler">handleHelp() — intent-handlers.js:45</div>
+    <div class="llm-calls">LLM calls: 0</div>
+    <p>Static help text. No Claude involvement.</p>
+  </div>
+  <div class="intent-card">
+    <h4>conversational</h4>
+    <div class="route">Pre-router: greetings, thanks, bye, off-topic | AI router</div>
+    <div class="handler">handleConversational() — intent-handlers.js:54</div>
+    <div class="llm-calls">LLM calls: 0 (pre-routed) or 1 (AI-routed)</div>
+    <p>Social niceties + off-topic deflection. Always redirects back to events. Session-aware — mentions "more" if they have recent picks.</p>
+  </div>
+  <div class="intent-card">
+    <h4>nudge_accept</h4>
+    <div class="route">Pre-router: affirmative + pendingNearby in session</div>
+    <div class="handler">handleNudgeAccept() — intent-handlers.js:300</div>
+    <div class="llm-calls">LLM calls: compose (always)</div>
+    <p>User said "yes" to "would you travel to X?" nudge. Serves the pre-loaded nearby events from session.</p>
+  </div>
+</div>
+
+<h3>Intent Decision Flow</h3>
+<div class="dep-graph"><span class="arrow">message arrives</span>
+  │
+  ├─ <span class="file">pre-router.js</span> — <span class="data">14 regex patterns (no LLM)</span>
+  │   ├─ help, conversational, details, more, free → <span class="llm">skip Claude routing</span>
+  │   ├─ bare neighborhood match → <span class="llm">events (skip Claude routing)</span>
+  │   ├─ borough / unsupported → conversational (ask to narrow)
+  │   └─ null (no match) → <span class="llm">fall through to Claude</span>
+  │
+  ├─ <span class="file">ai.js:routeMessage()</span> — <span class="llm">LLM Call #1 (Haiku, 8s timeout)</span>
+  │   └─ returns { intent, neighborhood, filters, confidence }
+  │
+  ├─ <span class="file">handler.js</span> — intent dispatch
+  │   ├─ help → static response
+  │   ├─ conversational → static or AI-routed reply
+  │   ├─ details → composeDetails() or formatEventDetails()
+  │   ├─ events/more/free → getEvents() → <span class="llm">composeResponse() — LLM Call #2</span>
+  │   └─ nudge_accept → session events → <span class="llm">composeResponse() — LLM Call #2</span></div>
+</section>
+
+<!-- ============================================================ -->
+<section id="llm-calls">
+<h2>LLM Calls — Complete Inventory</h2>
+<p>Every Claude API call in the system, when it fires, and what it does.</p>
+
+<table>
+  <tr><th>Call</th><th>Model</th><th>System Prompt</th><th>When</th><th>Timeout</th><th>max_tokens</th><th>Pipeline</th></tr>
+  <tr>
+    <td><strong>routeMessage()</strong></td>
+    <td>Haiku 4.5</td>
+    <td>ROUTE_SYSTEM (290 lines)</td>
+    <td>Every SMS not caught by pre-router</td>
+    <td>8s</td>
+    <td>256</td>
+    <td><span class="badge badge-io">SMS</span></td>
+  </tr>
+  <tr>
+    <td><strong>composeResponse()</strong></td>
+    <td>Haiku 4.5</td>
+    <td>COMPOSE_SYSTEM (393 lines)</td>
+    <td>Every events/more/free/nudge_accept intent</td>
+    <td>12s</td>
+    <td>512</td>
+    <td><span class="badge badge-io">SMS</span></td>
+  </tr>
+  <tr>
+    <td><strong>composeDetails()</strong></td>
+    <td>Haiku 4.5</td>
+    <td>DETAILS_SYSTEM (29 lines)</td>
+    <td>User asks for details on a specific pick</td>
+    <td>8s</td>
+    <td>256</td>
+    <td><span class="badge badge-io">SMS</span></td>
+  </tr>
+  <tr>
+    <td><strong>extractEvents()</strong></td>
+    <td>Haiku 4.5</td>
+    <td>EXTRACTION_PROMPT (168 lines)</td>
+    <td>Daily scrape — Skint, Nonsense NYC, Oh My Rockness</td>
+    <td>15s</td>
+    <td>8192</td>
+    <td><span class="badge badge-data">Scrape</span></td>
+  </tr>
+</table>
+
+<h3>LLM Call Frequency Analysis</h3>
+<div class="annotation">
+  <strong>Hot path (per SMS):</strong> At most 2 calls — route + compose. Pre-router eliminates the route call for ~60-70% of messages (greetings, numbers, "more", bare neighborhoods). So the average is closer to 1.3 calls per SMS.
+</div>
+<div class="annotation">
+  <strong>Cold path (daily):</strong> 3 extraction calls during scrape. Each processes large HTML documents (5-50KB) with 8192 max tokens.
+</div>
+
+<h3>Token Budget Estimates</h3>
+<table>
+  <tr><th>Call</th><th>System Prompt</th><th>User Content (typical)</th><th>Output</th><th>Total per call</th></tr>
+  <tr><td>routeMessage</td><td>~2,800 tokens</td><td>~100-200 tokens</td><td>~80-120 tokens</td><td>~3,000-3,100</td></tr>
+  <tr><td>composeResponse</td><td>~3,600 tokens</td><td>~800-2,000 tokens (8 events)</td><td>~200-400 tokens</td><td>~4,600-6,000</td></tr>
+  <tr><td>composeDetails</td><td>~400 tokens</td><td>~200-300 tokens</td><td>~100-200 tokens</td><td>~700-900</td></tr>
+  <tr><td>extractEvents</td><td>~1,600 tokens</td><td>~2,000-10,000 tokens</td><td>~2,000-6,000 tokens</td><td>~5,600-17,600</td></tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<section id="prompts">
+<h2>All Prompts</h2>
+<p>Complete text of every system prompt in the system, with annotations.</p>
+
+<div class="prompt-block">
+  <div class="prompt-header" onclick="togglePrompt(this)">
+    <span class="prompt-name">1. EXTRACTION_PROMPT — Event Extraction</span>
+    <span class="prompt-meta">~1,600 tokens | Used by: Skint, Nonsense NYC, Oh My Rockness | ai.js:extractEvents()</span>
+  </div>
+  <div class="prompt-content" id="prompt-extraction">Role: Event Extractor for Pulse (NYC). Convert messy source text into normalized event records.
+
+RULES:
+- VENUES vs EVENTS: If a venue hosts a specific event, extract the EVENT with venue as venue_name.
+  Only extract venue-only records when no specific event is mentioned.
+  Bars, restaurants, game spots, arcades — extract these too with best-fit category.
+  Permanent venues: set date_local/start_time_local to null, time_window to "evening", confidence to 0.6.
+
+- SOURCE URLs: Use [Source: URL] markers before each item as that event's source_url.
+  Prefer per-item [Source: URL] over top-level source_url input.
+
+- TRUTH + SAFETY: Extract only what is explicitly present. Do not guess. If missing, set null.
+  Prefer NYC interpretation (America/New_York).
+
+- DATE RESOLUTION: Use retrieved_at_nyc to resolve relative days.
+  "today"/"tonight" → retrieved_at_nyc date.
+  Past day names → set confidence to 0.1.
+
+- CONFIDENCE SCALE:
+  0.9+: name + date/time + location clearly present
+  0.7–0.85: name + (date OR time window) + partial location
+  0.4–0.65: name clear but time/location ambiguous
+  &lt; 0.4: too ambiguous → needs_review = true
+  0.1: event date has already passed
+
+- NEEDS_REVIEW TRIGGERS: confidence &lt; 0.5, ambiguous name, unresolvable date,
+  both venue_name and neighborhood missing, contradictory price info.
+
+- DEDUPE HINT: Output duplicates separately; downstream will dedupe.
+
+OUTPUT FORMAT:
+{
+  "events": [{
+    source_name, source_url, name, description_short, venue_name, venue_address,
+    neighborhood, latitude, longitude, category, subcategory,
+    start_time_local, end_time_local, date_local, time_window,
+    is_free, price_display, ticket_url, map_hint, confidence, needs_review,
+    evidence: { name_quote, time_quote, location_quote, price_quote }
+  }]
+}
+
+EXAMPLES: Skint-style newsletter, Tavily venue (no specific event)</div>
+</div>
+
+<div class="prompt-block">
+  <div class="prompt-header" onclick="togglePrompt(this)">
+    <span class="prompt-name">2. ROUTE_SYSTEM — Message Routing</span>
+    <span class="prompt-meta">~2,800 tokens | Used by: routeMessage() | ai.js:21 | Hot path</span>
+  </div>
+  <div class="prompt-content" id="prompt-route">Role: Pulse's message router. SMS bot that recommends NYC nightlife and events.
+Given incoming SMS (&lt;user_message&gt; tags), session context, and valid neighborhoods,
+determine intent and extract parameters.
+
+VALID INTENTS:
+- "events" — wants recommendations (mentions place, wants to go out)
+- "details" — wants more info on shown event (references specific pick)
+- "more" — wants additional options beyond what was shown
+- "free" — wants free events specifically
+- "help" — asks what Pulse is / how to use it
+- "conversational" — social niceties + off-topic (greetings, thanks, goodbyes)
+
+OFF-TOPIC HANDLING: Pulse is event discovery, not general assistant.
+Trivia, sports, advice, jokes, opinions → "conversational" + redirect.
+
+SESSION AWARENESS:
+- Active session + vague event-seeking → "more" or "events", not "conversational"
+- Only "conversational" for true social niceties regardless of session
+
+NEIGHBORHOOD RESOLUTION:
+- Map to ONE valid neighborhood from VALID_NEIGHBORHOODS
+- Handle slang, landmarks, subway stops
+- BOROUGHS → "__borough_brooklyn" etc. (system asks to narrow)
+- No neighborhood + session has one → use session
+- Truly nothing → null
+
+FILTERS:
+- free_only: true if user asks for free
+- category: comedy, art, nightlife, live_music, theater, food_drink, community, or null
+- vibe: "chill", "wild", "romantic", "weird", or null
+
+DECISION TREE (more vs events):
+1. Session has prior picks? No → "events"
+2. Message mentions specific neighborhood? Yes → "events"
+3. Message asks for more/other/different? Yes → "more"
+4. Vague event-seeking, no new neighborhood? Yes → "more"
+5. Otherwise → "events"
+
+CONFIDENCE: 0.9+ unambiguous, 0.7-0.85 inferred, 0.5-0.69 ambiguous, &lt;0.5 uncertain
+
+REPLY: Only for help/conversational. 1 short sentence + redirect to events.
+
+OUTPUT:
+{
+  "intent": "events|details|more|free|help|conversational",
+  "neighborhood": "string or null",
+  "filters": { "free_only": false, "category": null, "vibe": null },
+  "event_reference": null,
+  "reply": "string or null",
+  "confidence": 0.0
+}</div>
+</div>
+
+<div class="prompt-block">
+  <div class="prompt-header" onclick="togglePrompt(this)">
+    <span class="prompt-name">3. COMPOSE_SYSTEM — Event Curation + SMS Writing</span>
+    <span class="prompt-meta">~3,600 tokens | Used by: composeResponse() | ai.js:73 | Hot path — BIGGEST PROMPT</span>
+  </div>
+  <div class="prompt-content" id="prompt-compose">Role: Pulse — NYC "plugged-in friend" who curates best upcoming events.
+Text like a real person — warm, opinionated, concise. Never robotic.
+Job: pick 1–3 events from provided list AND write SMS in one step.
+
+PICK PRIORITY ORDER:
+1. Tonight first: TODAY + confidence ≥ 0.5 beats tomorrow. User asking what's happening NOW.
+2. Source trust: prefer higher source_weight.
+   Skint (0.9) = Nonsense (0.9) > RA (0.85) = OhMyRockness (0.85) > Dice (0.8) ...
+3. Neighborhood match: STRONGLY prefer requested neighborhood.
+   If NONE match → acknowledge upfront ("Not much in UWS, but nearby in HK:")
+4. Curation taste: gallery openings, DJ nights at small venues, indie concerts, comedy,
+   themed pop-ups, unique one-offs. AVOID corporate, hotel bars, tourist traps, chains.
+5. Tomorrow only if &lt; 2 good tonight options.
+
+DATE AWARENESS:
+- TODAY → say "tonight" or "today"
+- TOMORROW → say "tomorrow" — NEVER "tonight" for tomorrow
+- Further → mention day ("this Friday")
+
+VENUE ITEMS (Tavily source): permanent venues, no date/time.
+Frame as "solid spots to check out", not "tonight at 9pm".
+
+PERENNIAL PICKS (source "perennial"):
+- ONLY recommend if description mentions specific activity (trivia, jazz, DJs, karaoke...)
+- Lead with activity: "Black Rabbit has great trivia tonight at 8"
+- LATE NIGHT (after 10pm): bars stronger, but late events still win if good
+- THIN EVENTS (1-3 scraped): lead with event, add a perennial
+- RICH EVENTS (4+): perennials optional
+- No start time unless mentioned in description
+
+KIDS EVENTS: Skip NYC Parks children's events unless user asked family-friendly.
+
+HONESTY: Only use provided events. If nothing worth recommending, be honest + funny.
+
+FORMAT (HARD REQUIREMENT):
+Line 1: Short intro ("Tonight in East Village:")
+Blank line
+"1) Event at Venue — your take on why it's good. Time, price"
+Blank line
+"2) Event at Venue — your take. Time, price"
+Blank line
+Last line: "Reply 1-N for details, MORE for extra picks, or FREE for free events"
+
+Even 1 pick → numbered. NO URLs (sent separately). NO prose/paragraphs.
+480 CHARACTER LIMIT. If over, cut least important pick.
+
+VOICE: friend texting picks. Light NYC shorthand OK.
+Opinionated — quick take on why it's worth going.
+Enough context to decide without Googling.
+
+OUTPUT:
+{
+  "sms_text": "the complete SMS message, max 480 chars",
+  "picks": [{ "rank": 1, "event_id": "...", "why": "reason" }, ...],
+  "not_picked_reason": "1 sentence on skipped events",
+  "neighborhood_used": "the neighborhood"
+}</div>
+</div>
+
+<div class="prompt-block">
+  <div class="prompt-header" onclick="togglePrompt(this)">
+    <span class="prompt-name">4. DETAILS_SYSTEM — Event Details</span>
+    <span class="prompt-meta">~400 tokens | Used by: composeDetails() | ai.js:320 | Lightest prompt</span>
+  </div>
+  <div class="prompt-content" id="prompt-details">Role: Pulse — NYC "plugged-in friend" texting about a spot you recommended.
+Write like a real person — warm, opinionated, concise. Never robotic.
+
+CONTENT PRIORITY (include in order, cut from bottom if long):
+1. Vibe / what makes it worth going (LEAD with this)
+2. Time (tonight at 9, doors at 10, etc.)
+3. Price or "free"
+4. URL (always include if provided)
+5. Address (only if space remains)
+
+CONSTRAINTS:
+- 320 character limit (SMS split prevention)
+- Plain text only. No JSON, no quotes, no preamble.
+- No list format or bullet points. One natural paragraph like a text from a friend.
+- No Yelp URLs.</div>
+</div>
+
+<div class="concern">
+  <strong>Prompt Drift Risk:</strong> COMPOSE_SYSTEM is 3,600+ tokens and contains curation logic, formatting rules, persona instructions, edge case handling (perennials, venues, kids events, late night), and output formatting — all in one prompt. This is the primary candidate for skill decomposition.
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section id="sources">
+<h2>Source Registry</h2>
+<p>All 17 event sources, ordered by trust weight. Higher weight wins in cross-source dedup.</p>
+
+<div class="source-grid">
+  <div class="source-item">
+    <div class="source-weight w-high">0.9</div>
+    <div class="source-info">
+      <div class="name">Skint</div>
+      <div class="technique">HTML → Claude extraction</div>
+      <div class="file">sources/skint.js</div>
+    </div>
+  </div>
+  <div class="source-item">
+    <div class="source-weight w-high">0.9</div>
+    <div class="source-info">
+      <div class="name">Nonsense NYC</div>
+      <div class="technique">HTML → Claude extraction</div>
+      <div class="file">sources/nonsense.js</div>
+    </div>
+  </div>
+  <div class="source-item">
+    <div class="source-weight w-med">0.85</div>
+    <div class="source-info">
+      <div class="name">Resident Advisor</div>
+      <div class="technique">GraphQL API</div>
+      <div class="file">sources/ra.js</div>
+    </div>
+  </div>
+  <div class="source-item">
+    <div class="source-weight w-med">0.85</div>
+    <div class="source-info">
+      <div class="name">Oh My Rockness</div>
+      <div class="technique">HTML → Claude extraction</div>
+      <div class="file">sources/ohmyrockness.js</div>
+    </div>
+  </div>
+  <div class="source-item">
+    <div class="source-weight w-med">0.8</div>
+    <div class="source-info">
+      <div class="name">Dice</div>
+      <div class="technique">__NEXT_DATA__ JSON</div>
+      <div class="file">sources/dice.js</div>
+    </div>
+  </div>
+  <div class="source-item">
+    <div class="source-weight w-med">0.8</div>
+    <div class="source-info">
+      <div class="name">BrooklynVegan</div>
+      <div class="technique">DoStuff JSON</div>
+      <div class="file">sources/brooklynvegan.js</div>
+    </div>
+  </div>
+  <div class="source-item">
+    <div class="source-weight w-med">0.8</div>
+    <div class="source-info">
+      <div class="name">BAM</div>
+      <div class="technique">JSON API</div>
+      <div class="file">sources/bam.js</div>
+    </div>
+  </div>
+  <div class="source-item">
+    <div class="source-weight w-med">0.8</div>
+    <div class="source-info">
+      <div class="name">SmallsLIVE</div>
+      <div class="technique">AJAX HTML</div>
+      <div class="file">sources/smallslive.js</div>
+    </div>
+  </div>
+  <div class="source-item">
+    <div class="source-weight w-low">0.75</div>
+    <div class="source-info">
+      <div class="name">NYC Parks</div>
+      <div class="technique">Schema.org</div>
+      <div class="file">sources/nyc-parks.js</div>
+    </div>
+  </div>
+  <div class="source-item">
+    <div class="source-weight w-low">0.75</div>
+    <div class="source-info">
+      <div class="name">DoNYC</div>
+      <div class="technique">Cheerio HTML</div>
+      <div class="file">sources/donyc.js</div>
+    </div>
+  </div>
+  <div class="source-item">
+    <div class="source-weight w-low">0.75</div>
+    <div class="source-info">
+      <div class="name">Songkick</div>
+      <div class="technique">JSON-LD</div>
+      <div class="file">sources/songkick.js</div>
+    </div>
+  </div>
+  <div class="source-item">
+    <div class="source-weight w-low">0.75</div>
+    <div class="source-info">
+      <div class="name">Ticketmaster</div>
+      <div class="technique">Discovery API</div>
+      <div class="file">sources/ticketmaster.js</div>
+    </div>
+  </div>
+  <div class="source-item">
+    <div class="source-weight w-low">0.7</div>
+    <div class="source-info">
+      <div class="name">Eventbrite</div>
+      <div class="technique">JSON-LD + __SERVER_DATA__</div>
+      <div class="file">sources/eventbrite.js</div>
+    </div>
+  </div>
+  <div class="source-item">
+    <div class="source-weight w-low">0.7</div>
+    <div class="source-info">
+      <div class="name">NYPL</div>
+      <div class="technique">Eventbrite organizer pages</div>
+      <div class="file">sources/nypl.js</div>
+    </div>
+  </div>
+  <div class="source-item">
+    <div class="source-weight w-low">0.7</div>
+    <div class="source-info">
+      <div class="name">Eventbrite Comedy</div>
+      <div class="technique">Eventbrite category page</div>
+      <div class="file">sources/eventbrite.js</div>
+    </div>
+  </div>
+  <div class="source-item">
+    <div class="source-weight w-low">0.7</div>
+    <div class="source-info">
+      <div class="name">Eventbrite Arts</div>
+      <div class="technique">Eventbrite category page</div>
+      <div class="file">sources/eventbrite.js</div>
+    </div>
+  </div>
+  <div class="source-item">
+    <div class="source-weight w-low">0.6</div>
+    <div class="source-info">
+      <div class="name">Tavily</div>
+      <div class="technique">Web search API</div>
+      <div class="file">sources/tavily.js</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section id="data-model">
+<h2>Data Model</h2>
+
+<h3>Normalized Event Object</h3>
+<p>Every event from every source gets normalized to this shape by <code>normalizeExtractedEvent()</code>:</p>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Source</th><th>Used By</th></tr>
+  <tr><td><code>id</code></td><td>string (12-char MD5)</td><td>makeEventId(name, venue, date)</td><td>Dedup, session tracking</td></tr>
+  <tr><td><code>source_name</code></td><td>string</td><td>Scraper label</td><td>Trust weighting</td></tr>
+  <tr><td><code>source_weight</code></td><td>number (0-1)</td><td>SOURCES registry</td><td>Compose prompt picks</td></tr>
+  <tr><td><code>name</code></td><td>string</td><td>Scraped/extracted</td><td>Display, dedup</td></tr>
+  <tr><td><code>venue_name</code></td><td>string</td><td>Scraped/extracted</td><td>Display, venue lookup, dedup</td></tr>
+  <tr><td><code>neighborhood</code></td><td>string | null</td><td>resolveNeighborhood()</td><td>Proximity ranking, filtering</td></tr>
+  <tr><td><code>date_local</code></td><td>YYYY-MM-DD | null</td><td>Scraped/extracted</td><td>Today/tomorrow filtering</td></tr>
+  <tr><td><code>start_time_local</code></td><td>ISO datetime | null</td><td>Scraped/extracted</td><td>Upcoming filter, display</td></tr>
+  <tr><td><code>is_free</code></td><td>boolean</td><td>Scraped/extracted</td><td>Free filter, display</td></tr>
+  <tr><td><code>category</code></td><td>string enum</td><td>Scraped or inferCategory()</td><td>Category filter, display</td></tr>
+  <tr><td><code>confidence</code></td><td>number (0-1)</td><td>Extraction or source default</td><td>Compose picks</td></tr>
+  <tr><td><code>ticket_url</code></td><td>string | null</td><td>Scraped/extracted</td><td>Link follow-ups</td></tr>
+  <tr><td><code>source_url</code></td><td>string | null</td><td>Scraped/extracted</td><td>Link follow-ups (fallback)</td></tr>
+</table>
+
+<h3>Session Object</h3>
+<p>Per-phone, 2-hour TTL, stored in memory (<code>session.js</code>). Merged on each setSession() call.</p>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Purpose</th></tr>
+  <tr><td><code>lastNeighborhood</code></td><td>string</td><td>Carries neighborhood for "more", implicit context</td></tr>
+  <tr><td><code>lastPicks</code></td><td>array</td><td>Current displayed picks — for details + pick recovery</td></tr>
+  <tr><td><code>allPicks</code></td><td>array</td><td>All picks across more batches — for dedup</td></tr>
+  <tr><td><code>lastEvents</code></td><td>object</td><td>Event map (id → event) — for details, more remaining calc</td></tr>
+  <tr><td><code>allOfferedIds</code></td><td>array</td><td>All events offered to Claude — for more exclusion</td></tr>
+  <tr><td><code>pendingNearby</code></td><td>string | null</td><td>Pending travel nudge neighborhood</td></tr>
+  <tr><td><code>pendingNearbyEvents</code></td><td>object | null</td><td>Pre-loaded events for nudge accept</td></tr>
+  <tr><td><code>pendingFilters</code></td><td>object | null</td><td>Saved filters when asking for neighborhood</td></tr>
+  <tr><td><code>visitedHoods</code></td><td>array</td><td>Tracks visited neighborhoods — for nudge dedup</td></tr>
+</table>
+
+<h3>Trace Object</h3>
+<p>Every SMS request generates a trace (<code>traces.js</code>). Stored as JSONL, 200-item ring buffer, 4-day rotation.</p>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Content</th></tr>
+  <tr><td><code>routing</code></td><td>object</td><td>pre_routed flag, result (intent/neighborhood/confidence), latency, raw response</td></tr>
+  <tr><td><code>events</code></td><td>object</td><td>cache_size, candidates_count, sent_to_claude count, candidate/sent IDs</td></tr>
+  <tr><td><code>composition</code></td><td>object</td><td>latency, raw response, picks, not_picked_reason, neighborhood_used</td></tr>
+  <tr><td><code>annotation</code></td><td>object | null</td><td>verdict (pass/fail), failure_modes, notes</td></tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<section id="files">
+<h2>File Dependency Map</h2>
+
+<div class="dep-graph"><span class="file">server.js</span> (Express setup, routes, schedule)
+  ├── <span class="file">handler.js</span> (Twilio webhook, async dispatch)
+  │   ├── <span class="file">neighborhoods.js</span> (36 hoods, aliases, landmarks)
+  │   ├── <span class="llm">ai.js</span> (routeMessage, composeResponse, composeDetails, extractEvents)
+  │   │   ├── <span class="file">prompts.js</span> (EXTRACTION_PROMPT, ROUTE_SYSTEM, COMPOSE_SYSTEM, DETAILS_SYSTEM)
+  │   │   ├── <span class="file">geo.js</span> (getEventDate, getNycDateString)
+  │   │   └── <span class="file">formatters.js</span> (smartTruncate)
+  │   ├── <span class="file">twilio.js</span> (sendSMS, maskPhone, test capture)
+  │   ├── <span class="file">traces.js</span> (startTrace, saveTrace)
+  │   ├── <span class="file">session.js</span> (getSession, setSession, clearSession)
+  │   ├── <span class="file">pre-router.js</span> (regex intent matching)
+  │   │   └── <span class="file">neighborhoods.js</span>
+  │   ├── <span class="file">intent-handlers.js</span> (help, conversational, details, more, free, nudge, events)
+  │   │   ├── <span class="file">events.js</span> (getEvents)
+  │   │   ├── <span class="llm">ai.js</span> (composeDetails, isSearchUrl)
+  │   │   ├── <span class="file">twilio.js</span>
+  │   │   ├── <span class="file">session.js</span>
+  │   │   ├── <span class="file">formatters.js</span>
+  │   │   ├── <span class="file">pre-router.js</span> (getAdjacentNeighborhoods)
+  │   │   └── <span class="file">perennial.js</span> (getPerennialPicks, toEventObjects)
+  │   └── <span class="file">alerts.js</span> (sendRuntimeAlert)
+  │
+  ├── <span class="data">events.js</span> (cache, scrape, health tracking)
+  │   ├── <span class="file">sources/index.js</span> (barrel — 17 scrapers)
+  │   │   ├── <span class="file">sources/shared.js</span> (makeEventId, normalizeExtractedEvent)
+  │   │   │   ├── <span class="file">geo.js</span> (resolveNeighborhood)
+  │   │   │   └── <span class="file">venues.js</span> (lookupVenue)
+  │   │   ├── <span class="file">sources/skint.js</span> → <span class="llm">ai.js:extractEvents()</span>
+  │   │   ├── <span class="file">sources/nonsense.js</span> → <span class="llm">ai.js:extractEvents()</span>
+  │   │   ├── <span class="file">sources/ohmyrockness.js</span> → <span class="llm">ai.js:extractEvents()</span>
+  │   │   ├── <span class="file">sources/ra.js</span> (GraphQL)
+  │   │   ├── <span class="file">sources/dice.js</span> (__NEXT_DATA__)
+  │   │   └── <span class="file">... 11 more scrapers</span>
+  │   ├── <span class="file">geo.js</span> (rankEventsByProximity, filterUpcomingEvents)
+  │   ├── <span class="file">venues.js</span> (batchGeocodeEvents, exportLearnedVenues)
+  │   └── <span class="file">alerts.js</span> (sendHealthAlert)</div>
+
+<h3>File Purpose Summary</h3>
+<table>
+  <tr><th>File</th><th>Lines</th><th>Type</th><th>LLM?</th><th>Purpose</th></tr>
+  <tr><td><code>server.js</code></td><td>~210</td><td><span class="badge badge-io">IO</span></td><td>No</td><td>Express setup, routes, health check, daily schedule</td></tr>
+  <tr><td><code>handler.js</code></td><td>~332</td><td><span class="badge badge-logic">Logic</span></td><td>No</td><td>Twilio webhook, dedup, rate limiter, orchestrator</td></tr>
+  <tr><td><code>intent-handlers.js</code></td><td>~504</td><td><span class="badge badge-logic">Logic</span></td><td>Indirect</td><td>7 intent handlers — help, conversational, details, more, free, nudge, events</td></tr>
+  <tr><td><code>pre-router.js</code></td><td>~140</td><td><span class="badge badge-logic">Logic</span></td><td>No</td><td>14 regex patterns, adjacent neighborhood helper</td></tr>
+  <tr><td><code>ai.js</code></td><td>~407</td><td><span class="badge badge-llm">LLM</span></td><td>Yes</td><td>4 Claude calls: route, compose, details, extract</td></tr>
+  <tr><td><code>prompts.js</code></td><td>~425</td><td><span class="badge badge-llm">LLM</span></td><td>Prompts</td><td>All 4 system prompts</td></tr>
+  <tr><td><code>events.js</code></td><td>~407</td><td><span class="badge badge-data">Data</span></td><td>No</td><td>Cache, scrape orchestrator, health tracking, scheduler</td></tr>
+  <tr><td><code>geo.js</code></td><td>~249</td><td><span class="badge badge-logic">Logic</span></td><td>No</td><td>Neighborhood resolution, proximity, time filtering, haversine</td></tr>
+  <tr><td><code>neighborhoods.js</code></td><td>~302</td><td><span class="badge badge-data">Data</span></td><td>No</td><td>36 neighborhoods, aliases, landmarks, borough detection</td></tr>
+  <tr><td><code>venues.js</code></td><td>~313</td><td><span class="badge badge-data">Data</span></td><td>No</td><td>~190 venue coords, auto-learning, Nominatim geocoding</td></tr>
+  <tr><td><code>session.js</code></td><td>~36</td><td><span class="badge badge-data">Data</span></td><td>No</td><td>In-memory session store with TTL</td></tr>
+  <tr><td><code>formatters.js</code></td><td>~144</td><td><span class="badge badge-logic">Logic</span></td><td>No</td><td>Time formatting, URL cleaning, event details, smart truncate</td></tr>
+  <tr><td><code>twilio.js</code></td><td>~59</td><td><span class="badge badge-io">IO</span></td><td>No</td><td>SMS sending with retry, test capture mode</td></tr>
+  <tr><td><code>perennial.js</code></td><td>~103</td><td><span class="badge badge-data">Data</span></td><td>No</td><td>Perennial picks loader, day filtering, event conversion</td></tr>
+  <tr><td><code>alerts.js</code></td><td>~115</td><td><span class="badge badge-io">IO</span></td><td>No</td><td>Health + runtime email alerts via Resend</td></tr>
+  <tr><td><code>traces.js</code></td><td>~196</td><td><span class="badge badge-data">Data</span></td><td>No</td><td>JSONL trace storage, ring buffer, annotations</td></tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<section id="skills">
+<h2>Skills Analysis — Modularization Opportunities</h2>
+<p>Analysis of where prompt "stuffing" is happening and how skills could help.</p>
+
+<h3>Current Prompt Complexity</h3>
+<table>
+  <tr><th>Prompt</th><th>Tokens</th><th>Responsibilities</th><th>Stuffing Risk</th></tr>
+  <tr>
+    <td><strong>COMPOSE_SYSTEM</strong></td>
+    <td>~3,600</td>
+    <td>
+      Event curation logic<br>
+      Source trust hierarchy<br>
+      Neighborhood mismatch handling<br>
+      Date awareness (today/tomorrow)<br>
+      Perennial pick rules<br>
+      Venue item framing<br>
+      Kids event filtering<br>
+      Late-night behavior<br>
+      Thin-event behavior<br>
+      SMS format rules<br>
+      Character limit<br>
+      Voice/personality<br>
+      Output JSON format
+    </td>
+    <td><span class="badge badge-error">HIGH</span></td>
+  </tr>
+  <tr>
+    <td><strong>ROUTE_SYSTEM</strong></td>
+    <td>~2,800</td>
+    <td>
+      Intent classification<br>
+      Neighborhood resolution<br>
+      Filter extraction<br>
+      Session awareness<br>
+      More vs events decision tree<br>
+      Off-topic detection<br>
+      Borough handling<br>
+      Reply generation (help/conversational)
+    </td>
+    <td><span class="badge badge-error">HIGH</span></td>
+  </tr>
+  <tr>
+    <td><strong>EXTRACTION_PROMPT</strong></td>
+    <td>~1,600</td>
+    <td>
+      Event normalization<br>
+      Date resolution<br>
+      Confidence scoring<br>
+      Venue vs event distinction<br>
+      Source URL handling<br>
+      Output format
+    </td>
+    <td><span class="badge badge-logic">MEDIUM</span></td>
+  </tr>
+  <tr>
+    <td><strong>DETAILS_SYSTEM</strong></td>
+    <td>~400</td>
+    <td>
+      Content prioritization<br>
+      Character limit<br>
+      Voice/personality
+    </td>
+    <td><span class="badge badge-data">LOW</span></td>
+  </tr>
+</table>
+
+<h3>Where Drift Happens</h3>
+
+<div class="concern">
+  <strong>COMPOSE_SYSTEM Drift Vectors:</strong>
+  <ul style="margin-top: 8px; padding-left: 20px; font-size: 13px;">
+    <li><strong>Curation rules keep growing:</strong> Perennial pick rules were added incrementally (5 sub-rules). Late-night behavior, thin-event behavior, kids filtering — each was a patch.</li>
+    <li><strong>Format enforcement is fragile:</strong> The "WRONG/RIGHT" example and "NEVER write paragraph/prose" rules exist because Claude keeps drifting back to prose. More rules = more tokens for diminishing returns.</li>
+    <li><strong>Source trust is duplicated:</strong> The weight hierarchy is in both the code (SOURCES array) and the prompt. They can diverge.</li>
+    <li><strong>Context injection via extraContext:</strong> Handlers inject special instructions (OVERRIDE CLOSING LINE, User's original request, last batch notes) by appending to the user message. This is ad-hoc prompt stuffing.</li>
+  </ul>
+</div>
+
+<div class="concern">
+  <strong>ROUTE_SYSTEM Drift Vectors:</strong>
+  <ul style="margin-top: 8px; padding-left: 20px; font-size: 13px;">
+    <li><strong>Pre-router duplication:</strong> Intent classification logic exists in BOTH the pre-router (regex) and the route prompt. Adding a new intent means updating both.</li>
+    <li><strong>Neighborhood resolution is split:</strong> Done by Claude (in prompt), extractNeighborhood() (regex), and detectBorough() (regex). Three systems, three potential disagreements.</li>
+    <li><strong>Reply generation is bundled:</strong> The router generates conversational replies AND classifies intent. These are distinct concerns.</li>
+  </ul>
+</div>
+
+<h3>Potential Skill Decomposition</h3>
+
+<div class="opportunity">
+  <strong>Skill 1: Event Curator</strong><br>
+  Extract curation logic from COMPOSE_SYSTEM into a separate concern. The curator decides WHICH events to pick based on rules (tonight-first, source trust, neighborhood match, curation taste). The composer just writes the SMS for the already-chosen events.
+  <br><br>
+  <em>Benefit:</em> Curation rules become testable independently of SMS formatting. Pick logic stops fighting with character limits.
+</div>
+
+<div class="opportunity">
+  <strong>Skill 2: SMS Writer</strong><br>
+  Pure formatting skill — takes picked events + context, writes the SMS. Only knows about character limits, numbered format, and voice/personality. Doesn't make curation decisions.
+  <br><br>
+  <em>Benefit:</em> Format enforcement becomes simpler (fewer competing instructions). Voice/personality is isolated and tunable.
+</div>
+
+<div class="opportunity">
+  <strong>Skill 3: Intent Classifier</strong><br>
+  The routing call already does this, but it also resolves neighborhoods and generates replies. Splitting: classify intent only, then let deterministic code handle neighborhood resolution (which the pre-router already does well).
+  <br><br>
+  <em>Benefit:</em> Smaller route prompt, faster response. Neighborhood resolution consolidated in code (single source of truth).
+</div>
+
+<div class="opportunity">
+  <strong>Skill 4: Context Assembler (no LLM)</strong><br>
+  The ad-hoc extraContext strings injected by handlers (OVERRIDE CLOSING LINE, last batch notes, original request context) could become a structured context builder that assembles the right context for each call type.
+  <br><br>
+  <em>Benefit:</em> Context injection becomes predictable and testable. No more string concatenation surprises.
+</div>
+
+<h3>What Stays as Code (Not Skills)</h3>
+<div class="annotation">
+  <strong>Already well-handled by deterministic code:</strong>
+  <ul style="margin-top: 8px; padding-left: 20px; font-size: 13px;">
+    <li>Pre-router intent matching (14 regex patterns — fast and reliable)</li>
+    <li>Neighborhood extraction (regex + alias map + landmark map)</li>
+    <li>Event filtering and ranking (proximity, upcoming, tonight-only)</li>
+    <li>Cross-source dedup (hash-based)</li>
+    <li>Session management</li>
+    <li>SMS formatting fallback (formatEventDetails)</li>
+  </ul>
+  These should remain code — Claude adds no value here and would only add latency.
+</div>
+</section>
+
+</div>
+
+<script>
+function togglePrompt(header) {
+  const content = header.nextElementSibling;
+  content.classList.toggle('hidden');
+  header.classList.toggle('collapsed');
+}
+
+// Nav highlighting
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('.nav a');
+
+function updateNav() {
+  let current = '';
+  for (const section of sections) {
+    const top = section.offsetTop - 80;
+    if (scrollY >= top) current = section.id;
+  }
+  navLinks.forEach(link => {
+    link.classList.toggle('active', link.getAttribute('href') === '#' + current);
+  });
+}
+window.addEventListener('scroll', updateNav, { passive: true });
+updateNav();
+</script>
+</body>
+</html>
