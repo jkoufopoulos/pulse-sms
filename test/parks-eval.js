@@ -49,7 +49,7 @@ function makeSyntheticCompetition(neighborhood, dateLocal) {
       neighborhood, date_local: dateLocal,
       start_time_local: `${dateLocal}T22:00:00`, end_time_local: null,
       is_free: false, price_display: '$20', category: 'nightlife', subcategory: null,
-      confidence: 0.85, ticket_url: 'https://dice.fm/event/warehouse-night',
+      completeness: 0.85, ticket_url: 'https://dice.fm/event/warehouse-night',
     },
     {
       id: makeEventId('Jazz Trio at Blue Note', 'Blue Note', dateLocal, 'songkick'),
@@ -61,7 +61,7 @@ function makeSyntheticCompetition(neighborhood, dateLocal) {
       neighborhood, date_local: dateLocal,
       start_time_local: `${dateLocal}T20:00:00`, end_time_local: `${dateLocal}T23:00:00`,
       is_free: false, price_display: '$30', category: 'live_music', subcategory: null,
-      confidence: 0.85, ticket_url: 'https://www.songkick.com/concerts/blue-note',
+      completeness: 0.85, ticket_url: 'https://www.songkick.com/concerts/blue-note',
     },
     {
       id: makeEventId('Stand-Up Showcase', 'Comedy Dungeon', dateLocal, 'eventbrite'),
@@ -73,7 +73,7 @@ function makeSyntheticCompetition(neighborhood, dateLocal) {
       neighborhood, date_local: dateLocal,
       start_time_local: `${dateLocal}T21:00:00`, end_time_local: `${dateLocal}T23:30:00`,
       is_free: false, price_display: '$15', category: 'comedy', subcategory: null,
-      confidence: 0.85, ticket_url: 'https://www.eventbrite.com/e/standup-showcase',
+      completeness: 0.85, ticket_url: 'https://www.eventbrite.com/e/standup-showcase',
     },
   ];
 }
@@ -96,7 +96,7 @@ function makeFallbackParksEvents(dateLocal) {
       start_time_local: `${dateLocal}T08:00:00-05:00`, end_time_local: `${dateLocal}T09:00:00-05:00`,
       time_window: null, is_free: true, price_display: 'free',
       category: 'community', subcategory: 'fitness',
-      confidence: 0.85,
+      completeness: 0.85,
       ticket_url: `https://www.nycgovparks.org/events/${dateLocal.replace(/-/g, '/')}/total-body-fitness`,
       source_url: `https://www.nycgovparks.org/events/${dateLocal.replace(/-/g, '/')}/total-body-fitness`,
       map_url: null, map_hint: '95 Prospect Park West',
@@ -112,7 +112,7 @@ function makeFallbackParksEvents(dateLocal) {
       start_time_local: `${dateLocal}T09:00:00-05:00`, end_time_local: `${dateLocal}T17:00:00-05:00`,
       time_window: null, is_free: true, price_display: 'free',
       category: 'art', subcategory: 'nature',
-      confidence: 0.85,
+      completeness: 0.85,
       ticket_url: `https://www.nycgovparks.org/events/${dateLocal.replace(/-/g, '/')}/arsenal-gallery`,
       source_url: `https://www.nycgovparks.org/events/${dateLocal.replace(/-/g, '/')}/arsenal-gallery`,
       map_url: null, map_hint: '830 Fifth Avenue',
@@ -128,7 +128,7 @@ function makeFallbackParksEvents(dateLocal) {
       start_time_local: `${dateLocal}T10:00:00-05:00`, end_time_local: `${dateLocal}T16:00:00-05:00`,
       time_window: null, is_free: true, price_display: 'free',
       category: 'art', subcategory: 'nature',
-      confidence: 0.85,
+      completeness: 0.85,
       ticket_url: `https://www.nycgovparks.org/events/${dateLocal.replace(/-/g, '/')}/think-global`,
       source_url: `https://www.nycgovparks.org/events/${dateLocal.replace(/-/g, '/')}/think-global`,
       map_url: null, map_hint: '298 Satterlee Street',
@@ -144,7 +144,7 @@ function makeFallbackParksEvents(dateLocal) {
       start_time_local: `${dateLocal}T10:00:00-05:00`, end_time_local: `${dateLocal}T12:00:00-05:00`,
       time_window: null, is_free: true, price_display: 'free',
       category: 'community', subcategory: 'nature',
-      confidence: 0.85,
+      completeness: 0.85,
       ticket_url: `https://www.nycgovparks.org/events/${dateLocal.replace(/-/g, '/')}/winter-bird-count`,
       source_url: `https://www.nycgovparks.org/events/${dateLocal.replace(/-/g, '/')}/winter-bird-count`,
       map_url: null, map_hint: 'Van Cortlandt Park South',
@@ -160,7 +160,7 @@ function makeFallbackParksEvents(dateLocal) {
       start_time_local: `${dateLocal}T11:00:00-05:00`, end_time_local: `${dateLocal}T12:00:00-05:00`,
       time_window: null, is_free: true, price_display: 'free',
       category: 'community', subcategory: 'fitness',
-      confidence: 0.85,
+      completeness: 0.85,
       ticket_url: `https://www.nycgovparks.org/events/${dateLocal.replace(/-/g, '/')}/tai-chi`,
       source_url: `https://www.nycgovparks.org/events/${dateLocal.replace(/-/g, '/')}/tai-chi`,
       map_url: null, map_hint: 'Central Park West & 72nd Street',
@@ -176,7 +176,7 @@ function makeFallbackParksEvents(dateLocal) {
       start_time_local: `${dateLocal}T16:30:00-05:00`, end_time_local: `${dateLocal}T17:30:00-05:00`,
       time_window: null, is_free: true, price_display: 'free',
       category: 'community', subcategory: 'fitness',
-      confidence: 0.85,
+      completeness: 0.85,
       ticket_url: `https://www.nycgovparks.org/events/${dateLocal.replace(/-/g, '/')}/sunset-yoga`,
       source_url: `https://www.nycgovparks.org/events/${dateLocal.replace(/-/g, '/')}/sunset-yoga`,
       map_url: null, map_hint: 'Pier 1, Old Fulton Street',
@@ -433,8 +433,8 @@ async function main() {
     parksInTop8.every(e => !e.ticket_url || e.ticket_url.startsWith('https://www.nycgovparks.org/')));
   check('parks events have source_weight 0.75',
     parksInTop8.every(e => e.source_weight === 0.75));
-  check('parks events have confidence 0.85',
-    parksInTop8.every(e => e.confidence === 0.85));
+  check('parks events have completeness',
+    parksInTop8.every(e => typeof e.completeness === 'number'));
   check('parks events have venue addresses',
     parksInTop8.filter(e => e.venue_address).length > 0);
 

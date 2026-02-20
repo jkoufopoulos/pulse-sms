@@ -47,7 +47,7 @@ function makeSyntheticCompetition(neighborhood, dateLocal) {
       neighborhood, date_local: dateLocal,
       start_time_local: `${dateLocal}T22:00:00`, end_time_local: null,
       is_free: false, price_display: '$20', category: 'nightlife', subcategory: null,
-      confidence: 0.85, ticket_url: 'https://dice.fm/event/warehouse-night',
+      completeness: 0.85, ticket_url: 'https://dice.fm/event/warehouse-night',
     },
     {
       id: makeEventId('Jazz Trio at Blue Note', 'Blue Note', dateLocal, 'songkick'),
@@ -59,7 +59,7 @@ function makeSyntheticCompetition(neighborhood, dateLocal) {
       neighborhood, date_local: dateLocal,
       start_time_local: `${dateLocal}T20:00:00`, end_time_local: `${dateLocal}T23:00:00`,
       is_free: false, price_display: '$30', category: 'live_music', subcategory: null,
-      confidence: 0.85, ticket_url: 'https://www.songkick.com/concerts/blue-note',
+      completeness: 0.85, ticket_url: 'https://www.songkick.com/concerts/blue-note',
     },
     {
       id: makeEventId('Stand-Up Showcase', 'Comedy Dungeon', dateLocal, 'eventbrite'),
@@ -71,7 +71,7 @@ function makeSyntheticCompetition(neighborhood, dateLocal) {
       neighborhood, date_local: dateLocal,
       start_time_local: `${dateLocal}T21:00:00`, end_time_local: `${dateLocal}T23:30:00`,
       is_free: false, price_display: '$15', category: 'comedy', subcategory: null,
-      confidence: 0.85, ticket_url: 'https://www.eventbrite.com/e/standup-showcase',
+      completeness: 0.85, ticket_url: 'https://www.eventbrite.com/e/standup-showcase',
     },
   ];
 }
@@ -92,7 +92,7 @@ function makeFallbackBVEvents(dateLocal) {
       neighborhood: 'Williamsburg', date_local: dateLocal,
       start_time_local: `${dateLocal}T20:00:00`, end_time_local: null,
       is_free: false, price_display: '$25', category: 'live_music', subcategory: 'music',
-      confidence: 0.9, ticket_url: 'https://link.dice.fm/mdou-moctar',
+      completeness: 0.85, ticket_url: 'https://link.dice.fm/mdou-moctar',
       source_url: 'https://nyc-shows.brooklynvegan.com/events/12345',
       map_url: null, map_hint: '319 Frost St, Brooklyn, NY 11222',
     },
@@ -106,7 +106,7 @@ function makeFallbackBVEvents(dateLocal) {
       neighborhood: 'Williamsburg', date_local: dateLocal,
       start_time_local: `${dateLocal}T19:00:00`, end_time_local: null,
       is_free: false, price_display: '$30', category: 'live_music', subcategory: 'music',
-      confidence: 0.9, ticket_url: 'https://link.dice.fm/wednesday',
+      completeness: 0.85, ticket_url: 'https://link.dice.fm/wednesday',
       source_url: 'https://nyc-shows.brooklynvegan.com/events/12346',
       map_url: null, map_hint: '66 N 6th St, Brooklyn, NY 11249',
     },
@@ -120,7 +120,7 @@ function makeFallbackBVEvents(dateLocal) {
       neighborhood: 'Bushwick', date_local: dateLocal,
       start_time_local: `${dateLocal}T20:00:00`, end_time_local: null,
       is_free: false, price_display: '$22', category: 'live_music', subcategory: 'music',
-      confidence: 0.9, ticket_url: 'https://link.dice.fm/geese',
+      completeness: 0.85, ticket_url: 'https://link.dice.fm/geese',
       source_url: 'https://nyc-shows.brooklynvegan.com/events/12347',
       map_url: null, map_hint: '599 Johnson Ave, Brooklyn, NY 11237',
     },
@@ -134,7 +134,7 @@ function makeFallbackBVEvents(dateLocal) {
       neighborhood: 'Lower East Side', date_local: dateLocal,
       start_time_local: `${dateLocal}T21:00:00`, end_time_local: null,
       is_free: false, price_display: '$28', category: 'live_music', subcategory: 'music',
-      confidence: 0.9, ticket_url: 'https://link.dice.fm/bar-italia',
+      completeness: 0.85, ticket_url: 'https://link.dice.fm/bar-italia',
       source_url: 'https://nyc-shows.brooklynvegan.com/events/12348',
       map_url: null, map_hint: '6 Delancey St, New York, NY 10002',
     },
@@ -148,7 +148,7 @@ function makeFallbackBVEvents(dateLocal) {
       neighborhood: 'Park Slope', date_local: dateLocal,
       start_time_local: `${dateLocal}T18:00:00`, end_time_local: null,
       is_free: true, price_display: 'free', category: 'live_music', subcategory: 'music',
-      confidence: 0.9, ticket_url: null,
+      completeness: 0.85, ticket_url: null,
       source_url: 'https://nyc-shows.brooklynvegan.com/events/12349',
       map_url: null, map_hint: 'Prospect Park West, Brooklyn, NY',
     },
@@ -194,7 +194,7 @@ async function main() {
   // Validate event shape
   check('all BV events have source_name brooklynvegan', bvEvents.every(e => e.source_name === 'brooklynvegan'));
   check('all BV events have source_weight 0.8', bvEvents.every(e => e.source_weight === 0.8));
-  check('all BV events have confidence 0.9', bvEvents.every(e => e.confidence === 0.9));
+  check('all BV events have completeness', bvEvents.every(e => typeof e.completeness === 'number'));
   check('all BV events have dates', bvEvents.every(e => e.date_local));
   check('all BV events have venue names', bvEvents.every(e => e.venue_name && e.venue_name !== 'TBA'));
   check('BV events have neighborhoods', bvEvents.filter(e => e.neighborhood).length > 0);
@@ -369,8 +369,8 @@ async function main() {
 
   check('BV events have source_weight 0.8',
     bvInTop8.every(e => e.source_weight === 0.8));
-  check('BV events have confidence 0.9',
-    bvInTop8.every(e => e.confidence === 0.9));
+  check('BV events have completeness',
+    bvInTop8.every(e => typeof e.completeness === 'number'));
   check('BV events have venue addresses',
     bvInTop8.filter(e => e.venue_address).length > 0);
   check('BV events have source_type curated',

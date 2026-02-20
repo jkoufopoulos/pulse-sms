@@ -80,7 +80,6 @@ async function fetchNYCParksEvents() {
           price_display: 'free',
           category,
           subcategory: categories[0] || null,
-          confidence: 0.85,
           ticket_url: eventUrl ? `https://www.nycgovparks.org${eventUrl}` : null,
           source_url: eventUrl ? `https://www.nycgovparks.org${eventUrl}` : null,
           map_url: null,

@@ -17,7 +17,7 @@ console.log('\nbuildComposePrompt:');
 const coreOnly = buildComposePrompt([], {});
 check('core-only includes role tag', coreOnly.includes('<role>'));
 check('core-only includes output_format', coreOnly.includes('<output_format>'));
-check('core-only includes source trust', coreOnly.includes('SOURCE TRUST HIERARCHY'));
+check('core-only includes source tiers', coreOnly.includes('SOURCE TIERS'));
 check('core-only does NOT include tonight-priority', !coreOnly.includes('TONIGHT PRIORITY'));
 check('core-only does NOT include perennial-framing', !coreOnly.includes('PERENNIAL PICKS'));
 check('core-only does NOT include last-batch', !coreOnly.includes('LAST batch'));

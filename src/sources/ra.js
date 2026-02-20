@@ -116,7 +116,6 @@ async function fetchRAEvents() {
         price_display: null,
         category: 'nightlife',
         subcategory: null,
-        confidence: 0.85,
         ticket_url: e.contentUrl ? `https://ra.co${e.contentUrl}` : null,
         map_url: null,
         map_hint: null,

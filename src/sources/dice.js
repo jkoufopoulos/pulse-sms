@@ -95,7 +95,6 @@ async function fetchDiceEvents() {
         price_display: isFree ? 'free' : (priceDollars ? `$${priceDollars}+` : null),
         category,
         subcategory: (e.tags_types || [])[0]?.title || null,
-        confidence: 0.85,
         ticket_url: e.perm_name ? `https://dice.fm/event/${e.perm_name}` : null,
         map_url: null,
         map_hint: venue.address || null,

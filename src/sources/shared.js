@@ -40,6 +40,19 @@ function makeEventId(name, venue, date, source, sourceUrl) {
   return crypto.createHash('md5').update(raw).digest('hex').slice(0, 12);
 }
 
+/**
+ * Compute data completeness score (0–1) based on which fields are present.
+ */
+function computeCompleteness(e) {
+  let score = 0;
+  if (e.name) score += 0.3;
+  if (e.date_local) score += 0.2;
+  if (e.venue_name && e.venue_name !== 'TBA') score += 0.2;
+  if (e.neighborhood) score += 0.15;
+  if (e.start_time_local) score += 0.15;
+  return score;
+}
+
 function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
   const id = makeEventId(e.name, e.venue_name, e.date_local || e.start_time_local || '', sourceName, e.source_url);
 
@@ -78,7 +91,14 @@ function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
     price_display: e.price_display || null,
     category: e.category || 'other',
     subcategory: e.subcategory || null,
-    confidence: e.confidence || 0.5,
+    extraction_confidence: e.confidence ?? null,
+    completeness: computeCompleteness({
+      name: e.name,
+      date_local: e.date_local,
+      venue_name: e.venue_name || 'TBA',
+      neighborhood,
+      start_time_local: e.start_time_local,
+    }),
     ticket_url: e.ticket_url || null,
     source_url: e.source_url || null,
     map_url: null,
@@ -86,4 +106,4 @@ function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
   };
 }
 
-module.exports = { FETCH_HEADERS, makeEventId, normalizeExtractedEvent, normalizeEventName };
+module.exports = { FETCH_HEADERS, makeEventId, normalizeExtractedEvent, normalizeEventName, computeCompleteness };

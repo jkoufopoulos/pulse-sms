@@ -54,7 +54,7 @@ async function searchTavilyEvents(neighborhood, { query: customQuery } = {}) {
     const extracted = await extractEvents(rawText, 'tavily', query, { model: 'claude-haiku-4-5-20251001' });
     const events = (extracted.events || [])
       .map(raw => normalizeExtractedEvent(raw, 'tavily', 'search', 0.6))
-      .filter(e => e.name && e.confidence >= 0.6);
+      .filter(e => e.name && e.completeness >= 0.5);
 
     const upcoming = filterUpcomingEvents(events);
     if (upcoming.length < events.length) {
@@ -134,7 +134,7 @@ async function fetchTavilyFreeEvents() {
         e.is_free = true;
         return e;
       })
-      .filter(e => e.name && e.confidence >= 0.5);
+      .filter(e => e.name && e.completeness >= 0.5);
 
     const upcoming = filterUpcomingEvents(events);
     console.log(`Tavily daily free: ${upcoming.length} events (from ${freshResults.length} search results)`);

@@ -107,7 +107,6 @@ async function fetchSmallsLiveEvents() {
           price_display: null,
           category: 'live_music',
           subcategory: 'jazz',
-          confidence: 0.9,
           ticket_url: sourceUrl,
           source_url: sourceUrl,
           map_url: null,

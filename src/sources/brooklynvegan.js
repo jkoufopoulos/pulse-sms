@@ -80,7 +80,6 @@ async function fetchBrooklynVeganEvents() {
           price_display: priceDisplay,
           category,
           subcategory: item.category || null,
-          confidence: 0.9,
           ticket_url: item.buy_url || null,
           source_url: item.url ? `https://nyc-shows.brooklynvegan.com${item.url}` : null,
           map_url: null,

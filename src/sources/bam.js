@@ -94,7 +94,6 @@ async function fetchBAMEvents() {
         price_display: null,
         category,
         subcategory: item.genres || null,
-        confidence: 0.9,
         ticket_url: ticketUrl,
         source_url: moreLink || ticketUrl,
         map_url: null,

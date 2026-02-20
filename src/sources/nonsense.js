@@ -46,8 +46,8 @@ async function fetchNonsenseNYC() {
 
     const result = await extractEvents(content, 'nonsensenyc', 'https://nonsensenyc.com/');
     const events = (result.events || [])
-      .filter(e => e.name && e.confidence >= 0.5)
-      .map(e => normalizeExtractedEvent(e, 'nonsensenyc', 'curated', 0.9));
+      .map(e => normalizeExtractedEvent(e, 'nonsensenyc', 'curated', 0.9))
+      .filter(e => e.name && e.completeness >= 0.5);
 
     console.log(`Nonsense NYC: ${events.length} events`);
     return events;

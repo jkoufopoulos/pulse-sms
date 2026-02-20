@@ -12,8 +12,8 @@ Your job: pick the best 1–3 events from the provided list AND write the SMS te
 
 <rules>
 PICK PRIORITY ORDER:
-1. Tonight first: if an event's day is "TODAY" and confidence >= 0.5, prefer it over tomorrow events.
-2. Source trust: among tonight options, prefer higher source_weight.
+1. Tonight first: if an event's day is "TODAY", prefer it over tomorrow events.
+2. Source tier: among tonight options, prefer unstructured and primary over secondary.
 3. Neighborhood match: strongly prefer events in the user's requested neighborhood.
 4. Curation taste: prefer gallery openings, DJ nights at small venues, indie concerts, comedy shows, themed pop-ups, and unique one-off events. Avoid corporate events, hotel bars, tourist traps, and chain venues.
 5. Only include a tomorrow event if there are genuinely fewer than 2 good tonight options.
@@ -72,10 +72,14 @@ const tonightPriority = {
 TONIGHT PRIORITY: A decent tonight event beats a great tomorrow event — the user is asking what's happening now.`,
 };
 
-const sourceTrust = {
-  id: 'source-trust',
+const sourceTiers = {
+  id: 'source-tiers',
   text: `
-SOURCE TRUST HIERARCHY: Skint (0.9) = Nonsense NYC (0.9) > RA (0.85) = Oh My Rockness (0.85) > Dice (0.8) = BrooklynVegan (0.8) = BAM (0.8) = SmallsLIVE (0.8) = Yutori (0.8) > NYC Parks (0.75) = DoNYC (0.75) = Songkick (0.75) = Ticketmaster (0.75) > Eventbrite (0.7) = NYPL (0.7) > Tavily (0.6).`,
+SOURCE TIERS — use source_tier to break ties between similar events:
+- "unstructured" (Skint, Nonsense NYC, Oh My Rockness, Yutori): curated editorial picks — trust these, they've been hand-selected.
+- "primary" (RA, Dice, BrooklynVegan, BAM, SmallsLIVE): structured high-quality listings.
+- "secondary" (NYC Parks, DoNYC, Songkick, Ticketmaster, Eventbrite, NYPL, Tavily): broader aggregators.
+Prefer unstructured and primary over secondary when choosing between similar events.`,
 };
 
 const neighborhoodMismatch = {
@@ -122,6 +126,6 @@ const pendingIntent = {
   text: '',
 };
 
-const ALL_SKILLS = { core, tonightPriority, sourceTrust, neighborhoodMismatch, perennialFraming, venueFraming, lastBatch, freeEmphasis, pendingIntent };
+const ALL_SKILLS = { core, tonightPriority, sourceTiers, neighborhoodMismatch, perennialFraming, venueFraming, lastBatch, freeEmphasis, pendingIntent };
 
 module.exports = ALL_SKILLS;

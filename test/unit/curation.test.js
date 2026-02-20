@@ -1,12 +1,12 @@
 const { check } = require('../helpers');
-const { filterKidsEvents, filterLowConfidence, validatePerennialActivity } = require('../../src/curation');
+const { filterKidsEvents, filterIncomplete, validatePerennialActivity } = require('../../src/curation');
 
 console.log('\nfilterKidsEvents:');
 
-const kidsEvent = { id: 'k1', name: 'Kids Storytime at the Park', source_name: 'nyc-parks', description_short: 'Fun for toddlers', confidence: 0.8 };
-const adultParkEvent = { id: 'k2', name: 'Jazz in the Park', source_name: 'nyc-parks', description_short: 'Live jazz under the stars', confidence: 0.8 };
-const familyDayEvent = { id: 'k3', name: 'Family Day Festival', source_name: 'nyc-parks', description_short: 'Activities for children and parents', confidence: 0.8 };
-const nonParkKids = { id: 'k4', name: 'Kids Comedy Show', source_name: 'dice', description_short: 'Family friendly comedy', confidence: 0.8 };
+const kidsEvent = { id: 'k1', name: 'Kids Storytime at the Park', source_name: 'nyc-parks', description_short: 'Fun for toddlers', completeness: 0.8 };
+const adultParkEvent = { id: 'k2', name: 'Jazz in the Park', source_name: 'nyc-parks', description_short: 'Live jazz under the stars', completeness: 0.8 };
+const familyDayEvent = { id: 'k3', name: 'Family Day Festival', source_name: 'nyc-parks', description_short: 'Activities for children and parents', completeness: 0.8 };
+const nonParkKids = { id: 'k4', name: 'Kids Comedy Show', source_name: 'dice', description_short: 'Family friendly comedy', completeness: 0.8 };
 
 const kidsResult = filterKidsEvents([kidsEvent, adultParkEvent, familyDayEvent, nonParkKids]);
 check('removes kids storytime from nyc-parks', !kidsResult.find(e => e.id === 'k1'));
@@ -18,20 +18,20 @@ check('returns 2 events after filtering', kidsResult.length === 2);
 const emptyResult = filterKidsEvents([]);
 check('handles empty array', emptyResult.length === 0);
 
-console.log('\nfilterLowConfidence:');
+console.log('\nfilterIncomplete:');
 
-const highConf = { id: 'c1', confidence: 0.9 };
-const medConf = { id: 'c2', confidence: 0.5 };
-const lowConf = { id: 'c3', confidence: 0.3 };
-const noConf = { id: 'c4' };
+const highComp = { id: 'c1', completeness: 0.9 };
+const medComp = { id: 'c2', completeness: 0.5 };
+const lowComp = { id: 'c3', completeness: 0.3 };
+const noComp = { id: 'c4' };
 
-const confResult = filterLowConfidence([highConf, medConf, lowConf, noConf]);
-check('keeps high confidence', !!confResult.find(e => e.id === 'c1'));
-check('keeps medium confidence', !!confResult.find(e => e.id === 'c2'));
-check('removes low confidence', !confResult.find(e => e.id === 'c3'));
-check('removes no confidence', !confResult.find(e => e.id === 'c4'));
+const compResult = filterIncomplete([highComp, medComp, lowComp, noComp]);
+check('keeps high completeness', !!compResult.find(e => e.id === 'c1'));
+check('keeps medium completeness', !!compResult.find(e => e.id === 'c2'));
+check('removes low completeness', !compResult.find(e => e.id === 'c3'));
+check('removes no completeness', !compResult.find(e => e.id === 'c4'));
 
-const customThreshold = filterLowConfidence([highConf, medConf, lowConf], 0.6);
+const customThreshold = filterIncomplete([highComp, medComp, lowComp], 0.6);
 check('custom threshold removes medium', !customThreshold.find(e => e.id === 'c2'));
 check('custom threshold keeps high', !!customThreshold.find(e => e.id === 'c1'));
 

@@ -49,8 +49,8 @@ async function fetchSkintEvents() {
 
     const result = await extractEvents(content, 'theskint', 'https://theskint.com/');
     const events = (result.events || [])
-      .filter(e => e.name && e.confidence >= 0.5)
-      .map(e => normalizeExtractedEvent(e, 'theskint', 'curated', 0.9));
+      .map(e => normalizeExtractedEvent(e, 'theskint', 'curated', 0.9))
+      .filter(e => e.name && e.completeness >= 0.5);
 
     console.log(`Skint: ${events.length} events`);
     return events;

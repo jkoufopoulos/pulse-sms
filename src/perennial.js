@@ -60,7 +60,7 @@ function getPerennialPicks(neighborhood, { dayOfWeek } = {}) {
  * @param {Array} picks - Array of perennial pick objects
  * @param {string} neighborhood - The neighborhood these picks belong to
  * @param {object} [opts]
- * @param {boolean} [opts.isNearby] - If true, confidence is 0.6 instead of 0.7
+ * @param {boolean} [opts.isNearby] - If true, marks as nearby pick
  * @returns {Array} Event-shaped objects
  */
 function toEventObjects(picks, neighborhood, { isNearby } = {}) {
@@ -80,7 +80,9 @@ function toEventObjects(picks, neighborhood, { isNearby } = {}) {
       short_detail: pick.vibe,
       source_name: 'perennial',
       source_weight: 0.78,
-      confidence: isNearby ? 0.6 : 0.7,
+      extraction_confidence: null,
+      source_tier: 'secondary',
+      completeness: pick.venue ? 0.5 : 0.3,
       day: null,
       date_local: null,
       start_time_local: null,

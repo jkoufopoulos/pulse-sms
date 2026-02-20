@@ -144,7 +144,6 @@ async function fetchTicketmasterEvents() {
           price_display: isFree ? 'free' : (typeof priceMin === 'number' && priceMin > 0 ? `$${priceMin}+` : null),
           category,
           subcategory: e.classifications?.[0]?.subGenre?.name || null,
-          confidence: 0.9,
           ticket_url: e.url || null,
           map_url: null,
           map_hint: venue.address?.line1 || null,

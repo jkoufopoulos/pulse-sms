@@ -4,6 +4,29 @@ const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceE
 const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate } = require('./geo');
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues } = require('./venues');
 const { sendHealthAlert } = require('./alerts');
+const { computeCompleteness } = require('./sources/shared');
+
+// Source tier classification for compose prompt
+const SOURCE_TIERS = {
+  Skint: 'unstructured',
+  NonsenseNYC: 'unstructured',
+  OhMyRockness: 'unstructured',
+  Yutori: 'unstructured',
+  RA: 'primary',
+  Dice: 'primary',
+  BrooklynVegan: 'primary',
+  BAM: 'primary',
+  SmallsLIVE: 'primary',
+  NYCParks: 'secondary',
+  DoNYC: 'secondary',
+  Songkick: 'secondary',
+  Ticketmaster: 'secondary',
+  Eventbrite: 'secondary',
+  NYPL: 'secondary',
+  EventbriteComedy: 'secondary',
+  EventbriteArts: 'secondary',
+  Tavily: 'secondary',
+};
 
 // Load persisted learned venues on boot
 try {
@@ -111,8 +134,13 @@ async function timedFetch(fetchFn, label, weight) {
   try {
     const events = await fetchFn();
     const durationMs = Date.now() - start;
-    // Stamp canonical weight from registry (overrides whatever scrapers set)
-    for (const e of events) { e.source_weight = weight; }
+    // Stamp canonical weight + new fields from registry
+    for (const e of events) {
+      e.source_weight = weight;
+      e.source_tier = SOURCE_TIERS[label] || 'secondary';
+      if (e.completeness === undefined) e.completeness = computeCompleteness(e);
+      if (e.extraction_confidence === undefined) e.extraction_confidence = null;
+    }
     return { events, durationMs, status: events.length > 0 ? 'ok' : 'empty', error: null };
   } catch (err) {
     const durationMs = Date.now() - start;
@@ -404,4 +432,4 @@ function getRawCache() {
   return { events: [...eventCache], timestamp: cacheTimestamp };
 }
 
-module.exports = { SOURCES, refreshCache, getEvents, getCacheStatus, getHealthStatus, getRawCache, scheduleDailyScrape, clearSchedule };
+module.exports = { SOURCES, SOURCE_TIERS, refreshCache, getEvents, getCacheStatus, getHealthStatus, getRawCache, scheduleDailyScrape, clearSchedule };

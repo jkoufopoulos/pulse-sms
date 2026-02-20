@@ -52,8 +52,8 @@ async function fetchOhMyRockness() {
 
     const result = await extractEvents(content, 'ohmyrockness', 'https://www.ohmyrockness.com/shows', { model: 'claude-haiku-4-5-20251001' });
     const events = (result.events || [])
-      .filter(e => e.name && e.confidence >= 0.5)
-      .map(e => normalizeExtractedEvent(e, 'ohmyrockness', 'curated', 0.85));
+      .map(e => normalizeExtractedEvent(e, 'ohmyrockness', 'curated', 0.85))
+      .filter(e => e.name && e.completeness >= 0.5);
 
     console.log(`Oh My Rockness: ${events.length} events`);
     return events;

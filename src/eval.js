@@ -30,7 +30,7 @@ FLAG TYPES (include all that apply):
 
 EXAMPLE:
 Input event:
-{ "id": "evt_jazz_smalls", "name": "Jazz Night", "venue_name": "Smalls Jazz Club", "neighborhood": "West Village", "start_time_local": "2026-02-15T21:30:00", "date_local": "2026-02-15", "category": "live_music", "is_free": false, "price_display": "$20", "source_name": "theskint", "confidence": 0.9, "description_short": "Live jazz with rotating musicians" }
+{ "id": "evt_jazz_smalls", "name": "Jazz Night", "venue_name": "Smalls Jazz Club", "neighborhood": "West Village", "start_time_local": "2026-02-15T21:30:00", "date_local": "2026-02-15", "category": "live_music", "is_free": false, "price_display": "$20", "source_name": "theskint", "source_tier": "unstructured", "description_short": "Live jazz with rotating musicians" }
 
 Output:
 [{ "event_id": "evt_jazz_smalls", "score": 9, "flags": [], "note": "Named venue, specific time, well-known spot, tonight — strong pick" }]
@@ -71,7 +71,7 @@ async function scoreEvents(events) {
       is_free: e.is_free,
       price_display: e.price_display,
       source_name: e.source_name,
-      confidence: e.confidence,
+      source_tier: e.source_tier || 'secondary',
       description_short: e.description_short || e.short_detail,
     }));
 

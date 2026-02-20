@@ -94,8 +94,7 @@ async function composeResponse(message, events, neighborhood, filters, { exclude
       category: e.category,
       short_detail: e.short_detail || e.description_short,
       source_name: e.source_name,
-      source_weight: e.source_weight,
-      confidence: e.confidence,
+      source_tier: e.source_tier || 'secondary',
       ticket_url: e.ticket_url,
     });
   }).join('\n');
@@ -206,12 +205,13 @@ ${rawText}
 
 Extract all events and venues into the JSON format specified in your instructions.`;
 
+  const timeout = sourceName === 'yutori' ? 60000 : 15000;
   const response = await getClient().messages.create({
     model: model || MODELS.extract,
     max_tokens: 8192,
     system: EXTRACTION_PROMPT,
     messages: [{ role: 'user', content: userPrompt }],
-  }, { timeout: 15000 });
+  }, { timeout });
 
   const text = response.content?.[0]?.text || '';
 

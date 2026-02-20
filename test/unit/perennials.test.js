@@ -49,11 +49,12 @@ check('has venue_name', typeof firstObj.venue_name === 'string');
 check('has neighborhood', firstObj.neighborhood === 'West Village');
 check('has short_detail', typeof firstObj.short_detail === 'string');
 check('has description_short', typeof firstObj.description_short === 'string');
-check('confidence is 0.7 for local', firstObj.confidence === 0.7);
+check('completeness is 0.5 for local', firstObj.completeness === 0.5);
+check('extraction_confidence is null for perennials', firstObj.extraction_confidence === null);
 
-// Nearby picks get lower confidence
+// Nearby picks have completeness too
 const nearbyEventObjs = toEventObjects(chelseaPicks.nearby, 'Chelsea', { isNearby: true });
-check('nearby confidence is 0.6', nearbyEventObjs.length > 0 && nearbyEventObjs[0].confidence === 0.6);
+check('nearby completeness is 0.5', nearbyEventObjs.length > 0 && nearbyEventObjs[0].completeness === 0.5);
 
 // Free picks have is_free: true
 const bedStuyAllPicks = getPerennialPicks('Bed-Stuy', { dayOfWeek: 'fri' });

@@ -755,7 +755,7 @@ function getClientFlags(e) {
   } else if (e.start_time_local && !e.start_time_local.includes('T') && !e.start_time_local.includes(':')) {
     flags.push('no_time');
   }
-  if (e.confidence != null && e.confidence < 0.5) flags.push('low_confidence');
+  if (e.completeness != null && e.completeness < 0.5) flags.push('low_completeness');
   return flags;
 }
 
@@ -797,9 +797,9 @@ function applyFilters() {
     if (currentSort.col === 'ai_score') {
       va = aiScores[a.id]?.score ?? -1;
       vb = aiScores[b.id]?.score ?? -1;
-    } else if (currentSort.col === 'confidence') {
-      va = a.confidence ?? -1;
-      vb = b.confidence ?? -1;
+    } else if (currentSort.col === 'completeness') {
+      va = a.completeness ?? -1;
+      vb = b.completeness ?? -1;
     } else if (currentSort.col === 'price') {
       va = a.is_free ? 'free' : (a.price_display || 'zzz');
       vb = b.is_free ? 'free' : (b.price_display || 'zzz');
@@ -912,10 +912,10 @@ function priceCell(e) {
 }
 
 function confidenceCell(e) {
-  if (e.confidence == null) return '—';
-  const pct = Math.round(e.confidence * 100);
-  const color = e.confidence >= 0.7 ? '#68d391' : e.confidence >= 0.5 ? '#f6e05e' : '#fc8181';
-  return `<span class="confidence-bar"><span class="confidence-fill" style="width:${pct}%;background:${color}"></span></span> <span style="font-size:11px;color:${color}">${e.confidence.toFixed(2)}</span>`;
+  if (e.completeness == null) return '—';
+  const pct = Math.round(e.completeness * 100);
+  const color = e.completeness >= 0.7 ? '#68d391' : e.completeness >= 0.5 ? '#f6e05e' : '#fc8181';
+  return `<span class="confidence-bar"><span class="confidence-fill" style="width:${pct}%;background:${color}"></span></span> <span style="font-size:11px;color:${color}">${e.completeness.toFixed(2)}</span>`;
 }
 
 function scoreCell(score) {

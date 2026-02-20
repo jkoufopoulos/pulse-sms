@@ -72,7 +72,6 @@ async function fetchSongkickEvents() {
             price_display: skFree ? 'free' : (!isNaN(skPrice) && skPrice > 0 ? `$${skPrice}+` : null),
             category: 'live_music',
             subcategory: null,
-            confidence: 0.85,
             ticket_url: e.url || null,
             map_url: null,
             map_hint: address.streetAddress || null,

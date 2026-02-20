@@ -93,7 +93,6 @@ function parseCards($, cards, dateStr, categoryOverride) {
       price_display: isFree ? 'free' : null,
       category,
       subcategory: null,
-      confidence: 0.8,
       ticket_url: sourceUrl,
       source_url: sourceUrl,
       map_url: null,

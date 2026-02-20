@@ -847,7 +847,7 @@ CORE skill (always included, ~1,400 tokens):
 
 CONDITIONAL skills (included only when relevant):
   tonight-priority  (~40 tokens)  — when events include day=TODAY
-  source-trust      (~60 tokens)  — always (slimmed to one line)
+  source-tiers      (~60 tokens)  — always (slimmed to one line)
   neighborhood-mismatch (~50 tokens) — when no events match requested hood
   perennial-framing (~120 tokens) — when batch contains perennial events
   venue-framing     (~50 tokens)  — when batch contains Tavily venues
@@ -858,9 +858,9 @@ CONDITIONAL skills (included only when relevant):
 WHAT MOVED TO CODE (deterministic, pre-compose):
   Kids event filtering → curation.js:filterKidsEvents()
   Perennial activity validation → curation.js:validatePerennialActivity()
-  Low confidence removal → curation.js:filterLowConfidence()
+  Incomplete event removal → curation.js:filterIncomplete()
 
-Typical call: core + source-trust + tonight-priority = ~1,500 tokens
+Typical call: core + source-tiers + tonight-priority = ~1,500 tokens
 Worst case (all skills): ~1,800 tokens
 Previous monolith: ~3,600 tokens (sent every call regardless)</div>
 </div>
@@ -1256,7 +1256,7 @@ CONSTRAINTS:
   <tr><th>Before (monolith)</th><th>After (skills)</th></tr>
   <tr>
     <td>Every compose call sent all 13 rules (~3,600 tokens) — perennial framing, venue framing, kids filtering, neighborhood mismatch handling — even when none of those situations applied.</td>
-    <td>Core prompt (~1,400 tokens) + only the conditional skills that apply. A simple "East Village tonight" request gets core + tonight-priority + source-trust (~1,500 tokens). A last-batch-with-perennials request adds perennial-framing + last-batch.</td>
+    <td>Core prompt (~1,400 tokens) + only the conditional skills that apply. A simple "East Village tonight" request gets core + tonight-priority + source-tiers (~1,500 tokens). A last-batch-with-perennials request adds perennial-framing + last-batch.</td>
   </tr>
   <tr>
     <td>4 sites in intent-handlers.js built raw <code>extraContext</code> strings with inline prompt overrides like "OVERRIDE CLOSING LINE: Instead of 'Reply 1-N for details, MORE for extra picks'..."</td>

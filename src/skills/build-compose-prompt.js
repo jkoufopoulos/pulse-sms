@@ -13,8 +13,8 @@ const { getNycDateString } = require('../geo');
 function buildComposePrompt(events, options = {}) {
   const parts = [skills.core.text];
 
-  // Always include source trust hierarchy
-  parts.push(skills.sourceTrust.text);
+  // Always include source tiers
+  parts.push(skills.sourceTiers.text);
 
   // Tonight priority — when at least one event is today
   const todayNyc = getNycDateString(0);

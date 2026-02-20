@@ -164,8 +164,8 @@ async function fetchYutoriEvents() {
 
     const result = await extractEvents(combined, 'yutori', null);
     const events = (result.events || [])
-      .filter(e => e.name && e.confidence >= 0.5)
-      .map(e => normalizeExtractedEvent(e, 'yutori', 'aggregator', 0.8));
+      .map(e => normalizeExtractedEvent(e, 'yutori', 'aggregator', 0.8))
+      .filter(e => e.name && e.completeness >= 0.5);
 
     // Move processed files to processed/ directory
     fs.mkdirSync(PROCESSED_DIR, { recursive: true });
