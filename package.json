@@ -19,6 +19,7 @@
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.0",
     "express": "^4.21.0",
+    "googleapis": "^171.4.0",
     "helmet": "^8.1.0",
     "twilio": "^5.4.0"
   }

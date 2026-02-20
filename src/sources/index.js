@@ -14,6 +14,7 @@ const { fetchSmallsLiveEvents } = require('./smallslive');
 const { fetchNYPLEvents } = require('./nypl');
 const { searchTavilyEvents, fetchTavilyFreeEvents } = require('./tavily');
 const { fetchTicketmasterEvents } = require('./ticketmaster');
+const { fetchYutoriEvents } = require('./yutori');
 
 module.exports = {
   fetchSkintEvents,
@@ -37,4 +38,5 @@ module.exports = {
   searchTavilyEvents,
   fetchTavilyFreeEvents,
   fetchTicketmasterEvents,
+  fetchYutoriEvents,
 };

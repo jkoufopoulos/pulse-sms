@@ -75,7 +75,7 @@ check('scrape has sourcesFailed', 'sourcesFailed' in healthData.scrape);
 check('has sources object', typeof healthData.sources === 'object' && healthData.sources !== null);
 check('sources has Skint', 'Skint' in healthData.sources);
 check('sources has RA', 'RA' in healthData.sources);
-check('sources has 17 entries', Object.keys(healthData.sources).length === 17);
+check('sources has 18 entries', Object.keys(healthData.sources).length === 18);
 
 const sampleSource = healthData.sources.Skint;
 check('source has status field', 'status' in sampleSource);

@@ -75,7 +75,7 @@ TONIGHT PRIORITY: A decent tonight event beats a great tomorrow event — the us
 const sourceTrust = {
   id: 'source-trust',
   text: `
-SOURCE TRUST HIERARCHY: Skint (0.9) = Nonsense NYC (0.9) > RA (0.85) = Oh My Rockness (0.85) > Dice (0.8) = BrooklynVegan (0.8) = BAM (0.8) = SmallsLIVE (0.8) > NYC Parks (0.75) = DoNYC (0.75) = Songkick (0.75) = Ticketmaster (0.75) > Eventbrite (0.7) = NYPL (0.7) > Tavily (0.6).`,
+SOURCE TRUST HIERARCHY: Skint (0.9) = Nonsense NYC (0.9) > RA (0.85) = Oh My Rockness (0.85) > Dice (0.8) = BrooklynVegan (0.8) = BAM (0.8) = SmallsLIVE (0.8) = Yutori (0.8) > NYC Parks (0.75) = DoNYC (0.75) = Songkick (0.75) = Ticketmaster (0.75) > Eventbrite (0.7) = NYPL (0.7) > Tavily (0.6).`,
 };
 
 const neighborhoodMismatch = {
