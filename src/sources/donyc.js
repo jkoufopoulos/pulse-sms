@@ -50,9 +50,14 @@ function parseCards($, cards, dateStr, categoryOverride) {
           null, null
         );
 
-    // Time
+    // Time — prefer actual startDate over page date (DoNYC sometimes lists
+    // next-day events on the prior day's page)
     const startDate = card.find('meta[itemprop="startDate"]').attr('content') || null;
-    const dateLocal = dateStr;
+    let dateLocal = dateStr;
+    if (startDate) {
+      const m = startDate.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (m) dateLocal = m[1];
+    }
 
     // Free detection
     const cardText = card.text();
