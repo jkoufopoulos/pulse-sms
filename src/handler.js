@@ -7,6 +7,7 @@ const { startTrace, saveTrace } = require('./traces');
 const { getSession, setSession, clearSession, clearSessionInterval } = require('./session');
 const { preRoute } = require('./pre-router');
 const { handleHelp, handleConversational, handleDetails, handleMore, handleFree, handleNudgeAccept, handleEventsDefault } = require('./intent-handlers');
+const { sendRuntimeAlert } = require('./alerts');
 
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
 
@@ -33,30 +34,50 @@ const dedupInterval = setInterval(() => {
   } catch (e) { console.error('Dedup cleanup error:', e); }
 }, 5 * 60 * 1000);
 
-// --- Simple in-memory rate limiter ---
-const rateLimits = new Map(); // phone → { count, resetAt }
-const RATE_LIMIT_MAX = 15; // max requests per phone per hour
-const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour
+// --- Cost-based daily AI budget per user ---
+const aiBudgets = new Map(); // phone → { cost_usd, date }
+const DAILY_BUDGET_USD = 0.10;
+// Per-token pricing by provider
+const PRICING = {
+  anthropic: { input: 1.00 / 1_000_000, output: 5.00 / 1_000_000 },  // Haiku 4.5
+  gemini:    { input: 0.10 / 1_000_000, output: 0.40 / 1_000_000 },  // Gemini 2.0 Flash
+};
 
-function isRateLimited(phone) {
-  const now = Date.now();
-  const entry = rateLimits.get(phone);
-  if (!entry || now > entry.resetAt) {
-    rateLimits.set(phone, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
-    return false;
-  }
-  entry.count++;
-  return entry.count > RATE_LIMIT_MAX;
+function getNycDate() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 }
 
-// Clean stale rate limit entries every 10 minutes
+function isOverBudget(phone) {
+  const today = getNycDate();
+  const entry = aiBudgets.get(phone);
+  if (!entry || entry.date !== today) return false;
+  return entry.cost_usd >= DAILY_BUDGET_USD;
+}
+
+function trackAICost(phone, usage, provider = 'anthropic') {
+  if (!usage) return;
+  const pricing = PRICING[provider] || PRICING.anthropic;
+  const inputTokens = usage.input_tokens || 0;
+  const outputTokens = usage.output_tokens || 0;
+  const cost = inputTokens * pricing.input + outputTokens * pricing.output;
+
+  const today = getNycDate();
+  const entry = aiBudgets.get(phone);
+  if (!entry || entry.date !== today) {
+    aiBudgets.set(phone, { cost_usd: cost, date: today });
+  } else {
+    entry.cost_usd += cost;
+  }
+}
+
+// Clean stale budget entries every 10 minutes
 const rateLimitInterval = setInterval(() => {
   try {
-    const now = Date.now();
-    for (const [phone, entry] of rateLimits) {
-      if (now > entry.resetAt) rateLimits.delete(phone);
+    const today = getNycDate();
+    for (const [phone, entry] of aiBudgets) {
+      if (entry.date !== today) aiBudgets.delete(phone);
     }
-  } catch (e) { console.error('Rate limit cleanup error:', e); }
+  } catch (e) { console.error('Budget cleanup error:', e); }
 }, 10 * 60 * 1000);
 
 // =======================================================
@@ -133,9 +154,9 @@ async function handleMessage(phone, message) {
     return;
   }
 
-  if (isRateLimited(phone)) {
-    console.warn(`Rate limited: ${masked}`);
-    await sendSMS(phone, "Easy there — give it a few minutes and try again!");
+  if (isOverBudget(phone)) {
+    console.warn(`Over daily AI budget: ${masked}`);
+    await sendSMS(phone, "You've hit your daily limit — check back tomorrow for more picks!");
     return;
   }
 
@@ -174,6 +195,27 @@ async function handleMessageAI(phone, message) {
     trace.output_intent = intent || trace.routing.result?.intent || null;
     trace.total_latency_ms = Date.now() - traceStart;
     saveTrace(trace);
+
+    const SLOW_THRESHOLD_MS = 10000;
+    if (trace.total_latency_ms > SLOW_THRESHOLD_MS) {
+      const breakdown = [
+        `route: ${trace.routing.latency_ms}ms`,
+        trace.events.getEvents_ms != null ? `events: ${trace.events.getEvents_ms}ms` : null,
+        `compose: ${trace.composition.latency_ms}ms`,
+        `total: ${trace.total_latency_ms}ms`,
+      ].filter(Boolean).join(' | ');
+      console.warn(`[SLOW] ${(trace.total_latency_ms / 1000).toFixed(1)}s | ${breakdown} | intent=${trace.output_intent} | msg="${trace.input_message.slice(0, 40)}"`);
+
+      sendRuntimeAlert('slow_response', {
+        total_ms: trace.total_latency_ms,
+        routing_ms: trace.routing.latency_ms,
+        compose_ms: trace.composition.latency_ms,
+        events_ms: trace.events.getEvents_ms,
+        intent: trace.output_intent,
+        phone_masked: trace.phone_masked,
+        message: trace.input_message,
+      });
+    }
   }
 
   // --- Route ---
@@ -191,8 +233,10 @@ async function handleMessageAI(phone, message) {
     trace.routing.pre_routed = false;
     trace.routing.result = { intent: route.intent, neighborhood: route.neighborhood, confidence: route.confidence };
     trace.routing.raw_response = route._raw || null;
+    trace.routing.provider = route._provider || 'anthropic';
+    trackAICost(phone, route._usage, route._provider);
   }
-  console.log(`${preRouted ? 'Pre' : 'AI'} route: intent=${route.intent}, neighborhood=${route.neighborhood}, confidence=${route.confidence}`);
+  console.log(`${preRouted ? 'Pre' : 'AI'} route (${route._provider || 'pre'}): intent=${route.intent}, neighborhood=${route.neighborhood}, confidence=${route.confidence}`);
 
   // Shared compose helper (closure over message + trace)
   async function composeAndSend(composeEvents, hood, filters, intentLabel, { excludeIds, skills } = {}) {
@@ -201,6 +245,7 @@ async function handleMessageAI(phone, message) {
     const composeStart = Date.now();
     const result = await composeResponse(message, composeEvents, hood, filters, { excludeIds, skills });
     trace.composition.latency_ms = Date.now() - composeStart;
+    trackAICost(phone, result._usage);
     trace.composition.raw_response = result._raw || null;
     trace.composition.picks = (result.picks || []).map(p => {
       const evt = composeEvents.find(e => e.id === p.event_id);
@@ -211,7 +256,7 @@ async function handleMessageAI(phone, message) {
     return result;
   }
 
-  const ctx = { phone, message, masked, session, trace, route, finalizeTrace, composeAndSend };
+  const ctx = { phone, message, masked, session, trace, route, finalizeTrace, composeAndSend, trackAICost: (usage) => trackAICost(phone, usage) };
 
   // Clear stale nudge state when intent isn't a nudge response —
   // prevents "yeah" in unrelated messages from triggering old nearby redirect
@@ -277,6 +322,9 @@ async function handleMessageAI(phone, message) {
     }
     if (pendingFilters.category && !route.filters?.category) {
       route.filters = { ...route.filters, category: pendingFilters.category };
+    }
+    if (pendingFilters.time_after && !route.filters?.time_after) {
+      route.filters = { ...route.filters, time_after: pendingFilters.time_after };
     }
     // Restore original message context for compose
     if (session?.pendingMessage) {

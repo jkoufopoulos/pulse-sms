@@ -68,4 +68,50 @@ async function sendHealthAlert(failures, scrapeStats) {
   }
 }
 
-module.exports = { sendHealthAlert };
+// --- Runtime alerts (slow responses, errors) ---
+const _runtimeCooldowns = new Map(); // alertType → timestamp
+const RUNTIME_COOLDOWN_MS = 30 * 60 * 1000; // 30 min per alert type
+
+async function sendRuntimeAlert(alertType, details) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn('[ALERT] RESEND_API_KEY not set — skipping email alert');
+    return;
+  }
+
+  const lastSent = _runtimeCooldowns.get(alertType) || 0;
+  if (Date.now() - lastSent < RUNTIME_COOLDOWN_MS) return;
+
+  const subject = `Pulse: ${alertType}`;
+  const body = Object.entries(details)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join('\n');
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'Pulse Alerts <onboarding@resend.dev>',
+        to: ALERT_EMAIL,
+        subject,
+        text: body,
+      }),
+    });
+
+    if (res.ok) {
+      _runtimeCooldowns.set(alertType, Date.now());
+      console.log(`[ALERT] Runtime alert "${alertType}" sent to ${ALERT_EMAIL}`);
+    } else {
+      const err = await res.text();
+      console.error(`[ALERT] Resend API error: ${res.status} ${err}`);
+    }
+  } catch (err) {
+    console.error(`[ALERT] Runtime alert send failed:`, err.message);
+  }
+}
+
+module.exports = { sendHealthAlert, sendRuntimeAlert, _runtimeCooldowns };

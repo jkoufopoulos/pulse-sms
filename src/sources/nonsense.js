@@ -1,6 +1,7 @@
 const cheerio = require('cheerio');
 const { extractEvents } = require('../ai');
 const { FETCH_HEADERS, normalizeExtractedEvent } = require('./shared');
+const { captureExtractionInput } = require('../extraction-capture');
 
 async function fetchNonsenseNYC() {
   console.log('Fetching Nonsense NYC...');
@@ -43,6 +44,7 @@ async function fetchNonsenseNYC() {
     }
 
     console.log(`Nonsense NYC content: ${content.length} chars (${paragraphs.length} paragraphs)`);
+    captureExtractionInput('nonsensenyc', content, 'https://nonsensenyc.com/');
 
     const result = await extractEvents(content, 'nonsensenyc', 'https://nonsensenyc.com/');
     const events = (result.events || [])

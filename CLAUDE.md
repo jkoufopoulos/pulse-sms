@@ -73,7 +73,9 @@ Daily scrape (10am ET)     Incoming SMS
 | `geo.js` | `resolveNeighborhood`, proximity ranking, haversine, time filtering |
 | `neighborhoods.js` | 36 NYC neighborhoods with coords, aliases, landmarks, subway stops |
 | `test-ui.html` | Browser-based SMS simulator for testing (served at `/test`) |
-| `health-ui.html` | Source health dashboard — per-source timing, status, history sparklines (served at `/health`) |
+| `extraction-capture.js` | Lightweight extraction input capture — stores raw text before `extractEvents()` for audit verification |
+| `evals/extraction-audit.js` | Extraction fidelity audit — Tier 1 deterministic checks (evidence quotes in source) + Tier 2 LLM judge |
+| `health-ui.html` | Source health dashboard — per-source timing, status, history sparklines, extraction quality (served at `/health`) |
 
 ## Env Vars
 
@@ -88,7 +90,10 @@ Optional:
 - `PORT` — Server port (default: 3000)
 - `PULSE_TEST_MODE=true` — Enables `/test` simulator UI and `/api/sms/test` endpoint
 - `PULSE_AI_ROUTING=false` — Disable AI routing (unused now that legacy is removed)
-- `PULSE_MODEL_ROUTE` — Claude model for routing (default: claude-haiku-4-5-20251001)
+- `GEMINI_API_KEY` — Google Gemini API key (optional; enables Gemini Flash for routing — ~10x cheaper than Haiku)
+- `PULSE_ROUTE_PROVIDER` — Routing provider: "gemini" or "anthropic" (default: "gemini" if GEMINI_API_KEY set, else "anthropic")
+- `PULSE_MODEL_ROUTE` — Claude model for routing (default: claude-haiku-4-5-20251001, used when provider=anthropic)
+- `PULSE_MODEL_ROUTE_GEMINI` — Gemini model for routing (default: gemini-2.0-flash)
 - `PULSE_MODEL_COMPOSE` — Claude model for composition (default: claude-haiku-4-5-20251001)
 - `PULSE_MODEL_EXTRACT` — Claude model for extraction (default: claude-sonnet-4-5-20250929)
 - `TICKETMASTER_API_KEY` — Ticketmaster Discovery API key (optional; scraper returns [] if missing)
@@ -111,6 +116,7 @@ npm test               # runs smoke tests (pure functions only, no API calls)
 - Test endpoint: `POST /api/sms/test` with `Body` and optional `From` params
 - Health check: `GET /` returns cache status and source health
 - Health dashboard: `GET /health` returns HTML dashboard (or JSON with `?json=1` / `Accept: application/json`)
+- Eval how-to: `docs/eval-howto.md` — end-to-end guide for running all eval layers
 
 ## Key Design Decisions
 

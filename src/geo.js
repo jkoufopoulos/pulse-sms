@@ -245,4 +245,32 @@ function filterUpcomingEvents(events, { refTimeMs } = {}) {
   });
 }
 
-module.exports = { resolveNeighborhood, rankEventsByProximity, getNycDateString, getNycUtcOffset, inferCategory, haversine, filterUpcomingEvents, getEventDate, parseAsNycTime };
+/**
+ * Filter events to those starting at or after a given HH:MM time (NYC timezone).
+ * Events without parseable start times are kept (let Claude decide).
+ * Returns original array if no events match the filter (soft filter).
+ */
+function filterByTimeAfter(events, timeAfterHHMM) {
+  if (!timeAfterHHMM || !/^\d{2}:\d{2}$/.test(timeAfterHHMM)) return events;
+  const [filterH, filterM] = timeAfterHHMM.split(':').map(Number);
+  const filterMinutes = filterH * 60 + filterM;
+
+  const filtered = events.filter(e => {
+    if (!e.start_time_local || !/T\d{2}:/.test(e.start_time_local)) return true; // no time → keep
+    try {
+      const ms = parseAsNycTime(e.start_time_local);
+      if (isNaN(ms)) return true;
+      const nycDate = new Date(ms).toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', hour12: false });
+      const [h, m] = nycDate.split(':').map(Number);
+      const eventMinutes = h * 60 + m;
+      // Handle after-midnight: if filter is 22:00 and event is 01:00, treat 01:00 as 25:00
+      const adjustedEvent = eventMinutes < 6 * 60 ? eventMinutes + 24 * 60 : eventMinutes;
+      const adjustedFilter = filterMinutes < 6 * 60 ? filterMinutes + 24 * 60 : filterMinutes;
+      return adjustedEvent >= adjustedFilter;
+    } catch { return true; }
+  });
+
+  return filtered.length > 0 ? filtered : events; // soft filter
+}
+
+module.exports = { resolveNeighborhood, rankEventsByProximity, getNycDateString, getNycUtcOffset, inferCategory, haversine, filterUpcomingEvents, getEventDate, parseAsNycTime, filterByTimeAfter };

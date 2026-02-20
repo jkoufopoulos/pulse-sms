@@ -1,4 +1,5 @@
 const Anthropic = require('@anthropic-ai/sdk');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { getEventDate, getNycDateString } = require('./geo');
 const { EXTRACTION_PROMPT, ROUTE_SYSTEM, COMPOSE_SYSTEM, DETAILS_SYSTEM } = require('./prompts');
 const { buildComposePrompt } = require('./skills/build-compose-prompt');
@@ -9,17 +10,29 @@ function getClient() {
   return client;
 }
 
+let geminiClient = null;
+function getGeminiClient() {
+  if (!geminiClient) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return null;
+    geminiClient = new GoogleGenerativeAI(apiKey);
+  }
+  return geminiClient;
+}
+
+const ROUTE_PROVIDER = process.env.PULSE_ROUTE_PROVIDER || (process.env.GEMINI_API_KEY ? 'gemini' : 'anthropic');
+
 const MODELS = {
   route: process.env.PULSE_MODEL_ROUTE || 'claude-haiku-4-5-20251001',
+  routeGemini: process.env.PULSE_MODEL_ROUTE_GEMINI || 'gemini-2.0-flash',
   compose: process.env.PULSE_MODEL_COMPOSE || 'claude-haiku-4-5-20251001',
   extract: process.env.PULSE_MODEL_EXTRACT || 'claude-haiku-4-5-20251001',
 };
 
 /**
- * Route an incoming SMS using Claude. Determines intent, neighborhood, and filters.
- * Returns { intent, neighborhood, filters, event_reference, reply, confidence }
+ * Build the routing prompt parts (shared by both providers).
  */
-async function routeMessage(message, session, neighborhoodNames) {
+function buildRoutePrompt(message, session, neighborhoodNames) {
   const sessionContext = session
     ? `Last neighborhood: ${session.lastNeighborhood || 'none'}. Last picks: ${(session.lastPicks || []).map((p, i) => {
         const evt = session.lastEvents?.[p.event_id];
@@ -33,29 +46,21 @@ Session context: ${sessionContext}
 
 VALID_NEIGHBORHOODS: ${neighborhoodNames.join(', ')}`;
 
-  const response = await getClient().messages.create({
-    model: MODELS.route,
-    max_tokens: 256,
-    system: ROUTE_SYSTEM,
-    messages: [{ role: 'user', content: userPrompt }],
-  }, { timeout: 8000 });
+  return { systemPrompt: ROUTE_SYSTEM, userPrompt };
+}
 
-  const text = response.content?.[0]?.text || '';
+const ROUTE_FALLBACK = {
+  intent: 'conversational',
+  neighborhood: null,
+  filters: { free_only: false, category: null, vibe: null },
+  event_reference: null,
+  reply: "Sorry, I didn't catch that. Text a neighborhood to see tonight's picks, or HELP for commands.",
+  confidence: 0,
+};
+
+function parseRouteResult(text) {
   const parsed = parseJsonFromResponse(text);
-
-  if (!parsed || !parsed.intent) {
-    console.error('routeMessage: invalid response:', text);
-    return {
-      intent: 'conversational',
-      neighborhood: null,
-      filters: { free_only: false, category: null, vibe: null },
-      event_reference: null,
-      reply: "Sorry, I didn't catch that. Text a neighborhood to see tonight's picks, or HELP for commands.",
-      confidence: 0,
-      _raw: text,
-    };
-  }
-
+  if (!parsed || !parsed.intent) return null;
   return {
     intent: parsed.intent,
     neighborhood: parsed.neighborhood || null,
@@ -63,8 +68,73 @@ VALID_NEIGHBORHOODS: ${neighborhoodNames.join(', ')}`;
     event_reference: parsed.event_reference || null,
     reply: parsed.reply || null,
     confidence: parsed.confidence || 0,
-    _raw: text,
   };
+}
+
+/**
+ * Route via Anthropic (Claude Haiku).
+ */
+async function routeWithAnthropic(systemPrompt, userPrompt) {
+  const response = await getClient().messages.create({
+    model: MODELS.route,
+    max_tokens: 256,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userPrompt }],
+  }, { timeout: 8000 });
+
+  const text = response.content?.[0]?.text || '';
+  return { text, usage: response.usage || null, provider: 'anthropic' };
+}
+
+/**
+ * Route via Google Gemini Flash.
+ */
+async function routeWithGemini(systemPrompt, userPrompt) {
+  const genAI = getGeminiClient();
+  const model = genAI.getGenerativeModel({
+    model: MODELS.routeGemini,
+    systemInstruction: systemPrompt,
+    generationConfig: { maxOutputTokens: 256, temperature: 0 },
+  });
+
+  const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }] });
+  const response = result.response;
+  const text = response.text() || '';
+  const usageMetadata = response.usageMetadata;
+  const usage = usageMetadata ? {
+    input_tokens: usageMetadata.promptTokenCount || 0,
+    output_tokens: usageMetadata.candidatesTokenCount || 0,
+  } : null;
+
+  return { text, usage, provider: 'gemini' };
+}
+
+/**
+ * Route an incoming SMS. Determines intent, neighborhood, and filters.
+ * Uses Gemini Flash by default (cheaper), falls back to Anthropic on error.
+ */
+async function routeMessage(message, session, neighborhoodNames) {
+  const { systemPrompt, userPrompt } = buildRoutePrompt(message, session, neighborhoodNames);
+
+  let raw;
+  if (ROUTE_PROVIDER === 'gemini' && getGeminiClient()) {
+    try {
+      raw = await routeWithGemini(systemPrompt, userPrompt);
+    } catch (err) {
+      console.warn(`Gemini route failed, falling back to Anthropic: ${err.message}`);
+      raw = await routeWithAnthropic(systemPrompt, userPrompt);
+    }
+  } else {
+    raw = await routeWithAnthropic(systemPrompt, userPrompt);
+  }
+
+  const parsed = parseRouteResult(raw.text);
+  if (!parsed) {
+    console.error(`routeMessage (${raw.provider}): invalid response:`, raw.text);
+    return { ...ROUTE_FALLBACK, _raw: raw.text, _usage: raw.usage, _provider: raw.provider };
+  }
+
+  return { ...parsed, _raw: raw.text, _usage: raw.usage, _provider: raw.provider };
 }
 
 /**
@@ -106,7 +176,7 @@ async function composeResponse(message, events, neighborhood, filters, { exclude
   const userPrompt = `Current time (NYC): ${now}
 <user_message>${message}</user_message>
 Neighborhood: ${neighborhood || 'not specified'}
-User preferences: category=${filters?.category || 'any'}, vibe=${filters?.vibe || 'any'}, free_only=${filters?.free_only ? 'yes' : 'no'}
+User preferences: category=${filters?.category || 'any'}, vibe=${filters?.vibe || 'any'}, free_only=${filters?.free_only ? 'yes' : 'no'}${filters?.time_after ? `, time_after=${filters.time_after}` : ''}
 ${excludeNote}
 EVENT_LIST:
 ${eventListStr}
@@ -183,6 +253,7 @@ Compose the SMS now.`;
     not_picked_reason: parsed.not_picked_reason || null,
     neighborhood_used: neighborhoodUsed,
     _raw: text,
+    _usage: response.usage || null,
   };
 }
 
@@ -382,7 +453,7 @@ Write the details text. Include this URL: ${bestUrl}`;
     smsText = text.replace(/^["']|["']$/g, '').trim();
   }
 
-  return { sms_text: require('./formatters').smartTruncate(smsText), _raw: text };
+  return { sms_text: require('./formatters').smartTruncate(smsText), _raw: text, _usage: response.usage || null };
 }
 
 /**

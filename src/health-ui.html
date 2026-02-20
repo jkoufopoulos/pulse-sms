@@ -283,6 +283,53 @@
     padding: 8px 0;
   }
 
+  .audit-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+  }
+
+  .audit-card {
+    background: #141414;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .audit-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .audit-card-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .audit-card-rate {
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .audit-card-rate.good { color: #4ade80; }
+  .audit-card-rate.warn { color: #fbbf24; }
+  .audit-card-rate.bad { color: #f87171; }
+
+  .audit-card-detail {
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+  }
+
+  .audit-failures {
+    margin-top: 6px;
+    font-size: 11px;
+    color: #f87171;
+  }
+
   .refresh-indicator {
     display: inline-block;
     width: 8px;
@@ -315,6 +362,13 @@
   <h2>Scrape Timing</h2>
   <div class="timing-bar-container" id="timing-bars">
     <div class="no-data">No scrape data yet</div>
+  </div>
+</div>
+
+<div class="timing-section">
+  <h2>Extraction Quality</h2>
+  <div id="extraction-quality">
+    <div class="no-data">Loading audit data...</div>
   </div>
 </div>
 
@@ -464,6 +518,76 @@ function escHtml(str) {
   return el.innerHTML;
 }
 
+function renderExtractionQuality(audit) {
+  const container = $('extraction-quality');
+  if (!audit || audit.error || !audit.sourceStats) {
+    container.innerHTML = '<div class="timing-bar-container"><div class="no-data">No audit data yet — run a scrape first</div></div>';
+    return;
+  }
+
+  const entries = Object.entries(audit.sourceStats);
+  if (entries.length === 0) {
+    container.innerHTML = '<div class="timing-bar-container"><div class="no-data">No Claude-extracted events in cache</div></div>';
+    return;
+  }
+
+  const summaryHtml = `
+    <div class="summary-row" style="margin-bottom:12px">
+      <div class="summary-card">
+        <div class="label">Events Audited</div>
+        <div class="value">${audit.summary.total}</div>
+        <div class="sub">${audit.summary.passed} passed</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Pass Rate</div>
+        <div class="value">${audit.summary.passRate}</div>
+        <div class="sub">${audit.summary.issues} issues</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Audit Time</div>
+        <div class="value" style="font-size:14px">${fmtTime(audit.timestamp)}</div>
+        <div class="sub">${audit.tier || 'deterministic'}</div>
+      </div>
+    </div>
+  `;
+
+  const cardsHtml = entries.map(([source, stats]) => {
+    const rate = stats.total > 0 ? (stats.passed / stats.total * 100) : 0;
+    const rateClass = rate >= 90 ? 'good' : rate >= 70 ? 'warn' : 'bad';
+    const failureEntries = Object.entries(stats.failures || {}).sort((a, b) => b[1] - a[1]);
+    const failureHtml = failureEntries.length > 0
+      ? `<div class="audit-failures">${failureEntries.map(([name, count]) => `${name}: ${count}`).join(', ')}</div>`
+      : '';
+
+    return `
+      <div class="audit-card">
+        <div class="audit-card-header">
+          <div class="audit-card-name">${source}</div>
+          <div class="audit-card-rate ${rateClass}">${rate.toFixed(0)}%</div>
+        </div>
+        <div class="audit-card-detail">${stats.passed}/${stats.total} events pass</div>
+        ${failureHtml}
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = summaryHtml + `<div class="audit-grid">${cardsHtml}</div>`;
+}
+
+async function refreshAudit() {
+  try {
+    const res = await fetch('/api/eval/audit');
+    if (res.ok) {
+      const data = await res.json();
+      renderExtractionQuality(data);
+    } else {
+      renderExtractionQuality(null);
+    }
+  } catch {
+    renderExtractionQuality(null);
+  }
+}
+
 async function refresh() {
   try {
     const res = await fetch('/health?json=1');
@@ -477,7 +601,9 @@ async function refresh() {
 }
 
 refresh();
+refreshAudit();
 setInterval(refresh, 60000);
+setInterval(refreshAudit, 60000);
 </script>
 </body>
 </html>

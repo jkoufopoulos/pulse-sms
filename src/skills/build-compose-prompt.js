@@ -64,6 +64,14 @@ function buildComposePrompt(events, options = {}) {
     parts.push(`\nUser's original request: "${options.pendingMessage}". Prioritize events matching that intent.`);
   }
 
+  // Activity adherence — when user asks for a specific activity type not covered by category routing
+  if (options.userMessage && !options.requestedCategory) {
+    const ACTIVITY_KEYWORDS = /\b(trivia|karaoke|bingo|open mic|drag|burlesque|poetry|salsa|bachata|swing|vinyl|happy hour|game night|pub quiz|board game)\b/i;
+    if (ACTIVITY_KEYWORDS.test(options.userMessage)) {
+      parts.push(skills.activityAdherence.text);
+    }
+  }
+
   return parts.join('\n');
 }
 

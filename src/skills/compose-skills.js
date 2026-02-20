@@ -126,6 +126,13 @@ const pendingIntent = {
   text: '',
 };
 
-const ALL_SKILLS = { core, tonightPriority, sourceTiers, neighborhoodMismatch, perennialFraming, venueFraming, lastBatch, freeEmphasis, pendingIntent };
+const activityAdherence = {
+  id: 'activity-adherence',
+  text: `
+ACTIVITY ADHERENCE: The user asked for a specific type of activity. If NONE of the events match that activity type, do NOT recommend unrelated events as alternatives. Instead, say honestly you don't have that tonight — e.g. "No trivia in Fort Greene tonight." Then suggest trying a different neighborhood or event type.
+DAY-SPECIFIC CLAIMS: NEVER say an event happens on a particular day (e.g. "trivia on Thursdays") unless you can verify from the event data that today IS that day. Check "Current time (NYC)" above.`,
+};
+
+const ALL_SKILLS = { core, tonightPriority, sourceTiers, neighborhoodMismatch, perennialFraming, venueFraming, lastBatch, freeEmphasis, pendingIntent, activityAdherence };
 
 module.exports = ALL_SKILLS;

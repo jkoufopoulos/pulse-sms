@@ -1,6 +1,7 @@
 const cheerio = require('cheerio');
 const { extractEvents } = require('../ai');
 const { FETCH_HEADERS, normalizeExtractedEvent } = require('./shared');
+const { captureExtractionInput } = require('../extraction-capture');
 
 async function fetchSkintEvents() {
   console.log('Fetching The Skint...');
@@ -46,6 +47,7 @@ async function fetchSkintEvents() {
     }
 
     console.log(`Skint content: ${content.length} chars (${eventParagraphs.length} event paragraphs)`);
+    captureExtractionInput('theskint', content, 'https://theskint.com/');
 
     const result = await extractEvents(content, 'theskint', 'https://theskint.com/');
     const events = (result.events || [])

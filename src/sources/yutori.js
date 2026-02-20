@@ -3,6 +3,7 @@ const path = require('path');
 const { extractEvents } = require('../ai');
 const { fetchYutoriEmails } = require('../gmail');
 const { normalizeExtractedEvent } = require('./shared');
+const { captureExtractionInput } = require('../extraction-capture');
 
 const YUTORI_DIR = path.join(__dirname, '../../data/yutori');
 const PROCESSED_DIR = path.join(YUTORI_DIR, 'processed');
@@ -161,6 +162,7 @@ async function fetchYutoriEvents() {
 
     const combined = sections.join('\n\n---\n\n');
     console.log(`Yutori content: ${combined.length} chars (${files.length} files)`);
+    captureExtractionInput('yutori', combined, null);
 
     const result = await extractEvents(combined, 'yutori', null);
     const events = (result.events || [])

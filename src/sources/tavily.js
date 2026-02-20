@@ -1,6 +1,7 @@
 const { extractEvents } = require('../ai');
 const { normalizeExtractedEvent } = require('./shared');
 const { filterUpcomingEvents } = require('../geo');
+const { captureExtractionInput } = require('../extraction-capture');
 
 async function searchTavilyEvents(neighborhood, { query: customQuery } = {}) {
   const apiKey = process.env.TAVILY_API_KEY;
@@ -126,6 +127,7 @@ async function fetchTavilyFreeEvents() {
       .join('\n\n---\n\n');
 
     if (!rawText.trim()) return [];
+    captureExtractionInput('tavily', rawText, 'daily scrape');
 
     const extracted = await extractEvents(rawText, 'tavily-free', 'daily scrape', { model: 'claude-haiku-4-5-20251001' });
     const events = (extracted.events || [])

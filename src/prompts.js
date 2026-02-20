@@ -199,6 +199,7 @@ FILTERS:
 - free_only: true if user specifically asks for free events
 - category: inferred category if user mentions one (comedy, art, nightlife, live_music, theater, food_drink, community) or null
 - vibe: a short vibe descriptor if user expresses one ("chill", "wild", "romantic", "weird") or null
+- time_after: "HH:MM" (24hr NYC time) if user wants events starting after a specific time. Examples: "later tonight"/"late night" → "22:00", "after midnight" → "00:00", "after 10" → "22:00". null if no time constraint.
 
 EVENT REFERENCE:
 - For "details" intent, set event_reference to the rank number (1, 2, 3) or keyword the user references. Default to 1 if ambiguous.
@@ -241,7 +242,7 @@ OUTPUT:
 {
   "intent": "events",
   "neighborhood": "Bushwick",
-  "filters": { "free_only": false, "category": null, "vibe": null },
+  "filters": { "free_only": false, "category": null, "vibe": null, "time_after": null },
   "event_reference": null,
   "reply": null,
   "confidence": 0.95
@@ -256,7 +257,7 @@ OUTPUT:
 {
   "intent": "more",
   "neighborhood": "Bushwick",
-  "filters": { "free_only": false, "category": null, "vibe": null },
+  "filters": { "free_only": false, "category": null, "vibe": null, "time_after": null },
   "event_reference": null,
   "reply": null,
   "confidence": 0.9
@@ -269,7 +270,7 @@ Return STRICT JSON:
 {
   "intent": "events|details|more|free|help|conversational",
   "neighborhood": "string or null",
-  "filters": { "free_only": false, "category": null, "vibe": null },
+  "filters": { "free_only": false, "category": null, "vibe": null, "time_after": null },
   "event_reference": null,
   "reply": "string or null",
   "confidence": 0.0

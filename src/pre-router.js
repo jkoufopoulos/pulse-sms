@@ -29,7 +29,7 @@ function getAdjacentNeighborhoods(hood, count = 3) {
 function preRoute(message, session) {
   const msg = message.trim();
   const lower = msg.toLowerCase();
-  const base = { filters: { free_only: false, category: null, vibe: null }, event_reference: null, reply: null, confidence: 1.0 };
+  const base = { filters: { free_only: false, category: null, vibe: null, time_after: null }, event_reference: null, reply: null, confidence: 1.0 };
 
   // Help
   if (/^(help|\?)$/i.test(msg)) {

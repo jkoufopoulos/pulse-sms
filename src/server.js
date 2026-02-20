@@ -128,6 +128,45 @@ if (process.env.PULSE_TEST_MODE === 'true') {
     res.json({ ok: true });
   });
 
+  // API: extraction audit
+  app.get('/api/eval/audit', (req, res) => {
+    // Return latest audit report from disk
+    const fs = require('fs');
+    const reportsDir = require('path').join(__dirname, '../data/reports');
+    try {
+      const files = fs.readdirSync(reportsDir)
+        .filter(f => f.startsWith('extraction-audit-'))
+        .sort()
+        .reverse();
+      if (files.length === 0) return res.json({ error: 'No audit reports yet' });
+      const report = JSON.parse(fs.readFileSync(require('path').join(reportsDir, files[0]), 'utf8'));
+      res.json(report);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/eval/audit', async (req, res) => {
+    try {
+      const { getRawCache, getExtractionInputs } = require('./events');
+      const { runFullAudit } = require('./evals/extraction-audit');
+      const { events } = getRawCache();
+      const inputs = getExtractionInputs();
+      const sampleSize = parseInt(req.query.sample) || 10;
+      const report = await runFullAudit(events, inputs, sampleSize);
+      // Save report
+      const fs = require('fs');
+      const reportsDir = require('path').join(__dirname, '../data/reports');
+      fs.mkdirSync(reportsDir, { recursive: true });
+      const reportFile = require('path').join(reportsDir, `extraction-audit-${new Date().toISOString().slice(0, 10)}.json`);
+      fs.writeFileSync(reportFile, JSON.stringify(report, null, 2));
+      res.json(report);
+    } catch (err) {
+      console.error('Audit error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // API: session injection for eval runner
   const { setSession, clearSession } = require('./handler');
   app.post('/api/eval/session', (req, res) => {

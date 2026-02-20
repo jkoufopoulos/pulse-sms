@@ -5,6 +5,8 @@ const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventD
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues } = require('./venues');
 const { sendHealthAlert } = require('./alerts');
 const { computeCompleteness } = require('./sources/shared');
+const { runExtractionAudit } = require('./evals/extraction-audit');
+const { captureExtractionInput, getExtractionInputs, clearExtractionInputs } = require('./extraction-capture');
 
 // Source tier classification for compose prompt
 const SOURCE_TIERS = {
@@ -186,6 +188,7 @@ async function refreshCache() {
   refreshPromise = (async () => {
     const scrapeStart = new Date();
     lastScrapeStats.startedAt = scrapeStart.toISOString();
+    clearExtractionInputs(); // Clear for this scrape cycle
     console.log('Refreshing event cache (all sources)...');
 
     // Run endpoint checks and source fetches in parallel
@@ -310,6 +313,21 @@ async function refreshCache() {
       );
     }
 
+    // Run extraction audit (deterministic tier only — fast, free)
+    try {
+      const auditReport = runExtractionAudit(allEvents, getExtractionInputs());
+      if (auditReport.summary.total > 0) {
+        console.log(`Extraction audit: ${auditReport.summary.passed}/${auditReport.summary.total} events pass (${auditReport.summary.passRate}), ${auditReport.summary.issues} issues`);
+        // Save report to disk
+        const reportsDir = path.join(__dirname, '../data/reports');
+        fs.mkdirSync(reportsDir, { recursive: true });
+        const reportFile = path.join(reportsDir, `extraction-audit-${new Date().toISOString().slice(0, 10)}.json`);
+        fs.writeFileSync(reportFile, JSON.stringify(auditReport, null, 2));
+      }
+    } catch (err) {
+      console.error('Extraction audit failed:', err.message);
+    }
+
     console.log(`Cache refreshed: ${allEvents.length} deduped events (${totalRaw} raw from ${sourcesOk} ok / ${sourcesFailed} failed / ${sourcesEmpty} empty sources)`);
     return eventCache;
   })().finally(() => { refreshPromise = null; });
@@ -432,4 +450,4 @@ function getRawCache() {
   return { events: [...eventCache], timestamp: cacheTimestamp };
 }
 
-module.exports = { SOURCES, SOURCE_TIERS, refreshCache, getEvents, getCacheStatus, getHealthStatus, getRawCache, scheduleDailyScrape, clearSchedule };
+module.exports = { SOURCES, SOURCE_TIERS, refreshCache, getEvents, getCacheStatus, getHealthStatus, getRawCache, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs };

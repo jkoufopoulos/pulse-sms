@@ -43,7 +43,7 @@ function startTrace(phone_masked, input_message) {
     input_message,
     session_before: { lastNeighborhood: null, lastPicks: null },
     routing: { pre_routed: false, result: null, latency_ms: 0, raw_response: null },
-    events: { cache_size: 0, candidates_count: 0, sent_to_claude: 0, candidate_ids: [], sent_ids: [] },
+    events: { cache_size: 0, candidates_count: 0, sent_to_claude: 0, candidate_ids: [], sent_ids: [], getEvents_ms: null },
     composition: { raw_response: null, latency_ms: 0, picks: null, not_picked_reason: null, neighborhood_used: null },
     output_sms: null,
     output_sms_length: 0,

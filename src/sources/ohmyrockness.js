@@ -1,6 +1,7 @@
 const cheerio = require('cheerio');
 const { extractEvents } = require('../ai');
 const { FETCH_HEADERS, normalizeExtractedEvent } = require('./shared');
+const { captureExtractionInput } = require('../extraction-capture');
 
 async function fetchOhMyRockness() {
   console.log('Fetching Oh My Rockness...');
@@ -49,6 +50,7 @@ async function fetchOhMyRockness() {
     }
 
     console.log(`Oh My Rockness content: ${content.length} chars (${paragraphs.length} listings)`);
+    captureExtractionInput('ohmyrockness', content, 'https://www.ohmyrockness.com/shows');
 
     const result = await extractEvents(content, 'ohmyrockness', 'https://www.ohmyrockness.com/shows', { model: 'claude-haiku-4-5-20251001' });
     const events = (result.events || [])
