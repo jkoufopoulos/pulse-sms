@@ -64,8 +64,8 @@ function preRoute(message, session) {
   if (session?.lastNeighborhood && session?.lastPicks?.length > 0) {
     const hood = session.lastNeighborhood;
 
-    // Category follow-ups: "how about theater", "any comedy", "what about jazz"
-    const categoryMatch = lower.match(/^(?:how about|what about|any|show me|got any|have any|know any)\s+(comedy|standup|stand-up|improv|theater|theatre|jazz|music|art|nightlife|dance|live music|hip hop|hip-hop|rock|techno|house|electronic|punk|metal|folk|indie|r&b|soul|funk|rap|dj)(?:\s+(?:stuff|shows?|events?|tonight|picks?))?$/i);
+    // Category follow-ups: "how about theater", "any comedy", "what about jazz", "how about trivia night stuff"
+    const categoryMatch = lower.match(/^(?:how about|what about|any|show me|got any|have any|know any)\s+(comedy|standup|stand-up|improv|theater|theatre|jazz|music|art|nightlife|dance|live music|hip hop|hip-hop|rock|techno|house|electronic|punk|metal|folk|indie|r&b|soul|funk|rap|dj|trivia|karaoke|bingo|open mic|drag|burlesque|poetry|salsa|bachata|swing)(?:\s+(?:night|stuff|shows?|events?|tonight|picks?|options?))*$/i);
     if (categoryMatch) {
       const rawCat = categoryMatch[1].toLowerCase();
       const catMap = {
@@ -76,6 +76,9 @@ function preRoute(message, session) {
         'hip hop': 'live_music', 'hip-hop': 'live_music', 'r&b': 'live_music', 'soul': 'live_music', 'funk': 'live_music', 'rap': 'live_music',
         'techno': 'nightlife', 'house': 'nightlife', 'electronic': 'nightlife', 'dj': 'nightlife',
         'art': 'art', 'nightlife': 'nightlife', 'dance': 'nightlife',
+        'trivia': 'community', 'bingo': 'community', 'open mic': 'community', 'poetry': 'community',
+        'karaoke': 'community', 'drag': 'community', 'burlesque': 'community',
+        'salsa': 'nightlife', 'bachata': 'nightlife', 'swing': 'nightlife',
       };
       return { ...base, intent: 'events', neighborhood: hood, filters: { ...base.filters, category: catMap[rawCat] || rawCat } };
     }
@@ -143,7 +146,7 @@ function preRoute(message, session) {
   }
 
   // Bare neighborhood — check BEFORE borough detection
-  const CATEGORY_KEYWORDS = /\b(comedy|standup|stand-up|music|jazz|rock|techno|house|art|gallery|theater|theatre|dance|food|drink|free|cheap|underground|improv|hip hop|hip-hop|rap|r&b|soul|funk|punk|metal|folk|indie|electronic|dj)\b/i;
+  const CATEGORY_KEYWORDS = /\b(comedy|standup|stand-up|music|jazz|rock|techno|house|art|gallery|theater|theatre|dance|food|drink|free|cheap|underground|improv|hip hop|hip-hop|rap|r&b|soul|funk|punk|metal|folk|indie|electronic|dj|trivia|karaoke|bingo|open mic|drag|burlesque|poetry|salsa|bachata|swing)\b/i;
   if (msg.length <= 25 && !CATEGORY_KEYWORDS.test(msg)) {
     const hood = extractNeighborhood(msg);
     if (hood) {
@@ -152,8 +155,10 @@ function preRoute(message, session) {
   }
 
   // Borough detection — ask user to narrow down
+  // But if message contains a category/activity keyword, let Claude handle it
+  // (e.g. "any trivia options in bk" should route to AI, not just ask "which neighborhood?")
   const borough = detectBorough(msg);
-  if (borough) {
+  if (borough && !CATEGORY_KEYWORDS.test(msg)) {
     const name = borough.borough.charAt(0).toUpperCase() + borough.borough.slice(1);
     return { ...base, intent: 'conversational', neighborhood: null, reply: `${name}'s a big place! Which neighborhood?\n\n${borough.neighborhoods.join(', ')}` };
   }

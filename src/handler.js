@@ -70,12 +70,16 @@ function trackAICost(phone, usage, provider = 'anthropic') {
   }
 }
 
-// Clean stale budget entries every 10 minutes
+// Clean stale budget + IP rate limit entries every 10 minutes
 const rateLimitInterval = setInterval(() => {
   try {
     const today = getNycDate();
     for (const [phone, entry] of aiBudgets) {
       if (entry.date !== today) aiBudgets.delete(phone);
+    }
+    const now = Date.now();
+    for (const [ip, entry] of ipRateLimits) {
+      if (now >= entry.resetTime) ipRateLimits.delete(ip);
     }
   } catch (e) { console.error('Budget cleanup error:', e); }
 }, 10 * 60 * 1000);
@@ -85,8 +89,42 @@ const rateLimitInterval = setInterval(() => {
 // Gated behind PULSE_TEST_MODE=true env var
 // =======================================================
 
+// --- IP-based rate limit for test endpoint (7 messages per IP per hour) ---
+const ipRateLimits = new Map(); // ip → { count, resetTime }
+const IP_RATE_LIMIT = 7;
+const IP_RATE_WINDOW = 60 * 60 * 1000; // 1 hour
+
+const CORS_ORIGIN = 'https://jkoufopoulos.github.io';
+
+function setCorsHeaders(res) {
+  res.set('Access-Control-Allow-Origin', CORS_ORIGIN);
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+}
+
 if (process.env.PULSE_TEST_MODE === 'true') {
+  // CORS preflight
+  router.options('/test', (req, res) => {
+    setCorsHeaders(res);
+    res.sendStatus(204);
+  });
+
   router.post('/test', async (req, res) => {
+    setCorsHeaders(res);
+
+    // IP rate limit
+    const ip = req.ip;
+    const now = Date.now();
+    const entry = ipRateLimits.get(ip);
+    if (entry && now < entry.resetTime) {
+      if (entry.count >= IP_RATE_LIMIT) {
+        return res.status(429).json({ error: 'Rate limit exceeded' });
+      }
+      entry.count++;
+    } else {
+      ipRateLimits.set(ip, { count: 1, resetTime: now + IP_RATE_WINDOW });
+    }
+
     const { Body: message, From: phone } = req.body;
     if (!message?.trim()) {
       return res.status(400).json({ error: 'Missing Body parameter' });

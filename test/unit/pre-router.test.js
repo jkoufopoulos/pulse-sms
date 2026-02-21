@@ -149,6 +149,18 @@ check('how about theater no session → null', preRoute('how about theater', nul
 check('later tonight no session → null', preRoute('later tonight', null) === null);
 check('something chill no session → null', preRoute('something chill', null) === null);
 
+// Activity follow-ups
+check('how about trivia night stuff → events', preRoute('how about trivia night stuff', followUpSession)?.intent === 'events');
+check('how about trivia night stuff → community', preRoute('how about trivia night stuff', followUpSession)?.filters?.category === 'community');
+check('any karaoke → events', preRoute('any karaoke', followUpSession)?.intent === 'events');
+check('any karaoke → community', preRoute('any karaoke', followUpSession)?.filters?.category === 'community');
+check('show me drag events → events', preRoute('show me drag events', followUpSession)?.intent === 'events');
+check('show me drag events → community', preRoute('show me drag events', followUpSession)?.filters?.category === 'community');
+check('how about salsa → nightlife', preRoute('how about salsa', followUpSession)?.filters?.category === 'nightlife');
+
+// Borough + category falls through to Claude (not just "which neighborhood?")
+check('trivia in bk → null (not borough handler)', preRoute('any trivia options in bk', followUpSession) === null);
+
 // Compound messages fall through to Claude (too complex for regex)
 check('free comedy stuff → null (compound)', preRoute('any more free comedy stuff', followUpSession) === null);
 
