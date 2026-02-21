@@ -112,17 +112,19 @@ if (process.env.PULSE_TEST_MODE === 'true') {
   router.post('/test', async (req, res) => {
     setCorsHeaders(res);
 
-    // IP rate limit
-    const ip = req.ip;
-    const now = Date.now();
-    const entry = ipRateLimits.get(ip);
-    if (entry && now < entry.resetTime) {
-      if (entry.count >= IP_RATE_LIMIT) {
-        return res.status(429).json({ error: 'Rate limit exceeded' });
+    // IP rate limit (skip when PULSE_NO_RATE_LIMIT is set for eval runs)
+    if (!process.env.PULSE_NO_RATE_LIMIT) {
+      const ip = req.ip;
+      const now = Date.now();
+      const entry = ipRateLimits.get(ip);
+      if (entry && now < entry.resetTime) {
+        if (entry.count >= IP_RATE_LIMIT) {
+          return res.status(429).json({ error: 'Rate limit exceeded' });
+        }
+        entry.count++;
+      } else {
+        ipRateLimits.set(ip, { count: 1, resetTime: now + IP_RATE_WINDOW });
       }
-      entry.count++;
-    } else {
-      ipRateLimits.set(ip, { count: 1, resetTime: now + IP_RATE_WINDOW });
     }
 
     const { Body: message, From: phone } = req.body;

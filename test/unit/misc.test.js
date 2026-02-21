@@ -123,7 +123,7 @@ module.exports.runAsync = async function() {
   // ---- Session merge semantics ----
   console.log('\nSession merge:');
 
-  const { getSession, setSession, clearSession, clearSessionInterval } = require('../../src/session');
+  const { getSession, setSession, setResponseState, clearSession, clearSessionInterval } = require('../../src/session');
   const testPhone = '+15555550000';
   clearSession(testPhone);
   setSession(testPhone, { lastNeighborhood: 'Williamsburg', lastPicks: [{ event_id: 'abc' }] });
@@ -142,6 +142,35 @@ module.exports.runAsync = async function() {
   check('full update overwrites neighborhood', s3.lastNeighborhood === 'Bushwick');
   check('full update overwrites picks', s3.lastPicks.length === 0);
   check('full update preserves merged field', s3.pendingFilters.free_only === true);
+
+  // ---- setResponseState atomic replacement ----
+  console.log('\nsetResponseState atomic replacement:');
+
+  // Set up a full session with merge semantics first
+  clearSession(testPhone);
+  setSession(testPhone, { lastNeighborhood: 'Williamsburg', lastPicks: [{ event_id: 'abc' }], pendingNearby: 'Greenpoint', pendingFilters: { free_only: true }, conversationHistory: [{ role: 'user', content: 'hi' }] });
+
+  // setResponseState should atomically replace everything except conversationHistory
+  setResponseState(testPhone, { picks: [{ event_id: 'xyz' }], neighborhood: 'Bushwick', filters: { category: 'comedy' } });
+  const s4 = getSession(testPhone);
+  check('atomic: picks replaced', s4.lastPicks.length === 1 && s4.lastPicks[0].event_id === 'xyz');
+  check('atomic: neighborhood replaced', s4.lastNeighborhood === 'Bushwick');
+  check('atomic: filters replaced', s4.lastFilters?.category === 'comedy');
+  check('atomic: pendingNearby cleared', s4.pendingNearby === null);
+  check('atomic: pendingFilters cleared', s4.pendingFilters === null);
+  check('atomic: conversationHistory preserved', s4.conversationHistory?.length === 1);
+  check('atomic: allOfferedIds defaulted to empty', Array.isArray(s4.allOfferedIds) && s4.allOfferedIds.length === 0);
+  check('atomic: visitedHoods defaulted to empty', Array.isArray(s4.visitedHoods) && s4.visitedHoods.length === 0);
+
+  // Verify transition (no picks) clears old state
+  setResponseState(testPhone, { neighborhood: 'LES', pendingNearby: 'East Village' });
+  const s5 = getSession(testPhone);
+  check('transition: picks cleared', s5.lastPicks.length === 0);
+  check('transition: neighborhood set', s5.lastNeighborhood === 'LES');
+  check('transition: pendingNearby set', s5.pendingNearby === 'East Village');
+  check('transition: old filters cleared', s5.lastFilters === null);
+  check('transition: conversationHistory still preserved', s5.conversationHistory?.length === 1);
+
   clearSession(testPhone);
   clearSessionInterval();
 

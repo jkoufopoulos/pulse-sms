@@ -646,11 +646,11 @@
       "turns": [
         {
           "sender": "user",
-          "message": "bed-stuy"
+          "message": "jackson heights"
         },
         {
           "sender": "pulse",
-          "message": "Slim pickings in Bed-Stuy tonight. Bushwick is right nearby — want picks from there?"
+          "message": "Not much in Jackson Heights tonight. Astoria is close by — want picks from there?"
         },
         {
           "sender": "user",
@@ -658,15 +658,15 @@
         },
         {
           "sender": "pulse",
-          "message": "Tonight in Bushwick:\n\n1) BODEGA at TV Eye — post-punk energy. $15\n\n2) GENESIS at Bossa Nova Civic Club — free, always dancey\n\nReply 1-2 for details, MORE for extra picks"
+          "message": "Tonight in Astoria:\n\n1) Comedy show at QED — always solid lineup. $10\n\nReply 1 for details, MORE for extra picks"
         }
       ],
       "testing": "Sparse neighborhood — Pulse acknowledges thin events and suggests nearby, user accepts",
-      "expected_behavior": "Pulse acknowledges sparse events in Bed-Stuy — either serves thin picks with a nearby suggestion, serves nearby events with acknowledgment, or suggests nearby directly. When user accepts, serves picks from the nearby neighborhood. Pulse may inline nearby events in the first response rather than asking first.",
+      "expected_behavior": "Pulse acknowledges sparse events in Jackson Heights — either serves thin picks with a nearby suggestion, or suggests nearby directly. When user accepts, serves picks from the nearby neighborhood. Pulse may inline nearby events in the first response rather than asking first. If Jackson Heights has 1-2 events, serving them honestly with a nearby suggestion is also acceptable.",
       "failure_modes": [
-        "Invents fake events in Bed-Stuy",
+        "Invents fake events in Jackson Heights",
         "Robotic 'no events found' message",
-        "Suggests neighborhoods far away",
+        "Suggests neighborhoods far away (not Astoria/Flushing/LIC)",
         "User says yes but doesn't get events from suggested neighborhood"
       ]
     },
@@ -691,12 +691,13 @@
           "message": "All good! If you change your mind or end up somewhere else, just text me a neighborhood and I got you."
         }
       ],
-      "testing": "Travel nudge flow — user declines suggestion",
-      "expected_behavior": "Pulse accepts the no gracefully, doesn't push, leaves the door open for later",
+      "testing": "Travel nudge flow — user declines suggestion. Flushing may have sparse events some days.",
+      "expected_behavior": "Turn 1: Pulse either serves sparse events (if available) with honest framing, or suggests nearby neighborhoods if truly thin. Both are acceptable. Turn 2: When user declines with 'nah im good', Pulse accepts gracefully, doesn't push, leaves the door open for later. The decline handling is the core test.",
       "failure_modes": [
-        "Keeps pushing alternatives",
-        "Abrupt sign-off",
-        "Doesn't offer to help later"
+        "Keeps pushing alternatives after user says no",
+        "Abrupt sign-off with no warmth",
+        "Doesn't offer to help later",
+        "Treats 'nah im good' as an error or doesn't understand it"
       ]
     },
     {
@@ -720,11 +721,11 @@
           "message": "Tonight in Gowanus:\n\n1) Music at The Bell House — solid venue, good sound. 8pm\n\nReply 1 for details, MORE for extra picks"
         }
       ],
-      "testing": "Pulse handles nothing-tonight by suggesting nearby neighborhoods, user picks one",
-      "expected_behavior": "Pulse is honest about no/thin events in Red Hook, suggests one or more nearby neighborhoods. When user picks one, serves tonight picks from there. Never surfaces tomorrow events unless user asks. Pulse may suggest just one nearby neighborhood rather than multiple.",
+      "testing": "Red Hook has variable event coverage. Tests neighborhood switch flow.",
+      "expected_behavior": "Turn 1: Pulse serves whatever events exist in Red Hook with honest framing. If thin/sparse, may suggest nearby neighborhoods (Gowanus, Cobble Hill, Carroll Gardens). If events exist, serving them is correct. Turn 2: When user asks for a different neighborhood, Pulse serves picks from there. The neighborhood switch is the core test.",
       "failure_modes": [
         "Shows tomorrow events without being asked",
-        "Gives up entirely without suggesting alternatives",
+        "Gives up entirely without suggesting alternatives when events are thin",
         "Suggests far-away neighborhoods",
         "Doesn't serve events when user picks a neighborhood"
       ]
@@ -827,12 +828,13 @@
           "message": "Not much going on in Washington Heights tonight... would you try Harlem? It's right down the 1 and usually has stuff."
         }
       ],
-      "testing": "Low-density neighborhood with thin event cache suggests nearest neighbor",
-      "expected_behavior": "Pulse is honest about no events, suggests Harlem as the nearest supported neighborhood (right down the 1 train). Suggestion feels like a friend who knows the subway.",
+      "testing": "Low-density neighborhood with thin event cache. Washington Heights typically has 0-3 events.",
+      "expected_behavior": "Pulse handles a thin neighborhood honestly. If events exist (1-2), serves them with honest framing about sparse options — may suggest Harlem or East Harlem nearby. If no events, suggests Harlem as the nearest neighborhood. Either way, tone should feel like a friend who knows the subway, not a robotic error.",
       "failure_modes": [
-        "Suggests a far-away neighborhood",
+        "Suggests a far-away neighborhood (not Harlem or East Harlem)",
         "Invents events in Washington Heights",
-        "Vague 'no events' with no suggestion"
+        "Vague 'no events' with no nearby suggestion when cache is truly empty",
+        "Robotic error message instead of warm acknowledgment"
       ]
     },
     {
@@ -899,19 +901,20 @@
       "turns": [
         {
           "sender": "user",
-          "message": "comedy in east village"
+          "message": "comedy in greenpoint"
         },
         {
           "sender": "pulse",
-          "message": "Not seeing comedy in East Village tonight specifically, but Greenwich Village is right there:\n\n1) Comedy Cellar — legendary basement room, always a great lineup. $20\n\nReply 1 for details or try another neighborhood"
+          "message": "Not seeing comedy in Greenpoint tonight. Williamsburg is right nearby and usually has options — want picks from there?"
         }
       ],
-      "testing": "Category search finds no local matches, serves from neighboring area",
-      "expected_behavior": "Pulse is honest about no local comedy in EV, suggests Greenwich Village which is right next door — natural neighbor for comedy",
+      "testing": "Category search finds no local matches in a neighborhood without comedy venues",
+      "expected_behavior": "Pulse is honest about no comedy in Greenpoint and suggests a nearby neighborhood (Williamsburg, Bushwick) that's more likely to have comedy. Does NOT substitute non-comedy events. If comedy events happen to exist in Greenpoint, serving them is fine.",
       "failure_modes": [
-        "Returns non-comedy events",
+        "Returns non-comedy events (music, art, etc.) without acknowledging the category mismatch",
         "Suggests a far-away neighborhood",
-        "Gives up without trying nearby"
+        "Gives up without trying nearby",
+        "Silently drops the comedy filter"
       ]
     },
     {

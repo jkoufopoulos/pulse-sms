@@ -14,6 +14,32 @@ function setSession(phone, data) {
   sessions.set(phone, { ...existing, ...data, timestamp: Date.now() });
 }
 
+/**
+ * Atomically replace the full response state for a phone.
+ * Unlike setSession (which merges), this replaces ALL event-related fields
+ * so stale picks/filters/pending state can never survive a response transition.
+ *
+ * Only conversationHistory is preserved from the previous session.
+ */
+function setResponseState(phone, frame) {
+  const existing = sessions.get(phone);
+  sessions.set(phone, {
+    conversationHistory: existing?.conversationHistory || [],
+    lastPicks: frame.picks ?? [],
+    allPicks: frame.allPicks ?? frame.picks ?? [],
+    allOfferedIds: frame.offeredIds ?? [],
+    lastEvents: frame.eventMap ?? {},
+    lastNeighborhood: frame.neighborhood ?? null,
+    lastFilters: frame.filters ?? null,
+    visitedHoods: frame.visitedHoods ?? [],
+    pendingNearby: frame.pendingNearby ?? null,
+    pendingNearbyEvents: frame.pendingNearbyEvents ?? null,
+    pendingFilters: frame.pendingFilters ?? null,
+    pendingMessage: frame.pendingMessage ?? null,
+    timestamp: Date.now(),
+  });
+}
+
 function clearSession(phone) {
   sessions.delete(phone);
 }
@@ -45,4 +71,4 @@ function clearSessionInterval() {
   clearInterval(sessionInterval);
 }
 
-module.exports = { getSession, setSession, clearSession, addToHistory, clearSessionInterval };
+module.exports = { getSession, setSession, setResponseState, clearSession, addToHistory, clearSessionInterval };
