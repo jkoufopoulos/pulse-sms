@@ -43,6 +43,19 @@ let eventCache = [];
 let cacheTimestamp = 0;
 let refreshPromise = null; // mutex to prevent concurrent refreshes
 
+const CACHE_FILE = path.join(__dirname, '../data/events-cache.json');
+
+// Load persisted event cache on boot (stale but usable until fresh scrape completes)
+try {
+  const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+  if (cached.events?.length > 0) {
+    eventCache = cached.events;
+    cacheTimestamp = cached.timestamp || 0;
+    const ageMin = cacheTimestamp ? Math.round((Date.now() - cacheTimestamp) / 60000) : '?';
+    console.log(`Loaded ${eventCache.length} persisted events (${ageMin}min old)`);
+  }
+} catch { /* file doesn't exist yet — first deploy */ }
+
 // --- Source health tracking (expanded) ---
 function makeHealthEntry() {
   return {
@@ -291,6 +304,12 @@ async function refreshCache() {
     eventCache = allEvents;
     cacheTimestamp = Date.now();
 
+    // Persist cache to disk so next deploy starts with usable data
+    try {
+      fs.writeFileSync(CACHE_FILE, JSON.stringify({ events: allEvents, timestamp: cacheTimestamp }));
+      console.log(`Persisted ${allEvents.length} events to cache file`);
+    } catch (err) { console.error('Failed to persist event cache:', err.message); }
+
     // Update scrape-level stats
     const scrapeEnd = new Date();
     lastScrapeStats = {
@@ -342,7 +361,7 @@ async function refreshCache() {
 
 async function getEvents(neighborhood) {
   if (eventCache.length === 0) {
-    // First request before morning scrape — do a one-time load
+    // No persisted cache and scrape hasn't finished — trigger one and wait
     await refreshCache();
   }
 
