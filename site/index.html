@@ -224,10 +224,10 @@
       justify-content: center;
     }
     .phone-device {
-      width: 420px;
+      width: 310px;
       background: linear-gradient(145deg, #1a1825 0%, #111019 50%, #0d0c14 100%);
       border-radius: 48px;
-      padding: 14px;
+      padding: 10px;
       border: 1px solid rgba(255,255,255,0.1);
       box-shadow:
         0 0 0 1px rgba(0,0,0,0.8),
@@ -242,7 +242,7 @@
       content: '';
       position: absolute;
       right: -2px;
-      top: 140px;
+      top: 160px;
       width: 3px;
       height: 44px;
       background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
@@ -252,7 +252,7 @@
       content: '';
       position: absolute;
       left: -2px;
-      top: 120px;
+      top: 140px;
       width: 3px;
       height: 28px;
       background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
@@ -261,8 +261,8 @@
     }
     .phone-screen {
       background: #0a0912;
-      border-radius: 36px;
-      padding: 16px 14px 0;
+      border-radius: 40px;
+      padding: 14px 12px 0;
       overflow: hidden;
       display: flex;
       flex-direction: column;
@@ -271,10 +271,10 @@
       border: 1px solid rgba(255,255,255,0.03);
     }
     .phone-dynamic-island {
-      width: 100px;
-      height: 28px;
+      width: 90px;
+      height: 25px;
       background: #000;
-      border-radius: 20px;
+      border-radius: 50px;
       margin: 0 auto 10px;
       flex-shrink: 0;
       box-shadow: 0 0 0 1px rgba(255,255,255,0.04);
@@ -289,10 +289,10 @@
     .phone-contact .name {
       font-family: var(--font-display);
       font-weight: 700;
-      font-size: 0.95rem;
+      font-size: 0.88rem;
     }
     .phone-contact .number {
-      font-size: 0.72rem;
+      font-size: 0.7rem;
       color: var(--text-muted);
     }
     .sms-thread {
@@ -309,9 +309,9 @@
     .sms-thread::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
     .sms-bubble {
       max-width: 82%;
-      padding: 10px 14px;
+      padding: 9px 13px;
       border-radius: 18px;
-      font-size: 0.82rem;
+      font-size: 0.78rem;
       line-height: 1.5;
       word-break: break-word;
     }
@@ -356,9 +356,9 @@
     }
     .sms-try-prompt {
       text-align: center;
-      font-size: 0.76rem;
+      font-size: 0.72rem;
       color: var(--text-dim);
-      padding: 16px 16px 4px;
+      padding: 14px 12px 4px;
       line-height: 1.5;
     }
     .sms-try-prompt strong { color: var(--coral); font-weight: 600; }
@@ -375,22 +375,28 @@
       background: rgba(255,255,255,0.06);
       border: 1px solid rgba(255,255,255,0.08);
       border-radius: 20px;
-      padding: 9px 16px;
-      font-size: 0.82rem;
+      padding: 8px 14px;
+      font-size: 0.78rem;
       color: var(--text);
       font-family: var(--font-body);
       outline: none;
       transition: border-color 0.2s;
+      caret-color: var(--coral);
     }
     .sms-input::placeholder { color: var(--text-muted); }
-    .sms-input:focus { border-color: rgba(255,255,255,0.15); }
+    .sms-input:focus { border-color: rgba(255,107,66,0.4); }
+    .sms-input.blink-cursor { animation: cursorPulse 1.2s ease-in-out infinite; }
+    @keyframes cursorPulse {
+      0%, 100% { border-color: rgba(255,107,66,0.4); }
+      50% { border-color: rgba(255,255,255,0.08); }
+    }
     .sms-input:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
     .sms-send-btn {
-      width: 34px;
-      height: 34px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
       background: var(--coral);
       border: none;
@@ -658,7 +664,7 @@
       .hero { padding: 72px 0 56px; }
       .hero h1 { font-size: clamp(2rem, 8vw, 2.8rem); }
       .phone-badge { font-size: 1rem; padding: 14px 26px; }
-      .phone-device { width: 360px; border-radius: 44px; }
+      .phone-device { width: 280px; }
       .phone-screen { height: 560px; }
       .basics, .faq { padding: 64px 0; }
       .cta-phone { font-size: 1.15rem; padding: 16px 36px; }
@@ -936,6 +942,12 @@
     limitMsg.innerHTML = 'That\'s the free preview &mdash; text <a href="sms:+18337857300">(833) 785-7300</a> to keep going';
     thread.parentElement.appendChild(limitMsg);
   }
+
+  // Blinking cursor to draw attention
+  input.classList.add('blink-cursor');
+  input.addEventListener('focus', function() {
+    input.classList.remove('blink-cursor');
+  });
 
   sendBtn.addEventListener('click', send);
   input.addEventListener('keydown', function(e) {
