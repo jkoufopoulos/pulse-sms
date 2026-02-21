@@ -1,8 +1,8 @@
 const { getEvents } = require('./events');
-const { composeDetails, isSearchUrl } = require('./ai');
+const { composeDetails } = require('./ai');
 const { sendSMS } = require('./twilio');
 const { setSession } = require('./session');
-const { formatEventDetails, cleanUrl, smartTruncate } = require('./formatters');
+const { formatEventDetails, smartTruncate } = require('./formatters');
 const { getAdjacentNeighborhoods } = require('./pre-router');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
 const { filterKidsEvents, validatePerennialActivity } = require('./curation');
@@ -23,21 +23,10 @@ function applyFilters(events, filters) {
   return filtered;
 }
 
-// --- Send compose result + follow-up link messages ---
-// Sends the main sms_text, then each picked event's URL as a separate message
-// so that iMessage/Android unfurls a rich link preview with venue images.
+// --- Send compose result (picks only, no link messages) ---
+// Links are sent only when the user requests details (texts a number).
 async function sendComposeWithLinks(phone, result, eventSource) {
   await sendSMS(phone, result.sms_text);
-
-  const picks = result.picks || [];
-  for (const pick of picks) {
-    const event = eventSource[pick.event_id];
-    if (!event) continue;
-    const url = [event.ticket_url, event.source_url].find(u => u && !isSearchUrl(u));
-    if (url) {
-      await sendSMS(phone, cleanUrl(url));
-    }
-  }
 }
 
 const VIBE_WORDS = { live_music: 'some music', nightlife: 'some nightlife', comedy: 'some comedy', art: 'some art', community: 'something cool', food_drink: 'some food & drinks', theater: 'some theater' };
@@ -149,7 +138,10 @@ async function handleMore(ctx) {
     const allRemaining = Object.values(ctx.session.lastEvents).filter(e => !allShownIds.has(e.id));
 
     if (allRemaining.length > 0) {
-      const composeRemaining = allRemaining.slice(0, 8);
+      // Strictly prefer remaining events in the requested neighborhood
+      const inHoodRemaining = allRemaining.filter(e => e.neighborhood === hood);
+      const composePool = inHoodRemaining.length > 0 ? inHoodRemaining : allRemaining;
+      const composeRemaining = composePool.slice(0, 8);
       const isLastBatch = allRemaining.length <= 8;
       const nearbyForExhaustion = isLastBatch ? getAdjacentNeighborhoods(hood, 3).filter(n => !(ctx.session?.visitedHoods || []).includes(n))[0] : null;
       const exhaustionSuggestion = nearbyForExhaustion
@@ -250,79 +242,43 @@ async function handleFree(ctx) {
   const freeEventsStart = Date.now();
   const events = await getEvents(hood);
   ctx.trace.events.getEvents_ms = Date.now() - freeEventsStart;
-  const freeEvents = events.filter(e => e.is_free);
 
-  // Apply category filter if present (from pending filters or route)
-  let filteredFree = freeEvents;
-  let categoryMiss = false;
+  // Strictly filter to the requested neighborhood — "free in Williamsburg" means Williamsburg only
+  const inHood = events.filter(e => e.neighborhood === hood);
+  const pool = inHood.length > 0 ? inHood : events;
+
+  // Apply filters: free is always hard, category is hard when explicitly requested
+  // (e.g. "free comedy" → must match BOTH free AND comedy, not just free)
+  let freeEvents = pool.filter(e => e.is_free);
   if (ctx.route.filters?.category) {
-    const catFiltered = freeEvents.filter(e => e.category === ctx.route.filters.category);
-    if (catFiltered.length > 0) {
-      filteredFree = catFiltered;
-    } else {
-      categoryMiss = true;
-    }
+    freeEvents = freeEvents.filter(e => e.category === ctx.route.filters.category);
+  }
+  if (ctx.route.filters?.time_after) {
+    freeEvents = filterByTimeAfter(freeEvents, ctx.route.filters.time_after);
   }
 
-  // Category miss: free events exist but none match category — nudge to nearby hood with free + category
-  if (categoryMiss && freeEvents.length > 0) {
+  if (freeEvents.length === 0) {
     const nearbyHoods = getAdjacentNeighborhoods(hood, 3);
-    for (const nearbyHood of nearbyHoods) {
-      const nearbyEvents = await getEvents(nearbyHood);
-      const nearbyFreeCat = nearbyEvents.filter(e => e.is_free && e.category === ctx.route.filters.category);
-      if (nearbyFreeCat.length > 0) {
-        const eventMap = {};
-        for (const e of nearbyFreeCat) eventMap[e.id] = e;
-        const catLabel = ctx.route.filters.category.replace(/_/g, ' ');
-        setSession(ctx.phone, {
-          pendingNearby: nearbyHood,
-          pendingNearbyEvents: eventMap,
-          pendingFilters: { ...ctx.route.filters, free_only: true },
-        });
-        const sms = `Not seeing free ${catLabel} in ${hood} — ${nearbyHood} has some though. Want picks from there?`;
-        await sendSMS(ctx.phone, sms);
-        ctx.finalizeTrace(sms, 'free');
-        return;
-      }
-    }
-  }
-
-  if (filteredFree.length === 0) {
-    const nearbyHoods = getAdjacentNeighborhoods(hood, 3);
-    for (const nearbyHood of nearbyHoods) {
-      const nearbyEvents = await getEvents(nearbyHood);
-      let nearbyFree = nearbyEvents.filter(e => e.is_free);
-      if (ctx.route.filters?.category) {
-        const nearbyCat = nearbyFree.filter(e => e.category === ctx.route.filters.category);
-        if (nearbyCat.length > 0) nearbyFree = nearbyCat;
-      }
-      if (nearbyFree.length > 0) {
-        ctx.trace.events.cache_size = nearbyEvents.length;
-        ctx.trace.events.candidates_count = nearbyFree.length;
-        ctx.trace.events.candidate_ids = nearbyFree.map(e => e.id);
-        const eventMap = {};
-        for (const e of nearbyFree) eventMap[e.id] = e;
-        const result = await ctx.composeAndSend(nearbyFree.slice(0, 8), nearbyHood, { ...ctx.route.filters, free_only: true }, 'free', { skills: { isFree: true, pendingMessage: ctx.pendingMessage || undefined } });
-        setSession(ctx.phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: nearbyHood });
-        await sendComposeWithLinks(ctx.phone, result, eventMap);
-        console.log(`Free events from nearby ${nearbyHood} sent to ${ctx.masked}`);
-        ctx.finalizeTrace(result.sms_text, 'free');
-        return;
-      }
+    const suggestion = nearbyHoods.length > 0
+      ? ` ${nearbyHoods[0]} is right nearby — want free picks from there?`
+      : ' Try a different neighborhood!';
+    if (nearbyHoods.length > 0) {
+      // Preserve both the nearby suggestion AND the active filters for nudge_accept
+      setSession(ctx.phone, { pendingNearby: nearbyHoods[0], pendingFilters: { ...ctx.route.filters, free_only: true } });
     }
     const catLabel = ctx.route.filters?.category ? ctx.route.filters.category.replace(/_/g, ' ') + ' ' : '';
-    const sms = `Nothing free ${catLabel}near ${hood} tonight — text "${hood}" for all events or try a different neighborhood!`;
+    const sms = `Nothing free ${catLabel}near ${hood} tonight.${suggestion}`;
     await sendSMS(ctx.phone, sms);
     ctx.finalizeTrace(sms, 'free');
     return;
   }
 
   ctx.trace.events.cache_size = events.length;
-  ctx.trace.events.candidates_count = Math.min(filteredFree.length, 8);
-  ctx.trace.events.candidate_ids = filteredFree.slice(0, 8).map(e => e.id);
-  const result = await ctx.composeAndSend(filteredFree.slice(0, 8), hood, ctx.route.filters, 'free', { skills: { isFree: true, pendingMessage: ctx.pendingMessage || undefined } });
+  ctx.trace.events.candidates_count = Math.min(freeEvents.length, 8);
+  ctx.trace.events.candidate_ids = freeEvents.slice(0, 8).map(e => e.id);
+  const result = await ctx.composeAndSend(freeEvents.slice(0, 8), hood, ctx.route.filters, 'free', { skills: { isFree: true, pendingMessage: ctx.pendingMessage || undefined } });
   const eventMap = {};
-  for (const e of filteredFree) eventMap[e.id] = e;
+  for (const e of freeEvents) eventMap[e.id] = e;
   setSession(ctx.phone, {
     lastPicks: result.picks || [],
     allPicks: result.picks || [],
@@ -393,7 +349,7 @@ async function handleNudgeAccept(ctx) {
 
 // --- Events (default) ---
 async function handleEventsDefault(ctx) {
-  let hood = ctx.neighborhood;
+  const hood = ctx.neighborhood;
   const eventsStart = Date.now();
   let events = await getEvents(hood);
   ctx.trace.events.getEvents_ms = Date.now() - eventsStart;
@@ -404,77 +360,9 @@ async function handleEventsDefault(ctx) {
     events = events.filter(e => e.is_free);
   }
 
-  // Apply category filter (e.g. comedy, art, live_music)
-  let categoryApplied = false;
-  if (ctx.route.filters?.category) {
-    const catEvents = events.filter(e => e.category === ctx.route.filters.category);
-    if (catEvents.length > 0) {
-      events = catEvents;
-      categoryApplied = true;
-    } else {
-      const nearbyHoods = getAdjacentNeighborhoods(hood, 5);
-      for (const nearbyHood of nearbyHoods) {
-        const nearbyEvents = await getEvents(nearbyHood);
-        const nearbyCat = nearbyEvents.filter(e => e.category === ctx.route.filters.category);
-        if (nearbyCat.length > 0) {
-          events = nearbyCat;
-          console.log(`Category ${ctx.route.filters.category}: found ${nearbyCat.length} in ${nearbyHood} (not in ${hood})`);
-          hood = nearbyHood;
-          categoryApplied = true;
-          break;
-        }
-      }
-      if (events.filter(e => e.category === ctx.route.filters.category).length === 0) {
-        const catName = ctx.route.filters.category.replace(/_/g, ' ');
-        const sms = `Not seeing any ${catName} near ${hood} tonight. Text "${hood}" to see everything, or try a different neighborhood!`;
-        await sendSMS(ctx.phone, sms);
-        ctx.finalizeTrace(sms, 'events');
-        return;
-      }
-    }
-  }
-
   // Apply time_after filter (e.g. "later tonight" → "22:00")
   if (ctx.route.filters?.time_after) {
     events = filterByTimeAfter(events, ctx.route.filters.time_after);
-  }
-
-  // Activity keyword search — for queries like "trivia", "karaoke" that aren't recognized categories
-  const ACTIVITY_KEYWORDS = /\b(trivia|karaoke|bingo|open mic|drag|burlesque|poetry|salsa|bachata|swing|vinyl|happy hour|game night|pub quiz|board game)\b/i;
-  const activityMatch = !categoryApplied && ACTIVITY_KEYWORDS.exec(ctx.message);
-  if (activityMatch) {
-    const keyword = activityMatch[1].toLowerCase();
-    const matchesActivity = e => {
-      const text = `${e.name || ''} ${e.short_detail || ''} ${e.description_short || ''}`.toLowerCase();
-      return text.includes(keyword);
-    };
-    const localMatches = events.filter(matchesActivity);
-    if (localMatches.length > 0) {
-      events = localMatches;
-      console.log(`Activity "${keyword}": found ${localMatches.length} matches in ${hood}`);
-    } else {
-      // Search adjacent neighborhoods for the activity
-      const activityNearbyHoods = getAdjacentNeighborhoods(hood, 5);
-      for (const nearbyHood of activityNearbyHoods) {
-        const nearbyEvents = await getEvents(nearbyHood);
-        const nearbyMatches = nearbyEvents.filter(matchesActivity);
-        if (nearbyMatches.length > 0) {
-          const eventMap = {};
-          for (const e of nearbyMatches) eventMap[e.id] = e;
-          setSession(ctx.phone, {
-            pendingNearby: nearbyHood,
-            pendingNearbyEvents: eventMap,
-          });
-          const sms = `No ${keyword} in ${hood} tonight, but ${nearbyHood} has some. Want picks from there?`;
-          await sendSMS(ctx.phone, sms);
-          console.log(`Activity "${keyword}": found ${nearbyMatches.length} in ${nearbyHood} (none in ${hood})`);
-          ctx.finalizeTrace(sms, 'events');
-          return;
-        }
-      }
-      // No matches anywhere — activityAdherence skill will handle this in compose
-      console.log(`Activity "${keyword}": no matches found in ${hood} or nearby`);
-    }
   }
 
   // Pre-compose curation: remove kids events from NYC Parks
@@ -487,94 +375,29 @@ async function handleEventsDefault(ctx) {
   const perennialEvents = localPerennials.slice(0, perennialCap);
   const composeEventsWithPerennials = [...events.slice(0, 8 - perennialEvents.length), ...perennialEvents];
 
-  // Prevent redirect loops: if user already got a travel nudge, serve nearby events directly
-  const alreadyNudged = !!ctx.session?.pendingNearby;
+  // Nearby neighborhoods for Claude to suggest when picks are thin
+  const nearbyHoods = getAdjacentNeighborhoods(hood, 3);
 
-  if (events.length === 0) {
-    // Check LOCAL perennial picks before nudging to a nearby neighborhood
-    const zeroPicks = getPerennialPicks(hood);
-    const zeroLocal = validatePerennialActivity(toEventObjects(zeroPicks.local, hood));
-    const zeroPerennials = zeroLocal.slice(0, 4);
-    if (zeroPerennials.length > 0) {
-      const eventMap = {};
-      for (const e of zeroPerennials) eventMap[e.id] = e;
-      ctx.trace.events.cache_size = 0;
-      ctx.trace.events.candidates_count = zeroPerennials.length;
-      ctx.trace.events.candidate_ids = zeroPerennials.map(e => e.id);
-      const result = await ctx.composeAndSend(zeroPerennials, hood, ctx.route.filters, 'events');
-      setSession(ctx.phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: hood, visitedHoods: [hood] });
-      await sendComposeWithLinks(ctx.phone, result, eventMap);
-      console.log(`Perennial picks sent to ${ctx.masked} (zero scraped events in ${hood})`);
-      ctx.finalizeTrace(result.sms_text, 'events');
-      return;
+  if (composeEventsWithPerennials.length === 0) {
+    // Nothing at all — send quiet-night message with nearby suggestion
+    const suggestion = nearbyHoods.length > 0
+      ? ` ${nearbyHoods[0]} is right nearby — want picks from there?`
+      : ' Try a different neighborhood or check back later!';
+    const sms = `Quiet night in ${hood} — not seeing much right now.${suggestion}`;
+    if (nearbyHoods.length > 0) {
+      setSession(ctx.phone, { pendingNearby: nearbyHoods[0] });
     }
-
-    // Find nearby neighborhoods WITH events for a proper travel nudge
-    const nearbyHoods = getAdjacentNeighborhoods(hood, 5);
-    for (const nearbyHood of nearbyHoods) {
-      const nearbyEvents = await getEvents(nearbyHood);
-      if (nearbyEvents.length > 0) {
-        if (alreadyNudged) {
-          const composeEvents = nearbyEvents.slice(0, 8);
-          const eventMap = {};
-          for (const e of nearbyEvents) eventMap[e.id] = e;
-          ctx.trace.events.cache_size = nearbyEvents.length;
-          ctx.trace.events.candidates_count = composeEvents.length;
-          ctx.trace.events.candidate_ids = composeEvents.map(e => e.id);
-          const result = await ctx.composeAndSend(composeEvents, nearbyHood, ctx.route.filters, 'events');
-          setSession(ctx.phone, { lastPicks: result.picks || [], allPicks: result.picks || [], lastEvents: eventMap, lastNeighborhood: nearbyHood });
-          await sendComposeWithLinks(ctx.phone, result, eventMap);
-          console.log(`Loop prevention: served ${nearbyHood} picks to ${ctx.masked} (skipped nudge)`);
-          ctx.finalizeTrace(result.sms_text, 'events');
-          return;
-        }
-        const vibeWord = topVibeWord(nearbyEvents);
-        const eventMap = {};
-        for (const e of nearbyEvents) eventMap[e.id] = e;
-        setSession(ctx.phone, { pendingNearby: nearbyHood, pendingNearbyEvents: eventMap });
-        const sms = `Hey not much going on in ${hood}... would you travel to ${nearbyHood} for ${vibeWord}?`;
-        await sendSMS(ctx.phone, sms);
-        console.log(`Nudge sent to ${ctx.masked}: ${hood} → ${nearbyHood} (${nearbyEvents.length} events)`);
-        ctx.finalizeTrace(sms, 'events');
-        return;
-      }
-    }
-    const sms = `Quiet night in ${hood} — not seeing much right now. Check back later!`;
     await sendSMS(ctx.phone, sms);
     ctx.finalizeTrace(sms, 'events');
     return;
   }
 
-  // Check if any events are actually in the requested neighborhood
-  const inHood = events.filter(e => e.neighborhood === hood);
-
-  // Redirect to travel nudge when events are thin
-  const thinWithNoPerennial = events.length <= 1 && localPerennials.length === 0;
-  const fewNearbyOnly = inHood.length === 0 && events.length <= 6;
-  if ((fewNearbyOnly || thinWithNoPerennial) && !alreadyNudged && !categoryApplied) {
-    const thinNearbyHoods = getAdjacentNeighborhoods(hood, 5);
-    for (const nearbyHood of thinNearbyHoods) {
-      const nearbyEvents = await getEvents(nearbyHood);
-      if (nearbyEvents.length > 0) {
-        const vibeWord = topVibeWord(nearbyEvents);
-        const eventMap = {};
-        for (const e of nearbyEvents) eventMap[e.id] = e;
-        setSession(ctx.phone, { pendingNearby: nearbyHood, pendingNearbyEvents: eventMap });
-        const sms = `Hey not much going on in ${hood}... would you travel to ${nearbyHood} for ${vibeWord}?`;
-        await sendSMS(ctx.phone, sms);
-        console.log(`Thin nudge to ${ctx.masked}: ${hood} → ${nearbyHood} (inHood=${inHood.length}, events=${events.length})`);
-        ctx.finalizeTrace(sms, 'events');
-        return;
-      }
-    }
-  }
-
-  // Compose response (scraped events + perennial picks merged)
+  // Compose response — Claude handles category/activity filtering, nearby suggestions
   ctx.trace.events.cache_size = events.length;
   ctx.trace.events.candidates_count = composeEventsWithPerennials.length;
   ctx.trace.events.candidate_ids = composeEventsWithPerennials.map(e => e.id);
   const result = await ctx.composeAndSend(composeEventsWithPerennials, hood, ctx.route.filters, 'events', {
-    skills: { userMessage: ctx.message, requestedCategory: ctx.route.filters?.category },
+    skills: { userMessage: ctx.message, requestedCategory: ctx.route.filters?.category, nearbyNeighborhoods: nearbyHoods },
   });
 
   const eventMap = {};
@@ -588,27 +411,11 @@ async function handleEventsDefault(ctx) {
     console.warn(`Filtered ${(result.picks || []).length - validPicks.length} hallucinated pick IDs`);
   }
 
-  // Post-compose nudge: if compose returned 0 valid picks, set up pendingNearby so "yes" works
-  if (validPicks.length === 0 && !alreadyNudged) {
-    const postNearbyHoods = getAdjacentNeighborhoods(hood, 3);
-    for (const nearbyHood of postNearbyHoods) {
-      const nearbyEvents = await getEvents(nearbyHood);
-      if (nearbyEvents.length > 0) {
-        const nearbyEventMap = {};
-        for (const e of nearbyEvents) nearbyEventMap[e.id] = e;
-        setSession(ctx.phone, {
-          lastPicks: validPicks, allPicks: validPicks,
-          allOfferedIds: composeEventsWithPerennials.map(e => e.id),
-          lastEvents: eventMap, lastNeighborhood: result.neighborhood_used || hood,
-          visitedHoods: [hood],
-          pendingNearby: nearbyHood, pendingNearbyEvents: nearbyEventMap,
-        });
-        await sendComposeWithLinks(ctx.phone, result, eventMap);
-        console.log(`Post-compose nudge: 0 picks in ${hood}, set pendingNearby=${nearbyHood}`);
-        ctx.finalizeTrace(result.sms_text, 'events');
-        return;
-      }
-    }
+  // If Claude suggested a nearby neighborhood, validate and store for nudge_accept
+  // Also preserve active filters so they persist across the redirect (e.g. "later tonight", category)
+  if (result.suggested_neighborhood && nearbyHoods.includes(result.suggested_neighborhood)) {
+    const filtersToPreserve = ctx.route.filters && Object.values(ctx.route.filters).some(Boolean) ? ctx.route.filters : null;
+    setSession(ctx.phone, { pendingNearby: result.suggested_neighborhood, ...(filtersToPreserve && { pendingFilters: filtersToPreserve }) });
   }
 
   setSession(ctx.phone, { lastPicks: validPicks, allPicks: validPicks, allOfferedIds: composeEventsWithPerennials.map(e => e.id), lastEvents: eventMap, lastNeighborhood: result.neighborhood_used || hood, visitedHoods: [hood] });
