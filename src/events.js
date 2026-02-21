@@ -284,13 +284,13 @@ async function refreshCache() {
     }
 
     // Filter out stale/far-future events at scrape time
-    const yesterday = getNycDateString(-1);
+    const today = getNycDateString(0);
     const weekOut = getNycDateString(7);
     const beforeFilter = allEvents.length;
     const validEvents = allEvents.filter(e => {
       const d = getEventDate(e);
       if (!d) return true; // keep undated events (perennials, venues)
-      return d >= yesterday && d <= weekOut;
+      return d >= today && d <= weekOut;
     });
     const staleCount = beforeFilter - validEvents.length;
     if (staleCount > 0) {
