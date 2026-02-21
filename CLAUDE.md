@@ -93,9 +93,9 @@ Optional:
 - `GEMINI_API_KEY` — Google Gemini API key (optional; enables Gemini Flash for routing — ~10x cheaper than Haiku)
 - `PULSE_ROUTE_PROVIDER` — Routing provider: "gemini" or "anthropic" (default: "gemini" if GEMINI_API_KEY set, else "anthropic")
 - `PULSE_MODEL_ROUTE` — Claude model for routing (default: claude-haiku-4-5-20251001, used when provider=anthropic)
-- `PULSE_MODEL_ROUTE_GEMINI` — Gemini model for routing (default: gemini-2.0-flash)
+- `PULSE_MODEL_ROUTE_GEMINI` — Gemini model for routing (default: gemini-2.5-flash)
 - `PULSE_MODEL_COMPOSE` — Claude model for composition (default: claude-haiku-4-5-20251001)
-- `PULSE_MODEL_EXTRACT` — Claude model for extraction (default: claude-sonnet-4-5-20250929)
+- `PULSE_MODEL_EXTRACT` — Claude model for extraction (default: claude-haiku-4-5-20251001)
 - `TICKETMASTER_API_KEY` — Ticketmaster Discovery API key (optional; scraper returns [] if missing)
 - `GMAIL_CLIENT_ID` — Google OAuth client ID (optional; Yutori falls back to file-based if missing)
 - `GMAIL_CLIENT_SECRET` — Google OAuth client secret

@@ -24,7 +24,7 @@ const ROUTE_PROVIDER = process.env.PULSE_ROUTE_PROVIDER || (process.env.GEMINI_A
 
 const MODELS = {
   route: process.env.PULSE_MODEL_ROUTE || 'claude-haiku-4-5-20251001',
-  routeGemini: process.env.PULSE_MODEL_ROUTE_GEMINI || 'gemini-2.0-flash',
+  routeGemini: process.env.PULSE_MODEL_ROUTE_GEMINI || 'gemini-2.5-flash',
   compose: process.env.PULSE_MODEL_COMPOSE || 'claude-haiku-4-5-20251001',
   extract: process.env.PULSE_MODEL_EXTRACT || 'claude-haiku-4-5-20251001',
 };
@@ -94,10 +94,33 @@ async function routeWithGemini(systemPrompt, userPrompt) {
   const model = genAI.getGenerativeModel({
     model: MODELS.routeGemini,
     systemInstruction: systemPrompt,
-    generationConfig: { maxOutputTokens: 256, temperature: 0 },
+    generationConfig: { maxOutputTokens: 256, temperature: 0, responseMimeType: 'application/json' },
   });
 
   const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }] });
+  const response = result.response;
+  const text = response.text() || '';
+  const usageMetadata = response.usageMetadata;
+  const usage = usageMetadata ? {
+    input_tokens: usageMetadata.promptTokenCount || 0,
+    output_tokens: usageMetadata.candidatesTokenCount || 0,
+  } : null;
+
+  return { text, usage, provider: 'gemini' };
+}
+
+/**
+ * Compose via Google Gemini Flash.
+ */
+async function composeWithGemini(systemPrompt, userPrompt, model) {
+  const genAI = getGeminiClient();
+  const gemModel = genAI.getGenerativeModel({
+    model: model || MODELS.routeGemini,
+    systemInstruction: systemPrompt,
+    generationConfig: { maxOutputTokens: 8192, temperature: 1, responseMimeType: 'application/json' },
+  });
+
+  const result = await gemModel.generateContent({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }] });
   const response = result.response;
   const text = response.text() || '';
   const usageMetadata = response.usageMetadata;
@@ -141,7 +164,7 @@ async function routeMessage(message, session, neighborhoodNames) {
  * Compose an SMS response by picking events and writing the message in one Claude call.
  * Returns { sms_text, picks, neighborhood_used }
  */
-async function composeResponse(message, events, neighborhood, filters, { excludeIds, skills, model } = {}) {
+async function composeResponse(message, events, neighborhood, filters, { excludeIds, skills, model, conversationHistory } = {}) {
   const now = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   const todayNyc = getNycDateString(0);
@@ -173,11 +196,17 @@ async function composeResponse(message, events, neighborhood, filters, { exclude
     ? `\nEXCLUDED (already shown to user — do NOT pick these): ${excludeIds.join(', ')}`
     : '';
 
+  const historyBlock = conversationHistory?.length > 0
+    ? '\nCONVERSATION HISTORY (recent):\n' + conversationHistory.map(h =>
+        `${h.role === 'user' ? 'User' : 'Pulse'}: ${h.content}`
+      ).join('\n') + '\n'
+    : '';
+
   const userPrompt = `Current time (NYC): ${now}
 <user_message>${message}</user_message>
 Neighborhood: ${neighborhood || 'not specified'}
 User preferences: category=${filters?.category || 'any'}, vibe=${filters?.vibe || 'any'}, free_only=${filters?.free_only ? 'yes' : 'no'}${filters?.time_after ? `, time_after=${filters.time_after}` : ''}
-${excludeNote}
+${historyBlock}${excludeNote}
 EVENT_LIST:
 ${eventListStr}
 
@@ -185,14 +214,23 @@ Compose the SMS now.`;
 
   const systemPrompt = buildComposePrompt(events, { ...skills, requestedNeighborhood: neighborhood });
 
-  const response = await getClient().messages.create({
-    model: model || MODELS.compose,
-    max_tokens: 512,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: userPrompt }],
-  }, { timeout: 12000 });
+  let text, usage, provider;
+  const resolvedModel = model || MODELS.compose;
+  if (resolvedModel.startsWith('gemini-') && getGeminiClient()) {
+    const result = await composeWithGemini(systemPrompt, userPrompt, resolvedModel);
+    text = result.text; usage = result.usage; provider = 'gemini';
+  } else {
+    const response = await getClient().messages.create({
+      model: resolvedModel,
+      max_tokens: 512,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    }, { timeout: 12000 });
+    text = response.content?.[0]?.text || '';
+    usage = response.usage || null;
+    provider = 'anthropic';
+  }
 
-  const text = response.content?.[0]?.text || '';
   const parsed = parseJsonFromResponse(text);
 
   if (!parsed || !parsed.sms_text || typeof parsed.sms_text !== 'string') {
@@ -252,8 +290,10 @@ Compose the SMS now.`;
     picks: validPicks,
     not_picked_reason: parsed.not_picked_reason || null,
     neighborhood_used: neighborhoodUsed,
+    suggested_neighborhood: parsed.suggested_neighborhood || null,
     _raw: text,
-    _usage: response.usage || null,
+    _usage: usage,
+    _provider: provider,
   };
 }
 

@@ -33,20 +33,28 @@ function getArg(name) {
 const MODEL_MAP = {
   haiku: 'claude-haiku-4-5-20251001',
   sonnet: 'claude-sonnet-4-5-20250929',
+  'gemini-flash': 'gemini-2.5-flash',
 };
 
 const modelALabel = getArg('model-a') || 'haiku';
-const modelBLabel = getArg('model-b') || 'sonnet';
+const modelBLabel = getArg('model-b') || 'gemini-flash';
 const MODEL_A = MODEL_MAP[modelALabel] || modelALabel;
 const MODEL_B = MODEL_MAP[modelBLabel] || modelBLabel;
 const tagFilter = getArg('tag');
 const idFilter = getArg('id');
 const runsPerCase = parseInt(getArg('runs') || '1', 10);
 
+// Fail fast if a Gemini model is requested without API key
+if ((MODEL_A.startsWith('gemini-') || MODEL_B.startsWith('gemini-')) && !process.env.GEMINI_API_KEY) {
+  console.error('GEMINI_API_KEY is required to run evals with a Gemini model. Add it to .env and retry.');
+  process.exit(1);
+}
+
 // --- Cost constants (per 1M tokens, as of Feb 2026) ---
 const COSTS = {
   'claude-haiku-4-5-20251001': { input: 0.80, output: 4.00 },
   'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00 },
+  'gemini-2.5-flash': { input: 0.15, output: 0.60 },
 };
 
 function estimateCost(modelId, inputTokens, outputTokens) {
@@ -227,13 +235,11 @@ async function main() {
         for (const c of codeA) report.summary.code_checks[modelALabel][c.pass ? 'pass' : 'fail']++;
         for (const c of codeB) report.summary.code_checks[modelBLabel][c.pass ? 'pass' : 'fail']++;
 
-        // Cost tracking (from _raw response metadata if available, otherwise estimate)
-        // composeResponse doesn't return usage, so estimate from sms_text length
-        const estTokensIn = 2000; // approximate prompt tokens (system + events + user)
-        const estTokensOutA = Math.ceil((resultA.sms_text || '').length / 3);
-        const estTokensOutB = Math.ceil((resultB.sms_text || '').length / 3);
-        report.summary.cost[modelALabel] += estimateCost(MODEL_A, estTokensIn, estTokensOutA);
-        report.summary.cost[modelBLabel] += estimateCost(MODEL_B, estTokensIn, estTokensOutB);
+        // Cost tracking — use actual usage from compose result, fall back to estimate
+        const usageA = resultA._usage || { input_tokens: 2000, output_tokens: Math.ceil((resultA.sms_text || '').length / 3) };
+        const usageB = resultB._usage || { input_tokens: 2000, output_tokens: Math.ceil((resultB.sms_text || '').length / 3) };
+        report.summary.cost[modelALabel] += estimateCost(MODEL_A, usageA.input_tokens, usageA.output_tokens);
+        report.summary.cost[modelBLabel] += estimateCost(MODEL_B, usageB.input_tokens, usageB.output_tokens);
 
         // Color-code preference
         const prefColor = pref.winner === modelALabel ? '\x1b[36m' : pref.winner === modelBLabel ? '\x1b[33m' : '\x1b[90m';
