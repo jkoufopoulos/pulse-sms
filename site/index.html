@@ -1050,7 +1050,7 @@
 
       var data = await res.json();
       if (data.messages && data.messages.length > 0) {
-        data.messages.forEach(function(m) { addBubble(m, 'sms-recv'); });
+        data.messages.forEach(function(m) { addBubble(m.body || m, 'sms-recv'); });
       } else if (data.error) {
         addBubble('Something went wrong \u2014 try again.', 'sms-recv');
       }
