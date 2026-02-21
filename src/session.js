@@ -18,6 +18,19 @@ function clearSession(phone) {
   sessions.delete(phone);
 }
 
+const MAX_HISTORY_TURNS = 6;
+
+function addToHistory(phone, role, content) {
+  const session = sessions.get(phone);
+  if (!session) return;
+  if (!session.conversationHistory) session.conversationHistory = [];
+  session.conversationHistory.push({ role, content: content.slice(0, 300) });
+  if (session.conversationHistory.length > MAX_HISTORY_TURNS) {
+    session.conversationHistory = session.conversationHistory.slice(-MAX_HISTORY_TURNS);
+  }
+  session.timestamp = Date.now();
+}
+
 // Clean stale sessions every 10 minutes
 const sessionInterval = setInterval(() => {
   try {
@@ -32,4 +45,4 @@ function clearSessionInterval() {
   clearInterval(sessionInterval);
 }
 
-module.exports = { getSession, setSession, clearSession, clearSessionInterval };
+module.exports = { getSession, setSession, clearSession, addToHistory, clearSessionInterval };

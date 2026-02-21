@@ -22,6 +22,7 @@ DATE AWARENESS:
 - If TODAY, say "tonight" or "today" in the SMS.
 - If TOMORROW, say "tomorrow" or "tomorrow night" — do not say "tonight" for a tomorrow event.
 - If further out, mention the day (e.g. "this Friday").
+- Events that have already started are still worth recommending — concerts, DJ sets, comedy shows, and parties typically run for hours. Only skip an event if its end_time has clearly passed. A 9pm show is still going strong at 11pm.
 
 HONESTY:
 - Only use events from the provided list. Do not invent events.
@@ -57,10 +58,10 @@ Return STRICT JSON:
 {
   "sms_text": "the complete SMS message, max 480 chars",
   "picks": [
-    { "rank": 1, "event_id": "...", "why": "short reason for picking this event" },
-    { "rank": 2, "event_id": "...", "why": "short reason" }
+    { "rank": 1, "event_id": "...", "why": "5-10 word reason" },
+    { "rank": 2, "event_id": "...", "why": "5-10 word reason" }
   ],
-  "not_picked_reason": "1 sentence on why you skipped the other events",
+  "not_picked_reason": "brief reason (under 15 words)",
   "neighborhood_used": "the neighborhood these events are for"
 }
 </output_format>`,
@@ -133,6 +134,22 @@ ACTIVITY ADHERENCE: The user asked for a specific type of activity. If NONE of t
 DAY-SPECIFIC CLAIMS: NEVER say an event happens on a particular day (e.g. "trivia on Thursdays") unless you can verify from the event data that today IS that day. Check "Current time (NYC)" above.`,
 };
 
-const ALL_SKILLS = { core, tonightPriority, sourceTiers, neighborhoodMismatch, perennialFraming, venueFraming, lastBatch, freeEmphasis, pendingIntent, activityAdherence };
+const conversationAwareness = {
+  id: 'conversation-awareness',
+  text: `
+CONVERSATION AWARENESS:
+- Use conversation history to understand what the user has been asking about.
+- TEMPORAL INTENT: If user asks about "tomorrow", prefer TOMORROW events. For a "tomorrow" query, a great tomorrow event beats a decent tonight event — override the "tonight first" rule.
+- FILTER PERSISTENCE: If user asked for "free comedy" earlier and is now accepting a redirect or saying "yes", maintain BOTH "free" AND "comedy" as constraints. Do not silently drop filters across turns.
+- REPEAT AVOIDANCE: Do not recommend events already mentioned in conversation history.`,
+};
+
+const nearbySuggestion = {
+  id: 'nearby-suggestion',
+  text: `
+NEARBY NEIGHBORHOODS: When picks are thin (< 2 good options) or nothing matches the user's request, suggest a nearby neighborhood conversationally — e.g. "Slim pickings in Fort Greene tonight — Park Slope is right nearby, want picks from there?" Include the suggested neighborhood in your JSON output as "suggested_neighborhood".`,
+};
+
+const ALL_SKILLS = { core, tonightPriority, sourceTiers, neighborhoodMismatch, perennialFraming, venueFraming, lastBatch, freeEmphasis, pendingIntent, activityAdherence, conversationAwareness, nearbySuggestion };
 
 module.exports = ALL_SKILLS;

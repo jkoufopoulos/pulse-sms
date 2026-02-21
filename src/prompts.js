@@ -294,6 +294,7 @@ DATE AWARENESS:
 - If TODAY, say "tonight" or "today" in the SMS.
 - If TOMORROW, say "tomorrow" or "tomorrow night" — do not say "tonight" for a tomorrow event.
 - If further out, mention the day (e.g. "this Friday").
+- Events that have already started are still worth recommending — concerts, DJ sets, comedy shows, and parties typically run for hours. Only skip an event if its end_time has clearly passed. A 9pm show is still going strong at 11pm.
 
 HONESTY:
 - Only use events from the provided list. Do not invent events.
@@ -354,10 +355,10 @@ Return STRICT JSON:
 {
   "sms_text": "the complete SMS message, max 480 chars",
   "picks": [
-    { "rank": 1, "event_id": "...", "why": "short reason for picking this event" },
-    { "rank": 2, "event_id": "...", "why": "short reason" }
+    { "rank": 1, "event_id": "...", "why": "5-10 word reason" },
+    { "rank": 2, "event_id": "...", "why": "5-10 word reason" }
   ],
-  "not_picked_reason": "1 sentence on why you skipped the other events",
+  "not_picked_reason": "brief reason (under 15 words)",
   "neighborhood_used": "the neighborhood these events are for"
 }
 </output_format>`;

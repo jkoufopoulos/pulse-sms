@@ -64,12 +64,24 @@ function buildComposePrompt(events, options = {}) {
     parts.push(`\nUser's original request: "${options.pendingMessage}". Prioritize events matching that intent.`);
   }
 
-  // Activity adherence — when user asks for a specific activity type not covered by category routing
-  if (options.userMessage && !options.requestedCategory) {
+  // Activity adherence — when user asks for a specific activity type
+  // Always enable for activity keywords, even when requestedCategory is set,
+  // because categories (e.g. 'community') are broader than specific activities (e.g. 'trivia')
+  if (options.userMessage) {
     const ACTIVITY_KEYWORDS = /\b(trivia|karaoke|bingo|open mic|drag|burlesque|poetry|salsa|bachata|swing|vinyl|happy hour|game night|pub quiz|board game)\b/i;
     if (ACTIVITY_KEYWORDS.test(options.userMessage)) {
       parts.push(skills.activityAdherence.text);
     }
+  }
+
+  // Conversation awareness — when history is available
+  if (options.hasConversationHistory) {
+    parts.push(skills.conversationAwareness.text);
+  }
+
+  // Nearby suggestion — when nearby neighborhoods are provided
+  if (options.nearbyNeighborhoods?.length > 0) {
+    parts.push(skills.nearbySuggestion.text);
   }
 
   return parts.join('\n');

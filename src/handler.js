@@ -4,7 +4,7 @@ const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
 const { routeMessage, composeResponse } = require('./ai');
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
 const { startTrace, saveTrace } = require('./traces');
-const { getSession, setSession, clearSession, clearSessionInterval } = require('./session');
+const { getSession, setSession, clearSession, addToHistory, clearSessionInterval } = require('./session');
 const { preRoute } = require('./pre-router');
 const { handleHelp, handleConversational, handleDetails, handleMore, handleFree, handleNudgeAccept, handleEventsDefault } = require('./intent-handlers');
 const { sendRuntimeAlert } = require('./alerts');
@@ -190,6 +190,7 @@ async function handleMessageAI(phone, message) {
   }
 
   function finalizeTrace(smsText, intent) {
+    if (smsText) addToHistory(phone, 'assistant', smsText);
     trace.output_sms = smsText || null;
     trace.output_sms_length = smsText ? smsText.length : 0;
     trace.output_intent = intent || trace.routing.result?.intent || null;
@@ -238,12 +239,19 @@ async function handleMessageAI(phone, message) {
   }
   console.log(`${preRouted ? 'Pre' : 'AI'} route (${route._provider || 'pre'}): intent=${route.intent}, neighborhood=${route.neighborhood}, confidence=${route.confidence}`);
 
+  // Snapshot previous conversation history BEFORE adding current message
+  // (so Claude doesn't see the current message duplicated in both <user_message> and history)
+  if (!getSession(phone)) setSession(phone, {});
+  const history = getSession(phone)?.conversationHistory || [];
+  addToHistory(phone, 'user', message);
+
   // Shared compose helper (closure over message + trace)
   async function composeAndSend(composeEvents, hood, filters, intentLabel, { excludeIds, skills } = {}) {
+    const enrichedSkills = { ...(skills || {}), hasConversationHistory: history.length > 0 };
     trace.events.sent_to_claude = composeEvents.length;
     trace.events.sent_ids = composeEvents.map(e => e.id);
     const composeStart = Date.now();
-    const result = await composeResponse(message, composeEvents, hood, filters, { excludeIds, skills });
+    const result = await composeResponse(message, composeEvents, hood, filters, { excludeIds, skills: enrichedSkills, conversationHistory: history });
     trace.composition.latency_ms = Date.now() - composeStart;
     trackAICost(phone, result._usage);
     trace.composition.raw_response = result._raw || null;

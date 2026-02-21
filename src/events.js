@@ -348,15 +348,16 @@ async function getEvents(neighborhood) {
   const upcoming = filterUpcomingEvents(eventCache);
   const ranked = rankEventsByProximity(upcoming, neighborhood);
 
-  // Only return tonight's events — tomorrow events should only surface if the user asks
+  // Return today + tomorrow events — Claude handles temporal intent via conversation context
   const todayNyc = getNycDateString(0);
-  const tonightOnly = ranked.filter(e => {
+  const tomorrowNyc = getNycDateString(1);
+  const filtered = ranked.filter(e => {
     const d = getEventDate(e);
-    return !d || d === todayNyc;
+    return !d || d === todayNyc || d === tomorrowNyc;
   });
 
-  console.log(`${tonightOnly.length} tonight events near ${neighborhood} (${ranked.length} total upcoming, cache: ${eventCache.length})`);
-  return tonightOnly.slice(0, 20);
+  console.log(`${filtered.length} today+tomorrow events near ${neighborhood} (${ranked.length} total upcoming, cache: ${eventCache.length})`);
+  return filtered.slice(0, 20);
 }
 
 // ============================================================
