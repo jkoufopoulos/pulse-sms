@@ -387,6 +387,88 @@
       color: var(--text-muted);
     }
 
+    /* COLLAPSIBLE DETAILS */
+    details {
+      background: var(--bg-card);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: var(--radius);
+      margin-top: 12px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    details[open] {
+      border-color: rgba(255,255,255,0.08);
+    }
+    details summary {
+      padding: 18px 24px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      list-style: none;
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    details summary:hover { background: var(--bg-card-hover); }
+    details summary::-webkit-details-marker { display: none; }
+    details summary::before {
+      content: '';
+      display: inline-block;
+      width: 0;
+      height: 0;
+      border-left: 5px solid var(--text-muted);
+      border-top: 4px solid transparent;
+      border-bottom: 4px solid transparent;
+      flex-shrink: 0;
+      transition: transform 0.2s;
+    }
+    details[open] summary::before {
+      transform: rotate(90deg);
+    }
+    details summary .step-label {
+      color: var(--coral);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    details summary .step-preview {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      font-weight: 400;
+      font-family: var(--font-body);
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+    details .detail-body {
+      padding: 0 24px 20px;
+    }
+    details .detail-body p {
+      color: var(--text-dim);
+      font-size: 0.88rem;
+      line-height: 1.65;
+    }
+    details .detail-body p + p { margin-top: 8px; }
+    details .detail-body strong { color: var(--text); font-weight: 600; }
+    details .detail-body ul {
+      padding-left: 20px;
+      color: var(--text-dim);
+      font-size: 0.88rem;
+      line-height: 1.8;
+      margin-top: 8px;
+    }
+
+    /* Skill-specific: condition tag */
+    .skill-condition {
+      color: var(--text-muted);
+      font-weight: 400;
+      font-size: 0.82rem;
+      font-family: var(--font-body);
+    }
+
     /* RESPONSIVE */
     @media (max-width: 680px) {
       .card-grid { grid-template-columns: 1fr; }
@@ -436,7 +518,166 @@
   </div>
 </section>
 
-<!-- 2. Data Pipeline -->
+<!-- 2. End-to-End Walkthrough -->
+<section id="walkthrough">
+  <div class="container">
+    <p class="section-label">Walkthrough</p>
+    <h2 class="section-title">What happens when you text "williamsburg"</h2>
+    <div class="section-body">
+      <p>Let's trace a single message through the entire system. A user with no session history texts <strong>"williamsburg"</strong> at 7:14 PM on a Friday.</p>
+    </div>
+
+    <details open style="margin-top: 24px;">
+      <summary><span class="step-label">Step 1</span> Guard rails <span class="step-preview">&lt;1ms, $0</span></summary>
+      <div class="detail-body">
+        <p><code>handler.js</code> receives the Twilio webhook. Three checks run before any processing:</p>
+        <ul>
+          <li><strong>TCPA check</strong> &mdash; Is this "STOP", "UNSUBSCRIBE", "CANCEL", or "QUIT"? If yes, drop silently (no reply). Twilio manages the opt-out list; we just make sure no response leaks.</li>
+          <li><strong>Dedup</strong> &mdash; Has this MessageSid been seen in the last 5 minutes? Twilio retries on timeout, so this prevents double-processing.</li>
+          <li><strong>Budget</strong> &mdash; Has this phone number spent over $0.10 in AI costs today? If so, send a friendly limit message and stop. Pricing is provider-aware (Haiku input: $1/M tokens, Gemini: $0.10/M).</li>
+        </ul>
+        <p>"williamsburg" passes all three. Cost so far: <strong style="color: var(--green);">$0.00</strong>. Latency: <strong style="color: var(--green);">&lt;1ms</strong>.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="step-label">Step 2</span> Routing &mdash; pre-router match <span class="step-preview">0ms, $0</span></summary>
+      <div class="detail-body">
+        <p><code>pre-router.js</code> checks the message against pattern rules, using the session (empty in this case) for context. "williamsburg" matches the bare-neighborhood pattern &mdash; it's a recognized name in our 36-neighborhood map.</p>
+        <p>Returns: <code>{ intent: "events", neighborhood: "Williamsburg", confidence: 0.95 }</code></p>
+        <p><strong style="color: var(--green);">No AI call needed.</strong> The pre-router handles this at zero latency and zero cost. This is why ~60% of messages never touch the AI router &mdash; most texts are just neighborhood names, "more", numbers, or simple filter words.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="step-label">Step 3</span> Intent dispatch <span class="step-preview">7 handlers</span></summary>
+      <div class="detail-body">
+        <p><code>handler.js</code> dispatches to <code>handleEventsDefault()</code> in <code>intent-handlers.js</code> based on the <code>intent: "events"</code> result. Each intent has its own handler:</p>
+        <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;">
+          <span class="stat"><em>help</em> &rarr; usage guide</span>
+          <span class="stat"><em>conversational</em> &rarr; chitchat deflection</span>
+          <span class="stat"><em>details</em> &rarr; expand a pick</span>
+          <span class="stat"><em>more</em> &rarr; next batch</span>
+          <span class="stat"><em>free</em> &rarr; free events only</span>
+          <span class="stat"><em>nudge_accept</em> &rarr; "yes" to a travel suggestion</span>
+          <span class="stat"><em>events</em> &rarr; main recommendation flow</span>
+        </div>
+        <p style="margin-top: 12px;">Why separate handlers? Each intent has different data needs. "details" only needs the session's last picks. "more" needs to exclude already-shown events. "events" needs to fetch from the cache, run curation, and compose. Separating them keeps each handler focused and testable.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="step-label">Step 4</span> Event fetching &amp; curation <span class="step-preview">14 &rarr; 8 events</span></summary>
+      <div class="detail-body">
+        <p><code>getEvents("Williamsburg")</code> queries the in-memory cache. The cache was built at 10am from 18 scrapers. Events are already deduped and sorted by proximity to Williamsburg's center coordinates.</p>
+        <p>Say it returns 14 events. Before Claude sees them, <code>curation.js</code> runs three deterministic filters:</p>
+        <ul>
+          <li><strong>filterKidsEvents</strong> &mdash; Drops NYC Parks events that match children's patterns ("storytime", "toddler", "ages 3-5"). Without this, Claude would occasionally recommend a toddler puppet show alongside a DJ set.</li>
+          <li><strong>filterIncomplete</strong> &mdash; Drops events below a completeness threshold (missing name, venue, or time). Prevents Claude from recommending "TBA at TBD".</li>
+          <li><strong>validatePerennialActivity</strong> &mdash; Perennial picks (always-good bars/venues) are only included if they have a specific activity tonight (trivia, live jazz, DJ). Removes generic "nice bar" suggestions that don't answer "what's happening tonight?"</li>
+        </ul>
+        <p>After curation: 12 events remain. Plus 2 perennial picks with tonight activities. The top 8 are sent to Claude.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="step-label">Step 5</span> Prompt assembly <span class="step-preview">5 of 12 skills ON</span></summary>
+      <div class="detail-body">
+        <p><code>build-compose-prompt.js</code> looks at the request context and assembles a prompt from skill modules. For this first-message-to-Williamsburg request:</p>
+        <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; gap: 8px; align-items: baseline;">
+            <span style="color: var(--green); font-size: 0.82rem; font-weight: 700; min-width: 18px;">ON</span>
+            <span style="color: var(--text); font-weight: 600; font-size: 0.88rem;">core</span>
+            <span style="color: var(--text-dim); font-size: 0.82rem;">&mdash; always included. Persona, format, 480-char limit.</span>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: baseline;">
+            <span style="color: var(--green); font-size: 0.82rem; font-weight: 700; min-width: 18px;">ON</span>
+            <span style="color: var(--text); font-weight: 600; font-size: 0.88rem;">sourceTiers</span>
+            <span style="color: var(--text-dim); font-size: 0.82rem;">&mdash; always included. Tells Claude to prefer Skint/Nonsense picks over Eventbrite.</span>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: baseline;">
+            <span style="color: var(--green); font-size: 0.82rem; font-weight: 700; min-width: 18px;">ON</span>
+            <span style="color: var(--text); font-weight: 600; font-size: 0.88rem;">tonightPriority</span>
+            <span style="color: var(--text-dim); font-size: 0.82rem;">&mdash; at least one event is today. Tells Claude: a decent tonight event beats a great tomorrow event.</span>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: baseline;">
+            <span style="color: var(--green); font-size: 0.82rem; font-weight: 700; min-width: 18px;">ON</span>
+            <span style="color: var(--text); font-weight: 600; font-size: 0.88rem;">perennialFraming</span>
+            <span style="color: var(--text-dim); font-size: 0.82rem;">&mdash; batch includes perennial picks. Tells Claude: lead with the activity, not the venue name.</span>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: baseline;">
+            <span style="color: var(--green); font-size: 0.82rem; font-weight: 700; min-width: 18px;">ON</span>
+            <span style="color: var(--text); font-weight: 600; font-size: 0.88rem;">nearbySuggestion</span>
+            <span style="color: var(--text-dim); font-size: 0.82rem;">&mdash; nearby hoods provided. Claude can suggest Greenpoint/Bushwick if picks are thin.</span>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: baseline;">
+            <span style="color: var(--text-muted); font-size: 0.82rem; font-weight: 700; min-width: 18px;">off</span>
+            <span style="color: var(--text-muted); font-weight: 600; font-size: 0.88rem;">neighborhoodMismatch</span>
+            <span style="color: var(--text-muted); font-size: 0.82rem;">&mdash; events ARE in Williamsburg, so no mismatch disclaimer needed.</span>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: baseline;">
+            <span style="color: var(--text-muted); font-size: 0.82rem; font-weight: 700; min-width: 18px;">off</span>
+            <span style="color: var(--text-muted); font-weight: 600; font-size: 0.88rem;">freeEmphasis / activityAdherence / conversationAwareness</span>
+            <span style="color: var(--text-muted); font-size: 0.82rem;">&mdash; no filters, no activity keyword, no history.</span>
+          </div>
+        </div>
+        <p style="margin-top: 12px;">The assembled prompt is ~800 tokens. Without the skills system, the prompt would always include every instruction (~1,400 tokens), wasting context on irrelevant rules and sometimes confusing Claude. For example, including "ACTIVITY ADHERENCE" when the user didn't ask for a specific activity caused Claude to over-filter and return fewer picks.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="step-label">Step 6</span> Claude composes the SMS <span class="step-preview">~800ms, $0.003</span></summary>
+      <div class="detail-body">
+        <p><code>composeResponse()</code> sends the assembled prompt, the 8 candidate events (as structured JSON), and the user's message to <strong>Claude Haiku</strong>. Claude picks 2-3 events and writes the SMS text.</p>
+        <p>Claude returns structured JSON:</p>
+        <div class="code-block" style="margin-top: 8px;">{
+  "sms_text": "Tonight in Williamsburg:\n\n1) DJ set at Good Room — always goes off on Fridays. 10pm, $15\n\n2) Indie at Baby's All Right — solid lineup tonight. 8pm, $18\n\n3) Free comedy at Muchmore's — underground standup, BYOB vibes. 9pm\n\nReply 1-3 for details, MORE for extra picks, or FREE for free events",
+  "picks": [
+    { "rank": 1, "event_id": "dice-good-room-0221", "why": "reliable Friday DJ night" },
+    { "rank": 2, "event_id": "bv-babys-0221", "why": "strong indie lineup" },
+    { "rank": 3, "event_id": "skint-muchmores-0221", "why": "free comedy, unique" }
+  ],
+  "neighborhood_used": "Williamsburg"
+}</div>
+        <p>Notice the picks: #1 from Dice (weight 0.8), #2 from BrooklynVegan (0.8), #3 from Skint (0.9). The <code>sourceTiers</code> skill told Claude to prefer the Skint pick, and it was chosen despite being free &mdash; the curation taste in <code>core</code> favors "unique one-off events."</p>
+        <p>Cost: ~$0.003 (Haiku). Latency: ~800ms.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="step-label">Step 7</span> Send &amp; save <span class="step-preview">289 of 480 chars</span></summary>
+      <div class="detail-body">
+        <p>The SMS text (289 characters, under the 480-char cap) is sent via Twilio. The session is written with the picks, event map, neighborhood, and filters. A JSONL trace captures the full request for evals.</p>
+        <p>Now when the user texts <strong>"2"</strong>, the pre-router matches it as <code>intent: "details"</code>, looks up pick #2 (Baby's All Right) from <code>session.lastPicks</code>, and sends the full event details with a link. No AI call needed.</p>
+        <p>When they text <strong>"how about comedy"</strong>, the pre-router sees an active session in Williamsburg and matches the category filter change. It re-runs the events flow with <code>{ category: "comedy" }</code> &mdash; same neighborhood, filtered events, new compose call.</p>
+      </div>
+    </details>
+
+    <div class="card">
+      <h3>Total cost &amp; timing</h3>
+      <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 4px;">
+        <div>
+          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">~$0.003</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">AI cost (1 Haiku call)</div>
+        </div>
+        <div>
+          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">~1.2s</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">total latency</div>
+        </div>
+        <div>
+          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">0ms</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">routing (pre-router)</div>
+        </div>
+        <div>
+          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">289</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">chars (of 480 max)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Data Pipeline -->
 <section id="data-pipeline">
   <div class="container">
     <p class="section-label">Data Pipeline</p>
@@ -470,60 +711,51 @@
 <section id="message-flow">
   <div class="container">
     <p class="section-label">Message Flow</p>
-    <h2 class="section-title">From SMS to recommendation</h2>
+    <h2 class="section-title">The eight layers</h2>
     <div class="section-body">
-      <p>When a text arrives, it passes through TCPA compliance, deduplication, and a per-user cost budget before reaching the router. The pre-router handles ~60% of messages deterministically. The rest go to the AI router for semantic understanding. Matched intents dispatch to dedicated handlers, which orchestrate event fetching, curation, prompt assembly, and response composition.</p>
+      <p>Each message passes through up to 8 layers. Not every layer runs on every request &mdash; "more" skips the cache fetch, "details" skips curation and compose. The walkthrough above shows which layers fire for a typical request.</p>
     </div>
 
     <div class="flow">
-      <div class="flow-node node-coral">Incoming SMS via Twilio</div>
+      <div class="flow-node node-coral">
+        <strong>1. Incoming SMS</strong>
+        <div class="label">Twilio webhook delivers the message to handler.js</div>
+      </div>
       <div class="flow-arrow"></div>
       <div class="flow-node node-dim">
-        handler.js
-        <div class="label">TCPA opt-out check &rarr; dedup &rarr; $0.10/day budget</div>
+        <strong>2. Guard rails</strong>
+        <div class="label">TCPA opt-out &rarr; dedup (5min MessageSid cache) &rarr; $0.10/day AI budget</div>
       </div>
       <div class="flow-arrow"></div>
       <div class="flow-node node-blue">
-        pre-router.js &larr; session.js
-        <div class="label">Pattern-match: greetings, hoods, more, free, details, filters</div>
-      </div>
-      <div class="flow-arrow"></div>
-      <div class="flow-split">
-        <div class="flow-node node-green">
-          Match (~60%)
-          <div class="label">Zero latency, zero cost</div>
-        </div>
-        <div class="flow-node node-purple">
-          No match (~40%)
-          <div class="label">ai.js/routeMessage &mdash; Gemini Flash or Haiku</div>
-        </div>
+        <strong>3. Routing</strong>
+        <div class="label">Pre-router (deterministic, ~60%) or AI router (Gemini Flash / Haiku, ~40%)</div>
       </div>
       <div class="flow-arrow"></div>
       <div class="flow-node node-yellow">
-        intent-handlers.js &mdash; dispatch
-        <div class="label">help &bull; conversational &bull; details &bull; more &bull; free &bull; nudge_accept &bull; events</div>
+        <strong>4. Intent dispatch</strong>
+        <div class="label">7 handlers: help, conversational, details, more, free, nudge_accept, events</div>
       </div>
       <div class="flow-arrow"></div>
-      <div class="flow-node node-dim">
-        curation.js
-        <div class="label">Filter kids events, incomplete entries, validate perennials</div>
+      <div class="flow-node node-green">
+        <strong>5. Event fetch &amp; curation</strong>
+        <div class="label">In-memory cache query &rarr; filter kids &rarr; filter incomplete &rarr; validate perennials</div>
       </div>
       <div class="flow-arrow"></div>
       <div class="flow-node node-blue">
-        skills/ + prompts.js
-        <div class="label">Assemble compose prompt from 12 conditional skill modules</div>
+        <strong>6. Prompt assembly</strong>
+        <div class="label">Conditional skill modules assembled into the compose prompt (~800 tokens)</div>
       </div>
       <div class="flow-arrow"></div>
       <div class="flow-node node-purple">
-        ai.js/composeResponse
-        <div class="label">Claude Haiku &mdash; pick events + write SMS</div>
+        <strong>7. AI compose</strong>
+        <div class="label">Claude Haiku picks 2-3 events + writes the SMS. Returns structured JSON.</div>
       </div>
       <div class="flow-arrow"></div>
-      <div class="flow-node node-dim">
-        formatters.js &mdash; 480-char cap
+      <div class="flow-node node-coral">
+        <strong>8. Send &amp; trace</strong>
+        <div class="label">SMS via Twilio &rarr; session update &rarr; JSONL trace saved</div>
       </div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-coral">SMS out via Twilio</div>
     </div>
   </div>
 </section>
@@ -791,67 +1023,97 @@
     <p class="section-label">Prompts</p>
     <h2 class="section-title">Composable prompt skills</h2>
     <div class="section-body">
-      <p>The compose prompt is assembled dynamically from <strong>12 conditional skill modules</strong>. Rather than one monolithic prompt, <code>build-compose-prompt.js</code> selects which skills to include based on the current request context. This keeps prompts focused and avoids wasting tokens on irrelevant instructions.</p>
+      <p>The compose prompt is assembled dynamically from <strong>12 conditional skill modules</strong>. Rather than one monolithic prompt, <code>build-compose-prompt.js</code> checks the request context and includes only the relevant instructions. This keeps prompts focused (~800 tokens instead of ~1,400) and prevents Claude from applying rules that don't apply.</p>
+      <p><strong>Why not one big prompt?</strong> We tried that first. The problem: when Claude sees "ACTIVITY ADHERENCE: if none match, say honestly you don't have that tonight" on a request where the user didn't ask for an activity, it sometimes over-filters and returns fewer picks. Including "NEIGHBORHOOD MISMATCH: acknowledge this upfront" when events ARE in the right neighborhood caused Claude to add unnecessary disclaimers. Each skill solves a specific failure mode, and only fires when that failure mode is possible.</p>
     </div>
 
-    <div class="card-grid">
-      <div class="card">
-        <h3>core</h3>
-        <p>Base persona, tone, format rules, 480-char limit</p>
-      </div>
-      <div class="card">
-        <h3>tonightPriority</h3>
-        <p>Prioritize events happening tonight over future dates</p>
-      </div>
-      <div class="card">
-        <h3>sourceTiers</h3>
-        <p>Trust hierarchy: prefer Skint/Nonsense over Eventbrite/Tavily</p>
-      </div>
-      <div class="card">
-        <h3>neighborhoodMismatch</h3>
-        <p>Handle when events are from nearby-but-different neighborhoods</p>
-      </div>
-      <div class="card">
-        <h3>perennialFraming</h3>
-        <p>Frame recurring venue picks vs. one-off events</p>
-      </div>
-      <div class="card">
-        <h3>venueFraming</h3>
-        <p>Use venue reputation to add color to picks</p>
-      </div>
-      <div class="card">
-        <h3>lastBatch</h3>
-        <p>Adjust tone when serving "more" results</p>
-      </div>
-      <div class="card">
-        <h3>freeEmphasis</h3>
-        <p>Highlight free events when user asked for them</p>
-      </div>
-      <div class="card">
-        <h3>activityAdherence</h3>
-        <p>Stick to requested category (comedy, jazz, etc.)</p>
-      </div>
-      <div class="card">
-        <h3>conversationAwareness</h3>
-        <p>Reference prior turns for natural follow-ups</p>
-      </div>
-      <div class="card">
-        <h3>pendingIntent</h3>
-        <p>Context when fulfilling a deferred neighborhood ask</p>
-      </div>
-    </div>
+    <details open style="margin-top: 24px;">
+      <summary style="color: var(--coral);">core <span class="skill-condition">&mdash; always on. Persona, format, 480-char limit.</span></summary>
+      <div class="detail-body">
+        <p>Defines who Claude is and how to write. This is the only skill that's always included.</p>
+        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">You are Pulse: an NYC "plugged-in friend" who curates the best upcoming events. You text like a real person — warm, opinionated, concise. Never robotic.
 
-    <div class="code-block"><span class="hl-dim">// build-compose-prompt.js (simplified)</span>
-<span class="hl-blue">const</span> prompt = [skills.core.text];
+PICK PRIORITY ORDER:
+1. Tonight first: if an event's day is "TODAY", prefer it over tomorrow events.
+2. Source tier: among tonight options, prefer unstructured and primary over secondary.
+3. Neighborhood match: strongly prefer events in the user's requested neighborhood.
+4. Curation taste: prefer gallery openings, DJ nights at small venues, indie concerts, comedy shows, themed pop-ups, and unique one-off events. Avoid corporate events, hotel bars, tourist traps, and chain venues.
 
-<span class="hl-blue">if</span> (isTonight)     prompt.push(skills.<span class="hl">tonightPriority</span>.text);
-<span class="hl-blue">if</span> (mismatch)      prompt.push(skills.<span class="hl">neighborhoodMismatch</span>.text);
-<span class="hl-blue">if</span> (hasPerennials)  prompt.push(skills.<span class="hl">perennialFraming</span>.text);
-<span class="hl-blue">if</span> (isFree)        prompt.push(skills.<span class="hl">freeEmphasis</span>.text);
-<span class="hl-blue">if</span> (hasHistory)    prompt.push(skills.<span class="hl">conversationAwareness</span>.text);
-<span class="hl-dim">// ... conditionally adds more skills</span>
+VOICE: you're a friend texting picks. Light NYC shorthand OK.
+Each numbered pick should feel opinionated — "always a vibe", "goes off late", "legendary basement spot".
+CHARACTER LIMIT: 480 characters total for sms_text.</div>
+      </div>
+    </details>
 
-<span class="hl-blue">return</span> prompt.join(<span class="hl-green">'\n\n'</span>);</div>
+    <details>
+      <summary>sourceTiers <span class="skill-condition">&mdash; always on. Editorial trust hierarchy.</span></summary>
+      <div class="detail-body">
+        <p><strong>Problem it solves:</strong> Without this, Claude treats all events equally. An Eventbrite "networking mixer" looks the same as a Nonsense NYC underground art party. This skill teaches Claude our editorial hierarchy.</p>
+        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">SOURCE TIERS — use source_tier to break ties between similar events:
+- "unstructured" (Skint, Nonsense NYC, Oh My Rockness, Yutori): curated editorial picks — trust these, they've been hand-selected.
+- "primary" (RA, Dice, BrooklynVegan, BAM, SmallsLIVE): structured high-quality listings.
+- "secondary" (NYC Parks, DoNYC, Songkick, Ticketmaster, Eventbrite, NYPL, Tavily): broader aggregators.</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>tonightPriority <span class="skill-condition">&mdash; when today events exist in batch</span></summary>
+      <div class="detail-body">
+        <p><strong>Problem it solves:</strong> Claude naturally prefers the "best" event regardless of date. A great concert tomorrow looks better than a decent DJ set tonight. But the user texted now &mdash; they probably want something tonight.</p>
+        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">TONIGHT PRIORITY: A decent tonight event beats a great tomorrow event — the user is asking what's happening now.</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>neighborhoodMismatch <span class="skill-condition">&mdash; when NO events match the requested hood</span></summary>
+      <div class="detail-body">
+        <p><strong>Problem it solves:</strong> When the user asks for the Upper West Side but all events are in Hell's Kitchen, Claude would silently show the Hell's Kitchen events. The user assumes they're in UWS. This skill forces Claude to acknowledge the mismatch upfront.</p>
+        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">NEIGHBORHOOD MISMATCH: NONE of the events are in the requested neighborhood. You MUST acknowledge this upfront — e.g. "Not much tonight on the UWS, but nearby in Hell's Kitchen:"</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>perennialFraming <span class="skill-condition">&mdash; when batch includes perennial picks</span></summary>
+      <div class="detail-body">
+        <p><strong>Problem it solves:</strong> Perennials are always-good venues (bars with trivia, jazz clubs). Without framing, Claude writes "Black Rabbit is a solid bar" instead of "Black Rabbit has great trivia tonight at 8." It also needs to know when to lean on perennials (thin scrape nights) vs. skip them (plenty of events).</p>
+        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">PERENNIAL PICKS: Items with source_name "perennial" are bars/venues always worth visiting.
+- Lead with the activity: "Black Rabbit has great trivia tonight at 8" not "Black Rabbit is a solid bar."
+- THIN EVENTS (1-3 scraped events): Lead with the event, then add a perennial.
+- RICH EVENTS (4+ scraped events): Perennials are optional. Skip or mention one only if it has something specific and great happening.
+- Frame as personal recs — "always a good time" — never "if nothing else works."</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>activityAdherence <span class="skill-condition">&mdash; when user asks for trivia, karaoke, jazz, etc.</span></summary>
+      <div class="detail-body">
+        <p><strong>Problem it solves:</strong> When someone texts "trivia in fort greene" and there's no trivia, Claude would recommend random events as alternatives. This is misleading &mdash; the user specifically wants trivia. This skill tells Claude to be honest about the miss rather than silently substituting.</p>
+        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">ACTIVITY ADHERENCE: The user asked for a specific type of activity. If NONE of the events match, do NOT recommend unrelated events. Instead, say honestly you don't have that tonight.
+DAY-SPECIFIC CLAIMS: NEVER say an event happens on a particular day (e.g. "trivia on Thursdays") unless you can verify from the event data that today IS that day.</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>conversationAwareness <span class="skill-condition">&mdash; when session has conversation history</span></summary>
+      <div class="detail-body">
+        <p><strong>Problem it solves:</strong> Three specific bugs: (1) User asks for "tomorrow" events but Claude defaults to tonight-first priority &mdash; this skill overrides that. (2) User asked for "free comedy" earlier, then says "yes" to a neighborhood redirect &mdash; without this skill, Claude drops the filters. (3) Claude recommends events it already showed in earlier turns.</p>
+        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">CONVERSATION AWARENESS:
+- TEMPORAL INTENT: If user asks about "tomorrow", prefer TOMORROW events. Override the "tonight first" rule.
+- FILTER PERSISTENCE: If user asked for "free comedy" earlier and is now accepting a redirect, maintain BOTH filters.
+- REPEAT AVOIDANCE: Do not recommend events already mentioned in conversation history.</div>
+      </div>
+    </details>
+
+    <details>
+      <summary style="color: var(--text-dim);">5 more conditional skills <span class="skill-condition">&mdash; lastBatch, freeEmphasis, pendingIntent, venueFraming, nearbySuggestion</span></summary>
+      <div class="detail-body">
+        <p><strong>lastBatch</strong> &mdash; Fires on the final "more" batch. Removes the "Reply MORE for extra picks" CTA since there are no more picks. Appends a nearby neighborhood suggestion.</p>
+        <p><strong>freeEmphasis</strong> &mdash; Fires when user asked for free events. Tells Claude to list free events even if they seem niche &mdash; the user specifically wants free.</p>
+        <p><strong>pendingIntent</strong> &mdash; Fires when restoring a deferred request. User said "free comedy" with no neighborhood, then sent "bushwick" &mdash; this skill passes the original request so Claude knows the full intent.</p>
+        <p><strong>venueFraming</strong> &mdash; Fires when Tavily search results include permanent venues. Tells Claude to frame them as "solid spots to check out" rather than events with specific times.</p>
+        <p><strong>nearbySuggestion</strong> &mdash; Fires when nearby neighborhoods are provided. Tells Claude to suggest travel when picks are thin: "Slim pickings in Fort Greene &mdash; Park Slope is right nearby, want picks from there?"</p>
+      </div>
+    </details>
   </div>
 </section>
 
