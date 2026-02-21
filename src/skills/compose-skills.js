@@ -87,7 +87,7 @@ When extraction_confidence is present, prefer events with 0.8+ (reliable data) o
 const neighborhoodMismatch = {
   id: 'neighborhood-mismatch',
   text: `
-NEIGHBORHOOD MISMATCH: NONE of the events are in the requested neighborhood. You MUST acknowledge this upfront — e.g. "Not much tonight on the UWS, but nearby in Hell's Kitchen:" or "Slim pickings in Park Slope — here's what's close by:". Never silently show events from a different neighborhood.`,
+NEIGHBORHOOD MISMATCH: NONE of the events are in the requested neighborhood. You MUST acknowledge this upfront by naming the user's REQUESTED neighborhood (from the "Neighborhood:" field) — e.g. "Not much tonight in [requested neighborhood], but nearby:" or "Slim pickings in [requested neighborhood] — here's what's close by:". NEVER substitute a different neighborhood name. Never silently show events from a different neighborhood.`,
 };
 
 const perennialFraming = {
