@@ -13,18 +13,13 @@
 
     :root {
       --bg: #08070d;
-      --bg-elevated: #0f0e17;
       --bg-card: rgba(255,255,255,0.03);
-      --bg-card-hover: rgba(255,255,255,0.06);
+      --bg-card-hover: rgba(255,255,255,0.05);
       --text: #ede9e3;
       --text-dim: #7a756d;
       --text-muted: #4a463f;
       --coral: #ff6b42;
-      --magenta: #e5307e;
-      --amber: #ffb524;
-      --violet: #a855f7;
-      --gradient-hot: linear-gradient(135deg, #ff6b42 0%, #e5307e 50%, #ffb524 100%);
-      --gradient-warm: linear-gradient(135deg, #ff6b42 0%, #e5307e 100%);
+      --coral-dim: rgba(255,107,66,0.12);
       --font-display: 'Syne', sans-serif;
       --font-body: 'DM Sans', sans-serif;
       --radius: 20px;
@@ -43,87 +38,16 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Grain overlay */
-    body::after {
-      content: '';
-      position: fixed;
-      inset: 0;
-      z-index: 9999;
-      pointer-events: none;
-      opacity: 0.035;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-      background-repeat: repeat;
-      background-size: 200px;
-    }
-
-    /* Ambient glow blobs — slow drifting animation */
-    .glow {
-      position: fixed;
-      border-radius: 50%;
-      filter: blur(140px);
-      pointer-events: none;
-      z-index: 0;
-      will-change: transform;
-    }
-    .glow-1 {
-      width: 700px; height: 700px;
-      top: -300px; left: -200px;
-      background: var(--coral);
-      opacity: 0.15;
-      animation: drift1 20s ease-in-out infinite;
-    }
-    .glow-2 {
-      width: 600px; height: 600px;
-      top: 35%; right: -200px;
-      background: var(--magenta);
-      opacity: 0.12;
-      animation: drift2 25s ease-in-out infinite;
-    }
-    .glow-3 {
-      width: 500px; height: 500px;
-      bottom: 5%; left: 5%;
-      background: var(--amber);
-      opacity: 0.07;
-      animation: drift3 22s ease-in-out infinite;
-    }
-    @keyframes drift1 {
-      0%, 100% { transform: translate(0, 0) scale(1); }
-      33% { transform: translate(60px, 40px) scale(1.05); }
-      66% { transform: translate(-30px, 20px) scale(0.95); }
-    }
-    @keyframes drift2 {
-      0%, 100% { transform: translate(0, 0) scale(1); }
-      33% { transform: translate(-40px, -30px) scale(1.08); }
-      66% { transform: translate(20px, 50px) scale(0.96); }
-    }
-    @keyframes drift3 {
-      0%, 100% { transform: translate(0, 0) scale(1); }
-      50% { transform: translate(40px, -20px) scale(1.1); }
-    }
-
-    /* Scroll reveal animations */
-    .reveal {
-      opacity: 0;
-      transform: translateY(32px);
-      transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .reveal.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    .reveal-delay-1 { transition-delay: 0.1s; }
-    .reveal-delay-2 { transition-delay: 0.2s; }
-    .reveal-delay-3 { transition-delay: 0.3s; }
-    .reveal-delay-4 { transition-delay: 0.35s; }
-
-    /* Nav */
+    /* ============================
+       NAV
+    ============================ */
     nav {
       position: sticky;
       top: 0;
       z-index: 100;
       backdrop-filter: blur(24px) saturate(1.4);
       -webkit-backdrop-filter: blur(24px) saturate(1.4);
-      background: rgba(8,7,13,0.7);
+      background: rgba(8,7,13,0.8);
       border-bottom: 1px solid rgba(255,255,255,0.04);
     }
     .nav-inner {
@@ -136,12 +60,9 @@
     }
     .nav-logo {
       font-family: var(--font-display);
-      font-size: 1.6rem;
+      font-size: 1.5rem;
       font-weight: 800;
-      background: var(--gradient-hot);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: var(--coral);
       text-decoration: none;
       letter-spacing: -0.02em;
     }
@@ -152,26 +73,66 @@
       font-size: 0.88rem;
       font-weight: 500;
       transition: color 0.25s;
-      letter-spacing: 0.01em;
     }
     .nav-links a:hover { color: var(--text); }
-    .nav-links .nav-cta {
-      color: var(--bg);
-      background: var(--text);
+    .nav-cta {
+      color: var(--bg) !important;
+      background: var(--coral);
       padding: 8px 20px;
       border-radius: 100px;
-      font-weight: 700;
-      font-size: 0.82rem;
-      letter-spacing: 0.02em;
-      transition: background 0.25s, transform 0.2s;
+      font-weight: 700 !important;
+      font-size: 0.82rem !important;
+      transition: opacity 0.25s, transform 0.2s !important;
     }
-    .nav-links .nav-cta:hover {
-      background: var(--coral);
-      color: #fff;
+    .nav-cta:hover {
+      opacity: 0.9;
       transform: translateY(-1px);
+      color: var(--bg) !important;
     }
 
-    /* Sections */
+    /* Mobile menu */
+    .nav-menu-btn {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 8px;
+      color: var(--text);
+    }
+    .nav-menu-btn svg { display: block; }
+    .mobile-menu {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(8,7,13,0.95);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      z-index: 200;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+    }
+    .mobile-menu.open { display: flex; }
+    .mobile-menu a {
+      color: var(--text);
+      text-decoration: none;
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+    .mobile-menu a:hover { color: var(--coral); }
+    .mobile-menu .close-btn {
+      position: absolute;
+      top: 20px;
+      right: 24px;
+      background: none;
+      border: none;
+      color: var(--text);
+      cursor: pointer;
+      padding: 8px;
+    }
+
     section { position: relative; z-index: 1; }
     .container { max-width: var(--max-w); margin: 0 auto; padding: 0 28px; }
 
@@ -179,186 +140,148 @@
        HERO
     ============================ */
     .hero {
-      padding: 120px 0 60px;
-      display: flex;
-      justify-content: center;
+      padding: 100px 0 80px;
     }
     .hero .container {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 48px;
+      gap: 56px;
       align-items: center;
     }
-    .hero-text { max-width: 520px; }
-    .hero-eyebrow {
+    .hero-text { max-width: 500px; }
+    .hero-proof {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      font-size: 0.78rem;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--coral);
-      margin-bottom: 24px;
-      opacity: 0;
-      animation: fadeUp 0.6s 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      gap: 16px;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      margin-bottom: 28px;
+      letter-spacing: 0.01em;
     }
-    .hero-eyebrow::before {
-      content: '';
-      display: inline-block;
-      width: 8px;
-      height: 8px;
+    .hero-proof span {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .hero-proof .dot {
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
       background: var(--coral);
-      animation: blink 2s ease-in-out infinite;
-    }
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
     }
     .hero h1 {
       font-family: var(--font-display);
-      font-size: clamp(2.8rem, 5.5vw, 4.2rem);
+      font-size: clamp(2.6rem, 5vw, 3.8rem);
       font-weight: 800;
       line-height: 1.05;
       letter-spacing: -0.035em;
-      margin-bottom: 24px;
-      opacity: 0;
-      animation: fadeUp 0.7s 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      margin-bottom: 20px;
     }
-    .hero h1 .gradient-text {
-      background: var(--gradient-hot);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+    .hero h1 em {
+      font-style: normal;
+      color: var(--coral);
     }
     .hero .subtitle {
-      font-size: 1.15rem;
+      font-size: 1.1rem;
       color: var(--text-dim);
-      max-width: 400px;
-      line-height: 1.6;
-      margin-bottom: 40px;
-      opacity: 0;
-      animation: fadeUp 0.7s 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      max-width: 380px;
+      line-height: 1.65;
+      margin-bottom: 36px;
     }
     .hero-actions {
       display: flex;
       align-items: center;
       gap: 20px;
       flex-wrap: wrap;
-      opacity: 0;
-      animation: fadeUp 0.7s 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(24px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
     .phone-badge {
       display: inline-flex;
       align-items: center;
       gap: 10px;
-      background: var(--gradient-hot);
+      background: var(--coral);
       padding: 16px 32px;
       border-radius: 100px;
       font-family: var(--font-display);
-      font-size: 1.2rem;
+      font-size: 1.15rem;
       font-weight: 700;
       color: #fff;
       text-decoration: none;
-      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s;
-      box-shadow: 0 4px 24px rgba(255,107,66,0.25), 0 0 0 0 rgba(255,107,66,0);
-      position: relative;
-      overflow: hidden;
-    }
-    .phone-badge::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%);
-      opacity: 0;
-      transition: opacity 0.3s;
+      transition: opacity 0.2s, transform 0.2s;
+      box-shadow: 0 4px 24px rgba(255,107,66,0.2);
     }
     .phone-badge:hover {
-      transform: translateY(-3px) scale(1.02);
-      box-shadow: 0 8px 40px rgba(255,107,66,0.35), 0 0 0 4px rgba(255,107,66,0.1);
+      opacity: 0.92;
+      transform: translateY(-2px);
     }
-    .phone-badge:hover::before { opacity: 1; }
     .hero-hint {
-      font-size: 0.88rem;
-      color: var(--text-dim);
-      font-style: italic;
+      font-size: 0.85rem;
+      color: var(--text-muted);
     }
 
-    /* Phone mockup — hero */
+    /* Phone mockup */
     .hero-phone-wrap {
       display: flex;
       justify-content: center;
-      opacity: 0;
-      animation: fadeUp 0.8s 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
     .phone-device {
-      width: 300px;
+      width: 310px;
       background: #111019;
       border-radius: 36px;
-      padding: 16px;
-      border: 1px solid rgba(255,255,255,0.08);
-      box-shadow:
-        0 24px 80px rgba(0,0,0,0.6),
-        0 0 0 1px rgba(255,255,255,0.04),
-        inset 0 1px 0 rgba(255,255,255,0.06);
-      position: relative;
+      padding: 14px;
+      border: 1px solid rgba(255,255,255,0.07);
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
     }
     .phone-screen {
       background: #0a0912;
-      border-radius: 24px;
-      padding: 16px 14px 14px;
-      min-height: 380px;
+      border-radius: 26px;
+      padding: 14px 12px 12px;
       overflow: hidden;
     }
-    .phone-status-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 4px 4px 12px;
-      font-size: 0.68rem;
-      font-weight: 600;
-      color: var(--text-dim);
-    }
-    .phone-status-bar .time { letter-spacing: 0.02em; }
-    .phone-status-bar .indicators { display: flex; gap: 4px; align-items: center; }
-    .phone-status-bar .indicators span {
-      display: inline-block;
-      width: 14px;
-      height: 10px;
-      border-radius: 2px;
-      background: var(--text-dim);
-      opacity: 0.5;
-    }
     .phone-dynamic-island {
-      width: 80px;
-      height: 24px;
+      width: 76px;
+      height: 22px;
       background: #000;
       border-radius: 20px;
-      margin: 0 auto 12px;
+      margin: 0 auto 10px;
     }
-    .sms-thread { display: flex; flex-direction: column; gap: 8px; }
+    .phone-contact {
+      text-align: center;
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .phone-contact .name {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 0.88rem;
+    }
+    .phone-contact .number {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+    .sms-thread {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      max-height: 400px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.08) transparent;
+    }
+    .sms-thread::-webkit-scrollbar { width: 3px; }
+    .sms-thread::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+    .sms-time {
+      text-align: center;
+      font-size: 0.66rem;
+      color: var(--text-muted);
+      margin: 6px 0 2px;
+    }
     .sms-bubble {
       max-width: 82%;
-      padding: 10px 14px;
+      padding: 9px 13px;
       border-radius: 18px;
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       line-height: 1.5;
-      opacity: 0;
-      animation: msgIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-    .sms-bubble:nth-child(1) { animation-delay: 0.8s; }
-    .sms-bubble:nth-child(2) { animation-delay: 1.4s; }
-    .sms-bubble:nth-child(3) { animation-delay: 2.4s; }
-    .sms-bubble:nth-child(4) { animation-delay: 3.0s; }
-    @keyframes msgIn {
-      from { opacity: 0; transform: translateY(12px) scale(0.96); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
     }
     .sms-sent {
       align-self: flex-end;
@@ -374,375 +297,185 @@
     }
 
     /* ============================
-       SECTION STYLING
+       DIVIDER
     ============================ */
-    .section-divider {
+    .divider {
       height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06) 20%, rgba(255,255,255,0.06) 80%, transparent);
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05) 30%, rgba(255,255,255,0.05) 70%, transparent);
       margin: 0 28px;
     }
 
+    /* ============================
+       BASICS — replaces the standard how-it-works + features
+    ============================ */
+    .basics { padding: 88px 0; }
+    .basics-header {
+      margin-bottom: 56px;
+      max-width: 500px;
+    }
     .section-label {
       font-family: var(--font-display);
       text-transform: uppercase;
       font-size: 0.72rem;
       font-weight: 700;
-      letter-spacing: 0.2em;
+      letter-spacing: 0.18em;
       color: var(--coral);
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
     .section-title {
       font-family: var(--font-display);
-      font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+      font-size: clamp(1.7rem, 3.5vw, 2.4rem);
       font-weight: 800;
       letter-spacing: -0.03em;
       line-height: 1.1;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
     .section-subtitle {
       color: var(--text-dim);
-      font-size: 1.05rem;
-      max-width: 480px;
-      margin-bottom: 56px;
+      font-size: 1rem;
     }
 
-    /* ============================
-       HOW IT WORKS
-    ============================ */
-    .how-it-works { padding: 100px 0; }
-    .steps {
+    .basics-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
     }
-    .step-card {
+    .basics-item {
+      padding: 28px 24px;
       background: var(--bg-card);
-      border: 1px solid rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.04);
       border-radius: var(--radius);
-      padding: 36px 28px 32px;
-      transition: background 0.3s, border-color 0.3s, transform 0.3s;
-      position: relative;
-      overflow: hidden;
+      transition: background 0.2s;
     }
-    .step-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: var(--gradient-hot);
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-    .step-card:hover {
-      background: var(--bg-card-hover);
-      border-color: rgba(255,255,255,0.08);
-      transform: translateY(-4px);
-    }
-    .step-card:hover::before { opacity: 1; }
-
-    .step-num {
-      display: inline-flex;
-      width: 40px;
-      height: 40px;
-      align-items: center;
-      justify-content: center;
-      border-radius: var(--radius-sm);
-      background: var(--gradient-hot);
-      color: #fff;
+    .basics-item:hover { background: var(--bg-card-hover); }
+    .basics-item h3 {
       font-family: var(--font-display);
-      font-weight: 800;
-      font-size: 0.95rem;
-      margin-bottom: 20px;
-      box-shadow: 0 4px 16px rgba(255,107,66,0.2);
-    }
-    .step-card h3 {
-      font-family: var(--font-display);
-      font-size: 1.15rem;
+      font-size: 1rem;
       font-weight: 700;
-      margin-bottom: 10px;
+      margin-bottom: 6px;
       letter-spacing: -0.01em;
     }
-    .step-card p {
+    .basics-item p {
       color: var(--text-dim);
-      font-size: 0.92rem;
+      font-size: 0.88rem;
+      line-height: 1.6;
     }
-    .step-tags {
+    .basics-item .accent { color: var(--coral); }
+
+    /* Wide item spanning both columns */
+    .basics-item.wide {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 40px;
+      align-items: center;
+    }
+    .basics-item.wide .basics-item-text { flex: 1; }
+    .basics-item.wide .hood-tags {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
-      margin-top: 16px;
+      max-width: 320px;
     }
-    .step-tags span {
-      background: rgba(255,107,66,0.1);
-      color: var(--coral);
-      padding: 5px 12px;
+    .hood-tag {
+      padding: 6px 14px;
       border-radius: 100px;
       font-size: 0.76rem;
       font-weight: 600;
-      letter-spacing: 0.02em;
-      border: 1px solid rgba(255,107,66,0.15);
+      border: 1px solid rgba(255,255,255,0.06);
+      color: var(--text-dim);
+      transition: border-color 0.2s, color 0.2s;
     }
+    .hood-tag:hover { border-color: var(--coral); color: var(--coral); }
 
     /* ============================
-       FEATURES
+       FAQ
     ============================ */
-    .features { padding: 100px 0; }
-    .feature-grid {
+    .faq { padding: 88px 0; }
+    .faq-header { margin-bottom: 48px; max-width: 400px; }
+    .faq-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 16px;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
     }
-    .feature-card {
+    .faq-item {
+      padding: 28px 24px;
       background: var(--bg-card);
-      border: 1px solid rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.04);
       border-radius: var(--radius);
-      padding: 32px 28px;
-      transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-      position: relative;
-      overflow: hidden;
     }
-    .feature-card::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      border-radius: var(--radius);
-      padding: 1px;
-      background: var(--gradient-hot);
-      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
-      opacity: 0;
-      transition: opacity 0.35s;
-    }
-    .feature-card:hover {
-      background: var(--bg-card-hover);
-      transform: translateY(-2px);
-    }
-    .feature-card:hover::after { opacity: 0.5; }
-
-    .feature-icon-wrap {
-      width: 44px;
-      height: 44px;
-      border-radius: var(--radius-sm);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 18px;
-      font-size: 1.3rem;
-    }
-    .feature-icon-wrap.coral { background: rgba(255,107,66,0.12); }
-    .feature-icon-wrap.magenta { background: rgba(229,48,126,0.12); }
-    .feature-icon-wrap.amber { background: rgba(255,181,36,0.12); }
-    .feature-icon-wrap.violet { background: rgba(168,85,247,0.12); }
-
-    .feature-card h3 {
+    .faq-item h3 {
       font-family: var(--font-display);
-      font-size: 1.05rem;
+      font-size: 0.95rem;
       font-weight: 700;
       margin-bottom: 8px;
       letter-spacing: -0.01em;
     }
-    .feature-card p {
-      color: var(--text-dim);
-      font-size: 0.9rem;
-      line-height: 1.6;
-    }
-
-    /* ============================
-       CONVERSATION DEMO
-    ============================ */
-    .conversation-demo {
-      padding: 100px 0;
-      position: relative;
-    }
-    .convo-layout {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 64px;
-      align-items: center;
-    }
-    .convo-text {
-      max-width: 420px;
-    }
-    .convo-text .section-subtitle { margin-bottom: 32px; }
-    .convo-features {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-    .convo-feature {
-      display: flex;
-      gap: 14px;
-      align-items: flex-start;
-    }
-    .convo-feature-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--coral);
-      margin-top: 8px;
-      flex-shrink: 0;
-    }
-    .convo-feature-dot.mag { background: var(--magenta); }
-    .convo-feature-dot.amb { background: var(--amber); }
-    .convo-feature h4 {
-      font-family: var(--font-display);
-      font-size: 0.95rem;
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
-    .convo-feature p {
+    .faq-item p {
       color: var(--text-dim);
       font-size: 0.88rem;
-    }
-
-    .convo-phone-wrap {
-      display: flex;
-      justify-content: center;
-    }
-    .convo-device {
-      width: 320px;
-      background: #111019;
-      border-radius: 36px;
-      padding: 16px;
-      border: 1px solid rgba(255,255,255,0.08);
-      box-shadow:
-        0 32px 100px rgba(0,0,0,0.6),
-        0 0 0 1px rgba(255,255,255,0.04),
-        inset 0 1px 0 rgba(255,255,255,0.06);
-    }
-    .convo-screen {
-      background: #0a0912;
-      border-radius: 24px;
-      padding: 16px 14px 14px;
-    }
-    .convo-header {
-      text-align: center;
-      margin-bottom: 14px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-    }
-    .convo-header .name {
-      font-family: var(--font-display);
-      font-weight: 700;
-      font-size: 0.92rem;
-      letter-spacing: -0.01em;
-    }
-    .convo-header .number {
-      font-size: 0.72rem;
-      color: var(--text-dim);
-    }
-    .convo-thread {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      max-height: 420px;
-      overflow-y: auto;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(255,255,255,0.1) transparent;
-    }
-    .convo-thread::-webkit-scrollbar { width: 3px; }
-    .convo-thread::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
-    .convo-time {
-      text-align: center;
-      font-size: 0.68rem;
-      color: var(--text-muted);
-      margin: 8px 0 4px;
-      letter-spacing: 0.03em;
+      line-height: 1.6;
     }
 
     /* ============================
        CTA
     ============================ */
     .cta-section {
-      padding: 120px 0 80px;
+      padding: 100px 0 48px;
       text-align: center;
-      position: relative;
-    }
-    .cta-section::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 600px;
-      height: 600px;
-      background: radial-gradient(circle, rgba(255,107,66,0.08) 0%, transparent 70%);
-      pointer-events: none;
     }
     .cta-section h2 {
       font-family: var(--font-display);
-      font-size: clamp(2rem, 4.5vw, 3.2rem);
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
       font-weight: 800;
       letter-spacing: -0.03em;
       line-height: 1.1;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
     .cta-section .subtitle {
       color: var(--text-dim);
-      font-size: 1.1rem;
-      margin-bottom: 48px;
+      font-size: 1.05rem;
+      margin-bottom: 40px;
     }
     .cta-phone {
       display: inline-flex;
       align-items: center;
-      gap: 12px;
-      background: var(--gradient-hot);
-      padding: 22px 52px;
+      background: var(--coral);
+      padding: 20px 48px;
       border-radius: 100px;
       font-family: var(--font-display);
-      font-size: 1.6rem;
+      font-size: 1.5rem;
       font-weight: 800;
       color: #fff;
       text-decoration: none;
-      letter-spacing: -0.01em;
-      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s;
-      box-shadow: 0 4px 30px rgba(255,107,66,0.25);
-      margin-bottom: 32px;
-      position: relative;
-      overflow: hidden;
-    }
-    .cta-phone::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%);
-      opacity: 0;
-      transition: opacity 0.3s;
+      transition: opacity 0.2s, transform 0.2s;
+      box-shadow: 0 4px 24px rgba(255,107,66,0.2);
+      margin-bottom: 28px;
     }
     .cta-phone:hover {
-      transform: translateY(-3px) scale(1.02);
-      box-shadow: 0 12px 50px rgba(255,107,66,0.35);
+      opacity: 0.92;
+      transform: translateY(-2px);
     }
-    .cta-phone:hover::before { opacity: 1; }
-
     .opt-in-disclosure {
-      max-width: 540px;
+      max-width: 520px;
       margin: 0 auto;
-      padding: 24px 28px;
+      padding: 20px 24px;
       background: rgba(255,255,255,0.02);
-      border: 1px solid rgba(255,255,255,0.05);
-      border-radius: var(--radius);
-      font-size: 0.8rem;
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: var(--radius-sm);
+      font-size: 0.78rem;
       color: var(--text-dim);
       line-height: 1.7;
     }
     .opt-in-disclosure strong { color: var(--text); font-weight: 600; }
-    .opt-in-disclosure a {
-      color: var(--coral);
-      text-decoration: none;
-      transition: color 0.2s;
-    }
-    .opt-in-disclosure a:hover { color: #ff8b6a; }
+    .opt-in-disclosure a { color: var(--coral); text-decoration: none; }
+    .opt-in-disclosure a:hover { text-decoration: underline; }
 
     /* ============================
        FOOTER
     ============================ */
     footer {
       border-top: 1px solid rgba(255,255,255,0.04);
-      padding: 48px 0;
+      padding: 40px 0;
     }
     .footer-inner {
       max-width: var(--max-w);
@@ -755,33 +488,30 @@
     .footer-left {
       display: flex;
       align-items: center;
-      gap: 24px;
+      gap: 20px;
     }
     .footer-brand {
       font-family: var(--font-display);
-      font-size: 1.1rem;
+      font-size: 1rem;
       font-weight: 800;
-      background: var(--gradient-hot);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: var(--coral);
     }
     .footer-tagline {
-      font-size: 0.82rem;
+      font-size: 0.8rem;
       color: var(--text-muted);
-      padding-left: 24px;
+      padding-left: 20px;
       border-left: 1px solid rgba(255,255,255,0.06);
     }
     .footer-links {
       display: flex;
-      gap: 24px;
+      gap: 20px;
     }
     .footer-links a {
       color: var(--text-dim);
       text-decoration: none;
       font-size: 0.82rem;
       font-weight: 500;
-      transition: color 0.25s;
+      transition: color 0.2s;
     }
     .footer-links a:hover { color: var(--text); }
 
@@ -796,67 +526,74 @@
       }
       .hero-text { max-width: 100%; margin: 0 auto; }
       .hero .subtitle { margin-left: auto; margin-right: auto; }
+      .hero-proof { justify-content: center; }
       .hero-actions { justify-content: center; }
-      .convo-layout {
-        grid-template-columns: 1fr;
-        gap: 48px;
-        text-align: center;
-      }
-      .convo-text { max-width: 100%; margin: 0 auto; }
-      .convo-text .section-subtitle { margin-left: auto; margin-right: auto; }
-      .convo-features { align-items: center; }
-      .convo-feature { text-align: left; }
+      .basics-grid { grid-template-columns: 1fr; }
+      .basics-item.wide { flex-direction: column; gap: 20px; }
+      .basics-item.wide .hood-tags { max-width: 100%; }
+      .faq-grid { grid-template-columns: 1fr; }
     }
 
     @media (max-width: 680px) {
-      .nav-links .hide-mobile { display: none; }
-      .hero { padding: 80px 0 40px; }
-      .hero h1 { font-size: clamp(2.2rem, 8vw, 3rem); }
-      .phone-badge { font-size: 1.05rem; padding: 14px 26px; }
-      .phone-device { width: 260px; }
-      .steps { grid-template-columns: 1fr; }
-      .feature-grid { grid-template-columns: 1fr; }
-      .how-it-works, .features, .conversation-demo { padding: 72px 0; }
-      .cta-phone { font-size: 1.2rem; padding: 18px 36px; }
-      .convo-device { width: 280px; }
-      .footer-inner { flex-direction: column; gap: 20px; text-align: center; }
-      .footer-left { flex-direction: column; gap: 8px; }
+      .nav-links { display: none; }
+      .nav-menu-btn { display: block; }
+      .hero { padding: 72px 0 56px; }
+      .hero h1 { font-size: clamp(2rem, 8vw, 2.8rem); }
+      .phone-badge { font-size: 1rem; padding: 14px 26px; }
+      .phone-device { width: 270px; }
+      .basics, .faq { padding: 64px 0; }
+      .cta-phone { font-size: 1.15rem; padding: 16px 36px; }
+      .footer-inner { flex-direction: column; gap: 16px; text-align: center; }
+      .footer-left { flex-direction: column; gap: 6px; }
       .footer-tagline { border: none; padding: 0; }
     }
   </style>
 </head>
 <body>
 
-<div class="glow glow-1"></div>
-<div class="glow glow-2"></div>
-<div class="glow glow-3"></div>
-
 <!-- Nav -->
 <nav>
   <div class="nav-inner">
     <a href="#" class="nav-logo">Pulse</a>
     <div class="nav-links">
-      <a href="#how-it-works" class="hide-mobile">How It Works</a>
-      <a href="#features" class="hide-mobile">Features</a>
-      <a href="privacy.html" class="hide-mobile">Privacy</a>
-      <a href="terms.html" class="hide-mobile">Terms</a>
-      <a href="#get-started" class="nav-cta">Text Us</a>
+      <a href="#how-it-works">How It Works</a>
+      <a href="#faq">FAQ</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+      <a href="sms:+18337857300" class="nav-cta">Text Us</a>
     </div>
+    <button class="nav-menu-btn" onclick="document.getElementById('mobile-menu').classList.add('open')" aria-label="Open menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+    </button>
   </div>
 </nav>
+
+<!-- Mobile menu -->
+<div class="mobile-menu" id="mobile-menu">
+  <button class="close-btn" onclick="document.getElementById('mobile-menu').classList.remove('open')" aria-label="Close menu">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+  </button>
+  <a href="#how-it-works" onclick="document.getElementById('mobile-menu').classList.remove('open')">How It Works</a>
+  <a href="#faq" onclick="document.getElementById('mobile-menu').classList.remove('open')">FAQ</a>
+  <a href="sms:+18337857300">Text Us</a>
+  <a href="privacy.html">Privacy Policy</a>
+  <a href="terms.html">Terms of Service</a>
+</div>
 
 <!-- Hero -->
 <section class="hero">
   <div class="container">
     <div class="hero-text">
-      <div class="hero-eyebrow">Live now</div>
-      <h1>NYC events.<br><span class="gradient-text">One text away.</span></h1>
-      <p class="subtitle">Text a neighborhood. Get tonight's best picks curated from 18 sources. No app, no account, no nonsense.</p>
+      <div class="hero-proof">
+        <span><span class="dot"></span> Live now</span>
+        <span>36 neighborhoods</span>
+        <span>Free to use</span>
+      </div>
+      <h1>NYC events.<br><em>One text away.</em></h1>
+      <p class="subtitle">Text a neighborhood name and get tonight's best events back in seconds. Works on any phone. No app, no account.</p>
       <div class="hero-actions">
-        <a href="sms:+18337857300" class="phone-badge">
-          (833) 785-7300
-        </a>
-        <span class="hero-hint">Text any neighborhood</span>
+        <a href="sms:+18337857300" class="phone-badge">(833) 785-7300</a>
+        <span class="hero-hint">Text any neighborhood to start</span>
       </div>
     </div>
 
@@ -864,11 +601,18 @@
       <div class="phone-device">
         <div class="phone-screen">
           <div class="phone-dynamic-island"></div>
+          <div class="phone-contact">
+            <div class="name">Pulse</div>
+            <div class="number">(833) 785-7300</div>
+          </div>
           <div class="sms-thread">
-            <div class="sms-bubble sms-sent">east village</div>
-            <div class="sms-bubble sms-recv">Tonight in East Village:<br><br>1. Jazz at Nublu &mdash; 9pm, $15<br>2. Stand-up at Caveat &mdash; 8pm, $12<br>3. DJ night at Pyramid Club &mdash; 10pm, free<br><br>Reply # for details or "more"</div>
-            <div class="sms-bubble sms-sent">2</div>
-            <div class="sms-bubble sms-recv">Stand-up at Caveat<br>8pm &mdash; 21 A Clinton St<br>Weekly showcase with NYC's best up-and-coming comics. Strong drink menu.<br>$12 adv &middot; caveat.nyc</div>
+            <div class="sms-time">Today, 6:42 PM</div>
+            <div class="sms-bubble sms-sent">williamsburg</div>
+            <div class="sms-bubble sms-recv">Tonight in Williamsburg:<br><br>1. Mdou Moctar at Music Hall &mdash; 8pm, $28<br>2. Improv at Union Hall &mdash; 7:30pm, $10<br>3. Art opening at 56 Bogart &mdash; 6pm, free<br><br>Reply # for details, "more" for extras</div>
+            <div class="sms-bubble sms-sent">how about comedy</div>
+            <div class="sms-bubble sms-recv">Comedy in Williamsburg tonight:<br><br>1. Improv at Union Hall &mdash; 7:30pm, $10<br>2. Stand-up at Knitting Factory &mdash; 9pm, $12<br><br>Reply # for details</div>
+            <div class="sms-bubble sms-sent">1</div>
+            <div class="sms-bubble sms-recv">Improv at Union Hall<br>7:30pm &mdash; 702 Union St<br>Weekly drop-in improv. BYOB-friendly patio before the show. $10 door.<br>unionhallny.com</div>
           </div>
         </div>
       </div>
@@ -876,154 +620,94 @@
   </div>
 </section>
 
-<div class="section-divider"></div>
+<div class="divider"></div>
 
-<!-- How It Works -->
-<section class="how-it-works" id="how-it-works">
+<!-- How it works + features combined -->
+<section class="basics" id="how-it-works">
   <div class="container">
-    <div class="reveal">
+    <div class="basics-header">
       <p class="section-label">How It Works</p>
-      <h2 class="section-title">Three texts to a great night</h2>
-      <p class="section-subtitle">No app store. No password. Just open your messages and start typing.</p>
+      <h2 class="section-title">Text a neighborhood.<br>We do the rest.</h2>
+      <p class="section-subtitle">I got tired of checking a dozen sites every Friday, so I built something that does it for me.</p>
     </div>
-    <div class="steps">
-      <div class="step-card reveal reveal-delay-1">
-        <div class="step-num">1</div>
-        <h3>Text a neighborhood</h3>
-        <p>Send us any NYC neighborhood and we'll find what's happening there tonight.</p>
-        <div class="step-tags">
-          <span>Bushwick</span>
-          <span>LES</span>
-          <span>Williamsburg</span>
-          <span>Harlem</span>
+
+    <div class="basics-grid">
+      <div class="basics-item">
+        <h3>You text, we answer</h3>
+        <p>Send any neighborhood name &mdash; <span class="accent">Bushwick</span>, <span class="accent">LES</span>, <span class="accent">East Village</span> &mdash; and get back 2&ndash;3 curated picks within seconds.</p>
+      </div>
+      <div class="basics-item">
+        <h3>Talk naturally</h3>
+        <p>Reply "more" for extra picks. Say "comedy" or "free" or "late night" to filter. Ask "anything free later tonight?" &mdash; we'll figure it out.</p>
+      </div>
+      <div class="basics-item">
+        <h3>Every source, one thread</h3>
+        <p>Resident Advisor, Dice, Nonsense NYC, Eventbrite, Songkick, NYC Parks, and a dozen more &mdash; scraped every morning so you don't have to check them yourself.</p>
+      </div>
+      <div class="basics-item">
+        <h3>Nothing to install</h3>
+        <p>It's just SMS. Works on any phone, any carrier. No app to download, no account to create, no passwords to forget.</p>
+      </div>
+      <div class="basics-item wide">
+        <div class="basics-item-text">
+          <h3>36 neighborhoods across the city</h3>
+          <p>Manhattan, Brooklyn, and Queens. From warehouse shows in Bushwick to jazz on the Upper West Side.</p>
         </div>
-      </div>
-      <div class="step-card reveal reveal-delay-2">
-        <div class="step-num">2</div>
-        <h3>Get curated picks</h3>
-        <p>We pull from 18 sources &mdash; RA, Dice, Nonsense NYC, and more &mdash; so you don't have to check them all.</p>
-      </div>
-      <div class="step-card reveal reveal-delay-3">
-        <div class="step-num">3</div>
-        <h3>Drill into details</h3>
-        <p>Reply a number for more info, "more" for extra picks, or filter by "comedy", "free", or "late night".</p>
+        <div class="hood-tags">
+          <span class="hood-tag">East Village</span>
+          <span class="hood-tag">Williamsburg</span>
+          <span class="hood-tag">Bushwick</span>
+          <span class="hood-tag">LES</span>
+          <span class="hood-tag">Park Slope</span>
+          <span class="hood-tag">Harlem</span>
+          <span class="hood-tag">Greenpoint</span>
+          <span class="hood-tag">Astoria</span>
+          <span class="hood-tag">Chelsea</span>
+          <span class="hood-tag">SoHo</span>
+          <span class="hood-tag">Bed-Stuy</span>
+          <span class="hood-tag">Prospect Heights</span>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<div class="section-divider"></div>
+<div class="divider"></div>
 
-<!-- Features -->
-<section class="features" id="features">
+<!-- FAQ -->
+<section class="faq" id="faq">
   <div class="container">
-    <div class="reveal">
-      <p class="section-label">Features</p>
-      <h2 class="section-title">Everything you need,<br>nothing you don't</h2>
-      <p class="section-subtitle">We obsess over NYC's event listings so you can just show up.</p>
+    <div class="faq-header">
+      <p class="section-label">FAQ</p>
+      <h2 class="section-title">The stuff you're wondering</h2>
     </div>
-    <div class="feature-grid">
-      <div class="feature-card reveal reveal-delay-1">
-        <div class="feature-icon-wrap coral">&#127925;</div>
-        <h3>18 sources, one text</h3>
-        <p>Resident Advisor, Dice, Nonsense NYC, Eventbrite, Songkick, and 13 more &mdash; scraped every morning, served in seconds.</p>
+    <div class="faq-grid">
+      <div class="faq-item">
+        <h3>Is this free?</h3>
+        <p>Yes. Pulse is free to use. Standard text message rates from your carrier apply, but we don't charge anything.</p>
       </div>
-      <div class="feature-card reveal reveal-delay-2">
-        <div class="feature-icon-wrap magenta">&#9906;</div>
-        <h3>Every neighborhood</h3>
-        <p>36 neighborhoods across Manhattan, Brooklyn, and Queens. From Bushwick warehouse parties to Upper West Side jazz.</p>
+      <div class="faq-item">
+        <h3>Will you spam me?</h3>
+        <p>No. You only get texts in direct response to messages you send. We never text first. Reply STOP anytime to opt out.</p>
       </div>
-      <div class="feature-card reveal reveal-delay-3">
-        <div class="feature-icon-wrap amber">&#9883;</div>
-        <h3>Smart filters</h3>
-        <p>Ask for comedy, free events, late night, or a vibe like "something chill." Just text naturally &mdash; we get it.</p>
-      </div>
-      <div class="feature-card reveal reveal-delay-4">
-        <div class="feature-icon-wrap violet">&#9889;</div>
-        <h3>No app, no account</h3>
-        <p>Just text. Works on any phone, any carrier. No downloads, no sign-ups, no links until you want them.</p>
+      <div class="faq-item">
+        <h3>What do you do with my number?</h3>
+        <p>We use it to maintain your session for 2 hours. After that, it's gone. We don't store numbers, sell data, or send marketing.</p>
       </div>
     </div>
   </div>
 </section>
 
-<div class="section-divider"></div>
-
-<!-- Sample Conversation -->
-<section class="conversation-demo" id="conversation">
-  <div class="container">
-    <div class="convo-layout">
-      <div class="convo-text">
-        <div class="reveal">
-          <p class="section-label">See It In Action</p>
-          <h2 class="section-title">Talk to Pulse like you'd text a friend</h2>
-          <p class="section-subtitle">No rigid commands. Just say what you're looking for and we'll figure it out.</p>
-        </div>
-        <div class="convo-features reveal">
-          <div class="convo-feature">
-            <div class="convo-feature-dot"></div>
-            <div>
-              <h4>Follow-up naturally</h4>
-              <p>"How about comedy" narrows your results. No need to start over.</p>
-            </div>
-          </div>
-          <div class="convo-feature">
-            <div class="convo-feature-dot mag"></div>
-            <div>
-              <h4>Drill into any pick</h4>
-              <p>Reply a number and get the full rundown &mdash; time, address, price, vibe.</p>
-            </div>
-          </div>
-          <div class="convo-feature">
-            <div class="convo-feature-dot amb"></div>
-            <div>
-              <h4>Stack filters</h4>
-              <p>"Anything free later tonight?" &mdash; we understand compound requests.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="convo-phone-wrap reveal">
-        <div class="convo-device">
-          <div class="convo-screen">
-            <div class="phone-dynamic-island"></div>
-            <div class="convo-header">
-              <div class="name">Pulse</div>
-              <div class="number">(833) 785-7300</div>
-            </div>
-            <div class="convo-thread">
-              <div class="convo-time">Today, 6:42 PM</div>
-              <div class="sms-bubble sms-sent">williamsburg</div>
-              <div class="sms-bubble sms-recv">Tonight in Williamsburg:<br><br>1. Mdou Moctar at Music Hall &mdash; 8pm, $28<br>2. Improv at Union Hall &mdash; 7:30pm, $10<br>3. Art opening at 56 Bogart &mdash; 6pm, free<br><br>Reply # for details, "more" for extras</div>
-              <div class="sms-bubble sms-sent">how about comedy</div>
-              <div class="sms-bubble sms-recv">Comedy in Williamsburg tonight:<br><br>1. Improv at Union Hall &mdash; 7:30pm, $10<br>2. Stand-up at Knitting Factory &mdash; 9pm, $12<br><br>Reply # for details</div>
-              <div class="sms-bubble sms-sent">1</div>
-              <div class="sms-bubble sms-recv">Improv at Union Hall<br>7:30pm &mdash; 702 Union St<br>Weekly drop-in improv. BYOB-friendly patio before the show. $10 door.<br>unionhallny.com</div>
-              <div class="sms-bubble sms-sent">anything free later?</div>
-              <div class="sms-bubble sms-recv">Free &amp; late in Williamsburg:<br><br>1. DJ set at Bossa Nova Civic Club &mdash; 11pm<br>2. Open mic at Pete's Candy Store &mdash; 10pm<br><br>Reply # for details</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
+<div class="divider"></div>
 
 <!-- CTA / Get Started -->
 <section class="cta-section" id="get-started">
   <div class="container">
-    <div class="reveal">
-      <h2>Ready for tonight?</h2>
-      <p class="subtitle">Text any NYC neighborhood to get started</p>
-    </div>
-    <div class="reveal reveal-delay-1">
-      <a href="sms:+18337857300" class="cta-phone">
-        (833) 785-7300
-      </a>
-    </div>
-    <div class="opt-in-disclosure reveal reveal-delay-2">
-      By texting this number, you agree to receive event recommendation text messages from Pulse. Message frequency varies based on your requests. Message and data rates may apply. Reply <strong>STOP</strong> at any time to opt out. Reply <strong>HELP</strong> for support. See our <a href="privacy.html">Privacy Policy</a> and <a href="terms.html">Terms of Service</a>.
+    <h2>Ready for tonight?</h2>
+    <p class="subtitle">Text any NYC neighborhood to get started</p>
+    <a href="sms:+18337857300" class="cta-phone">(833) 785-7300</a>
+    <div class="opt-in-disclosure">
+      By texting this number, you agree to receive event recommendation text messages from Pulse. Message frequency varies based on your requests. Message and data rates may apply. Reply <strong>STOP</strong> at any time to opt out. Reply <strong>HELP</strong> for support. <a href="privacy.html">Privacy Policy</a> &middot; <a href="terms.html">Terms of Service</a>
     </div>
   </div>
 </section>
@@ -1033,7 +717,7 @@
   <div class="footer-inner">
     <div class="footer-left">
       <span class="footer-brand">Pulse</span>
-      <span class="footer-tagline">Made in Brooklyn</span>
+      <span class="footer-tagline">Built by <a href="https://github.com/jkoufopoulos" style="color:var(--text-dim);text-decoration:none;">Justin</a> in Brooklyn</span>
     </div>
     <div class="footer-links">
       <a href="privacy.html">Privacy</a>
@@ -1041,20 +725,6 @@
     </div>
   </div>
 </footer>
-
-<script>
-  // Scroll reveal observer
-  const obs = new IntersectionObserver((entries) => {
-    entries.forEach(e => {
-      if (e.isIntersecting) {
-        e.target.classList.add('visible');
-        obs.unobserve(e.target);
-      }
-    });
-  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
-
-  document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
-</script>
 
 </body>
 </html>

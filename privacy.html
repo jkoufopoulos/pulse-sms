@@ -4,62 +4,64 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Privacy Policy — Pulse SMS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
-      --bg: #0a0a0f;
-      --bg-card: rgba(255,255,255,0.04);
-      --text: #e8e4df;
-      --text-dim: #8a857e;
-      --accent: #f97652;
-      --accent2: #e24590;
-      --accent3: #f5b731;
-      --gradient: linear-gradient(135deg, #f97652, #e24590, #f5b731);
-      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+      --bg: #08070d;
+      --text: #ede9e3;
+      --text-dim: #7a756d;
+      --text-muted: #4a463f;
+      --coral: #ff6b42;
+      --font-display: 'Syne', sans-serif;
+      --font-body: 'DM Sans', sans-serif;
       --max-w: 720px;
     }
 
     html { scroll-behavior: smooth; }
 
     body {
-      font-family: var(--font);
+      font-family: var(--font-body);
       background: var(--bg);
       color: var(--text);
       line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
     }
 
     nav {
       position: sticky;
       top: 0;
       z-index: 100;
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      background: rgba(10,10,15,0.8);
-      border-bottom: 1px solid rgba(255,255,255,0.06);
+      backdrop-filter: blur(24px) saturate(1.4);
+      -webkit-backdrop-filter: blur(24px) saturate(1.4);
+      background: rgba(8,7,13,0.8);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
     }
     .nav-inner {
-      max-width: 1080px;
+      max-width: 1100px;
       margin: 0 auto;
-      padding: 16px 24px;
+      padding: 18px 28px;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
     .nav-logo {
+      font-family: var(--font-display);
       font-size: 1.5rem;
       font-weight: 800;
-      background: var(--gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: var(--coral);
       text-decoration: none;
+      letter-spacing: -0.02em;
     }
-    .nav-links { display: flex; gap: 20px; }
+    .nav-links { display: flex; gap: 24px; }
     .nav-links a {
       color: var(--text-dim);
       text-decoration: none;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
+      font-weight: 500;
       transition: color 0.2s;
     }
     .nav-links a:hover { color: var(--text); }
@@ -67,23 +69,27 @@
     .content {
       max-width: var(--max-w);
       margin: 0 auto;
-      padding: 60px 24px 80px;
+      padding: 64px 28px 88px;
     }
 
     h1 {
+      font-family: var(--font-display);
       font-size: 2rem;
       font-weight: 800;
+      letter-spacing: -0.02em;
       margin-bottom: 8px;
     }
     .effective-date {
-      color: var(--text-dim);
-      font-size: 0.9rem;
-      margin-bottom: 40px;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-bottom: 44px;
     }
     h2 {
-      font-size: 1.25rem;
+      font-family: var(--font-display);
+      font-size: 1.2rem;
       font-weight: 700;
-      margin: 36px 0 12px;
+      letter-spacing: -0.01em;
+      margin: 40px 0 12px;
     }
     p, li {
       color: var(--text-dim);
@@ -95,25 +101,39 @@
     }
     li { margin-bottom: 6px; }
     strong { color: var(--text); font-weight: 600; }
-    a { color: var(--accent); text-decoration: none; }
+    a { color: var(--coral); text-decoration: none; }
     a:hover { text-decoration: underline; }
 
     footer {
-      border-top: 1px solid rgba(255,255,255,0.06);
-      padding: 32px 0;
-      text-align: center;
+      border-top: 1px solid rgba(255,255,255,0.04);
+      padding: 36px 0;
     }
-    .footer-links {
+    .footer-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 28px;
       display: flex;
-      justify-content: center;
-      gap: 20px;
+      align-items: center;
+      justify-content: space-between;
     }
+    .footer-brand {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--coral);
+    }
+    .footer-links { display: flex; gap: 20px; }
     .footer-links a {
       color: var(--text-dim);
       text-decoration: none;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
+      font-weight: 500;
     }
-    .footer-links a:hover { color: var(--text); }
+    .footer-links a:hover { color: var(--text); text-decoration: none; }
+
+    @media (max-width: 600px) {
+      .footer-inner { flex-direction: column; gap: 12px; text-align: center; }
+    }
   </style>
 </head>
 <body>
@@ -187,9 +207,12 @@
 </div>
 
 <footer>
-  <div class="footer-links">
-    <a href="index.html">Home</a>
-    <a href="terms.html">Terms of Service</a>
+  <div class="footer-inner">
+    <span class="footer-brand">Pulse</span>
+    <div class="footer-links">
+      <a href="index.html">Home</a>
+      <a href="terms.html">Terms</a>
+    </div>
   </div>
 </footer>
 
