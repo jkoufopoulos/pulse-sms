@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pulse — NYC Events, One Text Away</title>
+  <meta name="description" content="Text a neighborhood, get tonight's best events. No app needed. Pulse is an SMS-based guide to NYC nightlife, comedy, music, and more.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #08070d;
+      --bg-card: rgba(255,255,255,0.03);
+      --bg-card-hover: rgba(255,255,255,0.05);
+      --text: #ede9e3;
+      --text-dim: #7a756d;
+      --text-muted: #4a463f;
+      --coral: #ff6b42;
+      --coral-dim: rgba(255,107,66,0.12);
+      --font-display: 'Syne', sans-serif;
+      --font-body: 'DM Sans', sans-serif;
+      --radius: 20px;
+      --radius-sm: 12px;
+      --max-w: 1100px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ============================
+       NAV
+    ============================ */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(24px) saturate(1.4);
+      -webkit-backdrop-filter: blur(24px) saturate(1.4);
+      background: rgba(8,7,13,0.8);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .nav-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 18px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-logo {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--coral);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+    .nav-links { display: flex; gap: 28px; align-items: center; }
+    .nav-links a {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 0.88rem;
+      font-weight: 500;
+      transition: color 0.25s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta {
+      color: var(--bg) !important;
+      background: var(--coral);
+      padding: 8px 20px;
+      border-radius: 100px;
+      font-weight: 700 !important;
+      font-size: 0.82rem !important;
+      transition: opacity 0.25s, transform 0.2s !important;
+    }
+    .nav-cta:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+      color: var(--bg) !important;
+    }
+
+    /* Mobile menu */
+    .nav-menu-btn {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 8px;
+      color: var(--text);
+    }
+    .nav-menu-btn svg { display: block; }
+    .mobile-menu {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(8,7,13,0.95);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      z-index: 200;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+    }
+    .mobile-menu.open { display: flex; }
+    .mobile-menu a {
+      color: var(--text);
+      text-decoration: none;
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+    .mobile-menu a:hover { color: var(--coral); }
+    .mobile-menu .close-btn {
+      position: absolute;
+      top: 20px;
+      right: 24px;
+      background: none;
+      border: none;
+      color: var(--text);
+      cursor: pointer;
+      padding: 8px;
+    }
+
+    section { position: relative; z-index: 1; }
+    .container { max-width: var(--max-w); margin: 0 auto; padding: 0 28px; }
+
+    /* ============================
+       HERO
+    ============================ */
+    .hero {
+      padding: 100px 0 80px;
+    }
+    .hero .container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 56px;
+      align-items: center;
+    }
+    .hero-text { max-width: 500px; }
+    .hero-proof {
+      display: inline-flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      margin-bottom: 28px;
+      letter-spacing: 0.01em;
+    }
+    .hero-proof span {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .hero-proof .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--coral);
+    }
+    .hero h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2.6rem, 5vw, 3.8rem);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.035em;
+      margin-bottom: 20px;
+    }
+    .hero h1 em {
+      font-style: normal;
+      color: var(--coral);
+    }
+    .hero .subtitle {
+      font-size: 1.1rem;
+      color: var(--text-dim);
+      max-width: 380px;
+      line-height: 1.65;
+      margin-bottom: 36px;
+    }
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .phone-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--coral);
+      padding: 16px 32px;
+      border-radius: 100px;
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #fff;
+      text-decoration: none;
+      transition: opacity 0.2s, transform 0.2s;
+      box-shadow: 0 4px 24px rgba(255,107,66,0.2);
+    }
+    .phone-badge:hover {
+      opacity: 0.92;
+      transform: translateY(-2px);
+    }
+    .hero-hint {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* Phone mockup */
+    .hero-phone-wrap {
+      display: flex;
+      justify-content: center;
+    }
+    .phone-device {
+      width: 360px;
+      background: linear-gradient(145deg, #1a1825 0%, #111019 50%, #0d0c14 100%);
+      border-radius: 44px;
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow:
+        0 0 0 1px rgba(0,0,0,0.8),
+        0 2px 4px rgba(0,0,0,0.3),
+        0 8px 24px rgba(0,0,0,0.4),
+        0 24px 80px rgba(0,0,0,0.6),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      position: relative;
+    }
+    /* Side button accents */
+    .phone-device::before {
+      content: '';
+      position: absolute;
+      right: -2px;
+      top: 140px;
+      width: 3px;
+      height: 44px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+      border-radius: 0 2px 2px 0;
+    }
+    .phone-device::after {
+      content: '';
+      position: absolute;
+      left: -2px;
+      top: 120px;
+      width: 3px;
+      height: 28px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+      border-radius: 2px 0 0 2px;
+      box-shadow: 0 46px 0 0 rgba(255,255,255,0.05), 0 80px 0 0 rgba(255,255,255,0.05);
+    }
+    .phone-screen {
+      background: #0a0912;
+      border-radius: 34px;
+      padding: 14px 12px 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 550px;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.03);
+    }
+    .phone-dynamic-island {
+      width: 90px;
+      height: 26px;
+      background: #000;
+      border-radius: 20px;
+      margin: 0 auto 10px;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.04);
+    }
+    .phone-contact {
+      text-align: center;
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      flex-shrink: 0;
+    }
+    .phone-contact .name {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 0.88rem;
+    }
+    .phone-contact .number {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+    .sms-thread {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.08) transparent;
+      padding-bottom: 8px;
+    }
+    .sms-thread::-webkit-scrollbar { width: 3px; }
+    .sms-thread::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+    .sms-bubble {
+      max-width: 82%;
+      padding: 9px 13px;
+      border-radius: 18px;
+      font-size: 0.76rem;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+    .sms-sent {
+      align-self: flex-end;
+      background: var(--coral);
+      color: #fff;
+      border-bottom-right-radius: 6px;
+    }
+    .sms-recv {
+      align-self: flex-start;
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      border-bottom-left-radius: 6px;
+    }
+    .sms-typing {
+      align-self: flex-start;
+      background: rgba(255,255,255,0.08);
+      border-radius: 18px;
+      border-bottom-left-radius: 6px;
+      padding: 12px 16px;
+      display: none;
+    }
+    .sms-typing.visible { display: flex; gap: 4px; }
+    .sms-typing span {
+      width: 6px; height: 6px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      animation: typingDot 1.4s infinite;
+    }
+    .sms-typing span:nth-child(2) { animation-delay: 0.2s; }
+    .sms-typing span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes typingDot {
+      0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+      30% { opacity: 1; transform: translateY(-3px); }
+    }
+    .sms-placeholder {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      padding: 60px 16px 0;
+      line-height: 1.6;
+    }
+    .sms-input-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 6px 12px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      flex-shrink: 0;
+    }
+    .sms-input {
+      flex: 1;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px;
+      padding: 8px 14px;
+      font-size: 0.78rem;
+      color: var(--text);
+      font-family: var(--font-body);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .sms-input::placeholder { color: var(--text-muted); }
+    .sms-input:focus { border-color: rgba(255,255,255,0.15); }
+    .sms-input:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .sms-send-btn {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--coral);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: opacity 0.2s;
+    }
+    .sms-send-btn:hover { opacity: 0.85; }
+    .sms-send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .sms-send-btn svg { width: 14px; height: 14px; }
+    .sms-limit-msg {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 10px 12px 14px;
+      line-height: 1.5;
+      flex-shrink: 0;
+    }
+    .sms-limit-msg a { color: var(--coral); text-decoration: none; font-weight: 600; }
+
+    /* ============================
+       DIVIDER
+    ============================ */
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05) 30%, rgba(255,255,255,0.05) 70%, transparent);
+      margin: 0 28px;
+    }
+
+    /* ============================
+       BASICS — replaces the standard how-it-works + features
+    ============================ */
+    .basics { padding: 88px 0; }
+    .basics-header {
+      margin-bottom: 56px;
+      max-width: 500px;
+    }
+    .section-label {
+      font-family: var(--font-display);
+      text-transform: uppercase;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      color: var(--coral);
+      margin-bottom: 14px;
+    }
+    .section-title {
+      font-family: var(--font-display);
+      font-size: clamp(1.7rem, 3.5vw, 2.4rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+    .section-subtitle {
+      color: var(--text-dim);
+      font-size: 1rem;
+    }
+
+    .basics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .basics-item {
+      padding: 28px 24px;
+      background: var(--bg-card);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: var(--radius);
+      transition: background 0.2s;
+    }
+    .basics-item:hover { background: var(--bg-card-hover); }
+    .basics-item h3 {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      letter-spacing: -0.01em;
+    }
+    .basics-item p {
+      color: var(--text-dim);
+      font-size: 0.88rem;
+      line-height: 1.6;
+    }
+    .basics-item .accent { color: var(--coral); }
+
+    /* Wide item spanning both columns */
+    .basics-item.wide {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 40px;
+      align-items: center;
+    }
+    .basics-item.wide .basics-item-text { flex: 1; }
+    .basics-item.wide .hood-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-width: 320px;
+    }
+    .hood-tag {
+      padding: 6px 14px;
+      border-radius: 100px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      border: 1px solid rgba(255,255,255,0.06);
+      color: var(--text-dim);
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .hood-tag:hover { border-color: var(--coral); color: var(--coral); }
+
+    /* ============================
+       FAQ
+    ============================ */
+    .faq { padding: 88px 0; }
+    .faq-header { margin-bottom: 48px; max-width: 400px; }
+    .faq-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+    .faq-item {
+      padding: 28px 24px;
+      background: var(--bg-card);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: var(--radius);
+    }
+    .faq-item h3 {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+    .faq-item p {
+      color: var(--text-dim);
+      font-size: 0.88rem;
+      line-height: 1.6;
+    }
+
+    /* ============================
+       CTA
+    ============================ */
+    .cta-section {
+      padding: 100px 0 48px;
+      text-align: center;
+    }
+    .cta-section h2 {
+      font-family: var(--font-display);
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 14px;
+    }
+    .cta-section .subtitle {
+      color: var(--text-dim);
+      font-size: 1.05rem;
+      margin-bottom: 40px;
+    }
+    .cta-phone {
+      display: inline-flex;
+      align-items: center;
+      background: var(--coral);
+      padding: 20px 48px;
+      border-radius: 100px;
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #fff;
+      text-decoration: none;
+      transition: opacity 0.2s, transform 0.2s;
+      box-shadow: 0 4px 24px rgba(255,107,66,0.2);
+      margin-bottom: 28px;
+    }
+    .cta-phone:hover {
+      opacity: 0.92;
+      transform: translateY(-2px);
+    }
+    .opt-in-disclosure {
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 20px 24px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: var(--radius-sm);
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      line-height: 1.7;
+    }
+    .opt-in-disclosure strong { color: var(--text); font-weight: 600; }
+    .opt-in-disclosure a { color: var(--coral); text-decoration: none; }
+    .opt-in-disclosure a:hover { text-decoration: underline; }
+
+    /* ============================
+       FOOTER
+    ============================ */
+    footer {
+      border-top: 1px solid rgba(255,255,255,0.04);
+      padding: 40px 0;
+    }
+    .footer-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .footer-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .footer-brand {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--coral);
+    }
+    .footer-tagline {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      padding-left: 20px;
+      border-left: 1px solid rgba(255,255,255,0.06);
+    }
+    .footer-links {
+      display: flex;
+      gap: 20px;
+    }
+    .footer-links a {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 0.82rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    .footer-links a:hover { color: var(--text); }
+
+    /* ============================
+       RESPONSIVE
+    ============================ */
+    @media (max-width: 900px) {
+      .hero .container {
+        grid-template-columns: 1fr;
+        text-align: center;
+        gap: 48px;
+      }
+      .hero-text { max-width: 100%; margin: 0 auto; }
+      .hero .subtitle { margin-left: auto; margin-right: auto; }
+      .hero-proof { justify-content: center; }
+      .hero-actions { justify-content: center; }
+      .basics-grid { grid-template-columns: 1fr; }
+      .basics-item.wide { flex-direction: column; gap: 20px; }
+      .basics-item.wide .hood-tags { max-width: 100%; }
+      .faq-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 680px) {
+      .nav-links { display: none; }
+      .nav-menu-btn { display: block; }
+      .hero { padding: 72px 0 56px; }
+      .hero h1 { font-size: clamp(2rem, 8vw, 2.8rem); }
+      .phone-badge { font-size: 1rem; padding: 14px 26px; }
+      .phone-device { width: 340px; }
+      .phone-screen { height: 510px; }
+      .basics, .faq { padding: 64px 0; }
+      .cta-phone { font-size: 1.15rem; padding: 16px 36px; }
+      .footer-inner { flex-direction: column; gap: 16px; text-align: center; }
+      .footer-left { flex-direction: column; gap: 6px; }
+      .footer-tagline { border: none; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">Pulse</a>
+    <div class="nav-links">
+      <a href="#how-it-works">How It Works</a>
+      <a href="#faq">FAQ</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+      <a href="sms:+18337857300" class="nav-cta">Text Us</a>
+    </div>
+    <button class="nav-menu-btn" onclick="document.getElementById('mobile-menu').classList.add('open')" aria-label="Open menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+    </button>
+  </div>
+</nav>
+
+<!-- Mobile menu -->
+<div class="mobile-menu" id="mobile-menu">
+  <button class="close-btn" onclick="document.getElementById('mobile-menu').classList.remove('open')" aria-label="Close menu">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+  </button>
+  <a href="#how-it-works" onclick="document.getElementById('mobile-menu').classList.remove('open')">How It Works</a>
+  <a href="#faq" onclick="document.getElementById('mobile-menu').classList.remove('open')">FAQ</a>
+  <a href="sms:+18337857300">Text Us</a>
+  <a href="privacy.html">Privacy Policy</a>
+  <a href="terms.html">Terms of Service</a>
+</div>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-text">
+      <div class="hero-proof">
+        <span><span class="dot"></span> Live now</span>
+        <span>36 neighborhoods</span>
+        <span>Free to use</span>
+      </div>
+      <h1>NYC events.<br><em>One text away.</em></h1>
+      <p class="subtitle">Text a neighborhood name and get tonight's best events back in seconds. Works on any phone. No app, no account.</p>
+      <div class="hero-actions">
+        <a href="sms:+18337857300" class="phone-badge">(833) 785-7300</a>
+        <span class="hero-hint">Text any neighborhood to start</span>
+      </div>
+    </div>
+
+    <div class="hero-phone-wrap">
+      <div class="phone-device">
+        <div class="phone-screen">
+          <div class="phone-dynamic-island"></div>
+          <div class="phone-contact">
+            <div class="name">Pulse</div>
+            <div class="number">(833) 785-7300</div>
+          </div>
+          <div class="sms-thread" id="sms-thread">
+            <div class="sms-placeholder" id="sms-placeholder">Try it &mdash; type a neighborhood</div>
+            <div class="sms-typing" id="sms-typing"><span></span><span></span><span></span></div>
+          </div>
+          <div class="sms-input-bar" id="sms-input-bar">
+            <input type="text" class="sms-input" id="sms-input" placeholder="Text message" autocomplete="off" maxlength="200">
+            <button class="sms-send-btn" id="sms-send" aria-label="Send">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- How it works + features combined -->
+<section class="basics" id="how-it-works">
+  <div class="container">
+    <div class="basics-header">
+      <p class="section-label">How It Works</p>
+      <h2 class="section-title">Text a neighborhood.<br>We do the rest.</h2>
+      <p class="section-subtitle">I got tired of checking a dozen sites every Friday, so I built something that does it for me.</p>
+    </div>
+
+    <div class="basics-grid">
+      <div class="basics-item">
+        <h3>You text, we answer</h3>
+        <p>Send any neighborhood name &mdash; <span class="accent">Bushwick</span>, <span class="accent">LES</span>, <span class="accent">East Village</span> &mdash; and get back 2&ndash;3 curated picks within seconds.</p>
+      </div>
+      <div class="basics-item">
+        <h3>Talk naturally</h3>
+        <p>Reply "more" for extra picks. Say "comedy" or "free" or "late night" to filter. Ask "anything free later tonight?" &mdash; we'll figure it out.</p>
+      </div>
+      <div class="basics-item">
+        <h3>Every source, one thread</h3>
+        <p>Resident Advisor, Dice, Nonsense NYC, Eventbrite, Songkick, NYC Parks, and a dozen more &mdash; scraped every morning so you don't have to check them yourself.</p>
+      </div>
+      <div class="basics-item">
+        <h3>Nothing to install</h3>
+        <p>It's just SMS. Works on any phone, any carrier. No app to download, no account to create, no passwords to forget.</p>
+      </div>
+      <div class="basics-item wide">
+        <div class="basics-item-text">
+          <h3>36 neighborhoods across the city</h3>
+          <p>Manhattan, Brooklyn, and Queens. From warehouse shows in Bushwick to jazz on the Upper West Side.</p>
+        </div>
+        <div class="hood-tags">
+          <span class="hood-tag">East Village</span>
+          <span class="hood-tag">Williamsburg</span>
+          <span class="hood-tag">Bushwick</span>
+          <span class="hood-tag">LES</span>
+          <span class="hood-tag">Park Slope</span>
+          <span class="hood-tag">Harlem</span>
+          <span class="hood-tag">Greenpoint</span>
+          <span class="hood-tag">Astoria</span>
+          <span class="hood-tag">Chelsea</span>
+          <span class="hood-tag">SoHo</span>
+          <span class="hood-tag">Bed-Stuy</span>
+          <span class="hood-tag">Prospect Heights</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- FAQ -->
+<section class="faq" id="faq">
+  <div class="container">
+    <div class="faq-header">
+      <p class="section-label">FAQ</p>
+      <h2 class="section-title">The stuff you're wondering</h2>
+    </div>
+    <div class="faq-grid">
+      <div class="faq-item">
+        <h3>Is this free?</h3>
+        <p>Yes. Pulse is free to use. Standard text message rates from your carrier apply, but we don't charge anything.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Will you spam me?</h3>
+        <p>No. You only get texts in direct response to messages you send. We never text first. Reply STOP anytime to opt out.</p>
+      </div>
+      <div class="faq-item">
+        <h3>What do you do with my number?</h3>
+        <p>We use it to maintain your session for 2 hours. After that, it's gone. We don't store numbers, sell data, or send marketing.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- CTA / Get Started -->
+<section class="cta-section" id="get-started">
+  <div class="container">
+    <h2>Ready for tonight?</h2>
+    <p class="subtitle">Text any NYC neighborhood to get started</p>
+    <a href="sms:+18337857300" class="cta-phone">(833) 785-7300</a>
+    <div class="opt-in-disclosure">
+      By texting this number, you agree to receive event recommendation text messages from Pulse. Message frequency varies based on your requests. Message and data rates may apply. Reply <strong>STOP</strong> at any time to opt out. Reply <strong>HELP</strong> for support. <a href="privacy.html">Privacy Policy</a> &middot; <a href="terms.html">Terms of Service</a>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-left">
+      <span class="footer-brand">Pulse</span>
+      <span class="footer-tagline">Built by <a href="https://github.com/jkoufopoulos" style="color:var(--text-dim);text-decoration:none;">Justin</a> in Brooklyn</span>
+    </div>
+    <div class="footer-links">
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function() {
+  const API = 'https://web-production-c8fdb.up.railway.app/api/sms/test';
+  const MAX_MESSAGES = 7;
+  const SESSION_PHONE = '+1555' + String(Math.floor(Math.random() * 9000000 + 1000000));
+
+  const thread = document.getElementById('sms-thread');
+  const placeholder = document.getElementById('sms-placeholder');
+  const typing = document.getElementById('sms-typing');
+  const input = document.getElementById('sms-input');
+  const sendBtn = document.getElementById('sms-send');
+  const inputBar = document.getElementById('sms-input-bar');
+  let msgCount = 0;
+  let sending = false;
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function addBubble(text, cls) {
+    const div = document.createElement('div');
+    div.className = 'sms-bubble ' + cls;
+    div.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+    thread.insertBefore(div, typing);
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  async function send() {
+    const msg = input.value.trim();
+    if (!msg || sending) return;
+
+    if (placeholder) placeholder.remove();
+    addBubble(msg, 'sms-sent');
+    input.value = '';
+    msgCount++;
+
+    sending = true;
+    input.disabled = true;
+    sendBtn.disabled = true;
+    typing.classList.add('visible');
+    thread.scrollTop = thread.scrollHeight;
+
+    try {
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Body: msg, From: SESSION_PHONE }),
+      });
+
+      typing.classList.remove('visible');
+
+      if (res.status === 429) {
+        showLimit();
+        return;
+      }
+
+      const data = await res.json();
+      if (data.messages && data.messages.length > 0) {
+        data.messages.forEach(function(m) { addBubble(m, 'sms-recv'); });
+      } else if (data.error) {
+        addBubble('Something went wrong — try again.', 'sms-recv');
+      }
+    } catch (e) {
+      typing.classList.remove('visible');
+      addBubble('Could not connect — try again.', 'sms-recv');
+    }
+
+    sending = false;
+
+    if (msgCount >= MAX_MESSAGES) {
+      showLimit();
+    } else {
+      input.disabled = false;
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  function showLimit() {
+    input.disabled = true;
+    sendBtn.disabled = true;
+    inputBar.style.display = 'none';
+    var limitMsg = document.createElement('div');
+    limitMsg.className = 'sms-limit-msg';
+    limitMsg.innerHTML = 'That\'s the free preview &mdash; text <a href="sms:+18337857300">(833) 785-7300</a> to keep going';
+    thread.parentElement.appendChild(limitMsg);
+  }
+
+  sendBtn.addEventListener('click', send);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+})();
+</script>
+</body>
+</html>
