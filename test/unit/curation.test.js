@@ -12,8 +12,8 @@ const kidsResult = filterKidsEvents([kidsEvent, adultParkEvent, familyDayEvent, 
 check('removes kids storytime from nyc-parks', !kidsResult.find(e => e.id === 'k1'));
 check('keeps adult park event', !!kidsResult.find(e => e.id === 'k2'));
 check('removes family day from nyc-parks', !kidsResult.find(e => e.id === 'k3'));
-check('keeps kids event from non-parks source', !!kidsResult.find(e => e.id === 'k4'));
-check('returns 2 events after filtering', kidsResult.length === 2);
+check('removes kids event from non-parks source too', !kidsResult.find(e => e.id === 'k4'));
+check('returns 1 event after filtering', kidsResult.length === 1);
 
 const emptyResult = filterKidsEvents([]);
 check('handles empty array', emptyResult.length === 0);

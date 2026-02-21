@@ -4,7 +4,7 @@ const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceE
 const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate } = require('./geo');
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues } = require('./venues');
 const { sendHealthAlert } = require('./alerts');
-const { filterIncomplete } = require('./curation');
+const { filterIncomplete, filterKidsEvents } = require('./curation');
 const { computeCompleteness } = require('./sources/shared');
 const { runExtractionAudit } = require('./evals/extraction-audit');
 const { captureExtractionInput, getExtractionInputs, clearExtractionInputs } = require('./extraction-capture');
@@ -283,18 +283,19 @@ async function refreshCache() {
       else sourcesFailed++;
     }
 
-    // Filter out stale/far-future events at scrape time
+    // Filter out stale/far-future events and kids events at scrape time
     const today = getNycDateString(0);
     const weekOut = getNycDateString(7);
-    const beforeFilter = allEvents.length;
-    const validEvents = allEvents.filter(e => {
+    const dateFiltered = allEvents.filter(e => {
       const d = getEventDate(e);
       if (!d) return true; // keep undated events (perennials, venues)
       return d >= today && d <= weekOut;
     });
-    const staleCount = beforeFilter - validEvents.length;
-    if (staleCount > 0) {
-      console.log(`Filtered ${staleCount} stale/far-future events at scrape time`);
+    const validEvents = filterKidsEvents(dateFiltered);
+    const staleCount = allEvents.length - dateFiltered.length;
+    const kidsCount = dateFiltered.length - validEvents.length;
+    if (staleCount > 0 || kidsCount > 0) {
+      console.log(`Scrape filter: removed ${staleCount} stale + ${kidsCount} kids events`);
     }
 
     // Geocode events that still have no neighborhood (venue map miss)

@@ -6,12 +6,10 @@
 const KIDS_PATTERNS = /\b(kids|children|storytime|story\s*time|family\s*day|toddler|pre-?school|youth|ages?\s*\d+-\d+|puppet|family-?friendly)\b/i;
 
 /**
- * Remove NYC Parks events that are clearly for children.
- * Only filters events where source_name includes 'nyc-parks'.
+ * Remove events that are clearly for children/families.
  */
 function filterKidsEvents(events) {
   return events.filter(e => {
-    if (!e.source_name || !e.source_name.includes('nyc-parks')) return true;
     const text = `${e.name || ''} ${e.description_short || ''} ${e.short_detail || ''}`;
     return !KIDS_PATTERNS.test(text);
   });
