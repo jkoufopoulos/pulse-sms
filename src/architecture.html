@@ -319,15 +319,15 @@
 <!-- ============================================================ -->
 <section id="overview">
 <h1>Pulse SMS Architecture</h1>
-<p class="subtitle">End-to-end map of the system — data flows, LLM calls, prompts, and modularization opportunities.</p>
+<p class="subtitle">Pulse turns a text message into a curated night out. Users text a neighborhood — "Bushwick", "LES", "prospect park" — and get back 1-3 opinionated event picks under 480 characters. They can reply a number for details, "more" for extra picks, or refine with follow-ups like "how about comedy" or "later tonight." The entire experience happens in a single SMS thread with no app, no account, and no links until you ask.</p>
 
 <div class="metrics">
   <div class="metric"><div class="metric-value">4</div><div class="metric-label">LLM prompts (system messages)</div></div>
-  <div class="metric"><div class="metric-value">17</div><div class="metric-label">Event sources (scrapers)</div></div>
+  <div class="metric"><div class="metric-value">18</div><div class="metric-label">Event sources (scrapers)</div></div>
   <div class="metric"><div class="metric-value">36</div><div class="metric-label">NYC neighborhoods</div></div>
   <div class="metric"><div class="metric-value">7</div><div class="metric-label">Intent types</div></div>
   <div class="metric"><div class="metric-value">2</div><div class="metric-label">LLM calls per SMS (max)</div></div>
-  <div class="metric"><div class="metric-value">3</div><div class="metric-label">LLM-powered scrapers</div></div>
+  <div class="metric"><div class="metric-value">4</div><div class="metric-label">LLM-powered scrapers</div></div>
   <div class="metric"><div class="metric-value">480</div><div class="metric-label">SMS char limit</div></div>
   <div class="metric"><div class="metric-value">23</div><div class="metric-label">Files in src/</div></div>
 </div>
@@ -340,7 +340,7 @@
   <tr>
     <td><strong>Scrape Pipeline</strong></td>
     <td>10am ET daily + on boot</td>
-    <td>3 sources use Claude for extraction (Skint, Nonsense NYC, Oh My Rockness)</td>
+    <td>4 sources use Claude for extraction (Skint, Nonsense NYC, Oh My Rockness, Yutori)</td>
     <td>30-90 seconds</td>
     <td>1-2x/day</td>
   </tr>
@@ -357,7 +357,7 @@
 <!-- ============================================================ -->
 <section id="scrape-pipeline">
 <h2>Scrape Pipeline</h2>
-<p>Daily at 10am ET, all 17 sources are fetched in parallel. Events are deduped, geocoded, and cached in memory.</p>
+<p>Daily at 10am ET, all 18 sources are fetched in parallel. Events are deduped, geocoded, and cached in memory.</p>
 
 <div class="flow">
   <div class="flow-step">
@@ -375,10 +375,10 @@
   </div>
   <div class="flow-arrow">&rarr;</div>
   <div class="flow-step llm">
-    <div class="step-label">3 use Claude</div>
+    <div class="step-label">4 use Claude</div>
     <div class="step-title">extractEvents()</div>
     <div class="step-file">ai.js:193</div>
-    <div class="step-detail">Skint, Nonsense NYC, Oh My Rockness send raw HTML to Claude</div>
+    <div class="step-detail">Skint, Nonsense NYC, Oh My Rockness, Yutori send raw text to Claude</div>
   </div>
   <div class="flow-arrow">&rarr;</div>
   <div class="flow-step logic">
@@ -415,9 +415,9 @@
   <tr><th>Technique</th><th>Sources</th><th>LLM?</th><th>Description</th></tr>
   <tr>
     <td><span class="badge badge-llm">HTML → Claude</span></td>
-    <td>Skint, Nonsense NYC, Oh My Rockness</td>
+    <td>Skint, Nonsense NYC, Oh My Rockness, Yutori</td>
     <td>Yes — EXTRACTION_PROMPT</td>
-    <td>Fetch raw HTML, send to Claude with extraction prompt, parse JSON response</td>
+    <td>Fetch raw HTML/email text, send to Claude with extraction prompt, parse JSON response</td>
   </tr>
   <tr>
     <td><span class="badge badge-data">JSON-LD / Schema.org</span></td>
@@ -485,9 +485,9 @@
   <div class="flow-arrow">&rarr;</div>
   <div class="flow-step logic">
     <div class="step-label">Step 1</div>
-    <div class="step-title">Pre-Router (Regex)</div>
+    <div class="step-title">Pre-Router (Deterministic)</div>
     <div class="step-file">pre-router.js:29</div>
-    <div class="step-detail">14 regex patterns — skips Claude for obvious intents</div>
+    <div class="step-detail">17 pattern groups — greetings, neighborhoods, more/free, follow-up filters (category/time/vibe with active session)</div>
   </div>
   <div class="flow-arrow">&rarr;</div>
   <div class="flow-step llm">
@@ -535,6 +535,9 @@
   <tr><td><code>/^(yes|yeah|sure|ok|...)$/i</code></td><td>nudge_accept (with pending)</td><td>"yeah", "sure", "let's go"</td></tr>
   <tr><td><code>/^(more|show me more|...)$/i</code></td><td>more</td><td>"more", "what else"</td></tr>
   <tr><td><code>/^(free|free stuff|...)$/i</code></td><td>free</td><td>"free", "free tonight"</td></tr>
+  <tr><td>Category follow-up (with session)</td><td>events + category filter</td><td>"how about theater", "any comedy", "what about jazz"</td></tr>
+  <tr><td>Time follow-up (with session)</td><td>events + time_after filter</td><td>"later tonight", "after midnight", "late night"</td></tr>
+  <tr><td>Vibe follow-up (with session)</td><td>events + vibe filter</td><td>"something chill", "anything wild", "something romantic"</td></tr>
   <tr><td>Event name match</td><td>details</td><td>Session pick name substring</td></tr>
   <tr><td><code>/^(hey|hi|hello|...)$/i</code></td><td>conversational</td><td>"hey", "hello"</td></tr>
   <tr><td><code>/^(thanks|thank you|...)$/i</code></td><td>conversational</td><td>"thanks", "ty"</td></tr>
@@ -590,10 +593,10 @@
 <div class="intent-grid">
   <div class="intent-card">
     <h4>events</h4>
-    <div class="route">Pre-router: bare neighborhood match | AI router</div>
+    <div class="route">Pre-router: bare neighborhood, follow-up filters (category/time/vibe) | AI router</div>
     <div class="handler">handleEventsDefault() — intent-handlers.js:352</div>
     <div class="llm-calls">LLM calls: route (maybe) + compose (always)</div>
-    <p>Core flow. Gets events from cache, merges perennial picks, calls composeResponse(), sends SMS + link follow-ups. Handles thin-event nudges to nearby neighborhoods.</p>
+    <p>Core flow. Gets events from cache, applies filters, merges perennial picks, calls composeResponse(), sends SMS. Also triggered by follow-up messages ("how about comedy", "later tonight") that modify filters on the active session.</p>
   </div>
   <div class="intent-card">
     <h4>more</h4>
@@ -642,8 +645,12 @@
 <h3>Intent Decision Flow</h3>
 <div class="dep-graph"><span class="arrow">message arrives</span>
   │
-  ├─ <span class="file">pre-router.js</span> — <span class="data">14 regex patterns (no LLM)</span>
+  ├─ <span class="file">pre-router.js</span> — <span class="data">17 pattern groups (no LLM)</span>
   │   ├─ help, conversational, details, more, free → <span class="llm">skip Claude routing</span>
+  │   ├─ follow-up filters (session active) → <span class="llm">events + filters (skip Claude)</span>
+  │   │   ├─ category: "how about theater" → events + category=theater
+  │   │   ├─ time: "later tonight" → events + time_after=22:00
+  │   │   └─ vibe: "something chill" → events + vibe=chill
   │   ├─ bare neighborhood match → <span class="llm">events (skip Claude routing)</span>
   │   ├─ borough / unsupported → conversational (ask to narrow)
   │   └─ null (no match) → <span class="llm">fall through to Claude</span>
@@ -697,7 +704,7 @@
     <td><strong>extractEvents()</strong></td>
     <td>Haiku 4.5</td>
     <td>EXTRACTION_PROMPT (168 lines)</td>
-    <td>Daily scrape — Skint, Nonsense NYC, Oh My Rockness</td>
+    <td>Daily scrape — Skint, Nonsense NYC, Oh My Rockness, Yutori</td>
     <td>15s</td>
     <td>8192</td>
     <td><span class="badge badge-data">Scrape</span></td>
@@ -709,7 +716,7 @@
   <strong>Hot path (per SMS):</strong> At most 2 calls — route + compose. Pre-router eliminates the route call for ~60-70% of messages (greetings, numbers, "more", bare neighborhoods). So the average is closer to 1.3 calls per SMS.
 </div>
 <div class="annotation">
-  <strong>Cold path (daily):</strong> 3 extraction calls during scrape. Each processes large HTML documents (5-50KB) with 8192 max tokens.
+  <strong>Cold path (daily):</strong> 4 extraction calls during scrape. Each processes large HTML/email documents (5-50KB) with 8192 max tokens.
 </div>
 
 <h3>Token Budget Estimates</h3>
@@ -798,6 +805,8 @@ Trivia, sports, advice, jokes, opinions → "conversational" + redirect.
 
 SESSION AWARENESS:
 - Active session + vague event-seeking → "more" or "events", not "conversational"
+- Filter-modification follow-ups with active session are ALWAYS "events" with filters — never "conversational"
+  Examples: "how about theater", "any comedy", "something chill", "later tonight"
 - Only "conversational" for true social niceties regardless of session
 
 NEIGHBORHOOD RESOLUTION:
@@ -812,12 +821,13 @@ FILTERS:
 - category: comedy, art, nightlife, live_music, theater, food_drink, community, or null
 - vibe: "chill", "wild", "romantic", "weird", or null
 
-DECISION TREE (more vs events):
+DECISION TREE (classifying messages with active session):
 1. Session has prior picks? No → "events"
 2. Message mentions specific neighborhood? Yes → "events"
-3. Message asks for more/other/different? Yes → "more"
-4. Vague event-seeking, no new neighborhood? Yes → "more"
-5. Otherwise → "events"
+3. Message modifies filters (category/time/vibe)? Yes → "events" + filters, same hood
+4. Message asks for more/other/different? Yes → "more"
+5. Vague event-seeking, no new neighborhood? Yes → "more"
+6. Otherwise → "events"
 
 CONFIDENCE: 0.9+ unambiguous, 0.7-0.85 inferred, 0.5-0.69 ambiguous, &lt;0.5 uncertain
 
@@ -895,7 +905,7 @@ CONSTRAINTS:
 <!-- ============================================================ -->
 <section id="sources">
 <h2>Source Registry</h2>
-<p>All 17 event sources, ordered by trust weight. Higher weight wins in cross-source dedup.</p>
+<p>All 18 event sources, ordered by trust weight. Higher weight wins in cross-source dedup.</p>
 
 <div class="source-grid">
   <div class="source-item">
@@ -960,6 +970,14 @@ CONSTRAINTS:
       <div class="name">SmallsLIVE</div>
       <div class="technique">AJAX HTML</div>
       <div class="file">sources/smallslive.js</div>
+    </div>
+  </div>
+  <div class="source-item">
+    <div class="source-weight w-med">0.8</div>
+    <div class="source-info">
+      <div class="name">Yutori</div>
+      <div class="technique">Gmail API + Claude extraction</div>
+      <div class="file">sources/yutori.js</div>
     </div>
   </div>
   <div class="source-item">
@@ -1069,6 +1087,8 @@ CONSTRAINTS:
   <tr><td><code>allPicks</code></td><td>array</td><td>All picks across more batches — for dedup</td></tr>
   <tr><td><code>lastEvents</code></td><td>object</td><td>Event map (id → event) — for details, more remaining calc</td></tr>
   <tr><td><code>allOfferedIds</code></td><td>array</td><td>All events offered to Claude — for more exclusion</td></tr>
+  <tr><td><code>lastFilters</code></td><td>object | null</td><td>Last applied filters (category, vibe, time_after, free_only) — exposed to router for follow-up context</td></tr>
+  <tr><td><code>conversationHistory</code></td><td>array</td><td>Last 6 turns of conversation (role + content, 300-char cap) — sent to router + compose for context</td></tr>
   <tr><td><code>pendingNearby</code></td><td>string | null</td><td>Pending travel nudge neighborhood</td></tr>
   <tr><td><code>pendingNearbyEvents</code></td><td>object | null</td><td>Pre-loaded events for nudge accept</td></tr>
   <tr><td><code>pendingFilters</code></td><td>object | null</td><td>Saved filters when asking for neighborhood</td></tr>
@@ -1103,7 +1123,7 @@ CONSTRAINTS:
   │   ├── <span class="file">twilio.js</span> (sendSMS, maskPhone, test capture)
   │   ├── <span class="file">traces.js</span> (startTrace, saveTrace)
   │   ├── <span class="file">session.js</span> (getSession, setSession, clearSession)
-  │   ├── <span class="file">pre-router.js</span> (regex intent matching)
+  │   ├── <span class="file">pre-router.js</span> (deterministic intent matching + follow-up filters)
   │   │   └── <span class="file">neighborhoods.js</span>
   │   ├── <span class="file">intent-handlers.js</span> (help, conversational, details, more, free, nudge, events)
   │   │   ├── <span class="file">events.js</span> (getEvents)
@@ -1124,6 +1144,7 @@ CONSTRAINTS:
   │   │   ├── <span class="file">sources/skint.js</span> → <span class="llm">ai.js:extractEvents()</span>
   │   │   ├── <span class="file">sources/nonsense.js</span> → <span class="llm">ai.js:extractEvents()</span>
   │   │   ├── <span class="file">sources/ohmyrockness.js</span> → <span class="llm">ai.js:extractEvents()</span>
+  │   │   ├── <span class="file">sources/yutori.js</span> → <span class="llm">ai.js:extractEvents()</span>
   │   │   ├── <span class="file">sources/ra.js</span> (GraphQL)
   │   │   ├── <span class="file">sources/dice.js</span> (__NEXT_DATA__)
   │   │   └── <span class="file">... 11 more scrapers</span>
@@ -1137,7 +1158,7 @@ CONSTRAINTS:
   <tr><td><code>server.js</code></td><td>~210</td><td><span class="badge badge-io">IO</span></td><td>No</td><td>Express setup, routes, health check, daily schedule</td></tr>
   <tr><td><code>handler.js</code></td><td>~332</td><td><span class="badge badge-logic">Logic</span></td><td>No</td><td>Twilio webhook, dedup, rate limiter, orchestrator</td></tr>
   <tr><td><code>intent-handlers.js</code></td><td>~504</td><td><span class="badge badge-logic">Logic</span></td><td>Indirect</td><td>7 intent handlers — help, conversational, details, more, free, nudge, events</td></tr>
-  <tr><td><code>pre-router.js</code></td><td>~140</td><td><span class="badge badge-logic">Logic</span></td><td>No</td><td>14 regex patterns, adjacent neighborhood helper</td></tr>
+  <tr><td><code>pre-router.js</code></td><td>~175</td><td><span class="badge badge-logic">Logic</span></td><td>No</td><td>17 pattern groups (incl. session-aware follow-up filters), adjacent neighborhood helper</td></tr>
   <tr><td><code>ai.js</code></td><td>~407</td><td><span class="badge badge-llm">LLM</span></td><td>Yes</td><td>4 Claude calls: route, compose, details, extract</td></tr>
   <tr><td><code>prompts.js</code></td><td>~395</td><td><span class="badge badge-llm">LLM</span></td><td>Prompts</td><td>EXTRACTION_PROMPT, ROUTE_SYSTEM (slimmed), COMPOSE_SYSTEM (base), DETAILS_SYSTEM</td></tr>
   <tr><td><code>skills/compose-skills.js</code></td><td>~120</td><td><span class="badge badge-llm">LLM</span></td><td>Prompts</td><td>9 composable skill modules for compose prompt</td></tr>
@@ -1175,7 +1196,7 @@ CONSTRAINTS:
   <div class="intent-card" style="border-left: 3px solid var(--accent3);">
     <h4>2. Semantic Routing — Understanding Ambiguous Messages</h4>
     <div class="handler">ai.js:routeMessage() | ROUTE_SYSTEM | SMS pipeline (30-40% of messages)</div>
-    <p style="margin-top: 8px;">The pre-router handles ~60-70% of messages deterministically (bare neighborhoods, "more", "free", greetings, numbers). Claude only gets the ambiguous remainder: "anything fun in the village tonight", "got jazz?", "i'm near prospect park looking for comedy".</p>
+    <p style="margin-top: 8px;">The pre-router handles ~60-70% of messages deterministically (bare neighborhoods, "more", "free", greetings, numbers, and simple follow-up filter changes). Claude only gets the ambiguous remainder: "anything fun in the village tonight", compound filters like "any more free comedy stuff", "i'm near prospect park looking for comedy".</p>
     <p><strong>Why Claude:</strong> These messages require understanding context + intent + geography simultaneously. "village" could be East Village, West Village, or Greenwich Village depending on context. "got jazz?" with a Bushwick session means "jazz near Bushwick" not "jazz anywhere." Code can't infer this reliably.</p>
     <p><strong>Why not code:</strong> We tried. The pre-router catches clear patterns, but NLP for open-ended SMS messages with slang, abbreviations, and implicit session context is where statistical matching fails. Claude's semantic understanding fills the gap the pre-router can't.</p>
   </div>
@@ -1204,8 +1225,8 @@ CONSTRAINTS:
   <tr><th>Operation</th><th>Implementation</th><th>Why Not Claude</th></tr>
   <tr>
     <td>Intent matching (60-70%)</td>
-    <td><code>pre-router.js</code> — 14 regex patterns</td>
-    <td>Bare "more", "1", "free", "hey" don't need semantic understanding. Regex is instant and deterministic.</td>
+    <td><code>pre-router.js</code> — 17 pattern groups</td>
+    <td>Bare "more", "1", "free", "hey", and follow-up filters ("how about comedy", "later tonight") don't need semantic understanding. Pattern matching is instant and deterministic.</td>
   </tr>
   <tr>
     <td>Neighborhood resolution</td>
