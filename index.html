@@ -224,31 +224,67 @@
       justify-content: center;
     }
     .phone-device {
-      width: 310px;
-      background: #111019;
-      border-radius: 36px;
-      padding: 14px;
-      border: 1px solid rgba(255,255,255,0.07);
-      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+      width: 360px;
+      background: linear-gradient(145deg, #1a1825 0%, #111019 50%, #0d0c14 100%);
+      border-radius: 44px;
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow:
+        0 0 0 1px rgba(0,0,0,0.8),
+        0 2px 4px rgba(0,0,0,0.3),
+        0 8px 24px rgba(0,0,0,0.4),
+        0 24px 80px rgba(0,0,0,0.6),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      position: relative;
+    }
+    /* Side button accents */
+    .phone-device::before {
+      content: '';
+      position: absolute;
+      right: -2px;
+      top: 140px;
+      width: 3px;
+      height: 44px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+      border-radius: 0 2px 2px 0;
+    }
+    .phone-device::after {
+      content: '';
+      position: absolute;
+      left: -2px;
+      top: 120px;
+      width: 3px;
+      height: 28px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+      border-radius: 2px 0 0 2px;
+      box-shadow: 0 46px 0 0 rgba(255,255,255,0.05), 0 80px 0 0 rgba(255,255,255,0.05);
     }
     .phone-screen {
       background: #0a0912;
-      border-radius: 26px;
-      padding: 14px 12px 12px;
+      border-radius: 34px;
+      padding: 14px 12px 0;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 550px;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.03);
     }
     .phone-dynamic-island {
-      width: 76px;
-      height: 22px;
+      width: 90px;
+      height: 26px;
       background: #000;
       border-radius: 20px;
       margin: 0 auto 10px;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.04);
     }
     .phone-contact {
       text-align: center;
       padding-bottom: 10px;
       margin-bottom: 10px;
       border-bottom: 1px solid rgba(255,255,255,0.06);
+      flex-shrink: 0;
     }
     .phone-contact .name {
       font-family: var(--font-display);
@@ -263,25 +299,21 @@
       display: flex;
       flex-direction: column;
       gap: 7px;
-      max-height: 400px;
+      flex: 1;
       overflow-y: auto;
       scrollbar-width: thin;
       scrollbar-color: rgba(255,255,255,0.08) transparent;
+      padding-bottom: 8px;
     }
     .sms-thread::-webkit-scrollbar { width: 3px; }
     .sms-thread::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
-    .sms-time {
-      text-align: center;
-      font-size: 0.66rem;
-      color: var(--text-muted);
-      margin: 6px 0 2px;
-    }
     .sms-bubble {
       max-width: 82%;
       padding: 9px 13px;
       border-radius: 18px;
       font-size: 0.76rem;
       line-height: 1.5;
+      word-break: break-word;
     }
     .sms-sent {
       align-self: flex-end;
@@ -295,6 +327,85 @@
       color: var(--text);
       border-bottom-left-radius: 6px;
     }
+    .sms-typing {
+      align-self: flex-start;
+      background: rgba(255,255,255,0.08);
+      border-radius: 18px;
+      border-bottom-left-radius: 6px;
+      padding: 12px 16px;
+      display: none;
+    }
+    .sms-typing.visible { display: flex; gap: 4px; }
+    .sms-typing span {
+      width: 6px; height: 6px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      animation: typingDot 1.4s infinite;
+    }
+    .sms-typing span:nth-child(2) { animation-delay: 0.2s; }
+    .sms-typing span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes typingDot {
+      0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+      30% { opacity: 1; transform: translateY(-3px); }
+    }
+    .sms-placeholder {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      padding: 60px 16px 0;
+      line-height: 1.6;
+    }
+    .sms-input-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 6px 12px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      flex-shrink: 0;
+    }
+    .sms-input {
+      flex: 1;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px;
+      padding: 8px 14px;
+      font-size: 0.78rem;
+      color: var(--text);
+      font-family: var(--font-body);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .sms-input::placeholder { color: var(--text-muted); }
+    .sms-input:focus { border-color: rgba(255,255,255,0.15); }
+    .sms-input:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .sms-send-btn {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--coral);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: opacity 0.2s;
+    }
+    .sms-send-btn:hover { opacity: 0.85; }
+    .sms-send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .sms-send-btn svg { width: 14px; height: 14px; }
+    .sms-limit-msg {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 10px 12px 14px;
+      line-height: 1.5;
+      flex-shrink: 0;
+    }
+    .sms-limit-msg a { color: var(--coral); text-decoration: none; font-weight: 600; }
 
     /* ============================
        DIVIDER
@@ -540,7 +651,8 @@
       .hero { padding: 72px 0 56px; }
       .hero h1 { font-size: clamp(2rem, 8vw, 2.8rem); }
       .phone-badge { font-size: 1rem; padding: 14px 26px; }
-      .phone-device { width: 270px; }
+      .phone-device { width: 340px; }
+      .phone-screen { height: 510px; }
       .basics, .faq { padding: 64px 0; }
       .cta-phone { font-size: 1.15rem; padding: 16px 36px; }
       .footer-inner { flex-direction: column; gap: 16px; text-align: center; }
@@ -605,14 +717,15 @@
             <div class="name">Pulse</div>
             <div class="number">(833) 785-7300</div>
           </div>
-          <div class="sms-thread">
-            <div class="sms-time">Today, 6:42 PM</div>
-            <div class="sms-bubble sms-sent">williamsburg</div>
-            <div class="sms-bubble sms-recv">Tonight in Williamsburg:<br><br>1. Mdou Moctar at Music Hall &mdash; 8pm, $28<br>2. Improv at Union Hall &mdash; 7:30pm, $10<br>3. Art opening at 56 Bogart &mdash; 6pm, free<br><br>Reply # for details, "more" for extras</div>
-            <div class="sms-bubble sms-sent">how about comedy</div>
-            <div class="sms-bubble sms-recv">Comedy in Williamsburg tonight:<br><br>1. Improv at Union Hall &mdash; 7:30pm, $10<br>2. Stand-up at Knitting Factory &mdash; 9pm, $12<br><br>Reply # for details</div>
-            <div class="sms-bubble sms-sent">1</div>
-            <div class="sms-bubble sms-recv">Improv at Union Hall<br>7:30pm &mdash; 702 Union St<br>Weekly drop-in improv. BYOB-friendly patio before the show. $10 door.<br>unionhallny.com</div>
+          <div class="sms-thread" id="sms-thread">
+            <div class="sms-placeholder" id="sms-placeholder">Try it &mdash; type a neighborhood</div>
+            <div class="sms-typing" id="sms-typing"><span></span><span></span><span></span></div>
+          </div>
+          <div class="sms-input-bar" id="sms-input-bar">
+            <input type="text" class="sms-input" id="sms-input" placeholder="Text message" autocomplete="off" maxlength="200">
+            <button class="sms-send-btn" id="sms-send" aria-label="Send">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
           </div>
         </div>
       </div>
@@ -726,5 +839,99 @@
   </div>
 </footer>
 
+<script>
+(function() {
+  const API = 'https://web-production-c8fdb.up.railway.app/api/sms/test';
+  const MAX_MESSAGES = 7;
+  const SESSION_PHONE = '+1555' + String(Math.floor(Math.random() * 9000000 + 1000000));
+
+  const thread = document.getElementById('sms-thread');
+  const placeholder = document.getElementById('sms-placeholder');
+  const typing = document.getElementById('sms-typing');
+  const input = document.getElementById('sms-input');
+  const sendBtn = document.getElementById('sms-send');
+  const inputBar = document.getElementById('sms-input-bar');
+  let msgCount = 0;
+  let sending = false;
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function addBubble(text, cls) {
+    const div = document.createElement('div');
+    div.className = 'sms-bubble ' + cls;
+    div.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+    thread.insertBefore(div, typing);
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  async function send() {
+    const msg = input.value.trim();
+    if (!msg || sending) return;
+
+    if (placeholder) placeholder.remove();
+    addBubble(msg, 'sms-sent');
+    input.value = '';
+    msgCount++;
+
+    sending = true;
+    input.disabled = true;
+    sendBtn.disabled = true;
+    typing.classList.add('visible');
+    thread.scrollTop = thread.scrollHeight;
+
+    try {
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Body: msg, From: SESSION_PHONE }),
+      });
+
+      typing.classList.remove('visible');
+
+      if (res.status === 429) {
+        showLimit();
+        return;
+      }
+
+      const data = await res.json();
+      if (data.messages && data.messages.length > 0) {
+        data.messages.forEach(function(m) { addBubble(m, 'sms-recv'); });
+      } else if (data.error) {
+        addBubble('Something went wrong — try again.', 'sms-recv');
+      }
+    } catch (e) {
+      typing.classList.remove('visible');
+      addBubble('Could not connect — try again.', 'sms-recv');
+    }
+
+    sending = false;
+
+    if (msgCount >= MAX_MESSAGES) {
+      showLimit();
+    } else {
+      input.disabled = false;
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  function showLimit() {
+    input.disabled = true;
+    sendBtn.disabled = true;
+    inputBar.style.display = 'none';
+    var limitMsg = document.createElement('div');
+    limitMsg.className = 'sms-limit-msg';
+    limitMsg.innerHTML = 'That\'s the free preview &mdash; text <a href="sms:+18337857300">(833) 785-7300</a> to keep going';
+    thread.parentElement.appendChild(limitMsg);
+  }
+
+  sendBtn.addEventListener('click', send);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+})();
+</script>
 </body>
 </html>
