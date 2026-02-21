@@ -283,10 +283,24 @@ async function refreshCache() {
       else sourcesFailed++;
     }
 
+    // Filter out stale/far-future events at scrape time
+    const yesterday = getNycDateString(-1);
+    const weekOut = getNycDateString(7);
+    const beforeFilter = allEvents.length;
+    const validEvents = allEvents.filter(e => {
+      const d = getEventDate(e);
+      if (!d) return true; // keep undated events (perennials, venues)
+      return d >= yesterday && d <= weekOut;
+    });
+    const staleCount = beforeFilter - validEvents.length;
+    if (staleCount > 0) {
+      console.log(`Filtered ${staleCount} stale/far-future events at scrape time`);
+    }
+
     // Geocode events that still have no neighborhood (venue map miss)
     // Wrapped in try-catch so geocoding failure doesn't block cache update
     try {
-      await batchGeocodeEvents(allEvents);
+      await batchGeocodeEvents(validEvents);
     } catch (err) {
       console.error('Geocoding failed, continuing with un-geocoded events:', err.message);
     }
@@ -301,13 +315,13 @@ async function refreshCache() {
       } catch (err) { console.error('Failed to persist venues:', err.message); }
     }
 
-    eventCache = allEvents;
+    eventCache = validEvents;
     cacheTimestamp = Date.now();
 
     // Persist cache to disk so next deploy starts with usable data
     try {
-      fs.writeFileSync(CACHE_FILE, JSON.stringify({ events: allEvents, timestamp: cacheTimestamp }));
-      console.log(`Persisted ${allEvents.length} events to cache file`);
+      fs.writeFileSync(CACHE_FILE, JSON.stringify({ events: validEvents, timestamp: cacheTimestamp }));
+      console.log(`Persisted ${validEvents.length} events to cache file`);
     } catch (err) { console.error('Failed to persist event cache:', err.message); }
 
     // Update scrape-level stats
@@ -317,7 +331,7 @@ async function refreshCache() {
       completedAt: scrapeEnd.toISOString(),
       totalDurationMs: scrapeEnd - scrapeStart,
       totalEvents: totalRaw,
-      dedupedEvents: allEvents.length,
+      dedupedEvents: validEvents.length,
       sourcesOk,
       sourcesFailed,
       sourcesEmpty,
@@ -335,7 +349,7 @@ async function refreshCache() {
 
     // Run extraction audit (deterministic tier only — fast, free)
     try {
-      const auditReport = runExtractionAudit(allEvents, getExtractionInputs());
+      const auditReport = runExtractionAudit(validEvents, getExtractionInputs());
       if (auditReport.summary.total > 0) {
         console.log(`Extraction audit: ${auditReport.summary.passed}/${auditReport.summary.total} events pass (${auditReport.summary.passRate}), ${auditReport.summary.issues} issues`);
         // Save report to disk
@@ -348,7 +362,7 @@ async function refreshCache() {
       console.error('Extraction audit failed:', err.message);
     }
 
-    console.log(`Cache refreshed: ${allEvents.length} deduped events (${totalRaw} raw from ${sourcesOk} ok / ${sourcesFailed} failed / ${sourcesEmpty} empty sources)`);
+    console.log(`Cache refreshed: ${validEvents.length} events (${totalRaw} raw, ${allEvents.length} deduped, ${staleCount} stale removed | ${sourcesOk} ok / ${sourcesFailed} failed / ${sourcesEmpty} empty)`);
     return eventCache;
   })().finally(() => { refreshPromise = null; });
 
