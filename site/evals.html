@@ -1220,6 +1220,96 @@ ab-compose-cases.json</span></div>
   </div>
 </section>
 
+<!-- FAQ -->
+<section id="faq">
+  <div class="container">
+    <p class="section-label">FAQ</p>
+    <h2 class="section-title">Frequently asked questions</h2>
+
+    <details open style="margin-top: 24px;">
+      <summary>Do I need API keys to run evals?</summary>
+      <div class="detail-body">
+        <p><strong>Layers 1-3 (unit tests, extraction audit, code evals) are completely free</strong> &mdash; no API keys needed beyond what the server already uses for scraping and compose. The AI costs are from the pipeline itself, not the eval checks.</p>
+        <p>Layers 4-6 (scenarios, regression, judges, A/B) require <code>ANTHROPIC_API_KEY</code> because they call Claude Sonnet as a judge. The A/B eval also needs <code>GEMINI_API_KEY</code> if you're comparing a Gemini model.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Can I run evals against the deployed production server?</summary>
+      <div class="detail-body">
+        <p>Yes. Any eval runner that accepts <code>--url</code> can point at the Railway deployment:</p>
+        <div class="code-block"><span class="hl">node scripts/run-scenario-evals.js --url=https://web-production-c8fdb.up.railway.app</span></div>
+        <p style="margin-top: 8px;">This is useful for verifying behavior after a deploy. The server must have <code>PULSE_TEST_MODE=true</code> set for the <code>/api/sms/test</code> and <code>/api/eval/*</code> endpoints to be available.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>How do I add a new test case?</summary>
+      <div class="detail-body">
+        <p>It depends on what you're testing:</p>
+        <ul>
+          <li><strong>Single message behavior</strong> &mdash; Add a case to <code>data/fixtures/synthetic-cases.json</code> with <code>id</code>, <code>message</code>, <code>expected</code> (intent, neighborhood, has_events), and optional <code>session</code> context. Or run <code>npm run eval:gen</code> to regenerate from templates.</li>
+          <li><strong>Multi-turn conversation</strong> &mdash; Add a scenario to <code>data/fixtures/multi-turn-scenarios.json</code> with <code>name</code>, <code>category</code>, <code>turns</code> (user/pulse pairs), and <code>failure_modes</code> to watch for.</li>
+          <li><strong>Behavioral assertion</strong> &mdash; Add a scenario to <code>data/fixtures/regression-scenarios.json</code> with <code>user_turns</code> and an <code>assertions</code> array where each assertion has a <code>check</code> and <code>anti_pattern</code>.</li>
+          <li><strong>Compose quality</strong> &mdash; Add a case to <code>data/fixtures/ab-compose-cases.json</code> with a pre-built event list for controlled comparison.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details>
+      <summary>Why are LLM judges binary PASS/FAIL instead of scores?</summary>
+      <div class="detail-body">
+        <p>Scores sound more precise but are less useful. When a judge returns 7/10, what does that mean? Is 6 a regression? Is 8 noise? Binary verdicts force the judge to commit &mdash; "this sounds like a friend" or "this sounds like a bot" &mdash; and the one-sentence explanation tells you why. Across 100+ traces, the pass <em>rate</em> gives you the signal that a score on one trace can't.</p>
+        <p>The A/B preference judge is the exception: it returns a winner (A, B, or tie) with a confidence level (high, medium, low). Position-randomized to control for the judge's bias toward whatever it reads first.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>What does "position-randomized" mean in A/B evals?</summary>
+      <div class="detail-body">
+        <p>LLM judges have a subtle bias toward the first response they see. If Model A is always shown first, the judge might prefer it just because of position, not quality. To control for this, the A/B runner randomly swaps which response is labeled "Response A" vs "Response B" for each test case, then maps the winner back to the correct model. This way, position bias cancels out over many cases.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>How do I know if an eval failure is a real regression or just LLM noise?</summary>
+      <div class="detail-body">
+        <p><strong>Deterministic failures (layers 1-3) are always real.</strong> If <code>char_limit</code> or <code>picked_events_exist</code> fails, something broke.</p>
+        <p><strong>Judge failures (layers 4-6) can be noisy.</strong> A single tone failure might just be the judge being strict. Look for patterns: if <code>judge_tone</code> fails on 3+ traces in the same run, the compose prompt probably changed in a way that sounds less natural. If it's 1 out of 105, it's probably noise.</p>
+        <p>The A/B eval handles noise explicitly with the <code>--runs=3</code> flag, which runs each case multiple times and averages the results.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Can I use a different judge model?</summary>
+      <div class="detail-body">
+        <p>Yes. Set <code>PULSE_MODEL_JUDGE</code> in your <code>.env</code> file. Defaults to Claude Sonnet (<code>claude-sonnet-4-5-20250929</code>). You could use Haiku for cheaper judging, but Sonnet is noticeably better at catching subtle tone and relevance issues. Using a stronger model for judging than for generation is the standard pattern &mdash; you want the judge to be at least as capable as the model it's evaluating.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Do evals test the actual Twilio SMS delivery?</summary>
+      <div class="detail-body">
+        <p>No. All evals use the <code>/api/sms/test</code> endpoint, which runs the full pipeline (routing, event fetch, curation, compose) but captures the SMS in memory instead of sending it through Twilio. This is why <code>PULSE_TEST_MODE=true</code> is required &mdash; it enables the test endpoint and the SMS capture system. The Twilio integration itself is tested manually via the browser-based simulator at <code>/test</code>.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Where do eval reports go? Do they accumulate forever?</summary>
+      <div class="detail-body">
+        <p>All reports are saved to <code>data/reports/</code> as timestamped JSON files. They do accumulate &mdash; there's no automatic cleanup. This is intentional: old reports are useful for tracking quality over time. If disk space becomes an issue, you can safely delete older reports. The extraction audit overwrites daily (one file per date), so it self-limits.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Can I run just one specific test case?</summary>
+      <div class="detail-body">
+        <p>For pipeline evals, filter by tag: <code>node scripts/run-evals.js --tag=bushwick</code>. For A/B evals, filter by ID: <code>node scripts/run-ab-eval.js --id=ab-004</code>. For scenario evals, filter by name: <code>node scripts/run-scenario-evals.js --name="events then details"</code>. For regression evals, filter by principle: <code>node scripts/run-regression-evals.js --principle P1</code>.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
 <footer>
   <div class="footer-inner">
     <span class="footer-brand">Pulse</span>
