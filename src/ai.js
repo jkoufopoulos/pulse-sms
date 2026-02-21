@@ -2,7 +2,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { getEventDate, getNycDateString } = require('./geo');
 const { EXTRACTION_PROMPT, ROUTE_SYSTEM, COMPOSE_SYSTEM, DETAILS_SYSTEM } = require('./prompts');
-const { buildComposePrompt } = require('./skills/build-compose-prompt');
+const { buildComposePrompt, buildUnifiedPrompt } = require('./skills/build-compose-prompt');
 
 let client = null;
 function getClient() {
@@ -522,4 +522,159 @@ function isSearchUrl(url) {
   }
 }
 
-module.exports = { routeMessage, composeResponse, composeDetails, extractEvents, isSearchUrl, parseJsonFromResponse };
+/**
+ * Unified LLM call for pre-router misses.
+ * Replaces routeMessage() + handler dispatch + composeResponse() with a single call
+ * that sees the full picture (message, session, events, history) and returns the SMS directly.
+ *
+ * Returns { type, sms_text, picks, neighborhood_used, filters_used, suggested_neighborhood, pending_filters }
+ */
+async function unifiedRespond(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime }) {
+  const now = currentTime || new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+  const todayNyc = getNycDateString(0);
+  const tomorrowNyc = getNycDateString(1);
+
+  // Build event list string (same format as composeResponse)
+  let eventListStr = '';
+  if (events && events.length > 0) {
+    eventListStr = events.map(e => {
+      const eventDate = getEventDate(e);
+      const dayLabel = eventDate === todayNyc ? 'TODAY' : eventDate === tomorrowNyc ? 'TOMORROW' : eventDate;
+      return JSON.stringify({
+        id: e.id,
+        name: e.name && e.name.length > 80 ? e.name.slice(0, 77) + '...' : e.name,
+        venue_name: e.venue_name,
+        neighborhood: e.neighborhood,
+        date_local: eventDate,
+        day: dayLabel,
+        start_time_local: e.start_time_local,
+        end_time_local: e.end_time_local,
+        is_free: e.is_free,
+        price_display: e.price_display,
+        category: e.category,
+        short_detail: e.short_detail || e.description_short,
+        source_name: e.source_name,
+        source_tier: e.source_tier || 'secondary',
+        extraction_confidence: e.extraction_confidence,
+        ticket_url: e.ticket_url,
+      });
+    }).join('\n');
+  }
+
+  // Build session context
+  const sessionContext = session
+    ? `Last neighborhood: ${session.lastNeighborhood || 'none'}. Last picks: ${(session.lastPicks || []).map((p, i) => {
+        const evt = session.lastEvents?.[p.event_id];
+        return evt ? `#${i + 1} "${evt.name}"` : `#${i + 1}`;
+      }).join(', ') || 'none'}.${session.lastFilters && Object.values(session.lastFilters).some(Boolean) ? ` Last filters: ${JSON.stringify(session.lastFilters)}.` : ''}`
+    : 'No prior session.';
+
+  const historyBlock = conversationHistory?.length > 0
+    ? '\nCONVERSATION HISTORY:\n' + conversationHistory.map(h =>
+        `${h.role === 'user' ? 'User' : 'Pulse'}: ${h.content}`
+      ).join('\n') + '\n'
+    : '';
+
+  const nearbyBlock = nearbyHoods?.length > 0
+    ? `\nNearby neighborhoods: ${nearbyHoods.join(', ')}`
+    : '';
+
+  const userPrompt = `Current time (NYC): ${now}
+<user_message>${message}</user_message>
+Session context: ${sessionContext}
+Neighborhood: ${neighborhood || 'not specified'}
+${historyBlock}${nearbyBlock}
+${eventListStr ? `EVENT_LIST (${events.length} events):\n${eventListStr}` : 'No events available for this area.'}
+
+Respond now.`;
+
+  // Build system prompt with dynamic skills
+  const skillOptions = {
+    requestedNeighborhood: neighborhood,
+    userMessage: message,
+    hasConversationHistory: conversationHistory?.length > 0,
+    nearbyNeighborhoods: nearbyHoods,
+  };
+  const systemPrompt = buildUnifiedPrompt(events || [], skillOptions);
+
+  const response = await getClient().messages.create({
+    model: MODELS.compose,
+    max_tokens: 512,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userPrompt }],
+  }, { timeout: 12000 });
+
+  const text = response.content?.[0]?.text || '';
+  const usage = response.usage || null;
+
+  const parsed = parseJsonFromResponse(text);
+
+  if (!parsed || !parsed.sms_text || typeof parsed.sms_text !== 'string') {
+    console.error('unifiedRespond: invalid response:', text);
+    return {
+      type: 'conversational',
+      sms_text: "Having a moment — try again in a sec!",
+      picks: [],
+      neighborhood_used: neighborhood,
+      filters_used: null,
+      suggested_neighborhood: null,
+      _raw: text,
+      _usage: usage,
+      _provider: 'anthropic',
+    };
+  }
+
+  // Validate picks against provided events
+  let validPicks = [];
+  if (parsed.picks && parsed.picks.length > 0 && events && events.length > 0) {
+    const validIds = new Set(events.map(e => e.id));
+    validPicks = parsed.picks.filter(p => p && typeof p.event_id === 'string' && validIds.has(p.event_id));
+
+    // Fallback: name matching (same as composeResponse)
+    if (validPicks.length === 0 && parsed.picks.length > 0) {
+      console.warn(`unifiedRespond: ${parsed.picks.length} picks had invalid IDs, attempting name match`);
+      const nameToId = new Map(events.map(e => [(e.name || '').toLowerCase(), e.id]));
+      validPicks = parsed.picks.map(p => {
+        if (p && validIds.has(p.event_id)) return p;
+        for (const [name, id] of nameToId) {
+          if (name && p.event_id && name.includes(p.event_id.toLowerCase())) return { ...p, event_id: id };
+        }
+        return null;
+      }).filter(Boolean);
+      if (validPicks.length === 0) {
+        const smsLower = parsed.sms_text.toLowerCase();
+        validPicks = events.filter(e => {
+          const name = (e.name || '').toLowerCase();
+          return name.length >= 3 && smsLower.includes(name);
+        }).slice(0, 3).map((e, i) => ({ rank: i + 1, event_id: e.id }));
+        if (validPicks.length > 0) {
+          console.warn(`unifiedRespond: [RECOVERED] ${validPicks.length} picks via full-name sms_text matching`);
+        }
+      }
+    }
+  }
+
+  // Sanitize neighborhood_used
+  let neighborhoodUsed = parsed.neighborhood_used || neighborhood;
+  if (neighborhoodUsed) {
+    const cleaned = neighborhoodUsed.replace(/\s*\(.*\)$/, '').trim();
+    const validNeighborhoods = Object.keys(require('./neighborhoods').NEIGHBORHOODS);
+    neighborhoodUsed = validNeighborhoods.includes(cleaned) ? cleaned : neighborhood;
+  }
+
+  return {
+    type: parsed.type || (validPicks.length > 0 ? 'event_picks' : 'conversational'),
+    sms_text: require('./formatters').smartTruncate(parsed.sms_text),
+    picks: validPicks,
+    neighborhood_used: neighborhoodUsed,
+    filters_used: parsed.filters_used || null,
+    suggested_neighborhood: parsed.suggested_neighborhood || null,
+    pending_filters: parsed.pending_filters || null,
+    _raw: text,
+    _usage: usage,
+    _provider: 'anthropic',
+  };
+}
+
+module.exports = { routeMessage, composeResponse, composeDetails, extractEvents, unifiedRespond, isSearchUrl, parseJsonFromResponse };
