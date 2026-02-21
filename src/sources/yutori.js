@@ -145,29 +145,46 @@ async function fetchYutoriEvents() {
       return [];
     }
 
-    // Read and concatenate all briefings with source markers
-    const sections = [];
+    // Process each file individually to stay within extraction limits
+    const fileContents = [];
     for (const file of files) {
       const raw = fs.readFileSync(path.join(YUTORI_DIR, file), 'utf8');
       const content = /\.html?$/i.test(file) ? stripHtml(raw) : raw;
       if (content.length >= 50) {
-        sections.push(`[Yutori Agent: ${file}]\n${content}`);
+        fileContents.push({ file, content });
       }
     }
 
-    if (sections.length === 0) {
+    if (fileContents.length === 0) {
       console.log('Yutori: all briefing files too short, skipping');
       return [];
     }
 
-    const combined = sections.join('\n\n---\n\n');
-    console.log(`Yutori content: ${combined.length} chars (${files.length} files)`);
-    captureExtractionInput('yutori', combined, null);
+    console.log(`Yutori: processing ${fileContents.length} files individually`);
+    const events = [];
 
-    const result = await extractEvents(combined, 'yutori', null);
-    const events = (result.events || [])
-      .map(e => normalizeExtractedEvent(e, 'yutori', 'aggregator', 0.8))
-      .filter(e => e.name && e.completeness >= 0.5);
+    // Process files in parallel (max 3 concurrent to avoid rate limits)
+    const CONCURRENCY = 3;
+    for (let i = 0; i < fileContents.length; i += CONCURRENCY) {
+      const batch = fileContents.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(
+        batch.map(async ({ file, content }) => {
+          console.log(`Yutori: extracting ${file} (${content.length} chars)`);
+          captureExtractionInput('yutori', content, null);
+          const result = await extractEvents(content, 'yutori', null);
+          return (result.events || [])
+            .map(e => normalizeExtractedEvent(e, 'yutori', 'aggregator', 0.8))
+            .filter(e => e.name && e.completeness >= 0.5);
+        })
+      );
+      for (const r of results) {
+        if (r.status === 'fulfilled') {
+          events.push(...r.value);
+        } else {
+          console.warn('Yutori: extraction failed for batch item:', r.reason?.message);
+        }
+      }
+    }
 
     // Move processed files to processed/ directory
     fs.mkdirSync(PROCESSED_DIR, { recursive: true });

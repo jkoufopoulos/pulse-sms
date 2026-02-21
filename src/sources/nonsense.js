@@ -1,62 +1,148 @@
-const cheerio = require('cheerio');
+const fs = require('fs');
+const path = require('path');
 const { extractEvents } = require('../ai');
-const { FETCH_HEADERS, normalizeExtractedEvent } = require('./shared');
+const { fetchEmails } = require('../gmail');
+const { normalizeExtractedEvent } = require('./shared');
 const { captureExtractionInput } = require('../extraction-capture');
+const { stripHtml } = require('./yutori');
+
+const NONSENSE_DIR = path.join(__dirname, '../../data/nonsense');
+const PROCESSED_IDS_FILE = path.join(NONSENSE_DIR, 'processed-ids.json');
+
+/**
+ * Load the set of already-processed Gmail message IDs.
+ */
+function loadProcessedIds() {
+  try {
+    if (fs.existsSync(PROCESSED_IDS_FILE)) {
+      return new Set(JSON.parse(fs.readFileSync(PROCESSED_IDS_FILE, 'utf8')));
+    }
+  } catch (err) {
+    console.warn('NonsenseNYC: failed to load processed-ids.json:', err.message);
+  }
+  return new Set();
+}
+
+/**
+ * Save the set of processed Gmail message IDs.
+ */
+function saveProcessedIds(ids) {
+  try {
+    fs.mkdirSync(NONSENSE_DIR, { recursive: true });
+    fs.writeFileSync(PROCESSED_IDS_FILE, JSON.stringify([...ids], null, 2));
+  } catch (err) {
+    console.warn('NonsenseNYC: failed to save processed-ids.json:', err.message);
+  }
+}
+
+/**
+ * Split a NonsenseNYC newsletter into day sections.
+ * The newsletter uses "XXXXX FRIDAY, FEBRUARY 20 XXXXX" as day headers.
+ * Returns array of { day, content } objects.
+ */
+function splitByDay(text) {
+  const dayPattern = /XXXXX\s+((?:MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY|SUNDAY)[^X]*?)\s*XXXXX/gi;
+  const sections = [];
+  let match;
+  const matches = [];
+
+  while ((match = dayPattern.exec(text)) !== null) {
+    matches.push({ day: match[1].trim(), index: match.index });
+  }
+
+  for (let i = 0; i < matches.length; i++) {
+    const start = matches[i].index;
+    const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
+    const content = text.slice(start, end).trim();
+    if (content.length >= 100) {
+      sections.push({ day: matches[i].day, content });
+    }
+  }
+
+  return sections;
+}
 
 async function fetchNonsenseNYC() {
   console.log('Fetching Nonsense NYC...');
   try {
-    const res = await fetch('https://nonsensenyc.com/', {
-      headers: FETCH_HEADERS,
-      signal: AbortSignal.timeout(10000),
-    });
-
-    if (!res.ok) {
-      console.error(`Nonsense NYC fetch failed: ${res.status}`);
+    // Fetch newsletter emails from Gmail (weekly, look back 8 days)
+    const emails = await fetchEmails('from:jstark@nonsensenyc.com subject:nonsense newer_than:8d', 3);
+    if (emails.length === 0) {
+      console.log('NonsenseNYC: no newsletter emails found');
       return [];
     }
 
-    const html = await res.text();
-    const $ = cheerio.load(html);
+    const processedIds = loadProcessedIds();
 
-    const entry = $('.entry-content, .post-content, article').first();
-    if (!entry.length) {
-      console.warn('Nonsense NYC: content container not found');
-      return [];
-    }
-
-    const paragraphs = [];
-    entry.find('p, li').each((i, el) => {
-      const text = $(el).text().trim();
-      if (text && text.length >= 30) {
-        paragraphs.push(text);
+    // Find the most recent unprocessed newsletter
+    let newsletter = null;
+    for (const email of emails) {
+      if (!processedIds.has(email.id)) {
+        newsletter = email;
+        break;
       }
-    });
-
-    let content = paragraphs.slice(0, 15).join('\n\n');
-    if (content.length < 50) {
-      content = entry.text().trim().slice(0, 5000);
     }
 
-    if (content.length < 50) {
-      console.warn('Nonsense NYC content too short, skipping extraction');
+    if (!newsletter) {
+      console.log('NonsenseNYC: all newsletters already processed');
       return [];
     }
 
-    console.log(`Nonsense NYC content: ${content.length} chars (${paragraphs.length} paragraphs)`);
-    captureExtractionInput('nonsensenyc', content, 'https://nonsensenyc.com/');
+    console.log(`NonsenseNYC: processing "${newsletter.subject}" (${newsletter.date})`);
+    const stripped = stripHtml(newsletter.body);
 
-    const result = await extractEvents(content, 'nonsensenyc', 'https://nonsensenyc.com/');
-    const events = (result.events || [])
-      .map(e => normalizeExtractedEvent(e, 'nonsensenyc', 'curated', 0.9))
-      .filter(e => e.name && e.completeness >= 0.5);
+    // Split into day sections for manageable extraction calls
+    const sections = splitByDay(stripped);
+    if (sections.length === 0) {
+      // Fallback: treat entire content as one section (cap at 10KB)
+      console.log('NonsenseNYC: no day headers found, using full content');
+      const content = stripped.slice(0, 10000);
+      captureExtractionInput('nonsensenyc', content, 'https://nonsensenyc.com/');
+      const result = await extractEvents(content, 'nonsensenyc', 'https://nonsensenyc.com/');
+      const events = (result.events || [])
+        .map(e => normalizeExtractedEvent(e, 'nonsensenyc', 'curated', 0.9))
+        .filter(e => e.name && e.completeness >= 0.5);
 
-    console.log(`Nonsense NYC: ${events.length} events`);
-    return events;
+      processedIds.add(newsletter.id);
+      saveProcessedIds(processedIds);
+      console.log(`NonsenseNYC: ${events.length} events`);
+      return events;
+    }
+
+    console.log(`NonsenseNYC: ${sections.length} day sections found`);
+    const allEvents = [];
+
+    // Process day sections in parallel (max 3 concurrent)
+    const CONCURRENCY = 3;
+    for (let i = 0; i < sections.length; i += CONCURRENCY) {
+      const batch = sections.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(
+        batch.map(async ({ day, content }) => {
+          console.log(`NonsenseNYC: extracting ${day} (${content.length} chars)`);
+          captureExtractionInput('nonsensenyc', content, 'https://nonsensenyc.com/');
+          const result = await extractEvents(content, 'nonsensenyc', 'https://nonsensenyc.com/');
+          return (result.events || [])
+            .map(e => normalizeExtractedEvent(e, 'nonsensenyc', 'curated', 0.9))
+            .filter(e => e.name && e.completeness >= 0.5);
+        })
+      );
+      for (const r of results) {
+        if (r.status === 'fulfilled') {
+          allEvents.push(...r.value);
+        } else {
+          console.warn('NonsenseNYC: extraction failed for day section:', r.reason?.message);
+        }
+      }
+    }
+
+    processedIds.add(newsletter.id);
+    saveProcessedIds(processedIds);
+    console.log(`NonsenseNYC: ${allEvents.length} events from ${sections.length} day sections`);
+    return allEvents;
   } catch (err) {
     console.error('Nonsense NYC error:', err.message);
     return [];
   }
 }
 
-module.exports = { fetchNonsenseNYC };
+module.exports = { fetchNonsenseNYC, splitByDay };

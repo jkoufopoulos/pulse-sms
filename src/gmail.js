@@ -115,4 +115,55 @@ function decodeBase64(data) {
   return Buffer.from(data, 'base64').toString('utf8');
 }
 
-module.exports = { getGmailService, fetchYutoriEmails };
+/**
+ * Generic email fetcher — search Gmail by query string.
+ * Returns [] if credentials are not configured or on any error.
+ *
+ * @param {string} query - Gmail search query (e.g. "from:foo@bar.com newer_than:7d")
+ * @param {number} maxResults - Max emails to return (default 10)
+ * @returns {Promise<Array<{id: string, subject: string, body: string, date: string}>>}
+ */
+async function fetchEmails(query, maxResults = 10) {
+  const gmail = getGmailService();
+  if (!gmail) {
+    return [];
+  }
+
+  try {
+    const listRes = await gmail.users.messages.list({
+      userId: 'me',
+      q: query,
+      maxResults,
+    });
+
+    const messages = listRes.data.messages || [];
+    if (messages.length === 0) {
+      return [];
+    }
+
+    const results = [];
+    for (const msg of messages) {
+      const full = await gmail.users.messages.get({
+        userId: 'me',
+        id: msg.id,
+        format: 'full',
+      });
+
+      const headers = full.data.payload.headers || [];
+      const subject = headers.find(h => h.name.toLowerCase() === 'subject')?.value || '';
+      const date = headers.find(h => h.name.toLowerCase() === 'date')?.value || '';
+      const body = extractBody(full.data.payload);
+
+      if (body) {
+        results.push({ id: msg.id, subject, body, date });
+      }
+    }
+
+    return results;
+  } catch (err) {
+    console.error('Gmail fetch error:', err.message);
+    return [];
+  }
+}
+
+module.exports = { getGmailService, fetchYutoriEmails, fetchEmails };

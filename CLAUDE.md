@@ -57,7 +57,7 @@ Daily scrape (10am ET)     Incoming SMS
 | `sources/ra.js` | Resident Advisor (GraphQL) |
 | `sources/nyc-parks.js` | NYC Parks (Schema.org) |
 | `sources/brooklynvegan.js` | BrooklynVegan (DoStuff JSON) |
-| `sources/nonsense.js` | Nonsense NYC (HTML→Claude extraction) |
+| `sources/nonsense.js` | Nonsense NYC (Gmail newsletter→Claude extraction, split by day) |
 | `sources/ohmyrockness.js` | Oh My Rockness (HTML→Claude extraction) |
 | `sources/donyc.js` | DoNYC (Cheerio HTML scraping — music, comedy, theater) |
 | `sources/bam.js` | BAM (JSON API — film, theater, music, dance) |
@@ -65,7 +65,7 @@ Daily scrape (10am ET)     Incoming SMS
 | `sources/nypl.js` | NYPL (Eventbrite organizer pages — free library events) |
 | `sources/ticketmaster.js` | Ticketmaster Discovery API (indie filter: large-venue blocklist + $100 price cap) |
 | `sources/yutori.js` | Yutori (Gmail API + file-based agent briefings → Claude extraction) |
-| `gmail.js` | Gmail OAuth client — `getGmailService`, `fetchYutoriEmails` (env-var credentials) |
+| `gmail.js` | Gmail OAuth client — `getGmailService`, `fetchYutoriEmails`, `fetchEmails` (generic sender query) |
 | `sources/tavily.js` | Tavily (web search fallback) |
 | `perennial.js` | Perennial picks loader — `getPerennialPicks(hood, opts)`, caches JSON, filters by day, checks adjacent neighborhoods |
 | `venues.js` | Shared venue coord map, auto-learning from sources, Nominatim geocoding fallback, persistence (export/import learned venues) |
