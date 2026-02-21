@@ -1,5 +1,9 @@
 # Codebase Audit — Pulse SMS
 
+> **Status: CLOSED** — Point-in-time audit. All critical and most medium-severity issues have been fixed.
+> Issues fixed since this audit: ISSUE-001, 002, 003, 005, 006, 008, 013, 016.
+> Remaining open: ISSUE-004 (RA free detection), ISSUE-007 (hallucination recovery), ISSUE-009 (all-details SMS length), ISSUE-010 (borough fallback), ISSUE-011 (parseAsNycTime), ISSUE-012 (geocode blocking), ISSUE-014 (per-intent errors), ISSUE-015 (DoNYC sequential), ISSUE-017 (JSON parser).
+
 **Date:** 2026-02-18 (v2 — second pass after initial fixes)
 **Scope:** Full codebase (~3,500 LOC across 20 source files)
 **Tests:** 421 passing (384 smoke + 37 eval), 0 npm vulnerabilities

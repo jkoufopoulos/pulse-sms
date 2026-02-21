@@ -20,6 +20,9 @@ Pulse is an SMS bot that recommends NYC events and nightlife. Users text a neigh
 | `more` / `what else` / `next` | Returns additional picks in the same neighborhood (no repeats) |
 | `free` / `free stuff` / `anything free` | Filters to free events only in the current neighborhood |
 | Category keyword | Filters by type: comedy, live music, art, nightlife, jazz, DJ, theater, etc. |
+| `how about [category]` / `any [category]` | Session follow-up: filters current neighborhood by category (e.g., "how about theater", "any comedy") |
+| `later tonight` / `after midnight` / `late night` | Session follow-up: filters current neighborhood by time |
+| `something [vibe]` / `anything [vibe]` | Session follow-up: filters current neighborhood by vibe (e.g., "something chill", "anything wild") |
 | `yes` / `yeah` / `sure` / `bet` | Accepts travel nudge suggestion |
 | `no` / `nah` | Declines travel nudge suggestion |
 | `hey` / `hi` / `yo` / `sup` | Greeting → "text a neighborhood" |
