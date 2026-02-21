@@ -224,10 +224,10 @@
       justify-content: center;
     }
     .phone-device {
-      width: 360px;
+      width: 420px;
       background: linear-gradient(145deg, #1a1825 0%, #111019 50%, #0d0c14 100%);
-      border-radius: 44px;
-      padding: 12px;
+      border-radius: 48px;
+      padding: 14px;
       border: 1px solid rgba(255,255,255,0.1);
       box-shadow:
         0 0 0 1px rgba(0,0,0,0.8),
@@ -261,18 +261,18 @@
     }
     .phone-screen {
       background: #0a0912;
-      border-radius: 34px;
-      padding: 14px 12px 0;
+      border-radius: 36px;
+      padding: 16px 14px 0;
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      height: 550px;
+      height: 620px;
       box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
       border: 1px solid rgba(255,255,255,0.03);
     }
     .phone-dynamic-island {
-      width: 90px;
-      height: 26px;
+      width: 100px;
+      height: 28px;
       background: #000;
       border-radius: 20px;
       margin: 0 auto 10px;
@@ -289,10 +289,10 @@
     .phone-contact .name {
       font-family: var(--font-display);
       font-weight: 700;
-      font-size: 0.88rem;
+      font-size: 0.95rem;
     }
     .phone-contact .number {
-      font-size: 0.7rem;
+      font-size: 0.72rem;
       color: var(--text-muted);
     }
     .sms-thread {
@@ -309,9 +309,9 @@
     .sms-thread::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
     .sms-bubble {
       max-width: 82%;
-      padding: 9px 13px;
+      padding: 10px 14px;
       border-radius: 18px;
-      font-size: 0.76rem;
+      font-size: 0.82rem;
       line-height: 1.5;
       word-break: break-word;
     }
@@ -348,13 +348,20 @@
       0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
       30% { opacity: 1; transform: translateY(-3px); }
     }
-    .sms-placeholder {
+    .sms-time {
       text-align: center;
-      font-size: 0.78rem;
+      font-size: 0.66rem;
       color: var(--text-muted);
-      padding: 60px 16px 0;
-      line-height: 1.6;
+      margin: 6px 0 2px;
     }
+    .sms-try-prompt {
+      text-align: center;
+      font-size: 0.76rem;
+      color: var(--text-dim);
+      padding: 16px 16px 4px;
+      line-height: 1.5;
+    }
+    .sms-try-prompt strong { color: var(--coral); font-weight: 600; }
     .sms-input-bar {
       display: flex;
       align-items: center;
@@ -368,8 +375,8 @@
       background: rgba(255,255,255,0.06);
       border: 1px solid rgba(255,255,255,0.08);
       border-radius: 20px;
-      padding: 8px 14px;
-      font-size: 0.78rem;
+      padding: 9px 16px;
+      font-size: 0.82rem;
       color: var(--text);
       font-family: var(--font-body);
       outline: none;
@@ -382,8 +389,8 @@
       cursor: not-allowed;
     }
     .sms-send-btn {
-      width: 30px;
-      height: 30px;
+      width: 34px;
+      height: 34px;
       border-radius: 50%;
       background: var(--coral);
       border: none;
@@ -651,8 +658,8 @@
       .hero { padding: 72px 0 56px; }
       .hero h1 { font-size: clamp(2rem, 8vw, 2.8rem); }
       .phone-badge { font-size: 1rem; padding: 14px 26px; }
-      .phone-device { width: 340px; }
-      .phone-screen { height: 510px; }
+      .phone-device { width: 360px; border-radius: 44px; }
+      .phone-screen { height: 560px; }
       .basics, .faq { padding: 64px 0; }
       .cta-phone { font-size: 1.15rem; padding: 16px 36px; }
       .footer-inner { flex-direction: column; gap: 16px; text-align: center; }
@@ -718,11 +725,14 @@
             <div class="number">(833) 785-7300</div>
           </div>
           <div class="sms-thread" id="sms-thread">
-            <div class="sms-placeholder" id="sms-placeholder">Try it &mdash; type a neighborhood</div>
+            <div class="sms-time">Today, 6:42 PM</div>
+            <div class="sms-bubble sms-sent">east village</div>
+            <div class="sms-bubble sms-recv">Tonight in East Village:<br><br>1. Jazz at Smalls &mdash; 7:30pm, $20<br>2. Stand-up at Eastville &mdash; 8pm, $12<br>3. DJ set at Nublu &mdash; 10pm, free<br><br>Reply # for details, "more" for extras</div>
+            <div class="sms-try-prompt" id="sms-try-prompt"><strong>This is live</strong> &mdash; type a neighborhood below and try it yourself</div>
             <div class="sms-typing" id="sms-typing"><span></span><span></span><span></span></div>
           </div>
           <div class="sms-input-bar" id="sms-input-bar">
-            <input type="text" class="sms-input" id="sms-input" placeholder="Text message" autocomplete="off" maxlength="200">
+            <input type="text" class="sms-input" id="sms-input" placeholder="Try it — type a neighborhood" autocomplete="off" maxlength="200">
             <button class="sms-send-btn" id="sms-send" aria-label="Send">
               <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
@@ -846,7 +856,7 @@
   const SESSION_PHONE = '+1555' + String(Math.floor(Math.random() * 9000000 + 1000000));
 
   const thread = document.getElementById('sms-thread');
-  const placeholder = document.getElementById('sms-placeholder');
+  const tryPrompt = document.getElementById('sms-try-prompt');
   const typing = document.getElementById('sms-typing');
   const input = document.getElementById('sms-input');
   const sendBtn = document.getElementById('sms-send');
@@ -870,7 +880,7 @@
     const msg = input.value.trim();
     if (!msg || sending) return;
 
-    if (placeholder) placeholder.remove();
+    if (tryPrompt) tryPrompt.remove();
     addBubble(msg, 'sms-sent');
     input.value = '';
     msgCount++;
