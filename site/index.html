@@ -354,14 +354,19 @@
       color: var(--text-muted);
       margin: 6px 0 2px;
     }
-    .sms-try-prompt {
+    .sms-demo-label {
       text-align: center;
-      font-size: 0.72rem;
-      color: var(--text-dim);
-      padding: 14px 12px 4px;
-      line-height: 1.5;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--coral);
+      font-weight: 700;
+      font-family: var(--font-display);
+      padding: 12px 0 2px;
+      opacity: 0;
+      transition: opacity 0.4s;
     }
-    .sms-try-prompt strong { color: var(--coral); font-weight: 600; }
+    .sms-demo-label.visible { opacity: 1; }
     .sms-input-bar {
       display: flex;
       align-items: center;
@@ -371,7 +376,7 @@
       flex-shrink: 0;
     }
     .sms-input {
-      flex: 1;
+      width: 100%;
       background: rgba(255,255,255,0.06);
       border: 1px solid rgba(255,255,255,0.08);
       border-radius: 20px;
@@ -385,10 +390,26 @@
     }
     .sms-input::placeholder { color: var(--text-muted); }
     .sms-input:focus { border-color: rgba(255,107,66,0.4); }
-    .sms-input.blink-cursor { animation: cursorPulse 1.2s ease-in-out infinite; }
-    @keyframes cursorPulse {
-      0%, 100% { border-color: rgba(255,107,66,0.4); }
-      50% { border-color: rgba(255,255,255,0.08); }
+    .sms-input-wrap {
+      flex: 1;
+      position: relative;
+    }
+    .sms-input-wrap .fake-cursor {
+      position: absolute;
+      left: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 1.5px;
+      height: 14px;
+      background: var(--coral);
+      border-radius: 1px;
+      animation: caretBlink 1s step-end infinite;
+      pointer-events: none;
+      z-index: 2;
+    }
+    @keyframes caretBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
     }
     .sms-input:disabled {
       opacity: 0.5;
@@ -646,8 +667,10 @@
       .hero .container {
         grid-template-columns: 1fr;
         text-align: center;
-        gap: 48px;
+        gap: 40px;
       }
+      /* Phone first on mobile — it's the product demo */
+      .hero-phone-wrap { order: -1; }
       .hero-text { max-width: 100%; margin: 0 auto; }
       .hero .subtitle { margin-left: auto; margin-right: auto; }
       .hero-proof { justify-content: center; }
@@ -661,16 +684,27 @@
     @media (max-width: 680px) {
       .nav-links { display: none; }
       .nav-menu-btn { display: block; }
-      .hero { padding: 72px 0 56px; }
+      .hero { padding: 48px 0 40px; }
+      .hero .container { gap: 32px; }
       .hero h1 { font-size: clamp(2rem, 8vw, 2.8rem); }
+      .hero .subtitle { font-size: 1rem; }
       .phone-badge { font-size: 1rem; padding: 14px 26px; }
-      .phone-device { width: 280px; }
-      .phone-screen { height: 560px; }
+      /* Phone nearly full-width on mobile */
+      .phone-device { width: min(310px, 85vw); }
+      .phone-screen { height: min(560px, 130vw); }
+      .sms-bubble { font-size: 0.76rem; }
       .basics, .faq { padding: 64px 0; }
       .cta-phone { font-size: 1.15rem; padding: 16px 36px; }
       .footer-inner { flex-direction: column; gap: 16px; text-align: center; }
       .footer-left { flex-direction: column; gap: 6px; }
       .footer-tagline { border: none; padding: 0; }
+    }
+
+    @media (max-width: 380px) {
+      .hero { padding: 36px 0 32px; }
+      .container { padding: 0 16px; }
+      .phone-device { width: 90vw; border-radius: 40px; padding: 8px; }
+      .phone-screen { border-radius: 34px; height: 135vw; }
     }
   </style>
 </head>
@@ -731,15 +765,13 @@
             <div class="number">(833) 785-7300</div>
           </div>
           <div class="sms-thread" id="sms-thread">
-            <div class="sms-time">Today, 6:42 PM</div>
-            <div class="sms-bubble sms-sent">east village</div>
-            <div class="sms-bubble sms-recv">Tonight in East Village:<br><br>1. Jazz at Smalls &mdash; 7:30pm, $20<br>2. Stand-up at Eastville &mdash; 8pm, $12<br>3. DJ set at Nublu &mdash; 10pm, free<br><br>Reply # for details, "more" for extras</div>
-            <div class="sms-try-prompt" id="sms-try-prompt"><strong>This is live</strong> &mdash; type a neighborhood below and try it yourself</div>
             <div class="sms-typing" id="sms-typing"><span></span><span></span><span></span></div>
           </div>
           <div class="sms-input-bar" id="sms-input-bar">
-            <input type="text" class="sms-input" id="sms-input" placeholder="Try it — type a neighborhood" autocomplete="off" maxlength="200">
-            <button class="sms-send-btn" id="sms-send" aria-label="Send">
+            <div class="sms-input-wrap" id="sms-input-wrap">
+              <input type="text" class="sms-input" id="sms-input" placeholder="Your turn — try a neighborhood" autocomplete="off" maxlength="200" disabled>
+            </div>
+            <button class="sms-send-btn" id="sms-send" disabled aria-label="Send">
               <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
           </div>
@@ -857,36 +889,142 @@
 
 <script>
 (function() {
-  const API = 'https://web-production-c8fdb.up.railway.app/api/sms/test';
-  const MAX_MESSAGES = 7;
-  const SESSION_PHONE = '+1555' + String(Math.floor(Math.random() * 9000000 + 1000000));
+  var API = 'https://web-production-c8fdb.up.railway.app/api/sms/test';
+  var MAX_MESSAGES = 7;
+  var SESSION_PHONE = '+1555' + String(Math.floor(Math.random() * 9000000 + 1000000));
 
-  const thread = document.getElementById('sms-thread');
-  const tryPrompt = document.getElementById('sms-try-prompt');
-  const typing = document.getElementById('sms-typing');
-  const input = document.getElementById('sms-input');
-  const sendBtn = document.getElementById('sms-send');
-  const inputBar = document.getElementById('sms-input-bar');
-  let msgCount = 0;
-  let sending = false;
+  var thread = document.getElementById('sms-thread');
+  var typing = document.getElementById('sms-typing');
+  var input = document.getElementById('sms-input');
+  var sendBtn = document.getElementById('sms-send');
+  var inputBar = document.getElementById('sms-input-bar');
+  var inputWrap = document.getElementById('sms-input-wrap');
+  var msgCount = 0;
+  var sending = false;
+  var demoComplete = false;
 
   function escapeHtml(str) {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  function addEl(tag, cls, html) {
+    var el = document.createElement(tag);
+    el.className = cls;
+    if (html) el.innerHTML = html;
+    thread.insertBefore(el, typing);
+    thread.scrollTop = thread.scrollHeight;
+    return el;
+  }
+
   function addBubble(text, cls) {
-    const div = document.createElement('div');
-    div.className = 'sms-bubble ' + cls;
-    div.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
-    thread.insertBefore(div, typing);
+    return addEl('div', 'sms-bubble ' + cls, escapeHtml(text).replace(/\n/g, '<br>'));
+  }
+
+  function addRawBubble(html, cls) {
+    return addEl('div', 'sms-bubble ' + cls, html);
+  }
+
+  function showTyping() {
+    typing.classList.add('visible');
     thread.scrollTop = thread.scrollHeight;
   }
 
-  async function send() {
-    const msg = input.value.trim();
-    if (!msg || sending) return;
+  function hideTyping() {
+    typing.classList.remove('visible');
+  }
 
-    if (tryPrompt) tryPrompt.remove();
+  function wait(ms) {
+    return new Promise(function(r) { setTimeout(r, ms); });
+  }
+
+  // --- Animated demo sequence ---
+  async function playDemo() {
+    await wait(600);
+
+    // Timestamp
+    addEl('div', 'sms-time', 'Today, 6:42 PM');
+
+    // Welcome message from Pulse
+    showTyping();
+    await wait(1200);
+    hideTyping();
+    addRawBubble("Hey! Text me a neighborhood and I'll find you something good tonight.", 'sms-recv');
+
+    await wait(1400);
+
+    // User sends "east village"
+    addBubble('east village', 'sms-sent');
+
+    await wait(600);
+    showTyping();
+    await wait(2000);
+    hideTyping();
+
+    // Pulse response
+    addRawBubble(
+      'Tonight in East Village:<br><br>' +
+      '1. Jazz at Smalls &mdash; 7:30pm, $20<br>' +
+      '2. Stand-up at Eastville &mdash; 8pm, $12<br>' +
+      '3. DJ set at Nublu &mdash; 10pm, free<br><br>' +
+      'Reply # for details, "more" for extras',
+      'sms-recv'
+    );
+
+    await wait(1400);
+
+    // User asks for details
+    addBubble('1', 'sms-sent');
+
+    await wait(600);
+    showTyping();
+    await wait(1800);
+    hideTyping();
+
+    // Detail response
+    addRawBubble(
+      'Jazz at Smalls<br>' +
+      '7:30pm &mdash; 183 W 10th St<br>' +
+      'Late-night jazz in a legendary basement club. Two sets nightly, BYOB-friendly. $20 cover.<br>' +
+      'smallslive.com',
+      'sms-recv'
+    );
+
+    await wait(800);
+
+    // "Your turn" label
+    var label = addEl('div', 'sms-demo-label', 'Your turn');
+    requestAnimationFrame(function() { label.classList.add('visible'); });
+
+    await wait(400);
+
+    // Enable input + show blinking cursor
+    demoComplete = true;
+    input.disabled = false;
+    sendBtn.disabled = false;
+    var cursor = document.createElement('div');
+    cursor.className = 'fake-cursor';
+    cursor.id = 'fake-cursor';
+    inputWrap.appendChild(cursor);
+  }
+
+  // Remove fake cursor when user focuses input
+  input.addEventListener('focus', function() {
+    var fc = document.getElementById('fake-cursor');
+    if (fc) fc.remove();
+  });
+
+  // --- Live chat ---
+  async function send() {
+    var msg = input.value.trim();
+    if (!msg || sending || !demoComplete) return;
+
+    // Remove "Your turn" label on first real message
+    var label = thread.querySelector('.sms-demo-label');
+    if (label) label.remove();
+
+    var fc = document.getElementById('fake-cursor');
+    if (fc) fc.remove();
+
     addBubble(msg, 'sms-sent');
     input.value = '';
     msgCount++;
@@ -894,32 +1032,31 @@
     sending = true;
     input.disabled = true;
     sendBtn.disabled = true;
-    typing.classList.add('visible');
-    thread.scrollTop = thread.scrollHeight;
+    showTyping();
 
     try {
-      const res = await fetch(API, {
+      var res = await fetch(API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ Body: msg, From: SESSION_PHONE }),
       });
 
-      typing.classList.remove('visible');
+      hideTyping();
 
       if (res.status === 429) {
         showLimit();
         return;
       }
 
-      const data = await res.json();
+      var data = await res.json();
       if (data.messages && data.messages.length > 0) {
         data.messages.forEach(function(m) { addBubble(m, 'sms-recv'); });
       } else if (data.error) {
-        addBubble('Something went wrong — try again.', 'sms-recv');
+        addBubble('Something went wrong \u2014 try again.', 'sms-recv');
       }
     } catch (e) {
-      typing.classList.remove('visible');
-      addBubble('Could not connect — try again.', 'sms-recv');
+      hideTyping();
+      addBubble('Could not connect \u2014 try again.', 'sms-recv');
     }
 
     sending = false;
@@ -937,22 +1074,19 @@
     input.disabled = true;
     sendBtn.disabled = true;
     inputBar.style.display = 'none';
-    var limitMsg = document.createElement('div');
-    limitMsg.className = 'sms-limit-msg';
-    limitMsg.innerHTML = 'That\'s the free preview &mdash; text <a href="sms:+18337857300">(833) 785-7300</a> to keep going';
-    thread.parentElement.appendChild(limitMsg);
+    var el = document.createElement('div');
+    el.className = 'sms-limit-msg';
+    el.innerHTML = 'That\'s the free preview \u2014 text <a href="sms:+18337857300">(833) 785-7300</a> to keep going';
+    thread.parentElement.appendChild(el);
   }
-
-  // Blinking cursor to draw attention
-  input.classList.add('blink-cursor');
-  input.addEventListener('focus', function() {
-    input.classList.remove('blink-cursor');
-  });
 
   sendBtn.addEventListener('click', send);
   input.addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   });
+
+  // Start demo
+  playDemo();
 })();
 </script>
 </body>
