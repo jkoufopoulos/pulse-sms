@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — Pulse SMS</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0a0a0f;
+      --bg-card: rgba(255,255,255,0.04);
+      --text: #e8e4df;
+      --text-dim: #8a857e;
+      --accent: #f97652;
+      --accent2: #e24590;
+      --accent3: #f5b731;
+      --gradient: linear-gradient(135deg, #f97652, #e24590, #f5b731);
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+      --max-w: 720px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background: rgba(10,10,15,0.8);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .nav-inner {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-logo {
+      font-size: 1.5rem;
+      font-weight: 800;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-decoration: none;
+    }
+    .nav-links { display: flex; gap: 20px; }
+    .nav-links a {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+
+    .content {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 60px 24px 80px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .effective-date {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+      margin-bottom: 40px;
+    }
+    h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin: 36px 0 12px;
+    }
+    p, li {
+      color: var(--text-dim);
+      margin-bottom: 12px;
+    }
+    ul {
+      padding-left: 24px;
+      margin-bottom: 12px;
+    }
+    li { margin-bottom: 6px; }
+    strong { color: var(--text); font-weight: 600; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    footer {
+      border-top: 1px solid rgba(255,255,255,0.06);
+      padding: 32px 0;
+      text-align: center;
+    }
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+    }
+    .footer-links a {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 0.85rem;
+    }
+    .footer-links a:hover { color: var(--text); }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">Pulse</a>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="terms.html">Terms</a>
+    </div>
+  </div>
+</nav>
+
+<div class="content">
+  <h1>Privacy Policy</h1>
+  <p class="effective-date">Effective date: February 20, 2026</p>
+
+  <p>Pulse SMS ("Pulse," "we," "us") is an SMS-based service that recommends New York City events and nightlife. This policy explains what information we collect, how we use it, and your choices.</p>
+
+  <h2>Information We Collect</h2>
+  <p>When you text Pulse, we receive:</p>
+  <ul>
+    <li><strong>Your phone number</strong> &mdash; provided by your carrier via Twilio, our SMS delivery provider.</li>
+    <li><strong>Your message content</strong> &mdash; the text you send us (e.g., a neighborhood name, "more," or a filter like "comedy").</li>
+  </ul>
+  <p>We do <strong>not</strong> collect your name, email, location data, device identifiers, or any other personal information.</p>
+
+  <h2>How We Use Your Information</h2>
+  <ul>
+    <li><strong>To respond to your requests.</strong> Your phone number identifies your session so we can send back relevant event recommendations and maintain conversation context (e.g., remembering your neighborhood across follow-up messages).</li>
+    <li><strong>To process your messages.</strong> Message content is sent to AI services (Anthropic Claude, Google Gemini) to understand your request and generate responses. These services process your message text only &mdash; your phone number is not sent to AI providers.</li>
+  </ul>
+
+  <h2>Data Retention</h2>
+  <ul>
+    <li><strong>Session data</strong> (your neighborhood, recent picks, and conversation context) is stored in temporary server memory and <strong>automatically expires after 2 hours</strong> of inactivity.</li>
+    <li><strong>We do not maintain a database of phone numbers.</strong> Once your session expires, we have no record of your phone number.</li>
+    <li><strong>Message logs</strong> may be retained in server logs for up to 7 days for debugging purposes, after which they are automatically deleted.</li>
+  </ul>
+
+  <h2>What We Don't Do</h2>
+  <ul>
+    <li>We do <strong>not</strong> sell, rent, or share your phone number or message content with third parties for marketing purposes.</li>
+    <li>We do <strong>not</strong> track your location. Neighborhood information comes only from what you tell us.</li>
+    <li>We do <strong>not</strong> send unsolicited messages. You will only receive texts in direct response to messages you send us.</li>
+    <li>We do <strong>not</strong> use your data for advertising or profiling.</li>
+  </ul>
+
+  <h2>Third-Party Services</h2>
+  <p>We use the following third-party services to operate Pulse:</p>
+  <ul>
+    <li><strong>Twilio</strong> &mdash; SMS delivery. Twilio processes your phone number and message content to deliver texts. <a href="https://www.twilio.com/legal/privacy" target="_blank" rel="noopener">Twilio Privacy Policy</a></li>
+    <li><strong>Anthropic (Claude)</strong> &mdash; AI processing for understanding messages and composing responses. Receives message text only. <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener">Anthropic Privacy Policy</a></li>
+    <li><strong>Google (Gemini)</strong> &mdash; AI processing for message routing. Receives message text only. <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy</a></li>
+    <li><strong>Railway</strong> &mdash; Cloud hosting. <a href="https://railway.app/legal/privacy" target="_blank" rel="noopener">Railway Privacy Policy</a></li>
+  </ul>
+
+  <h2>Opting Out</h2>
+  <p>You can stop receiving messages from Pulse at any time by replying <strong>STOP</strong> to any message. You will receive a confirmation and no further messages will be sent.</p>
+  <p>Reply <strong>HELP</strong> for support information.</p>
+
+  <h2>Children's Privacy</h2>
+  <p>Pulse is not directed at children under 13. We do not knowingly collect information from children under 13.</p>
+
+  <h2>Changes to This Policy</h2>
+  <p>We may update this policy from time to time. Changes will be posted at this URL with an updated effective date.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about this privacy policy? Text <strong>HELP</strong> to (833) 785-7300 or email <strong>pulse@jkoufopoulos.com</strong>.</p>
+</div>
+
+<footer>
+  <div class="footer-links">
+    <a href="index.html">Home</a>
+    <a href="terms.html">Terms of Service</a>
+  </div>
+</footer>
+
+</body>
+</html>
