@@ -7,31 +7,32 @@ const { captureExtractionInput } = require('../extraction-capture');
 const { stripHtml } = require('./yutori');
 
 const NONSENSE_DIR = path.join(__dirname, '../../data/nonsense');
-const PROCESSED_IDS_FILE = path.join(NONSENSE_DIR, 'processed-ids.json');
+const CACHE_FILE = path.join(NONSENSE_DIR, 'cached-events.json');
 
 /**
- * Load the set of already-processed Gmail message IDs.
+ * Load cached events from a previously processed newsletter.
+ * Returns { id, events } or null if no cache exists.
  */
-function loadProcessedIds() {
+function loadCachedEvents() {
   try {
-    if (fs.existsSync(PROCESSED_IDS_FILE)) {
-      return new Set(JSON.parse(fs.readFileSync(PROCESSED_IDS_FILE, 'utf8')));
+    if (fs.existsSync(CACHE_FILE)) {
+      return JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
     }
   } catch (err) {
-    console.warn('NonsenseNYC: failed to load processed-ids.json:', err.message);
+    console.warn('NonsenseNYC: failed to load cached-events.json:', err.message);
   }
-  return new Set();
+  return null;
 }
 
 /**
- * Save the set of processed Gmail message IDs.
+ * Save extracted events alongside the newsletter ID they came from.
  */
-function saveProcessedIds(ids) {
+function saveCachedEvents(emailId, events) {
   try {
     fs.mkdirSync(NONSENSE_DIR, { recursive: true });
-    fs.writeFileSync(PROCESSED_IDS_FILE, JSON.stringify([...ids], null, 2));
+    fs.writeFileSync(CACHE_FILE, JSON.stringify({ id: emailId, events }, null, 2));
   } catch (err) {
-    console.warn('NonsenseNYC: failed to save processed-ids.json:', err.message);
+    console.warn('NonsenseNYC: failed to save cached-events.json:', err.message);
   }
 }
 
@@ -72,21 +73,16 @@ async function fetchNonsenseNYC() {
       return [];
     }
 
-    const processedIds = loadProcessedIds();
+    const cached = loadCachedEvents();
+    const latest = emails[0];
 
-    // Find the most recent unprocessed newsletter
-    let newsletter = null;
-    for (const email of emails) {
-      if (!processedIds.has(email.id)) {
-        newsletter = email;
-        break;
-      }
+    // If the latest newsletter is already cached, return cached events
+    if (cached && cached.id === latest.id) {
+      console.log(`NonsenseNYC: returning ${cached.events.length} cached events from "${latest.subject}"`);
+      return cached.events;
     }
 
-    if (!newsletter) {
-      console.log('NonsenseNYC: all newsletters already processed');
-      return [];
-    }
+    const newsletter = latest;
 
     console.log(`NonsenseNYC: processing "${newsletter.subject}" (${newsletter.date})`);
     const stripped = stripHtml(newsletter.body);
@@ -103,8 +99,7 @@ async function fetchNonsenseNYC() {
         .map(e => normalizeExtractedEvent(e, 'nonsensenyc', 'curated', 0.9))
         .filter(e => e.name && e.completeness >= 0.5);
 
-      processedIds.add(newsletter.id);
-      saveProcessedIds(processedIds);
+      saveCachedEvents(newsletter.id, events);
       console.log(`NonsenseNYC: ${events.length} events`);
       return events;
     }
@@ -135,8 +130,7 @@ async function fetchNonsenseNYC() {
       }
     }
 
-    processedIds.add(newsletter.id);
-    saveProcessedIds(processedIds);
+    saveCachedEvents(newsletter.id, allEvents);
     console.log(`NonsenseNYC: ${allEvents.length} events from ${sections.length} day sections`);
     return allEvents;
   } catch (err) {
