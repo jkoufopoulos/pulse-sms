@@ -25,18 +25,28 @@ async function fetchSkintEvents() {
       return [];
     }
 
+    // Day header pattern — short paragraphs like "friday", "saturday", "ongoing"
+    const dayHeaderPattern = /^(monday|tuesday|wednesday|thursday|friday|saturday|sunday|ongoing)$/i;
     const eventPattern = /^(mon|tue|wed|thu|fri|sat|sun|thru|today|tonight|daily|\d{1,2}\/\d{1,2})/i;
     const eventParagraphs = [];
     entry.find('p').each((i, el) => {
       const text = $(el).text().trim();
-      if (!text || text.length < 30) return;
+      if (!text) return;
+      // Keep day headers as section markers for Claude
+      if (dayHeaderPattern.test(text)) {
+        eventParagraphs.push(`\n--- ${text.toUpperCase()} ---`);
+        return;
+      }
+      if (text.length < 30) return;
       if (text.toLowerCase().startsWith('sponsored')) return;
       if (eventPattern.test(text)) {
         eventParagraphs.push(text);
       }
     });
 
-    let content = eventParagraphs.slice(0, 12).join('\n\n');
+    // Prepend today's date so Claude can resolve "friday" → actual date
+    const today = new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    let content = `Published: ${today}\n\n` + eventParagraphs.slice(0, 20).join('\n\n');
     if (content.length < 50) {
       content = entry.text().trim().slice(0, 5000);
     }
