@@ -491,4 +491,10 @@ function getRawCache() {
   return { events: [...eventCache], timestamp: cacheTimestamp };
 }
 
-module.exports = { SOURCES, SOURCE_TIERS, refreshCache, getEvents, getCacheStatus, getHealthStatus, getRawCache, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs };
+const STALE_THRESHOLD_MS = 20 * 60 * 60 * 1000; // 20 hours
+
+function isCacheFresh() {
+  return eventCache.length > 0 && cacheTimestamp > 0 && (Date.now() - cacheTimestamp) < STALE_THRESHOLD_MS;
+}
+
+module.exports = { SOURCES, SOURCE_TIERS, refreshCache, getEvents, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs };

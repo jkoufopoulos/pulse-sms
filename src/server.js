@@ -4,7 +4,7 @@ const express = require('express');
 const helmet = require('helmet');
 const smsRoutes = require('./handler');
 const { clearSmsIntervals } = require('./handler');
-const { refreshCache, getCacheStatus, getHealthStatus, scheduleDailyScrape, clearSchedule } = require('./events');
+const { refreshCache, getCacheStatus, getHealthStatus, isCacheFresh, scheduleDailyScrape, clearSchedule } = require('./events');
 
 // Validate required env vars — exit if critical ones are missing
 const required = ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER', 'ANTHROPIC_API_KEY', 'TAVILY_API_KEY'];
@@ -228,8 +228,12 @@ if (process.env.PULSE_TEST_MODE === 'true') {
 const server = app.listen(PORT, () => {
   console.log(`Pulse listening on port ${PORT}`);
 
-  // Scrape on startup, then schedule daily at 10am ET
-  refreshCache().catch(err => console.error('Initial cache load failed:', err.message));
+  // Scrape on startup only if no fresh persisted cache — saves time and tokens on restarts
+  if (isCacheFresh()) {
+    console.log('Persisted cache is fresh, skipping startup scrape');
+  } else {
+    refreshCache().catch(err => console.error('Initial cache load failed:', err.message));
+  }
   scheduleDailyScrape();
 });
 
