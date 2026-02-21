@@ -40,10 +40,16 @@ function buildRoutePrompt(message, session, neighborhoodNames) {
       }).join(', ') || 'none'}.`
     : 'No prior session.';
 
+  const historyBlock = session?.conversationHistory?.length > 0
+    ? '\nRecent conversation:\n' + session.conversationHistory.map(h =>
+        `${h.role === 'user' ? 'User' : 'Pulse'}: ${h.content}`
+      ).join('\n') + '\n'
+    : '';
+
   const userPrompt = `<user_message>${message}</user_message>
 
 Session context: ${sessionContext}
-
+${historyBlock}
 VALID_NEIGHBORHOODS: ${neighborhoodNames.join(', ')}`;
 
   return { systemPrompt: ROUTE_SYSTEM, userPrompt };
