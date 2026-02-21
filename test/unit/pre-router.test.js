@@ -106,6 +106,52 @@ check('bk → conversational', preRoute('bk', null)?.intent === 'conversational'
 check('bay ridge → conversational', preRoute('bay ridge', null)?.intent === 'conversational');
 check('bay ridge suggests Sunset Park', preRoute('bay ridge', null)?.reply?.includes('Sunset Park'));
 
+// --- Follow-up filter modifications (with active session) ---
+console.log('\npreRoute follow-up filters:');
+
+const followUpSession = {
+  lastPicks: [{ event_id: 'e1' }, { event_id: 'e2' }],
+  lastEvents: { e1: { name: 'DJ Honeypot' }, e2: { name: 'Jazz at Smalls' } },
+  lastNeighborhood: 'East Village',
+};
+
+// Category follow-ups
+check('how about theater → events', preRoute('how about theater', followUpSession)?.intent === 'events');
+check('how about theater → theater category', preRoute('how about theater', followUpSession)?.filters?.category === 'theater');
+check('how about theater → session hood', preRoute('how about theater', followUpSession)?.neighborhood === 'East Village');
+check('any comedy → events', preRoute('any comedy', followUpSession)?.intent === 'events');
+check('any comedy → comedy category', preRoute('any comedy', followUpSession)?.filters?.category === 'comedy');
+check('what about jazz → events', preRoute('what about jazz', followUpSession)?.intent === 'events');
+check('what about jazz → live_music', preRoute('what about jazz', followUpSession)?.filters?.category === 'live_music');
+check('show me art → events', preRoute('show me art', followUpSession)?.intent === 'events');
+check('show me art → art category', preRoute('show me art', followUpSession)?.filters?.category === 'art');
+check('any comedy shows → events', preRoute('any comedy shows', followUpSession)?.intent === 'events');
+
+// Time follow-ups
+check('later tonight → events', preRoute('later tonight', followUpSession)?.intent === 'events');
+check('later tonight → time_after 22:00', preRoute('later tonight', followUpSession)?.filters?.time_after === '22:00');
+check('later tonight → session hood', preRoute('later tonight', followUpSession)?.neighborhood === 'East Village');
+check('after midnight → time_after 00:00', preRoute('after midnight', followUpSession)?.filters?.time_after === '00:00');
+check('how about later → events', preRoute('how about later', followUpSession)?.intent === 'events');
+check('late night → events', preRoute('late night', followUpSession)?.intent === 'events');
+check('anything late → events', preRoute('anything late', followUpSession)?.intent === 'events');
+
+// Vibe follow-ups
+check('something chill → events', preRoute('something chill', followUpSession)?.intent === 'events');
+check('something chill → vibe', preRoute('something chill', followUpSession)?.filters?.vibe === 'chill');
+check('something chill → session hood', preRoute('something chill', followUpSession)?.neighborhood === 'East Village');
+check('anything wild → events', preRoute('anything wild', followUpSession)?.intent === 'events');
+check('anything wild → vibe', preRoute('anything wild', followUpSession)?.filters?.vibe === 'wild');
+check('something romantic → events', preRoute('something romantic', followUpSession)?.intent === 'events');
+
+// No session → falls through to Claude
+check('how about theater no session → null', preRoute('how about theater', null) === null);
+check('later tonight no session → null', preRoute('later tonight', null) === null);
+check('something chill no session → null', preRoute('something chill', null) === null);
+
+// Compound messages fall through to Claude (too complex for regex)
+check('free comedy stuff → null (compound)', preRoute('any more free comedy stuff', followUpSession) === null);
+
 // Fall-through
 check('something wild tonight → null', preRoute('something wild tonight', null) === null);
 check('complex request → null', preRoute('any good jazz shows in williamsburg tonight', null) === null);

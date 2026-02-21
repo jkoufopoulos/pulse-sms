@@ -187,6 +187,7 @@ Pulse is an event discovery tool, not a general assistant. If the user asks anyt
 
 SESSION AWARENESS:
 - When the user has an active session (last neighborhood + last picks), vague event-seeking messages should be "more" or "events" — not "conversational".
+- Filter-modification follow-ups with an active session are ALWAYS "events" with the appropriate filter — never "conversational". Examples: "how about theater", "any comedy", "something chill", "later tonight", "how about later", "anything after midnight".
 - Only use "conversational" for true social niceties regardless of session state.
 
 NEIGHBORHOOD RESOLUTION:
@@ -211,19 +212,22 @@ REPLY (for help/conversational only):
 </rules>
 
 <decision_tree>
-Use this tree to distinguish "more" from "events":
+Use this tree to classify messages when the user has an active session:
 
 1. Does the session have prior picks?
    No → "events" (this is a fresh request)
 2. Does the message mention a specific neighborhood?
    Yes → "events" (new neighborhood = fresh request)
-3. Does the message ask for more/other/different options?
+3. Does the message modify filters on the current session? (category, time, vibe)
+   (e.g. "how about theater", "any comedy", "later tonight", "something chill", "any more free comedy stuff")
+   Yes → "events" with the session neighborhood + updated filters
+4. Does the message ask for more/other/different options?
    (e.g. "what else", "anything else", "show me more", "what else you got")
    Yes → "more"
-4. Is it a vague event-seeking message with no new neighborhood?
+5. Is it a vague event-seeking message with no new neighborhood?
    (e.g. "what's happening", "anything tonight")
    Yes → "more" (session context implies they want fresh picks in same area)
-5. Otherwise → "events"
+6. Otherwise → "events"
 </decision_tree>
 
 <confidence_scale>
@@ -263,6 +267,66 @@ OUTPUT:
   "confidence": 0.9
 }
 (Reason: session has picks + no new neighborhood + "anything else" = wants more options)
+
+INPUT:
+<user_message>how about theater</user_message>
+Session context: Last neighborhood: East Village. Last picks: #1 "DJ Honeypot", #2 "Jazz at Smalls".
+
+OUTPUT:
+{
+  "intent": "events",
+  "neighborhood": "East Village",
+  "filters": { "free_only": false, "category": "theater", "vibe": null, "time_after": null },
+  "event_reference": null,
+  "reply": null,
+  "confidence": 0.9
+}
+(Reason: session active + user is changing category filter → "events" with category, same neighborhood)
+
+INPUT:
+<user_message>later tonight</user_message>
+Session context: Last neighborhood: Williamsburg. Last picks: #1 "Art Opening", #2 "Comedy Show".
+
+OUTPUT:
+{
+  "intent": "events",
+  "neighborhood": "Williamsburg",
+  "filters": { "free_only": false, "category": null, "vibe": null, "time_after": "22:00" },
+  "event_reference": null,
+  "reply": null,
+  "confidence": 0.9
+}
+(Reason: session active + time modifier → "events" with time_after, same neighborhood)
+
+INPUT:
+<user_message>any more free comedy stuff</user_message>
+Session context: Last neighborhood: LES. Last picks: #1 "Improv Night", #2 "DJ Set".
+
+OUTPUT:
+{
+  "intent": "events",
+  "neighborhood": "LES",
+  "filters": { "free_only": true, "category": "comedy", "vibe": null, "time_after": null },
+  "event_reference": null,
+  "reply": null,
+  "confidence": 0.9
+}
+(Reason: session active + compound filter modification → "events" with free + comedy filters)
+
+INPUT:
+<user_message>something chill</user_message>
+Session context: Last neighborhood: Park Slope. Last picks: #1 "Punk Show", #2 "Dance Party".
+
+OUTPUT:
+{
+  "intent": "events",
+  "neighborhood": "Park Slope",
+  "filters": { "free_only": false, "category": null, "vibe": "chill", "time_after": null },
+  "event_reference": null,
+  "reply": null,
+  "confidence": 0.9
+}
+(Reason: session active + vibe shift → "events" with vibe filter, same neighborhood)
 </examples>
 
 <output_format>

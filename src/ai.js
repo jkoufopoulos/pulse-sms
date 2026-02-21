@@ -37,7 +37,7 @@ function buildRoutePrompt(message, session, neighborhoodNames) {
     ? `Last neighborhood: ${session.lastNeighborhood || 'none'}. Last picks: ${(session.lastPicks || []).map((p, i) => {
         const evt = session.lastEvents?.[p.event_id];
         return evt ? `#${i + 1} "${evt.name}"` : `#${i + 1}`;
-      }).join(', ') || 'none'}.`
+      }).join(', ') || 'none'}.${session.lastFilters && Object.values(session.lastFilters).some(Boolean) ? ` Last filters: ${JSON.stringify(session.lastFilters)}.` : ''}`
     : 'No prior session.';
 
   const historyBlock = session?.conversationHistory?.length > 0
@@ -322,13 +322,13 @@ ${rawText}
 
 Extract all events and venues into the JSON format specified in your instructions.`;
 
-  const timeout = sourceName === 'yutori' ? 60000 : 15000;
+  const timeout = sourceName === 'yutori' ? 90000 : 60000;
   const response = await getClient().messages.create({
     model: model || MODELS.extract,
     max_tokens: 8192,
     system: EXTRACTION_PROMPT,
     messages: [{ role: 'user', content: userPrompt }],
-  }, { timeout });
+  }, { timeout, maxRetries: 0 });
 
   const text = response.content?.[0]?.text || '';
 

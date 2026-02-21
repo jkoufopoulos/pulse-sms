@@ -60,6 +60,40 @@ function preRoute(message, session) {
     return { ...base, intent: 'free', neighborhood: session?.lastNeighborhood || null, filters: { free_only: true, category: null, vibe: null } };
   }
 
+  // --- Follow-up filter modifications (requires active session) ---
+  if (session?.lastNeighborhood && session?.lastPicks?.length > 0) {
+    const hood = session.lastNeighborhood;
+
+    // Category follow-ups: "how about theater", "any comedy", "what about jazz"
+    const categoryMatch = lower.match(/^(?:how about|what about|any|show me|got any|have any|know any)\s+(comedy|standup|stand-up|improv|theater|theatre|jazz|music|art|nightlife|dance|live music|hip hop|hip-hop|rock|techno|house|electronic|punk|metal|folk|indie|r&b|soul|funk|rap|dj)(?:\s+(?:stuff|shows?|events?|tonight|picks?))?$/i);
+    if (categoryMatch) {
+      const rawCat = categoryMatch[1].toLowerCase();
+      const catMap = {
+        'comedy': 'comedy', 'standup': 'comedy', 'stand-up': 'comedy', 'improv': 'comedy',
+        'theater': 'theater', 'theatre': 'theater',
+        'jazz': 'live_music', 'music': 'live_music', 'live music': 'live_music',
+        'rock': 'live_music', 'punk': 'live_music', 'metal': 'live_music', 'folk': 'live_music', 'indie': 'live_music',
+        'hip hop': 'live_music', 'hip-hop': 'live_music', 'r&b': 'live_music', 'soul': 'live_music', 'funk': 'live_music', 'rap': 'live_music',
+        'techno': 'nightlife', 'house': 'nightlife', 'electronic': 'nightlife', 'dj': 'nightlife',
+        'art': 'art', 'nightlife': 'nightlife', 'dance': 'nightlife',
+      };
+      return { ...base, intent: 'events', neighborhood: hood, filters: { ...base.filters, category: catMap[rawCat] || rawCat } };
+    }
+
+    // Time follow-ups: "later tonight", "how about later", "after midnight"
+    const timeMatch = lower.match(/^(?:how about\s+)?(?:later(?:\s+tonight)?|after\s+midnight|late(?:r)?\s*night|anything?\s+late)$/i);
+    if (timeMatch) {
+      const time = /midnight/i.test(lower) ? '00:00' : '22:00';
+      return { ...base, intent: 'events', neighborhood: hood, filters: { ...base.filters, time_after: time } };
+    }
+
+    // Vibe follow-ups: "something chill", "anything wild"
+    const vibeMatch = lower.match(/^(?:something|anything|how about something|got anything)\s+(chill|wild|weird|romantic|low.?key|fun|crazy|mellow|cozy|rowdy|intimate|energetic|upbeat|laid.?back)$/i);
+    if (vibeMatch) {
+      return { ...base, intent: 'events', neighborhood: hood, filters: { ...base.filters, vibe: vibeMatch[1].toLowerCase() } };
+    }
+  }
+
   // Event name match from session picks
   if (session?.lastPicks && session?.lastEvents && lower.length >= 3) {
     for (let i = 0; i < session.lastPicks.length; i++) {

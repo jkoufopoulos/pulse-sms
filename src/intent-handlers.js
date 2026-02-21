@@ -172,7 +172,7 @@ async function handleMore(ctx) {
       const newAllPicks = [...(ctx.session.allPicks || ctx.session.lastPicks || []), ...(result.picks || [])];
       const newAllOfferedIds = [...allOfferedIds, ...composeRemaining.map(e => e.id)];
       const visitedHoods = new Set([...(ctx.session.visitedHoods || []), hood]);
-      setSession(ctx.phone, { lastPicks: result.picks || [], allPicks: newAllPicks, allOfferedIds: newAllOfferedIds, lastEvents: ctx.session.lastEvents, lastNeighborhood: hood, visitedHoods: [...visitedHoods] });
+      setSession(ctx.phone, { lastPicks: result.picks || [], allPicks: newAllPicks, allOfferedIds: newAllOfferedIds, lastEvents: ctx.session.lastEvents, lastNeighborhood: hood, lastFilters: ctx.route.filters || null, visitedHoods: [...visitedHoods] });
       await sendComposeWithLinks(ctx.phone, result, ctx.session.lastEvents);
 
       console.log(`More sent to ${ctx.masked} (${allRemaining.length} remaining${isLastBatch ? ', last batch' : ''})`);
@@ -284,6 +284,7 @@ async function handleFree(ctx) {
     allPicks: result.picks || [],
     lastEvents: eventMap,
     lastNeighborhood: hood,
+    lastFilters: ctx.route.filters || null,
   });
   await sendComposeWithLinks(ctx.phone, result, eventMap);
   console.log(`Free events sent to ${ctx.masked}`);
@@ -418,7 +419,7 @@ async function handleEventsDefault(ctx) {
     setSession(ctx.phone, { pendingNearby: result.suggested_neighborhood, ...(filtersToPreserve && { pendingFilters: filtersToPreserve }) });
   }
 
-  setSession(ctx.phone, { lastPicks: validPicks, allPicks: validPicks, allOfferedIds: composeEventsWithPerennials.map(e => e.id), lastEvents: eventMap, lastNeighborhood: result.neighborhood_used || hood, visitedHoods: [hood] });
+  setSession(ctx.phone, { lastPicks: validPicks, allPicks: validPicks, allOfferedIds: composeEventsWithPerennials.map(e => e.id), lastEvents: eventMap, lastNeighborhood: result.neighborhood_used || hood, lastFilters: ctx.route.filters || null, visitedHoods: [hood] });
   await sendComposeWithLinks(ctx.phone, result, eventMap);
   console.log(`AI response sent to ${ctx.masked}`);
   ctx.finalizeTrace(result.sms_text, 'events');
