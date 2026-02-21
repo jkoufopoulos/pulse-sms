@@ -48,6 +48,14 @@ function cleanUrl(url) {
     const skMatch = clean.match(/(songkick\.com\/concerts\/\d+)/);
     if (skMatch) return `https://www.${skMatch[1]}`;
 
+    // Affiliate: tag Ticketmaster URLs with Impact tracking
+    const tmAffId = process.env.TICKETMASTER_AFFILIATE_ID;
+    if (tmAffId && u.hostname.includes('ticketmaster.com')) {
+      const tagged = new URL(clean);
+      tagged.searchParams.set('at', tmAffId);
+      return tagged.toString();
+    }
+
     return clean;
   } catch { return url; }
 }
