@@ -28,55 +28,109 @@ Session state (neighborhood, last picks, last filters) persists for 2 hours per 
 
 ## Architecture
 
+All application source lives under `src/`. Scripts and eval runners are at root level in `scripts/`.
+
 ```
-Daily scrape (10am ET)     Incoming SMS
-        │                       │
-        ▼                       ▼
-   sources/               handler.js
-   (18 scrapers:           (webhook, dedup,
-    Skint, RA, Dice,        rate limiter,
-    Eventbrite, Songkick,   AI orchestrator)
-    BrooklynVegan, NYC          │
-    Parks, Nonsense NYC,   pre-router.js ◄─── session.js
-    Oh My Rockness,        (deterministic       (lastPicks,
-    DoNYC, BAM, NYPL,      intent matching:     lastFilters,
-    SmallsLIVE, Ticketmaster, greetings, hoods,  lastNeighborhood)
-    Yutori, Tavily)          follow-up filters,
-        │                    more, free, details)
-        │                       │
-        │              match? ──┤── no match
-        │              │        │
-        ├─► venues.js  │    ai.js/routeMessage
-        │   (auto-learn │   (Gemini Flash or
-        │    coords,    │    Claude Haiku —
-        │    persist)   │    semantic routing)
-        ▼              │        │
-   events.js ◄─────────┴────────┘
-   (cache, filter,              │
-    rank by proximity,          ▼
-    cross-source dedup)     ai.js/composeResponse
-                            (pick events +
-                             write SMS)
-                                │
-                            formatters.js
-                            (480-char cap)
-                                │
-                                ▼
-                           twilio.js
-                           (send SMS)
+Daily scrape (10am ET)         Incoming SMS
+        │                           │
+        ▼                           ▼
+   sources/                    handler.js
+   (18 scrapers)               (TCPA opt-out,
+        │                       dedup, cost budget)
+        │                           │
+        ├─► venues.js          pre-router.js ◄─── session.js
+        │   (auto-learn         (deterministic      (12 fields,
+        │    coords,             intent match)       2hr TTL)
+        │    persist)                │
+        ▼                   match? ──┤── no match
+   events.js                    │        │
+   (cache, dedup,               │    ai.js/routeMessage
+    source health)              │    (Gemini / Haiku)
+        │                       │        │
+        │         ┌─────────────┴────────┘
+        │         ▼
+        │   intent-handlers.js
+        │   (dispatch: help, details, more,
+        │    free, nudge_accept, events)
+        │              │
+        └──────►  curation.js
+                  (filter kids, incomplete,
+                   validate perennials)
+                       │
+                  skills/ + prompts.js
+                  (compose prompt assembly,
+                   12 conditional modules)
+                       │
+                  ai.js/composeResponse
+                  (Claude Haiku)
+                       │
+                  formatters.js (480-char)
+                       │
+                  twilio.js (send SMS)
+
+──── observability ────
+traces.js — per-request JSONL + 200-trace ring buffer
+alerts.js — email alerts via Resend (health + runtime)
+
+──── offline eval ────
+evals/     — code checks, LLM judges, extraction audit
+scripts/   — pipeline, scenario, regression, A/B evals
 ```
 
 ## File Map
 
+All paths are relative to `src/` unless prefixed with a directory.
+
+**Core request handling:**
+
 | File | Purpose |
 |------|---------|
 | `server.js` | Express setup, routes, health check, daily schedule, graceful shutdown |
-| `handler.js` | Twilio webhook, dedup, rate limiter, message dispatcher, AI orchestrator |
+| `handler.js` | Twilio webhook, TCPA opt-out (STOP/UNSUBSCRIBE/CANCEL/QUIT), dedup, per-user daily cost budget ($0.10/day), intent dispatch to `intent-handlers.js` |
 | `pre-router.js` | Deterministic intent matching — greetings, details, more, free, bare neighborhoods, boroughs, and session-aware follow-up filters (category/time/vibe) |
-| `session.js` | Per-phone session store with TTL cleanup — lastPicks, lastEvents, lastNeighborhood, lastFilters, conversationHistory |
-| `formatters.js` | SMS formatting — `formatTime`, `cleanUrl`, `formatEventDetails` (480-char cap) |
-| `ai.js` | 3 Claude calls: `routeMessage`, `composeResponse`, `extractEvents` |
+| `intent-handlers.js` | Intent dispatch — `handleHelp`, `handleConversational`, `handleDetails`, `handleMore`, `handleFree`, `handleNudgeAccept`, `handleEventsDefault`; each receives context and orchestrates event fetching, filtering, compose, session writes, and trace finalization |
+| `session.js` | Per-phone session store with 2hr TTL — 12 fields: `lastPicks`, `lastEvents`, `lastNeighborhood`, `lastFilters`, `conversationHistory`, `allPicks`, `allOfferedIds`, `visitedHoods`, `pendingNearby`, `pendingNearbyEvents`, `pendingFilters`, `pendingMessage` |
+
+**AI & prompts:**
+
+| File | Purpose |
+|------|---------|
+| `ai.js` | 3 AI calls: `routeMessage` (Gemini Flash or Claude Haiku), `composeResponse` (Claude Haiku), `extractEvents` (Claude Haiku) |
+| `prompts.js` | System prompts for routing, composition, extraction, and details — centralized prompt strings used by `ai.js` |
+| `skills/build-compose-prompt.js` | Dynamic compose prompt assembly — `buildComposePrompt(events, options)` conditionally appends skill modules based on context |
+| `skills/compose-skills.js` | 12 composable prompt fragments: `core`, `tonightPriority`, `sourceTiers`, `neighborhoodMismatch`, `perennialFraming`, `venueFraming`, `lastBatch`, `freeEmphasis`, `activityAdherence`, `conversationAwareness`, `pendingIntent` |
+
+**Event data:**
+
+| File | Purpose |
+|------|---------|
 | `events.js` | Daily event cache, source health tracking, cross-source dedup, venue persistence, `getEvents()` |
+| `curation.js` | Pre-compose deterministic filters — `filterKidsEvents` (drops NYC Parks children's events), `filterIncomplete` (below completeness threshold), `validatePerennialActivity` (removes bare-venue perennials) |
+| `perennial.js` | Perennial picks loader — `getPerennialPicks(hood, opts)`, caches JSON, filters by day, checks adjacent neighborhoods |
+| `venues.js` | Shared venue coord map, auto-learning from sources, Nominatim geocoding fallback, persistence (export/import learned venues) |
+| `geo.js` | `resolveNeighborhood`, proximity ranking, haversine, time filtering |
+| `neighborhoods.js` | 36 NYC neighborhoods with coords, aliases, landmarks, subway stops |
+
+**Output:**
+
+| File | Purpose |
+|------|---------|
+| `formatters.js` | SMS formatting — `formatTime`, `cleanUrl`, `formatEventDetails` (480-char cap) |
+| `twilio.js` | `sendSMS` with timeout, test capture mode for simulator |
+
+**Observability:**
+
+| File | Purpose |
+|------|---------|
+| `traces.js` | Request trace capture — `startTrace`/`saveTrace` write per-request JSONL to `data/traces/` (daily rotation, 4-file max) + 200-entry in-memory ring buffer for eval UI |
+| `alerts.js` | Email health/runtime alerts via Resend — `sendHealthAlert` (scrape failures, 6hr cooldown), `sendRuntimeAlert` (slow responses/errors, 30min per-type cooldown); no-ops if `RESEND_API_KEY` unset |
+| `eval.js` | LLM-as-judge event quality scorer — `scoreEvents` batches events to Claude Sonnet, returns score 1-10 with flags (`stale`, `missing_venue`, `no_time`, `touristy`, `vague`, `duplicate`) |
+| `extraction-capture.js` | Lightweight extraction input capture — stores raw text before `extractEvents()` for audit verification |
+
+**Sources:**
+
+| File | Purpose |
+|------|---------|
 | `sources/` | 18 scrapers split into individual modules with barrel `index.js` |
 | `sources/shared.js` | `FETCH_HEADERS`, `makeEventId`, `normalizeExtractedEvent` |
 | `sources/skint.js` | Skint (HTML→Claude extraction) |
@@ -94,17 +148,32 @@ Daily scrape (10am ET)     Incoming SMS
 | `sources/nypl.js` | NYPL (Eventbrite organizer pages — free library events) |
 | `sources/ticketmaster.js` | Ticketmaster Discovery API (indie filter: large-venue blocklist + $100 price cap) |
 | `sources/yutori.js` | Yutori (Gmail API + file-based agent briefings → Claude extraction) |
-| `gmail.js` | Gmail OAuth client — `getGmailService`, `fetchYutoriEmails`, `fetchEmails` (generic sender query) |
 | `sources/tavily.js` | Tavily (web search fallback) |
-| `perennial.js` | Perennial picks loader — `getPerennialPicks(hood, opts)`, caches JSON, filters by day, checks adjacent neighborhoods |
-| `venues.js` | Shared venue coord map, auto-learning from sources, Nominatim geocoding fallback, persistence (export/import learned venues) |
-| `twilio.js` | `sendSMS` with timeout, test capture mode for simulator |
-| `geo.js` | `resolveNeighborhood`, proximity ranking, haversine, time filtering |
-| `neighborhoods.js` | 36 NYC neighborhoods with coords, aliases, landmarks, subway stops |
+| `gmail.js` | Gmail OAuth client — `getGmailService`, `fetchYutoriEmails`, `fetchEmails` (generic sender query) |
+
+**Evals & scripts** (paths from project root):
+
+| File | Purpose |
+|------|---------|
+| `src/evals/code-evals.js` | 9 deterministic trace checks — char limit, valid intent/neighborhood, picked events exist, valid URLs; free and instant |
+| `src/evals/extraction-audit.js` | Extraction fidelity — Tier 1 deterministic checks (evidence quotes in source) + Tier 2 LLM judge (optional) |
+| `src/evals/judge-evals.js` | LLM-as-judge trace quality — `judgeTone` (sounds like a friend, not a bot) + `judgePickRelevance` (events match request); binary PASS/FAIL |
+| `src/evals/expectation-evals.js` | Test-case assertion runner — compares trace fields against expected intent, neighborhood, has_events, must_not banned phrases |
+| `scripts/run-evals.js` | Pipeline eval runner (code evals on stored traces, `--judges` flag for LLM judges) |
+| `scripts/run-scenario-evals.js` | Multi-turn scenario evals |
+| `scripts/run-regression-evals.js` | Behavioral regression tests |
+| `scripts/run-ab-eval.js` | A/B model comparison |
+| `scripts/gen-synthetic.js` | Generate synthetic test scenarios for eval |
+| `scripts/judge-alignment.js` | Judge alignment checks — validates LLM judge consistency |
+| `scripts/gmail-auth.js` | Gmail OAuth token acquisition |
+
+**UI:**
+
+| File | Purpose |
+|------|---------|
 | `test-ui.html` | Browser-based SMS simulator for testing (served at `/test`) |
-| `extraction-capture.js` | Lightweight extraction input capture — stores raw text before `extractEvents()` for audit verification |
-| `evals/extraction-audit.js` | Extraction fidelity audit — Tier 1 deterministic checks (evidence quotes in source) + Tier 2 LLM judge |
 | `health-ui.html` | Source health dashboard — per-source timing, status, history sparklines, extraction quality (served at `/health`) |
+| `eval-ui.html` | Eval results dashboard — trace viewer with eval scores (served at `/evals`) |
 
 ## Env Vars
 
@@ -129,6 +198,8 @@ Optional:
 - `GMAIL_CLIENT_ID` — Google OAuth client ID (optional; Yutori falls back to file-based if missing)
 - `GMAIL_CLIENT_SECRET` — Google OAuth client secret
 - `GMAIL_REFRESH_TOKEN` — Gmail refresh token (run `scripts/gmail-auth.js` to obtain)
+- `RESEND_API_KEY` — Resend API key for email alerts (optional; alerts no-op if unset)
+- `ALERT_EMAIL` — Alert recipient email address
 
 ## Running Locally
 
@@ -136,7 +207,11 @@ Optional:
 cp .env.example .env   # fill in your keys
 npm install
 npm start              # boots on PORT (default 3000)
+npm run dev            # dev server with file-watch reload
 npm test               # runs smoke tests (pure functions only, no API calls)
+npm run eval           # code evals on stored traces (no API calls)
+npm run eval:judges    # code evals + LLM judge evals (costs API tokens)
+npm run eval:gen       # generate synthetic test scenarios
 ```
 
 ## Testing on Railway
@@ -160,3 +235,8 @@ npm test               # runs smoke tests (pure functions only, no API calls)
 - **Venue persistence**: Learned venues are saved to `data/venues-learned.json` after each scrape and loaded on boot, so knowledge compounds across restarts.
 - **Session-aware follow-ups**: The session stores `lastFilters` alongside picks and neighborhood, so the router sees what the user already asked for. This lets follow-ups like "how about theater" or "later tonight" modify the active session rather than being misclassified as conversational. The pre-router catches simple filter changes deterministically; the AI router handles compound requests ("any more free comedy stuff") with few-shot examples.
 - **480-char SMS limit**: All responses are capped at 480 chars. Claude is prompted to write concisely.
+- **TCPA opt-out compliance**: Messages starting with STOP, UNSUBSCRIBE, CANCEL, or QUIT are silently dropped (no reply sent). Twilio manages the actual opt-out list; Pulse ensures no response leaks through.
+- **Per-user daily AI budget**: Each phone number gets $0.10/day of AI spend. `trackAICost` accumulates per-user cost with provider-aware pricing (Haiku vs Gemini). `isOverBudget` blocks further AI calls with a friendly message. Resets daily (NYC timezone).
+- **Composable prompt skills**: The compose prompt is assembled dynamically from 12 conditional skill modules (`skills/compose-skills.js`). `build-compose-prompt.js` selects which skills to include based on context — tonight priority, neighborhood mismatch, perennial framing, free emphasis, conversation awareness, etc.
+- **Request tracing**: Every request writes a JSONL trace to `data/traces/` (daily rotation, 4-file max). A 200-entry in-memory ring buffer powers the eval UI. Traces capture intent, neighborhood, picked events, AI costs, timing, and the full SMS response.
+- **Intent dispatch separation**: `handler.js` handles TCPA, dedup, budget, and routing. `intent-handlers.js` handles the actual intent logic (7 handlers). This keeps handler.js focused on request lifecycle and intent-handlers.js focused on business logic.

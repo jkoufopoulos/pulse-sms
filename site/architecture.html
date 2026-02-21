@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pulse — Architecture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #08070d;
+      --bg-card: rgba(255,255,255,0.03);
+      --bg-card-hover: rgba(255,255,255,0.05);
+      --text: #ede9e3;
+      --text-dim: #7a756d;
+      --text-muted: #4a463f;
+      --coral: #ff6b42;
+      --coral-dim: rgba(255,107,66,0.12);
+      --blue: #58a6ff;
+      --green: #3fb950;
+      --purple: #d2a8ff;
+      --yellow: #f0883e;
+      --font-display: 'Syne', sans-serif;
+      --font-body: 'DM Sans', sans-serif;
+      --font-mono: 'DM Mono', monospace;
+      --radius: 20px;
+      --radius-sm: 12px;
+      --max-w: 900px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* NAV */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(24px) saturate(1.4);
+      -webkit-backdrop-filter: blur(24px) saturate(1.4);
+      background: rgba(8,7,13,0.8);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .nav-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 18px 28px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .nav-logo {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--coral);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+    .nav-sep {
+      color: var(--text-muted);
+      font-size: 1.2rem;
+      font-weight: 300;
+    }
+    .nav-page {
+      font-family: var(--font-display);
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text-dim);
+      letter-spacing: -0.01em;
+    }
+
+    /* LAYOUT */
+    .container { max-width: var(--max-w); margin: 0 auto; padding: 0 28px; }
+
+    .page-header {
+      padding: 72px 0 48px;
+    }
+    .page-header h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 4vw, 2.8rem);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.035em;
+      margin-bottom: 12px;
+    }
+    .page-header h1 em { font-style: normal; color: var(--coral); }
+    .page-header .subtitle {
+      color: var(--text-dim);
+      font-size: 1.05rem;
+      max-width: 600px;
+      line-height: 1.65;
+    }
+
+    /* SECTIONS */
+    section {
+      padding: 56px 0;
+      border-top: 1px solid rgba(255,255,255,0.04);
+    }
+    .section-label {
+      font-family: var(--font-display);
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      color: var(--coral);
+      margin-bottom: 10px;
+    }
+    .section-title {
+      font-family: var(--font-display);
+      font-size: clamp(1.4rem, 3vw, 1.8rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 20px;
+    }
+    .section-body {
+      color: var(--text-dim);
+      font-size: 0.92rem;
+      line-height: 1.75;
+      max-width: 700px;
+    }
+    .section-body p + p { margin-top: 12px; }
+    .section-body strong { color: var(--text); font-weight: 600; }
+
+    /* CARDS */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-top: 20px;
+    }
+    .card h3 {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+    .card p {
+      color: var(--text-dim);
+      font-size: 0.88rem;
+      line-height: 1.65;
+    }
+    .card-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    /* FLOW DIAGRAMS */
+    .flow {
+      margin-top: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      align-items: center;
+    }
+    .flow-node {
+      padding: 14px 24px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      text-align: center;
+      max-width: 360px;
+      width: 100%;
+      position: relative;
+    }
+    .flow-node .label {
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin-top: 4px;
+      font-style: italic;
+    }
+    .flow-arrow {
+      width: 1px;
+      height: 20px;
+      background: rgba(255,255,255,0.12);
+      position: relative;
+    }
+    .flow-arrow::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: -3px;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 5px solid rgba(255,255,255,0.12);
+    }
+    .flow-split {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      width: 100%;
+      max-width: 460px;
+    }
+    .flow-split .flow-node { flex: 1; }
+
+    .node-coral { background: var(--coral-dim); border: 1px solid rgba(255,107,66,0.2); color: var(--coral); }
+    .node-blue { background: rgba(88,166,255,0.08); border: 1px solid rgba(88,166,255,0.15); color: var(--blue); }
+    .node-green { background: rgba(63,185,80,0.08); border: 1px solid rgba(63,185,80,0.15); color: var(--green); }
+    .node-purple { background: rgba(210,168,255,0.08); border: 1px solid rgba(210,168,255,0.15); color: var(--purple); }
+    .node-yellow { background: rgba(240,136,62,0.08); border: 1px solid rgba(240,136,62,0.15); color: var(--yellow); }
+    .node-dim { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); color: var(--text-dim); }
+
+    /* TABLES */
+    .table-wrap {
+      margin-top: 20px;
+      overflow-x: auto;
+      border-radius: var(--radius);
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+    }
+    thead th {
+      text-align: left;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 0.75rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      padding: 12px 16px;
+      background: rgba(255,255,255,0.02);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    tbody td {
+      padding: 10px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      color: var(--text-dim);
+      vertical-align: top;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: rgba(255,255,255,0.02); }
+    .source-name { color: var(--text); font-weight: 600; }
+    .weight-high { color: var(--green); }
+    .weight-mid { color: var(--blue); }
+    .weight-low { color: var(--yellow); }
+
+    /* CODE BLOCKS */
+    .code-block {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: var(--radius-sm);
+      padding: 16px 20px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      line-height: 1.7;
+      color: var(--text-dim);
+      overflow-x: auto;
+      margin-top: 16px;
+      white-space: pre;
+    }
+    .code-block .hl { color: var(--coral); }
+    .code-block .hl-blue { color: var(--blue); }
+    .code-block .hl-green { color: var(--green); }
+    .code-block .hl-dim { color: var(--text-muted); }
+
+    /* INLINE MONO */
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      background: rgba(255,255,255,0.05);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--coral);
+    }
+
+    /* STAT PILLS */
+    .stats {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+    .stat {
+      padding: 8px 16px;
+      border-radius: 100px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      border: 1px solid rgba(255,255,255,0.06);
+      color: var(--text-dim);
+    }
+    .stat em { font-style: normal; color: var(--coral); }
+
+    /* EXAMPLES */
+    .example {
+      background: var(--bg-card);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: var(--radius-sm);
+      padding: 16px 20px;
+      margin-top: 12px;
+    }
+    .example-turn {
+      display: flex;
+      gap: 12px;
+      align-items: baseline;
+      font-size: 0.85rem;
+      padding: 4px 0;
+    }
+    .example-turn + .example-turn { border-top: 1px solid rgba(255,255,255,0.03); padding-top: 8px; margin-top: 4px; }
+    .turn-user {
+      font-weight: 700;
+      color: var(--coral);
+      flex-shrink: 0;
+      min-width: 36px;
+    }
+    .turn-system {
+      font-weight: 700;
+      color: var(--blue);
+      flex-shrink: 0;
+      min-width: 36px;
+    }
+    .turn-msg { color: var(--text); }
+    .turn-route {
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      font-style: italic;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    /* LAYER LIST */
+    .layer-list {
+      list-style: none;
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .layer-list li {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      font-size: 0.88rem;
+      color: var(--text-dim);
+    }
+    .layer-num {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 0.85rem;
+      color: var(--coral);
+      min-width: 20px;
+      flex-shrink: 0;
+    }
+    .layer-list li strong { color: var(--text); font-weight: 600; }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid rgba(255,255,255,0.04);
+      padding: 40px 0;
+      margin-top: 40px;
+    }
+    .footer-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .footer-brand {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--coral);
+    }
+    .footer-note {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 680px) {
+      .card-grid { grid-template-columns: 1fr; }
+      .flow-split { flex-direction: column; align-items: center; }
+      .page-header { padding: 56px 0 36px; }
+      section { padding: 40px 0; }
+      .turn-route { display: none; }
+      .footer-inner { flex-direction: column; gap: 8px; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">Pulse</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-page">Architecture</span>
+  </div>
+</nav>
+
+<!-- Header -->
+<header class="page-header">
+  <div class="container">
+    <h1>How Pulse <em>works</em></h1>
+    <p class="subtitle">A text message comes in. 18 scrapers, two routing layers, a prompt assembly system, and a 480-character limit later, a recommendation goes out.</p>
+  </div>
+</header>
+
+<!-- 1. System Overview -->
+<section id="overview">
+  <div class="container">
+    <p class="section-label">Overview</p>
+    <h2 class="section-title">Text in, picks out</h2>
+    <div class="section-body">
+      <p>Pulse is an SMS-based AI assistant that recommends NYC nightlife and events. A user texts a neighborhood name and gets back curated picks within seconds. The entire experience happens in a single SMS thread &mdash; no app, no account, no links until asked.</p>
+      <p>Behind the scenes, Pulse scrapes <strong>18 event sources</strong> every morning, deduplicates and caches them in memory, then uses a <strong>two-tier routing system</strong> to understand incoming messages and an <strong>AI compose step</strong> to write opinionated, concise recommendations that fit in a text message.</p>
+    </div>
+
+    <div class="stats">
+      <span class="stat"><em>18</em> event sources</span>
+      <span class="stat"><em>36</em> neighborhoods</span>
+      <span class="stat"><em>480</em> char SMS cap</span>
+      <span class="stat"><em>~60%</em> pre-routed (zero AI)</span>
+      <span class="stat"><em>2hr</em> session TTL</span>
+    </div>
+  </div>
+</section>
+
+<!-- 2. Data Pipeline -->
+<section id="data-pipeline">
+  <div class="container">
+    <p class="section-label">Data Pipeline</p>
+    <h2 class="section-title">Daily scrape, in-memory cache</h2>
+    <div class="section-body">
+      <p>Every morning at 10am ET, Pulse runs all 18 scrapers in parallel. Each scraper extracts structured event data from its source &mdash; parsing HTML, hitting APIs, or using Claude to extract from newsletters. Events are deduped across sources (hashed by name + venue + date), ranked by source trust weight, and cached in memory. No scraping happens in the hot request path.</p>
+    </div>
+
+    <div class="flow">
+      <div class="flow-node node-yellow">10am ET &mdash; daily cron trigger</div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node node-blue">
+        sources/ &mdash; 18 scrapers in parallel
+        <div class="label">Skint, RA, Dice, Eventbrite, Songkick, BrooklynVegan, NYC Parks, Nonsense NYC, Oh My Rockness, DoNYC, BAM, SmallsLIVE, NYPL, Ticketmaster, Yutori, Tavily</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node node-green">
+        venues.js &mdash; auto-learn coordinates
+        <div class="label">Sources with lat/lng teach the shared venue map</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node node-purple">
+        events.js &mdash; dedup, rank, cache
+        <div class="label">Cross-source dedup by name+venue+date. Higher-trust source wins.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Message Flow -->
+<section id="message-flow">
+  <div class="container">
+    <p class="section-label">Message Flow</p>
+    <h2 class="section-title">From SMS to recommendation</h2>
+    <div class="section-body">
+      <p>When a text arrives, it passes through TCPA compliance, deduplication, and a per-user cost budget before reaching the router. The pre-router handles ~60% of messages deterministically. The rest go to the AI router for semantic understanding. Matched intents dispatch to dedicated handlers, which orchestrate event fetching, curation, prompt assembly, and response composition.</p>
+    </div>
+
+    <div class="flow">
+      <div class="flow-node node-coral">Incoming SMS via Twilio</div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node node-dim">
+        handler.js
+        <div class="label">TCPA opt-out check &rarr; dedup &rarr; $0.10/day budget</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node node-blue">
+        pre-router.js &larr; session.js
+        <div class="label">Pattern-match: greetings, hoods, more, free, details, filters</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-split">
+        <div class="flow-node node-green">
+          Match (~60%)
+          <div class="label">Zero latency, zero cost</div>
+        </div>
+        <div class="flow-node node-purple">
+          No match (~40%)
+          <div class="label">ai.js/routeMessage &mdash; Gemini Flash or Haiku</div>
+        </div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node node-yellow">
+        intent-handlers.js &mdash; dispatch
+        <div class="label">help &bull; conversational &bull; details &bull; more &bull; free &bull; nudge_accept &bull; events</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node node-dim">
+        curation.js
+        <div class="label">Filter kids events, incomplete entries, validate perennials</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node node-blue">
+        skills/ + prompts.js
+        <div class="label">Assemble compose prompt from 12 conditional skill modules</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node node-purple">
+        ai.js/composeResponse
+        <div class="label">Claude Haiku &mdash; pick events + write SMS</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node node-dim">
+        formatters.js &mdash; 480-char cap
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node node-coral">SMS out via Twilio</div>
+    </div>
+  </div>
+</section>
+
+<!-- 4. Two-Tier Routing -->
+<section id="routing">
+  <div class="container">
+    <p class="section-label">Routing</p>
+    <h2 class="section-title">Two-tier intent resolution</h2>
+    <div class="section-body">
+      <p>Most messages follow predictable patterns. The <strong>pre-router</strong> catches them deterministically &mdash; instant, free, and reliable. Only ambiguous or compound messages reach the <strong>AI router</strong>, which uses Gemini Flash (~10x cheaper than Haiku) with Claude Haiku as fallback.</p>
+    </div>
+
+    <div class="card-grid">
+      <div class="card">
+        <h3>Pre-router (deterministic)</h3>
+        <p>Pattern-matches greetings, bare neighborhood names, "more", "free", number replies for details, and session-aware filter modifications (category, time, vibe changes on an active session). Handles ~60% of all traffic.</p>
+      </div>
+      <div class="card">
+        <h3>AI router (semantic)</h3>
+        <p>Handles ambiguous messages: "any good jazz shows near prospect park tonight", compound filters like "any more free comedy stuff", and off-topic deflection. Uses few-shot examples for accuracy.</p>
+      </div>
+    </div>
+
+    <div class="example" style="margin-top: 20px;">
+      <div class="example-turn">
+        <span class="turn-user">User</span>
+        <span class="turn-msg">"williamsburg"</span>
+        <span class="turn-route">pre-router &rarr; events</span>
+      </div>
+      <div class="example-turn">
+        <span class="turn-user">User</span>
+        <span class="turn-msg">"how about comedy"</span>
+        <span class="turn-route">pre-router &rarr; filter change</span>
+      </div>
+      <div class="example-turn">
+        <span class="turn-user">User</span>
+        <span class="turn-msg">"2"</span>
+        <span class="turn-route">pre-router &rarr; details</span>
+      </div>
+      <div class="example-turn">
+        <span class="turn-user">User</span>
+        <span class="turn-msg">"later tonight"</span>
+        <span class="turn-route">pre-router &rarr; time filter</span>
+      </div>
+      <div class="example-turn">
+        <span class="turn-user">User</span>
+        <span class="turn-msg">"any more free stuff"</span>
+        <span class="turn-route">AI router &rarr; compound</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. Source Registry -->
+<section id="sources">
+  <div class="container">
+    <p class="section-label">Sources</p>
+    <h2 class="section-title">18 event sources, ranked by trust</h2>
+    <div class="section-body">
+      <p>Events are deduplicated across sources using a hash of name + venue + date. When the same event appears in multiple sources, the version from the higher-trust source wins. Sources with geo data (lat/lng) also teach venue coordinates to the shared venue map.</p>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Weight</th>
+            <th>Method</th>
+            <th>Specialty</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="source-name">Skint</td>
+            <td class="weight-high">0.9</td>
+            <td>HTML &rarr; Claude extraction</td>
+            <td>Free &amp; cheap NYC events</td>
+          </tr>
+          <tr>
+            <td class="source-name">Nonsense NYC</td>
+            <td class="weight-high">0.9</td>
+            <td>Gmail newsletter &rarr; Claude</td>
+            <td>Underground, weird, one-of-a-kind</td>
+          </tr>
+          <tr>
+            <td class="source-name">Resident Advisor</td>
+            <td class="weight-high">0.85</td>
+            <td>GraphQL API</td>
+            <td>Electronic music &amp; club nights</td>
+          </tr>
+          <tr>
+            <td class="source-name">Oh My Rockness</td>
+            <td class="weight-high">0.85</td>
+            <td>HTML &rarr; Claude extraction</td>
+            <td>Indie &amp; live music</td>
+          </tr>
+          <tr>
+            <td class="source-name">Dice</td>
+            <td class="weight-mid">0.8</td>
+            <td>__NEXT_DATA__ JSON</td>
+            <td>Music &amp; nightlife</td>
+          </tr>
+          <tr>
+            <td class="source-name">BrooklynVegan</td>
+            <td class="weight-mid">0.8</td>
+            <td>DoStuff JSON feed</td>
+            <td>Indie shows, punk, rock</td>
+          </tr>
+          <tr>
+            <td class="source-name">BAM</td>
+            <td class="weight-mid">0.8</td>
+            <td>JSON API</td>
+            <td>Film, theater, music, dance</td>
+          </tr>
+          <tr>
+            <td class="source-name">SmallsLIVE</td>
+            <td class="weight-mid">0.8</td>
+            <td>AJAX HTML</td>
+            <td>Jazz at Smalls + Mezzrow</td>
+          </tr>
+          <tr>
+            <td class="source-name">Yutori</td>
+            <td class="weight-mid">0.8</td>
+            <td>Gmail API &rarr; Claude</td>
+            <td>Agent briefings, curated picks</td>
+          </tr>
+          <tr>
+            <td class="source-name">NYC Parks</td>
+            <td class="weight-mid">0.75</td>
+            <td>Schema.org markup</td>
+            <td>Outdoor events, free programming</td>
+          </tr>
+          <tr>
+            <td class="source-name">DoNYC</td>
+            <td class="weight-mid">0.75</td>
+            <td>Cheerio HTML scraping</td>
+            <td>Music, comedy, theater</td>
+          </tr>
+          <tr>
+            <td class="source-name">Songkick</td>
+            <td class="weight-mid">0.75</td>
+            <td>JSON-LD</td>
+            <td>Concerts &amp; live music</td>
+          </tr>
+          <tr>
+            <td class="source-name">Ticketmaster</td>
+            <td class="weight-mid">0.75</td>
+            <td>Discovery API</td>
+            <td>Indie filter: venue blocklist + $100 cap</td>
+          </tr>
+          <tr>
+            <td class="source-name">Eventbrite</td>
+            <td class="weight-low">0.7</td>
+            <td>JSON-LD + __SERVER_DATA__</td>
+            <td>Community events, workshops</td>
+          </tr>
+          <tr>
+            <td class="source-name">NYPL</td>
+            <td class="weight-low">0.7</td>
+            <td>Eventbrite organizer pages</td>
+            <td>Free library events</td>
+          </tr>
+          <tr>
+            <td class="source-name">Tavily</td>
+            <td class="weight-low">0.6</td>
+            <td>Web search</td>
+            <td>Fallback only (not in hot path)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Session & Conversation -->
+<section id="sessions">
+  <div class="container">
+    <p class="section-label">Sessions</p>
+    <h2 class="section-title">Multi-turn conversation state</h2>
+    <div class="section-body">
+      <p>Each phone number gets a session that persists for <strong>2 hours</strong>. The session tracks what the user has been shown, what filters they've applied, and what neighborhoods they've visited. This lets follow-up messages like "how about comedy" or "later tonight" modify the active context rather than starting over.</p>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="source-name">lastPicks</td>
+            <td>array</td>
+            <td>Most recent picks returned by compose</td>
+          </tr>
+          <tr>
+            <td class="source-name">lastEvents</td>
+            <td>object</td>
+            <td>Map of event objects offered in the last batch (for details lookup)</td>
+          </tr>
+          <tr>
+            <td class="source-name">lastNeighborhood</td>
+            <td>string</td>
+            <td>Neighborhood from the last events response</td>
+          </tr>
+          <tr>
+            <td class="source-name">lastFilters</td>
+            <td>object</td>
+            <td>Active filters: category, vibe, time_after, free_only</td>
+          </tr>
+          <tr>
+            <td class="source-name">conversationHistory</td>
+            <td>array</td>
+            <td>Last 6 turns (300 chars each) &mdash; sent to router and compose</td>
+          </tr>
+          <tr>
+            <td class="source-name">allPicks</td>
+            <td>array</td>
+            <td>Cumulative picks across all "more" batches</td>
+          </tr>
+          <tr>
+            <td class="source-name">allOfferedIds</td>
+            <td>array</td>
+            <td>All event IDs ever shown &mdash; excluded on "more" to avoid repeats</td>
+          </tr>
+          <tr>
+            <td class="source-name">visitedHoods</td>
+            <td>array</td>
+            <td>Neighborhoods visited this session (dedup travel nudges)</td>
+          </tr>
+          <tr>
+            <td class="source-name">pendingNearby</td>
+            <td>string</td>
+            <td>Neighborhood stored during a travel nudge ("would you travel to X?")</td>
+          </tr>
+          <tr>
+            <td class="source-name">pendingNearbyEvents</td>
+            <td>object</td>
+            <td>Pre-loaded events for the nudge neighborhood</td>
+          </tr>
+          <tr>
+            <td class="source-name">pendingFilters</td>
+            <td>object</td>
+            <td>Saved filters when asking user for a neighborhood</td>
+          </tr>
+          <tr>
+            <td class="source-name">pendingMessage</td>
+            <td>string</td>
+            <td>Original message stored with pending filters</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- 7. Prompt Architecture -->
+<section id="prompts">
+  <div class="container">
+    <p class="section-label">Prompts</p>
+    <h2 class="section-title">Composable prompt skills</h2>
+    <div class="section-body">
+      <p>The compose prompt is assembled dynamically from <strong>12 conditional skill modules</strong>. Rather than one monolithic prompt, <code>build-compose-prompt.js</code> selects which skills to include based on the current request context. This keeps prompts focused and avoids wasting tokens on irrelevant instructions.</p>
+    </div>
+
+    <div class="card-grid">
+      <div class="card">
+        <h3>core</h3>
+        <p>Base persona, tone, format rules, 480-char limit</p>
+      </div>
+      <div class="card">
+        <h3>tonightPriority</h3>
+        <p>Prioritize events happening tonight over future dates</p>
+      </div>
+      <div class="card">
+        <h3>sourceTiers</h3>
+        <p>Trust hierarchy: prefer Skint/Nonsense over Eventbrite/Tavily</p>
+      </div>
+      <div class="card">
+        <h3>neighborhoodMismatch</h3>
+        <p>Handle when events are from nearby-but-different neighborhoods</p>
+      </div>
+      <div class="card">
+        <h3>perennialFraming</h3>
+        <p>Frame recurring venue picks vs. one-off events</p>
+      </div>
+      <div class="card">
+        <h3>venueFraming</h3>
+        <p>Use venue reputation to add color to picks</p>
+      </div>
+      <div class="card">
+        <h3>lastBatch</h3>
+        <p>Adjust tone when serving "more" results</p>
+      </div>
+      <div class="card">
+        <h3>freeEmphasis</h3>
+        <p>Highlight free events when user asked for them</p>
+      </div>
+      <div class="card">
+        <h3>activityAdherence</h3>
+        <p>Stick to requested category (comedy, jazz, etc.)</p>
+      </div>
+      <div class="card">
+        <h3>conversationAwareness</h3>
+        <p>Reference prior turns for natural follow-ups</p>
+      </div>
+      <div class="card">
+        <h3>pendingIntent</h3>
+        <p>Context when fulfilling a deferred neighborhood ask</p>
+      </div>
+    </div>
+
+    <div class="code-block"><span class="hl-dim">// build-compose-prompt.js (simplified)</span>
+<span class="hl-blue">const</span> prompt = [skills.core.text];
+
+<span class="hl-blue">if</span> (isTonight)     prompt.push(skills.<span class="hl">tonightPriority</span>.text);
+<span class="hl-blue">if</span> (mismatch)      prompt.push(skills.<span class="hl">neighborhoodMismatch</span>.text);
+<span class="hl-blue">if</span> (hasPerennials)  prompt.push(skills.<span class="hl">perennialFraming</span>.text);
+<span class="hl-blue">if</span> (isFree)        prompt.push(skills.<span class="hl">freeEmphasis</span>.text);
+<span class="hl-blue">if</span> (hasHistory)    prompt.push(skills.<span class="hl">conversationAwareness</span>.text);
+<span class="hl-dim">// ... conditionally adds more skills</span>
+
+<span class="hl-blue">return</span> prompt.join(<span class="hl-green">'\n\n'</span>);</div>
+  </div>
+</section>
+
+<!-- 8. Quality & Eval -->
+<section id="eval">
+  <div class="container">
+    <p class="section-label">Quality</p>
+    <h2 class="section-title">5-layer eval system</h2>
+    <div class="section-body">
+      <p>Quality is measured offline against stored request traces. The eval system runs in layers, from fast deterministic checks to expensive LLM judges. Each layer catches different failure modes.</p>
+    </div>
+
+    <ul class="layer-list">
+      <li>
+        <span class="layer-num">1</span>
+        <span><strong>Unit tests</strong> &mdash; Pure function tests (formatters, geo, neighborhoods). Fast, no API calls. Run on every push.</span>
+      </li>
+      <li>
+        <span class="layer-num">2</span>
+        <span><strong>Code evals</strong> &mdash; 9 deterministic trace checks: 480-char limit, valid intent, valid neighborhood, picked events exist, no truncated URLs. Free and instant. (<code>evals/code-evals.js</code>)</span>
+      </li>
+      <li>
+        <span class="layer-num">3</span>
+        <span><strong>Extraction audit</strong> &mdash; Tier 1: verify Claude-extracted evidence quotes appear verbatim in source text. Tier 2: optional LLM judge for semantic accuracy. (<code>evals/extraction-audit.js</code>)</span>
+      </li>
+      <li>
+        <span class="layer-num">4</span>
+        <span><strong>Pipeline evals</strong> &mdash; Multi-turn scenario tests with expected outcomes. Trace assertions check intent, neighborhood, event presence, and banned phrases. (<code>scripts/run-scenario-evals.js</code>)</span>
+      </li>
+      <li>
+        <span class="layer-num">5</span>
+        <span><strong>LLM judges + A/B</strong> &mdash; Tone judge ("sounds like a friend, not a bot?"), relevance judge, and model-vs-model preference tests. Expensive, run on demand. (<code>evals/judge-evals.js</code>, <code>scripts/run-ab-eval.js</code>)</span>
+      </li>
+    </ul>
+
+    <div class="code-block"><span class="hl-dim"># Run the eval layers</span>
+$ npm run eval              <span class="hl-dim"># Layer 2: code evals on stored traces</span>
+$ npm run eval:judges       <span class="hl-dim"># Layers 2+5: code evals + LLM judges</span>
+$ node scripts/run-scenario-evals.js   <span class="hl-dim"># Layer 4: multi-turn scenarios</span>
+$ node scripts/run-ab-eval.js          <span class="hl-dim"># Layer 5: A/B comparison</span></div>
+  </div>
+</section>
+
+<!-- 9. Observability -->
+<section id="observability">
+  <div class="container">
+    <p class="section-label">Observability</p>
+    <h2 class="section-title">Traces, alerts, dashboards</h2>
+    <div class="section-body">
+      <p>Every request writes a structured trace. Health monitoring catches scrape failures and slow responses. Three dashboards provide real-time visibility.</p>
+    </div>
+
+    <div class="card-grid">
+      <div class="card">
+        <h3>Request traces</h3>
+        <p>Per-request JSONL records capture intent, neighborhood, picked events, AI costs, timing, and the full SMS response. Daily rotation with 4-file max. A 200-entry ring buffer powers the eval UI.</p>
+      </div>
+      <div class="card">
+        <h3>Email alerts</h3>
+        <p>Health alerts fire on scrape failures (6hr cooldown). Runtime alerts fire on slow responses or errors (30min per-type cooldown). Sent via Resend. No-op if API key is unset.</p>
+      </div>
+      <div class="card">
+        <h3>Health dashboard</h3>
+        <p>Per-source timing, success/failure status, history sparklines, extraction quality metrics. Available at <code>/health</code>.</p>
+      </div>
+      <div class="card">
+        <h3>Cost tracking</h3>
+        <p>Per-user daily budget of $0.10. Provider-aware pricing (Haiku vs Gemini). Budget resets daily on NYC timezone. Friendly message when exceeded.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-inner">
+    <span class="footer-brand">Pulse</span>
+    <span class="footer-note">Built in Brooklyn</span>
+  </div>
+</footer>
+
+</body>
+</html>
