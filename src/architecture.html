@@ -266,6 +266,25 @@
   /* --- SECTION ANCHORS --- */
   section { scroll-margin-top: 60px; }
 
+  /* Mobile */
+  @media (max-width: 600px) {
+    .nav { padding: 8px 12px; gap: 12px; flex-wrap: wrap; }
+    .nav a { font-size: 12px; padding: 3px 6px; }
+    .main { padding: 20px 12px 60px; }
+    h1 { font-size: 22px; }
+    h2 { font-size: 18px; margin: 32px 0 12px; }
+    .flow-step { min-width: 120px; padding: 10px 12px; }
+    th, td { padding: 6px 8px; font-size: 12px; }
+    .metrics { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+    .metric { padding: 12px; }
+    .metric-value { font-size: 22px; }
+    .intent-grid { grid-template-columns: 1fr; }
+    .source-grid { grid-template-columns: 1fr; }
+    .dep-graph { padding: 16px; font-size: 11px; }
+    .card { padding: 14px; }
+    .prompt-content { font-size: 11px; }
+  }
+
   /* --- ANNOTATIONS --- */
   .annotation {
     background: rgba(88,166,255,0.06);

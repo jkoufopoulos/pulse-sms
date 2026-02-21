@@ -333,6 +333,47 @@
   .anno-save:hover { background: #1d4ed8; }
   .anno-status { font-size: 12px; color: #888; align-self: center; }
   .kbd { background: #333; color: #ccc; padding: 1px 5px; border-radius: 3px; font-size: 11px; font-family: monospace; }
+
+  /* Mobile */
+  @media (max-width: 600px) {
+    .tab-btn { padding: 10px 14px; font-size: 13px; }
+
+    .summary { gap: 10px; padding: 12px; }
+    .stat-value { font-size: 15px; }
+
+    .actions { flex-wrap: wrap; padding: 10px 12px; }
+
+    .simulate-section { padding: 10px 12px; }
+    .simulate-bar { flex-direction: column; align-items: stretch; gap: 8px; }
+    .simulate-bar select, .simulate-bar button { width: 100%; }
+    .sms-bubble { max-width: 100%; }
+
+    .filters { flex-direction: column; align-items: stretch; gap: 8px; padding: 8px 12px; }
+    .filter-group { width: 100%; }
+
+    .table-wrap { padding: 0 8px 20px; }
+    td, th { padding: 6px 6px; font-size: 12px; }
+    /* Events tab: hide Conf, AI Score, Flags */
+    #events-tab td:nth-child(8), #events-tab th:nth-child(8),
+    #events-tab td:nth-child(9), #events-tab th:nth-child(9),
+    #events-tab td:nth-child(10), #events-tab th:nth-child(10) { display: none; }
+
+    .detail-panel { max-height: 75vh; padding: 12px; }
+
+    /* Traces tab: hide Neighborhood, Latency */
+    .trace-table td:nth-child(4), .trace-table th:nth-child(4),
+    .trace-table td:nth-child(6), .trace-table th:nth-child(6) { display: none; }
+    .trace-summary-bar { gap: 12px; padding: 10px 12px; }
+    .trace-filters { flex-direction: column; align-items: stretch; gap: 8px; padding: 8px 12px; }
+    .trace-table-wrap { padding: 0 8px; }
+
+    .trace-detail { max-height: 80vh; padding: 12px; }
+    .trace-meta { gap: 10px; }
+    .bubble-user, .bubble-pulse { max-width: 100%; }
+
+    .annotation-bar { flex-direction: column; gap: 12px; }
+    .anno-notes { max-width: 100%; }
+  }
 </style>
 </head>
 <body>
