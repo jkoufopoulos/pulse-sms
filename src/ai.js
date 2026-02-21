@@ -194,6 +194,7 @@ async function composeResponse(message, events, neighborhood, filters, { exclude
       short_detail: e.short_detail || e.description_short,
       source_name: e.source_name,
       source_tier: e.source_tier || 'secondary',
+      extraction_confidence: e.extraction_confidence,
       ticket_url: e.ticket_url,
     });
   }).join('\n');

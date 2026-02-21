@@ -80,7 +80,8 @@ SOURCE TIERS — use source_tier to break ties between similar events:
 - "unstructured" (Skint, Nonsense NYC, Oh My Rockness, Yutori): curated editorial picks — trust these, they've been hand-selected.
 - "primary" (RA, Dice, BrooklynVegan, BAM, SmallsLIVE): structured high-quality listings.
 - "secondary" (NYC Parks, DoNYC, Songkick, Ticketmaster, Eventbrite, NYPL, Tavily): broader aggregators.
-Prefer unstructured and primary over secondary when choosing between similar events.`,
+Prefer unstructured and primary over secondary when choosing between similar events.
+When extraction_confidence is present, prefer events with 0.8+ (reliable data) over 0.5-0.7 (uncertain). null means structured source — treat as reliable.`,
 };
 
 const neighborhoodMismatch = {

@@ -4,6 +4,7 @@ const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceE
 const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate } = require('./geo');
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues } = require('./venues');
 const { sendHealthAlert } = require('./alerts');
+const { filterIncomplete } = require('./curation');
 const { computeCompleteness } = require('./sources/shared');
 const { runExtractionAudit } = require('./evals/extraction-audit');
 const { captureExtractionInput, getExtractionInputs, clearExtractionInputs } = require('./extraction-capture');
@@ -346,7 +347,27 @@ async function getEvents(neighborhood) {
   }
 
   const upcoming = filterUpcomingEvents(eventCache);
-  const ranked = rankEventsByProximity(upcoming, neighborhood);
+
+  // Quality gate — remove events with low extraction confidence or incomplete data
+  const beforeQuality = upcoming.length;
+  const qualityFiltered = filterIncomplete(
+    upcoming.filter(e => {
+      if (e.needs_review === true) return false;
+      if (e.extraction_confidence !== null && e.extraction_confidence !== undefined && e.extraction_confidence < 0.4) return false;
+      return true;
+    }),
+    0.4
+  );
+  const lowConfidence = upcoming.filter(e =>
+    (e.extraction_confidence !== null && e.extraction_confidence !== undefined && e.extraction_confidence < 0.4) || e.needs_review === true
+  ).length;
+  const incomplete = beforeQuality - lowConfidence - qualityFiltered.length;
+  const totalFiltered = beforeQuality - qualityFiltered.length;
+  if (totalFiltered > 0) {
+    console.log(`Filtered ${totalFiltered} low-quality events (${lowConfidence} low-confidence/needs-review, ${incomplete} incomplete)`);
+  }
+
+  const ranked = rankEventsByProximity(qualityFiltered, neighborhood);
 
   // Return today + tomorrow events — Claude handles temporal intent via conversation context
   const todayNyc = getNycDateString(0);
