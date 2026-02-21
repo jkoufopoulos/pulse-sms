@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pulse — Evals</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #08070d;
+      --bg-card: rgba(255,255,255,0.03);
+      --bg-card-hover: rgba(255,255,255,0.05);
+      --text: #ede9e3;
+      --text-dim: #7a756d;
+      --text-muted: #4a463f;
+      --coral: #ff6b42;
+      --coral-dim: rgba(255,107,66,0.12);
+      --blue: #58a6ff;
+      --green: #3fb950;
+      --purple: #d2a8ff;
+      --yellow: #f0883e;
+      --font-display: 'Syne', sans-serif;
+      --font-body: 'DM Sans', sans-serif;
+      --font-mono: 'DM Mono', monospace;
+      --radius: 20px;
+      --radius-sm: 12px;
+      --max-w: 900px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* NAV */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(24px) saturate(1.4);
+      -webkit-backdrop-filter: blur(24px) saturate(1.4);
+      background: rgba(8,7,13,0.8);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .nav-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 18px 28px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .nav-logo {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--coral);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+    .nav-sep {
+      color: var(--text-muted);
+      font-size: 1.2rem;
+      font-weight: 300;
+    }
+    .nav-page {
+      font-family: var(--font-display);
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text-dim);
+      letter-spacing: -0.01em;
+    }
+
+    /* LAYOUT */
+    .container { max-width: var(--max-w); margin: 0 auto; padding: 0 28px; }
+
+    .page-header {
+      padding: 72px 0 48px;
+    }
+    .page-header h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 4vw, 2.8rem);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.035em;
+      margin-bottom: 12px;
+    }
+    .page-header h1 em { font-style: normal; color: var(--coral); }
+    .page-header .subtitle {
+      color: var(--text-dim);
+      font-size: 1.05rem;
+      max-width: 600px;
+      line-height: 1.65;
+    }
+
+    /* SECTIONS */
+    section {
+      padding: 56px 0;
+      border-top: 1px solid rgba(255,255,255,0.04);
+    }
+    .section-label {
+      font-family: var(--font-display);
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      color: var(--coral);
+      margin-bottom: 10px;
+    }
+    .section-title {
+      font-family: var(--font-display);
+      font-size: clamp(1.4rem, 3vw, 1.8rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 20px;
+    }
+    .section-body {
+      color: var(--text-dim);
+      font-size: 0.92rem;
+      line-height: 1.75;
+      max-width: 700px;
+    }
+    .section-body p + p { margin-top: 12px; }
+    .section-body strong { color: var(--text); font-weight: 600; }
+
+    /* CARDS */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-top: 20px;
+    }
+    .card h3 {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+    .card p {
+      color: var(--text-dim);
+      font-size: 0.88rem;
+      line-height: 1.65;
+    }
+    .card-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    /* FLOW DIAGRAMS */
+    .flow {
+      margin-top: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      align-items: center;
+    }
+    .flow-node {
+      padding: 14px 24px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      text-align: center;
+      max-width: 360px;
+      width: 100%;
+      position: relative;
+    }
+    .flow-node .label {
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin-top: 4px;
+      font-style: italic;
+    }
+    .flow-arrow {
+      width: 1px;
+      height: 20px;
+      background: rgba(255,255,255,0.12);
+      position: relative;
+    }
+    .flow-arrow::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: -3px;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 5px solid rgba(255,255,255,0.12);
+    }
+
+    .node-coral { background: var(--coral-dim); border: 1px solid rgba(255,107,66,0.2); color: var(--coral); }
+    .node-blue { background: rgba(88,166,255,0.08); border: 1px solid rgba(88,166,255,0.15); color: var(--blue); }
+    .node-green { background: rgba(63,185,80,0.08); border: 1px solid rgba(63,185,80,0.15); color: var(--green); }
+    .node-purple { background: rgba(210,168,255,0.08); border: 1px solid rgba(210,168,255,0.15); color: var(--purple); }
+    .node-yellow { background: rgba(240,136,62,0.08); border: 1px solid rgba(240,136,62,0.15); color: var(--yellow); }
+    .node-dim { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); color: var(--text-dim); }
+
+    /* TABLES */
+    .table-wrap {
+      margin-top: 20px;
+      overflow-x: auto;
+      border-radius: var(--radius);
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+    }
+    thead th {
+      text-align: left;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 0.75rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      padding: 12px 16px;
+      background: rgba(255,255,255,0.02);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    tbody td {
+      padding: 10px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      color: var(--text-dim);
+      vertical-align: top;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: rgba(255,255,255,0.02); }
+    .col-name { color: var(--text); font-weight: 600; }
+    .cost-free { color: var(--green); }
+    .cost-low { color: var(--blue); }
+    .cost-mid { color: var(--yellow); }
+
+    /* CODE BLOCKS */
+    .code-block {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: var(--radius-sm);
+      padding: 16px 20px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      line-height: 1.7;
+      color: var(--text-dim);
+      overflow-x: auto;
+      margin-top: 16px;
+      white-space: pre;
+    }
+    .code-block .hl { color: var(--coral); }
+    .code-block .hl-blue { color: var(--blue); }
+    .code-block .hl-green { color: var(--green); }
+    .code-block .hl-dim { color: var(--text-muted); }
+
+    /* INLINE MONO */
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      background: rgba(255,255,255,0.05);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--coral);
+    }
+
+    /* STAT PILLS */
+    .stats {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+    .stat {
+      padding: 8px 16px;
+      border-radius: 100px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      border: 1px solid rgba(255,255,255,0.06);
+      color: var(--text-dim);
+    }
+    .stat em { font-style: normal; color: var(--coral); }
+
+    /* LAYER LIST */
+    .layer-list {
+      list-style: none;
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .layer-list li {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      font-size: 0.88rem;
+      color: var(--text-dim);
+    }
+    .layer-num {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 0.85rem;
+      color: var(--coral);
+      min-width: 20px;
+      flex-shrink: 0;
+    }
+    .layer-list li strong { color: var(--text); font-weight: 600; }
+
+    /* COLLAPSIBLE DETAILS */
+    details {
+      background: var(--bg-card);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: var(--radius);
+      margin-top: 12px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    details[open] {
+      border-color: rgba(255,255,255,0.08);
+    }
+    details summary {
+      padding: 18px 24px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      list-style: none;
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    details summary:hover { background: var(--bg-card-hover); }
+    details summary::-webkit-details-marker { display: none; }
+    details summary::before {
+      content: '';
+      display: inline-block;
+      width: 0;
+      height: 0;
+      border-left: 5px solid var(--text-muted);
+      border-top: 4px solid transparent;
+      border-bottom: 4px solid transparent;
+      flex-shrink: 0;
+      transition: transform 0.2s;
+    }
+    details[open] summary::before {
+      transform: rotate(90deg);
+    }
+    details summary .step-label {
+      color: var(--coral);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    details summary .step-preview {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      font-weight: 400;
+      font-family: var(--font-body);
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+    details .detail-body {
+      padding: 0 24px 20px;
+    }
+    details .detail-body p {
+      color: var(--text-dim);
+      font-size: 0.88rem;
+      line-height: 1.65;
+    }
+    details .detail-body p + p { margin-top: 8px; }
+    details .detail-body strong { color: var(--text); font-weight: 600; }
+    details .detail-body ul {
+      padding-left: 20px;
+      color: var(--text-dim);
+      font-size: 0.88rem;
+      line-height: 1.8;
+      margin-top: 8px;
+    }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid rgba(255,255,255,0.04);
+      padding: 40px 0;
+      margin-top: 40px;
+    }
+    .footer-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .footer-brand {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--coral);
+    }
+    .footer-note {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* Eval-specific: check result */
+    .check-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .check-item {
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+      font-size: 0.84rem;
+    }
+    .check-pass { color: var(--green); font-weight: 700; font-size: 0.78rem; min-width: 32px; }
+    .check-fail { color: var(--coral); font-weight: 700; font-size: 0.78rem; min-width: 32px; }
+    .check-name { color: var(--text); font-weight: 600; }
+    .check-desc { color: var(--text-dim); font-size: 0.8rem; }
+
+    /* RESPONSIVE */
+    @media (max-width: 680px) {
+      .card-grid { grid-template-columns: 1fr; }
+      .check-grid { grid-template-columns: 1fr; }
+      .page-header { padding: 56px 0 36px; }
+      section { padding: 40px 0; }
+      .footer-inner { flex-direction: column; gap: 8px; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">Pulse</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-page">Evals</span>
+  </div>
+</nav>
+
+<!-- Header -->
+<header class="page-header">
+  <div class="container">
+    <h1>How Pulse <em>measures quality</em></h1>
+    <p class="subtitle">An AI assistant that recommends events needs more than unit tests. Pulse uses a 6-layer eval system &mdash; from instant deterministic checks to LLM judges that grade tone and taste &mdash; to catch regressions before users do.</p>
+  </div>
+</header>
+
+<!-- 1. Why Evals -->
+<section id="why-evals">
+  <div class="container">
+    <p class="section-label">Evals 101</p>
+    <h2 class="section-title">Why traditional tests aren't enough</h2>
+    <div class="section-body">
+      <p>Unit tests catch broken code. But Pulse's output is written by an LLM, and LLM output is non-deterministic. The same input can produce different (but equally good) responses. You can't assert <code>sms_text === "expected string"</code> when the words change every time.</p>
+      <p><strong>Evals solve this by checking properties, not exact strings.</strong> Instead of "does the SMS say exactly this?", evals ask: "Is it under 480 characters? Does it mention events in the right neighborhood? Does it sound like a friend, not a bot? Did it pick real events from the list, or hallucinate fake ones?"</p>
+      <p>Some properties are deterministic &mdash; character count, valid event IDs, correct day labels. These are free and fast. Others require judgment &mdash; tone, relevance, curation taste. For those, we use another LLM as a judge. It's evals all the way down.</p>
+    </div>
+
+    <div class="card-grid">
+      <div class="card">
+        <h3>Deterministic checks</h3>
+        <p>Binary pass/fail on objective properties: SMS length, valid IDs, correct neighborhoods, parseable URLs. Free, instant, run on every request.</p>
+      </div>
+      <div class="card">
+        <h3>LLM judges</h3>
+        <p>Claude Sonnet grades subjective quality: "Does this sound like a friend?" "Are these events relevant to the request?" Binary PASS/FAIL with a one-sentence explanation.</p>
+      </div>
+      <div class="card">
+        <h3>Expectation assertions</h3>
+        <p>Per-test-case expected values: this message should route to "events" intent, resolve to "Williamsburg", and never contain "sorry". Catch routing and dispatch regressions.</p>
+      </div>
+      <div class="card">
+        <h3>Head-to-head comparison</h3>
+        <p>Both models compose from the same event list. A judge picks the winner. Position-randomized to control for bias. Used for model swaps and prompt changes.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 2. The Layers -->
+<section id="layers">
+  <div class="container">
+    <p class="section-label">Overview</p>
+    <h2 class="section-title">6 layers, cheapest first</h2>
+    <div class="section-body">
+      <p>Eval layers are ordered by cost and speed. Run the free ones first &mdash; if they fail, there's no point burning API tokens on judges. Each layer catches different failure modes that the layers above it can't.</p>
+    </div>
+
+    <ul class="layer-list" style="margin-top: 24px;">
+      <li>
+        <span class="layer-num">1</span>
+        <span><strong>Unit tests</strong> &mdash; Pure function correctness: neighborhood extraction, event ID hashing, dedup, geo math, prompt construction, eval functions themselves. <strong style="color: var(--green);">Free. ~2s.</strong></span>
+      </li>
+      <li>
+        <span class="layer-num">2</span>
+        <span><strong>Extraction audit</strong> &mdash; Does Claude's extracted data match the actual source? Evidence quotes checked verbatim. Runs automatically every scrape. <strong style="color: var(--green);">Free. &lt;1s.</strong></span>
+      </li>
+      <li>
+        <span class="layer-num">3</span>
+        <span><strong>Code evals</strong> &mdash; 9 deterministic trace checks on full pipeline output: char limit, valid intent, valid neighborhood, picked events exist, day-label accuracy. <strong style="color: var(--green);">Free. ~3min.</strong></span>
+      </li>
+      <li>
+        <span class="layer-num">4</span>
+        <span><strong>Multi-turn scenarios</strong> &mdash; Scripted conversations played through the live system. An LLM judge grades whether session context carried forward and behavior matches expectations. <strong style="color: var(--blue);">~$0.20. ~5min.</strong></span>
+      </li>
+      <li>
+        <span class="layer-num">5</span>
+        <span><strong>Regression evals</strong> &mdash; Per-assertion behavioral tests tied to design principles. Each assertion has a "check" (what should be true) and an "anti-pattern" (what would be a failure). <strong style="color: var(--blue);">~$0.30. ~5min.</strong></span>
+      </li>
+      <li>
+        <span class="layer-num">6</span>
+        <span><strong>LLM judges + A/B</strong> &mdash; Tone judge, relevance judge, and model-vs-model preference tests. Position-randomized head-to-head. The most expensive layer, run on demand. <strong style="color: var(--yellow);">~$0.50. ~8min.</strong></span>
+      </li>
+    </ul>
+
+    <div class="stats" style="margin-top: 24px;">
+      <span class="stat"><em>539</em> unit tests</span>
+      <span class="stat"><em>9</em> code eval checks</span>
+      <span class="stat"><em>8</em> extraction audit checks</span>
+      <span class="stat"><em>105</em> synthetic cases</span>
+      <span class="stat"><em>~$0.70</em> full eval run</span>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Quick Start -->
+<section id="quickstart">
+  <div class="container">
+    <p class="section-label">Quick Start</p>
+    <h2 class="section-title">Run your first eval in 60 seconds</h2>
+    <div class="section-body">
+      <p>The fastest eval loop is free and catches most regressions. No server needed, no API keys burned.</p>
+    </div>
+
+    <div class="code-block"><span class="hl-dim"># 1. Unit tests — catches code bugs before anything else</span>
+<span class="hl">npm test</span>
+
+<span class="hl-dim"># 2. Start server in test mode (required for pipeline evals)</span>
+<span class="hl">PULSE_TEST_MODE=true node src/server.js</span>
+
+<span class="hl-dim"># 3. Wait for "Cache refreshed: ..." in the logs, then:</span>
+
+<span class="hl-dim"># 4. Pipeline evals — code checks on all 105 synthetic cases (free)</span>
+<span class="hl">npm run eval</span>
+
+<span class="hl-dim"># 5. Check extraction quality from the scrape that just ran</span>
+<span class="hl-blue">curl http://localhost:3000/api/eval/audit | jq .summary</span></div>
+
+    <div class="card" style="margin-top: 24px;">
+      <h3>When to run what</h3>
+      <div class="table-wrap" style="margin-top: 12px; border-radius: var(--radius-sm);">
+        <table>
+          <thead>
+            <tr>
+              <th>Situation</th>
+              <th>Run</th>
+              <th>Cost</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="col-name">Any code change</td>
+              <td><code>npm test</code></td>
+              <td class="cost-free">Free</td>
+              <td>~2s</td>
+            </tr>
+            <tr>
+              <td class="col-name">Prompt change</td>
+              <td><code>npm test</code> + <code>npm run eval</code></td>
+              <td class="cost-free">Free</td>
+              <td>~3min</td>
+            </tr>
+            <tr>
+              <td class="col-name">Routing change</td>
+              <td>Above + <code>run-scenario-evals.js</code></td>
+              <td class="cost-low">~$0.20</td>
+              <td>~8min</td>
+            </tr>
+            <tr>
+              <td class="col-name">Model swap</td>
+              <td>All above + <code>run-ab-eval.js</code></td>
+              <td class="cost-mid">~$0.70</td>
+              <td>~20min</td>
+            </tr>
+            <tr>
+              <td class="col-name">Pre-deploy sanity</td>
+              <td><code>npm test</code> + <code>npm run eval</code> + audit</td>
+              <td class="cost-free">Free</td>
+              <td>~5min</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 4. Layer 1: Unit Tests -->
+<section id="unit-tests">
+  <div class="container">
+    <p class="section-label">Layer 1</p>
+    <h2 class="section-title">Unit tests</h2>
+    <div class="section-body">
+      <p>Pure-function tests that verify the building blocks work correctly. No API keys, no server, no network. If these fail, nothing else matters.</p>
+    </div>
+
+    <div class="code-block"><span class="hl">npm test</span>
+
+<span class="hl-dim"># Output:</span>
+<span class="hl-green">extractNeighborhood:</span>
+  <span class="hl-green">PASS</span>: east village
+  <span class="hl-green">PASS</span>: LES
+  <span class="hl-green">PASS</span>: williamsburg
+  ...
+<span class="hl-green">539 passed</span>, 0 failed</div>
+
+    <div class="section-body" style="margin-top: 16px;">
+      <p><strong>What's covered:</strong> neighborhood extraction (36 hoods, aliases, landmarks, subway stops), event ID hashing and cross-source dedup, venue resolution and geo math, formatters and SMS truncation, pre-router intent matching (greetings, details, more, free, filters), prompt assembly and skill selection, session merge logic, TCPA opt-out patterns, eval functions themselves.</p>
+      <p><strong>What's not covered:</strong> Anything that requires an LLM call or live data. That's what the other layers are for.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 5. Layer 2: Extraction Audit -->
+<section id="extraction-audit">
+  <div class="container">
+    <p class="section-label">Layer 2</p>
+    <h2 class="section-title">Extraction audit</h2>
+    <div class="section-body">
+      <p>Five of Pulse's 18 sources use Claude to extract events from unstructured HTML or newsletters: <strong>Skint, Nonsense NYC, Oh My Rockness, Yutori, and Tavily</strong>. The extraction audit verifies that Claude's output matches the actual source text. It catches hallucinated venues, invented times, and overconfident scores.</p>
+      <p>Tier 1 runs <strong>automatically on every scrape</strong> &mdash; you don't need to do anything. Tier 2 (LLM judge) is on-demand for deeper investigation.</p>
+    </div>
+
+    <details open style="margin-top: 24px;">
+      <summary><span class="step-label">Tier 1</span> Deterministic checks <span class="step-preview">free, every scrape</span></summary>
+      <div class="detail-body">
+        <p>Eight checks run on every Claude-extracted event:</p>
+        <div class="check-grid" style="margin-top: 12px;">
+          <div class="check-item">
+            <span class="check-pass">PASS</span>
+            <span><span class="check-name">evidence_name_in_source</span><br><span class="check-desc">Event name quote found in raw source text</span></span>
+          </div>
+          <div class="check-item">
+            <span class="check-pass">PASS</span>
+            <span><span class="check-name">evidence_time_in_source</span><br><span class="check-desc">Time quote found in raw source text</span></span>
+          </div>
+          <div class="check-item">
+            <span class="check-pass">PASS</span>
+            <span><span class="check-name">evidence_location_in_source</span><br><span class="check-desc">Location quote found in raw source text</span></span>
+          </div>
+          <div class="check-item">
+            <span class="check-pass">PASS</span>
+            <span><span class="check-name">evidence_price_in_source</span><br><span class="check-desc">Price quote found in raw source text</span></span>
+          </div>
+          <div class="check-item">
+            <span class="check-pass">PASS</span>
+            <span><span class="check-name">has_evidence</span><br><span class="check-desc">At least 2 of 4 evidence fields present</span></span>
+          </div>
+          <div class="check-item">
+            <span class="check-fail">FAIL</span>
+            <span><span class="check-name">confidence_calibrated</span><br><span class="check-desc">High confidence but incomplete evidence</span></span>
+          </div>
+          <div class="check-item">
+            <span class="check-pass">PASS</span>
+            <span><span class="check-name">date_not_past</span><br><span class="check-desc">Event date is today or future</span></span>
+          </div>
+          <div class="check-item">
+            <span class="check-pass">PASS</span>
+            <span><span class="check-name">required_fields_present</span><br><span class="check-desc">Has name, venue/neighborhood, date/time</span></span>
+          </div>
+        </div>
+        <p style="margin-top: 12px;">Results appear in the server logs after each scrape: <code>Extraction audit: 45/48 events pass (93.8%), 3 issues</code>. Full reports are saved to <code>data/reports/extraction-audit-{date}.json</code>.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="step-label">Tier 2</span> LLM judge <span class="step-preview">~$0.01, on-demand</span></summary>
+      <div class="detail-body">
+        <p>Asks Claude Haiku to verify each extracted field as <strong>CORRECT</strong>, <strong>WRONG</strong>, or <strong>UNVERIFIABLE</strong> against the raw source text. Prioritizes events that failed Tier 1 checks.</p>
+        <div class="code-block"><span class="hl-dim"># Run the LLM audit (samples 10 events by default)</span>
+<span class="hl-blue">curl -X POST http://localhost:3000/api/eval/audit | jq .</span>
+
+<span class="hl-dim"># Custom sample size</span>
+<span class="hl-blue">curl -X POST "http://localhost:3000/api/eval/audit?sample=20" | jq .</span>
+
+<span class="hl-dim"># View the latest deterministic audit</span>
+<span class="hl-blue">curl http://localhost:3000/api/eval/audit | jq .summary</span></div>
+      </div>
+    </details>
+
+    <div class="card" style="margin-top: 20px;">
+      <h3>What to look for in audit reports</h3>
+      <ul style="padding-left: 20px; color: var(--text-dim); font-size: 0.88rem; line-height: 1.8; margin-top: 8px;">
+        <li><strong style="color: var(--text);">Pass rate below 80%</strong> for any source &mdash; the extraction prompt or source HTML may have changed</li>
+        <li><strong style="color: var(--text);">evidence_*_in_source failures</strong> &mdash; Claude is hallucinating or paraphrasing instead of quoting</li>
+        <li><strong style="color: var(--text);">date_not_past failures</strong> &mdash; stale events leaking into cache (source publishing old dates)</li>
+        <li><strong style="color: var(--text);">confidence_calibrated failures</strong> &mdash; extraction confidence scores are inflated</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Layer 3: Code Evals -->
+<section id="code-evals">
+  <div class="container">
+    <p class="section-label">Layer 3</p>
+    <h2 class="section-title">Code evals</h2>
+    <div class="section-body">
+      <p>The workhorse layer. Sends 105 synthetic test cases through the full live pipeline (routing, event fetch, curation, compose, SMS send), then runs 9 deterministic checks on each trace. Free, because the checks are just JavaScript &mdash; the only cost is the compose calls during the pipeline run.</p>
+    </div>
+
+    <div class="code-block"><span class="hl-dim"># Code checks only (free after initial pipeline run)</span>
+<span class="hl">npm run eval</span>
+
+<span class="hl-dim"># With LLM judges added (Layer 6, ~$0.50)</span>
+<span class="hl">npm run eval:judges</span>
+
+<span class="hl-dim"># Tag a run for comparison</span>
+<span class="hl">node scripts/run-evals.js --tag=after-prompt-change</span></div>
+
+    <div class="table-wrap" style="margin-top: 20px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Check</th>
+            <th>What it catches</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">char_limit</td>
+            <td>SMS over 480 characters (details intent exempt &mdash; multi-SMS is intentional)</td>
+          </tr>
+          <tr>
+            <td class="col-name">valid_intent</td>
+            <td>Intent not one of the 6 valid types (events, details, more, free, help, conversational)</td>
+          </tr>
+          <tr>
+            <td class="col-name">valid_neighborhood</td>
+            <td>Resolved neighborhood not in the 36-neighborhood map</td>
+          </tr>
+          <tr>
+            <td class="col-name">picked_events_exist</td>
+            <td>Claude picked event IDs that weren't in the candidate list (hallucination)</td>
+          </tr>
+          <tr>
+            <td class="col-name">valid_urls</td>
+            <td>Truncated or malformed URLs in SMS text</td>
+          </tr>
+          <tr>
+            <td class="col-name">off_topic_redirect</td>
+            <td>Conversational response doesn't redirect user back to events (excludes farewells)</td>
+          </tr>
+          <tr>
+            <td class="col-name">response_not_empty</td>
+            <td>Blank SMS response</td>
+          </tr>
+          <tr>
+            <td class="col-name">day_label_accuracy</td>
+            <td>Says "tonight" but all picked events are tomorrow, or vice versa</td>
+          </tr>
+          <tr>
+            <td class="col-name">latency_under_10s</td>
+            <td>Total response time exceeds 10 seconds</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section-body" style="margin-top: 16px;">
+      <p>Each test case can also include <strong>expectation assertions</strong>: expected intent, expected neighborhood, expected event presence, and banned words. These are checked alongside the 9 code evals. For example, "williamsburg" should route to <code>intent: "events"</code> and resolve to <code>"Williamsburg"</code>.</p>
+    </div>
+
+    <div class="card" style="margin-top: 20px;">
+      <h3>Reading an eval report</h3>
+      <div class="code-block"><span class="hl-dim"># Latest report:</span>
+ls -t data/reports/eval-*.json | head -1 | xargs cat | jq '
+{
+  pass_rate: "\(.passed)/\(.total)",
+  failures: [
+    .cases[] | select(.pass == false) |
+    { id, failures: [.results[] | select(.pass == false) | .name] }
+  ] | .[0:5]
+}'</div>
+      <p style="margin-top: 8px; color: var(--text-dim); font-size: 0.88rem;">Key signals: pass rate below 90% means something regressed. <code>picked_events_exist</code> failures mean the compose model is hallucinating event IDs. <code>off_topic_redirect</code> failures mean the bot is answering off-topic questions instead of redirecting to events.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 7. Layer 4: Scenario Evals -->
+<section id="scenario-evals">
+  <div class="container">
+    <p class="section-label">Layer 4</p>
+    <h2 class="section-title">Multi-turn scenario evals</h2>
+    <div class="section-body">
+      <p>Single-message evals miss conversation-level bugs. Does the session carry the right neighborhood across turns? Does "more" show new events, not repeats? Does a filter change preserve the active session? Scenario evals play <strong>scripted multi-turn conversations</strong> through the live pipeline, then use Claude Sonnet as a judge to grade the full conversation.</p>
+    </div>
+
+    <div class="code-block"><span class="hl-dim"># Run all scenarios</span>
+<span class="hl">node scripts/run-scenario-evals.js</span>
+
+<span class="hl-dim"># Filter by category</span>
+<span class="hl">node scripts/run-scenario-evals.js --category=details</span>
+
+<span class="hl-dim"># Filter by name</span>
+<span class="hl">node scripts/run-scenario-evals.js --name="events then details"</span>
+
+<span class="hl-dim"># Against deployed server</span>
+<span class="hl">node scripts/run-scenario-evals.js --url=https://web-production-c8fdb.up.railway.app</span></div>
+
+    <details style="margin-top: 20px;">
+      <summary>How scenario judging works <span class="step-preview">Claude Sonnet, ~$0.02/scenario</span></summary>
+      <div class="detail-body">
+        <p>Each scenario defines:</p>
+        <ul>
+          <li><strong>Turns</strong> &mdash; a scripted user/pulse conversation with expected behaviors</li>
+          <li><strong>Failure modes</strong> &mdash; known failure patterns to watch for (session leakage, filter drop, wrong event in details)</li>
+        </ul>
+        <p>The runner plays each user turn through the live pipeline, collects Pulse's actual responses, then sends the expected vs. actual conversation to Claude Sonnet. The judge grades each turn pass/fail and flags any triggered failure modes.</p>
+        <p><strong>The judge grades behavior, not content.</strong> Events, venues, and URLs will differ between runs &mdash; that's expected. What matters is whether the bot handled the conversation flow correctly.</p>
+      </div>
+    </details>
+
+    <div class="card" style="margin-top: 16px;">
+      <h3>What scenario evals catch</h3>
+      <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; gap: 8px; align-items: baseline; font-size: 0.88rem;">
+          <span style="color: var(--coral); font-weight: 700; min-width: 140px;">Session leakage</span>
+          <span style="color: var(--text-dim);">Bot forgets or confuses context between turns</span>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: baseline; font-size: 0.88rem;">
+          <span style="color: var(--coral); font-weight: 700; min-width: 140px;">Details mismatch</span>
+          <span style="color: var(--text-dim);">User asks about pick #1, bot responds about wrong event</span>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: baseline; font-size: 0.88rem;">
+          <span style="color: var(--coral); font-weight: 700; min-width: 140px;">More repeats</span>
+          <span style="color: var(--text-dim);">Bot re-sends same events instead of new ones on "more"</span>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: baseline; font-size: 0.88rem;">
+          <span style="color: var(--coral); font-weight: 700; min-width: 140px;">Hood switch fail</span>
+          <span style="color: var(--text-dim);">User changes neighborhood, bot still shows old hood's events</span>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: baseline; font-size: 0.88rem;">
+          <span style="color: var(--coral); font-weight: 700; min-width: 140px;">Filter drop</span>
+          <span style="color: var(--text-dim);">User asked for "free comedy", said "yes" to redirect, and free/comedy filters got dropped</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 8. Layer 5: Regression Evals -->
+<section id="regression-evals">
+  <div class="container">
+    <p class="section-label">Layer 5</p>
+    <h2 class="section-title">Regression evals</h2>
+    <div class="section-body">
+      <p>Scenario evals grade the whole conversation. Regression evals grade <strong>individual assertions</strong>, each tied to a behavioral principle. This makes failures more specific &mdash; instead of "scenario failed", you get "principle P3 (filter persistence) failed: user asked for free comedy but Pulse returned paid jazz."</p>
+    </div>
+
+    <div class="code-block"><span class="hl-dim"># Run all regression scenarios</span>
+<span class="hl">node scripts/run-regression-evals.js</span>
+
+<span class="hl-dim"># Filter by principle</span>
+<span class="hl">node scripts/run-regression-evals.js --principle P1</span>
+
+<span class="hl-dim"># Filter by name</span>
+<span class="hl">node scripts/run-regression-evals.js --name="filter"</span></div>
+
+    <div class="section-body" style="margin-top: 16px;">
+      <p>Each scenario defines a set of assertions with three fields:</p>
+    </div>
+
+    <div class="card" style="margin-top: 12px;">
+      <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">{
+  "id": "A2",
+  "principle": "P3",
+  "check": "Pulse returns free events (is_free: true) in its picks",
+  "anti_pattern": "Pulse returns paid events without acknowledging the filter"
+}</div>
+      <p style="margin-top: 12px;">The judge evaluates each assertion independently against the actual conversation transcript. Results are aggregated by principle, so you can see which design principles are holding up and which are regressing.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 9. Layer 6: LLM Judges + A/B -->
+<section id="judges-ab">
+  <div class="container">
+    <p class="section-label">Layer 6</p>
+    <h2 class="section-title">LLM judges and A/B evals</h2>
+    <div class="section-body">
+      <p>The most expensive layer, and the only one that measures subjective quality. Two judges grade every trace, and head-to-head comparisons settle model decisions.</p>
+    </div>
+
+    <div class="card-grid">
+      <div class="card">
+        <h3 style="color: var(--purple);">Tone judge</h3>
+        <p>"Does this SMS sound like a real friend texting you about things to do tonight?" Green flags: casual tone, NYC shorthand, personal opinions. Red flags: corporate language, marketing speak, generic descriptions.</p>
+      </div>
+      <div class="card">
+        <h3 style="color: var(--blue);">Relevance judge</h3>
+        <p>"Are the picked events relevant to the user's neighborhood and request?" Checks geographic match, filter adherence, and temporal correctness (tonight vs tomorrow).</p>
+      </div>
+    </div>
+
+    <details style="margin-top: 20px;">
+      <summary>A/B model comparison <span class="step-preview">~$0.30, on demand</span></summary>
+      <div class="detail-body">
+        <p>When considering a model swap (e.g., Haiku vs Sonnet, or Haiku vs Gemini Flash), the A/B eval gives you data instead of guesses.</p>
+        <div class="code-block"><span class="hl-dim"># Default: Haiku vs Gemini Flash</span>
+<span class="hl">node scripts/run-ab-eval.js</span>
+
+<span class="hl-dim"># Custom models</span>
+<span class="hl">node scripts/run-ab-eval.js --model-a haiku --model-b sonnet</span>
+
+<span class="hl-dim"># Multiple runs per case (reduces noise)</span>
+<span class="hl">node scripts/run-ab-eval.js --runs 3</span></div>
+        <p style="margin-top: 12px;">For each test case, both models compose from the <strong>same event list</strong>. Then three judges evaluate: tone (friend or bot?), pick relevance (right events?), and head-to-head preference (which SMS is better?). Positions are randomized to control for judge bias.</p>
+        <p><strong>Example result from the Haiku vs Sonnet eval:</strong> Haiku won 71% preference, 89% tone pass, at 73% lower cost. That's why Pulse uses Haiku for compose.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<!-- 10. Full Run -->
+<section id="full-run">
+  <div class="container">
+    <p class="section-label">Playbook</p>
+    <h2 class="section-title">Full end-to-end eval run</h2>
+    <div class="section-body">
+      <p>The complete sequence for a thorough quality check &mdash; for example, after a major prompt change or model swap. Steps are ordered cheapest-first: if unit tests fail, you save $0.70 in API costs.</p>
+    </div>
+
+    <details open style="margin-top: 24px;">
+      <summary><span class="step-label">Step 1</span> Start the server <span class="step-preview">Terminal 1</span></summary>
+      <div class="detail-body">
+        <div class="code-block"><span class="hl">PULSE_TEST_MODE=true node src/server.js</span>
+
+<span class="hl-dim"># Wait for the initial scrape to complete.</span>
+<span class="hl-dim"># You'll see: "Cache refreshed: 200 deduped events ..."</span>
+<span class="hl-dim"># And: "Extraction audit: 45/48 events pass (93.8%)"</span></div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="step-label">Step 2</span> Unit tests <span class="step-preview">free, ~2s</span></summary>
+      <div class="detail-body">
+        <p>Always first. Catches code bugs before burning API credits.</p>
+        <div class="code-block"><span class="hl">npm test</span></div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="step-label">Step 3</span> Check the extraction audit <span class="step-preview">free, already ran</span></summary>
+      <div class="detail-body">
+        <p>The scrape in Step 1 already ran the Tier 1 audit. Check the results:</p>
+        <div class="code-block"><span class="hl-blue">curl http://localhost:3000/api/eval/audit | jq .summary</span>
+
+<span class="hl-dim"># Example output:</span>
+{
+  "total": 48,
+  "passed": 45,
+  "issues": 3,
+  "passRate": "93.8%"
+}</div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="step-label">Step 4</span> Pipeline evals <span class="step-preview">free, ~3min</span></summary>
+      <div class="detail-body">
+        <p>105 synthetic cases through the full pipeline. 9 deterministic checks + expectation assertions per case.</p>
+        <div class="code-block"><span class="hl">npm run eval</span></div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="step-label">Step 5</span> Scenario evals <span class="step-preview">~$0.20, ~5min</span></summary>
+      <div class="detail-body">
+        <p>Multi-turn behavioral tests. This is where session bugs and filter persistence issues surface.</p>
+        <div class="code-block"><span class="hl">node scripts/run-scenario-evals.js</span></div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="step-label">Step 6</span> Regression evals <span class="step-preview">~$0.30, ~5min</span></summary>
+      <div class="detail-body">
+        <p>Per-assertion behavioral tests tied to design principles.</p>
+        <div class="code-block"><span class="hl">node scripts/run-regression-evals.js</span></div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="step-label">Step 7</span> LLM judges (optional) <span class="step-preview">~$0.50, ~8min</span></summary>
+      <div class="detail-body">
+        <p>Adds tone and relevance judges to the pipeline eval run. Only needed after major prompt or model changes.</p>
+        <div class="code-block"><span class="hl">npm run eval:judges</span></div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="step-label">Step 8</span> A/B eval (optional) <span class="step-preview">~$0.30, ~5min</span></summary>
+      <div class="detail-body">
+        <p>Only run when comparing models. Gives you head-to-head preference data.</p>
+        <div class="code-block"><span class="hl">node scripts/run-ab-eval.js</span></div>
+      </div>
+    </details>
+
+    <div class="card" style="margin-top: 24px;">
+      <h3>Total cost and timing</h3>
+      <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 4px;">
+        <div>
+          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--green);">~$0.00</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">steps 1-4 (free)</div>
+        </div>
+        <div>
+          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--blue);">~$0.50</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">steps 5-6 (scenarios + regression)</div>
+        </div>
+        <div>
+          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--yellow);">~$0.80</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">steps 7-8 (judges + A/B)</div>
+        </div>
+        <div>
+          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">~20min</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">full run wall time</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 11. Test Fixtures -->
+<section id="fixtures">
+  <div class="container">
+    <p class="section-label">Test Data</p>
+    <h2 class="section-title">Fixtures and test cases</h2>
+    <div class="section-body">
+      <p>Evals are only as good as their test cases. Pulse uses three fixture files covering different scopes, from single messages to full conversations.</p>
+    </div>
+
+    <div class="table-wrap" style="margin-top: 20px;">
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Cases</th>
+            <th>Used by</th>
+            <th>How to update</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">synthetic-cases.json</td>
+            <td>105 single-turn + multi-turn cases</td>
+            <td><code>run-evals.js</code></td>
+            <td><code>npm run eval:gen</code> or edit directly</td>
+          </tr>
+          <tr>
+            <td class="col-name">multi-turn-scenarios.json</td>
+            <td>Scripted conversations with failure modes</td>
+            <td><code>run-scenario-evals.js</code></td>
+            <td>Edit directly</td>
+          </tr>
+          <tr>
+            <td class="col-name">regression-scenarios.json</td>
+            <td>Assertion-based behavioral scenarios</td>
+            <td><code>run-regression-evals.js</code></td>
+            <td>Edit directly</td>
+          </tr>
+          <tr>
+            <td class="col-name">ab-compose-cases.json</td>
+            <td>Compose inputs with fixture events</td>
+            <td><code>run-ab-eval.js</code></td>
+            <td>Edit directly</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="code-block" style="margin-top: 16px;"><span class="hl-dim"># Generate synthetic cases from templates</span>
+<span class="hl">npm run eval:gen</span>
+
+<span class="hl-dim"># All fixtures live in data/fixtures/</span>
+ls data/fixtures/
+<span class="hl-dim">synthetic-cases.json
+multi-turn-scenarios.json
+regression-scenarios.json
+ab-compose-cases.json</span></div>
+  </div>
+</section>
+
+<!-- 12. Reports & Dashboards -->
+<section id="reports">
+  <div class="container">
+    <p class="section-label">Observability</p>
+    <h2 class="section-title">Reports and dashboards</h2>
+    <div class="section-body">
+      <p>Every eval run saves a JSON report to <code>data/reports/</code>. Three browser dashboards provide real-time visibility without reading JSON files.</p>
+    </div>
+
+    <div class="card-grid">
+      <div class="card">
+        <h3>Trace viewer</h3>
+        <p>Browse the 200 most recent request traces at <code>/eval</code>. Filter by intent, neighborhood, or source. Inspect the full request lifecycle and annotate traces as pass/fail.</p>
+      </div>
+      <div class="card">
+        <h3>Health dashboard</h3>
+        <p>Per-source scrape status at <code>/health</code>. Timing, success rates, history sparklines, extraction quality. Surfaces sources that are failing silently.</p>
+      </div>
+    </div>
+
+    <div class="table-wrap" style="margin-top: 20px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Report pattern</th>
+            <th>Created by</th>
+            <th>Contains</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">eval-{timestamp}.json</td>
+            <td><code>npm run eval</code></td>
+            <td>Per-case pass/fail, failure breakdown, eval details</td>
+          </tr>
+          <tr>
+            <td class="col-name">scenario-eval-{timestamp}.json</td>
+            <td><code>run-scenario-evals.js</code></td>
+            <td>Per-scenario judge verdicts, actual conversations</td>
+          </tr>
+          <tr>
+            <td class="col-name">regression-eval-{timestamp}.json</td>
+            <td><code>run-regression-evals.js</code></td>
+            <td>Per-assertion verdicts, principle breakdown</td>
+          </tr>
+          <tr>
+            <td class="col-name">ab-eval-{models}-{timestamp}.json</td>
+            <td><code>run-ab-eval.js</code></td>
+            <td>Side-by-side responses, preference stats, cost comparison</td>
+          </tr>
+          <tr>
+            <td class="col-name">extraction-audit-{date}.json</td>
+            <td>Every scrape</td>
+            <td>Per-event check results, per-source pass rates</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- 13. Troubleshooting -->
+<section id="troubleshooting">
+  <div class="container">
+    <p class="section-label">Troubleshooting</p>
+    <h2 class="section-title">Common issues</h2>
+
+    <details open style="margin-top: 20px;">
+      <summary>"No events in cache"</summary>
+      <div class="detail-body">
+        <p>The scrape hasn't completed yet. Wait for the "Cache refreshed" log message, or force a scrape:</p>
+        <div class="code-block"><span class="hl-blue">curl -X POST http://localhost:3000/api/eval/refresh</span></div>
+      </div>
+    </details>
+
+    <details>
+      <summary>"0 traces found" in eval runner</summary>
+      <div class="detail-body">
+        <p>Traces are only exposed in test mode. Make sure the server was started with <code>PULSE_TEST_MODE=true</code>. The eval runner fetches traces from <code>GET /api/eval/traces?limit=1</code> &mdash; this endpoint doesn't exist without test mode.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Judge evals failing with auth error</summary>
+      <div class="detail-body">
+        <p><code>ANTHROPIC_API_KEY</code> is missing or expired. Check your <code>.env</code> file. Judge evals use Claude Sonnet, which requires a valid API key.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Pipeline evals timing out</summary>
+      <div class="detail-body">
+        <p>Some sources are slow during the initial scrape. The server needs to finish its first cache refresh before evals can run. Watch the logs for "Cache refreshed: ..." before starting evals in the second terminal.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>A/B eval "no events for compose"</summary>
+      <div class="detail-body">
+        <p>The A/B runner calls <code>composeResponse()</code> directly with fixture events &mdash; it doesn't go through the pipeline. Make sure <code>data/fixtures/ab-compose-cases.json</code> has valid event arrays. Each case needs <code>id</code>, <code>message</code>, <code>neighborhood</code>, and <code>events</code>.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Extraction audit shows "No audit data yet"</summary>
+      <div class="detail-body">
+        <p>No scrape has completed since the server started. Either wait for the scheduled scrape or trigger one manually with <code>curl -X POST http://localhost:3000/api/eval/refresh</code>.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-inner">
+    <span class="footer-brand">Pulse</span>
+    <span class="footer-note">Built in Brooklyn</span>
+  </div>
+</footer>
+
+</body>
+</html>
