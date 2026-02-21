@@ -89,9 +89,9 @@ const rateLimitInterval = setInterval(() => {
 // Gated behind PULSE_TEST_MODE=true env var
 // =======================================================
 
-// --- IP-based rate limit for test endpoint (7 messages per IP per hour) ---
+// --- IP-based rate limit for test endpoint (30 messages per IP per hour) ---
 const ipRateLimits = new Map(); // ip → { count, resetTime }
-const IP_RATE_LIMIT = 7;
+const IP_RATE_LIMIT = 30;
 const IP_RATE_WINDOW = 60 * 60 * 1000; // 1 hour
 
 const CORS_ORIGIN = 'https://jkoufopoulos.github.io';
