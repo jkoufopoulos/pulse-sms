@@ -207,9 +207,9 @@ async function handleMessage(phone, message) {
   try {
     await handleMessageAI(phone, message);
   } catch (err) {
-    console.error('AI flow error:', err.message);
+    console.error('AI flow error:', err.message, err.stack);
     try {
-      await sendSMS(phone, "Pulse hit a snag — try again in a sec!");
+      await sendSMS(phone, `Pulse hit a snag — try again in a sec! [DEBUG: ${err.message}]`);
     } catch (smsErr) {
       console.error(`[CRITICAL] Double failure for ${masked}: AI error="${err.message}", SMS error="${smsErr.message}" — user received nothing`);
     }
@@ -223,7 +223,7 @@ async function handleMessage(phone, message) {
 async function handleMessageAI(phone, message) {
   const traceStart = Date.now();
   const masked = maskPhone(phone);
-  const session = getSession(phone);
+  let session = getSession(phone);
   const trace = startTrace(masked, message);
 
   if (session) {
@@ -271,9 +271,20 @@ async function handleMessageAI(phone, message) {
   const history = getSession(phone)?.conversationHistory || [];
   addToHistory(phone, 'user', message);
 
-  if (preRouted) {
+  // Pre-router filter follow-ups: inject detected filters into session for unified branch
+  let preDetectedFilters = null;
+  if (preRouted && preRouted.intent === 'events') {
+    // Deterministic filter detection (category/time/vibe/free) — use unified branch for composition
+    preDetectedFilters = preRouted.filters;
+    trace.routing.pre_routed = true;
+    trace.routing.result = { intent: preRouted.intent, neighborhood: preRouted.neighborhood, confidence: preRouted.confidence };
+    trace.routing.latency_ms = 0;
+    console.log(`Pre route (pre): intent=${preRouted.intent}, neighborhood=${preRouted.neighborhood} → unified with filters`);
+  }
+
+  if (preRouted && !preDetectedFilters) {
     // =============================================================
-    // Pre-router matched — mechanical shortcuts only
+    // Pre-router matched — mechanical shortcuts
     // (help, numbers, more, event name match, greetings, thanks, bye)
     // =============================================================
     const route = preRouted;
@@ -326,9 +337,16 @@ async function handleMessageAI(phone, message) {
     }
   } else {
     // =============================================================
-    // Pre-router didn't match — use unified LLM call
+    // Unified LLM call — handles semantic messages + pre-detected filter follow-ups
     // =============================================================
-    trace.routing.pre_routed = false;
+
+    // If pre-router detected filters (category/time/vibe/free), inject them for event pre-filtering
+    if (preDetectedFilters) {
+      setSession(phone, { pendingFilters: preDetectedFilters });
+      session = getSession(phone);
+    } else {
+      trace.routing.pre_routed = false;
+    }
 
     // Resolve neighborhood: explicit in message > affirmative nudge response > session fallback
     const extracted = extractNeighborhood(message);
