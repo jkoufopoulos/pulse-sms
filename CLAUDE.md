@@ -8,65 +8,74 @@ Pulse turns a simple text message into a curated night out. A user texts a neigh
 
 ## How Conversations Work
 
-Pulse uses a two-tier routing system to understand messages:
+Pulse routes every incoming message through a two-tier system: a fast deterministic pre-router and a unified LLM call. The handler owns all filter state deterministically — the LLM never manages filters, it only composes from a pre-tagged event pool.
 
-1. **Pre-router (deterministic)** — Pattern-matches common intents instantly with zero latency or AI cost: greetings, bare neighborhood names, "more", "free", number replies for details, and follow-up filter modifications (category/time/vibe changes when the user has an active session).
+**Pre-router (~15% of messages, zero AI cost)** — Pattern-matches mechanical shortcuts: help, numbers 1-5 for details, "more", greetings/thanks/bye, event name matches, and session-aware filter detection ("how about comedy", "free", "later tonight"). Filter detections are injected into the unified branch — the pre-router never composes responses for these.
 
-2. **AI router (semantic)** — Handles ambiguous messages that need real understanding: "any good jazz shows near prospect park tonight", compound filters like "any more free comedy stuff", off-topic deflection. Uses Gemini Flash by default (~10x cheaper than Haiku), falls back to Claude Haiku. When the pre-router doesn't match, `unifiedRespond` in `ai.js` handles routing + composition in a single call flow.
+**Unified LLM call (~85% of messages, ~$0.001/call)** — A single Claude Haiku call that understands intent AND composes the SMS response. Handles neighborhoods, compound requests, off-topic deflection, nudge accepts, boroughs, and all semantic understanding. Receives a tagged event pool where filter-matched events are marked `[MATCH]`.
 
 A typical multi-turn conversation:
 ```
-User: "williamsburg"           → pre-router: events in Williamsburg
-User: "how about comedy"       → pre-router: events + comedy filter, same hood
-User: "2"                      → pre-router: details on pick #2
-User: "later tonight"          → pre-router: events + time_after 22:00
-User: "any more free stuff"    → AI router: events + free + same hood (compound)
-User: "more"                   → pre-router: next batch of picks
+User: "williamsburg"           → unified: Haiku composes Williamsburg picks ($0.001)
+User: "how about comedy"       → pre-router detects comedy filter → unified: tagged pool, comedy [MATCH] ($0.001)
+User: "2"                      → pre-router: details on pick #2 ($0)
+User: "try bushwick"           → unified: comedy filter persists via mergeFilters, Bushwick comedy tagged [MATCH] ($0.001)
+User: "later tonight"          → pre-router detects time filter → unified: comedy+late compound, both filters applied ($0.001)
+User: "forget the comedy"      → pre-router: clear_filters → unified: fresh Bushwick picks, no filters ($0.001)
+User: "more"                   → pre-router: next batch of picks ($0)
 ```
 
-Session state (neighborhood, last picks, last filters) persists for 2 hours per phone number, enabling these follow-up flows without the user repeating context.
+**Filter state flow:** The handler resolves filters deterministically using `mergeFilters(lastFilters, preDetectedFilters)`. Filters persist across neighborhood switches, nudge accepts, and conversational responses. The LLM sees a tagged event pool (`[MATCH]` events first, padded with unmatched) and a `SPARSE` flag when matches are thin. After the LLM responds, the handler saves `activeFilters` as `lastFilters` — never the LLM's guess.
+
+Session state (neighborhood, last picks, active filters) persists for 2 hours per phone number.
 
 ## Architecture
 
 All application source lives under `src/`. Scripts and eval runners are at root level in `scripts/`.
 
 ```
-Daily scrape (10am ET)         Incoming SMS
-        │                           │
-        ▼                           ▼
-   sources/                    handler.js
-   (18 scrapers)               (TCPA opt-out,
-        │                       dedup, cost budget)
-        │                           │
-        ├─► venues.js          pre-router.js ◄─── session.js
-        │   (auto-learn         (deterministic      (12 fields,
-        │    coords,             intent match)       2hr TTL)
-        │    persist)                │
-        ▼                   match? ──┤── no match
-   events.js                    │        │
-   (cache, dedup,               │    ai.js/routeMessage
-    source health)              │    (Gemini / Haiku)
-        │                       │        │
-        │         ┌─────────────┴────────┘
-        │         ▼
-        │   intent-handlers.js
-        │   (dispatch: help, details, more,
-        │    free, nudge_accept, events)
-        │              │
-        └──────►  curation.js
-                  (filter kids, incomplete,
-                   validate perennials)
-                       │
-                  skills/ + prompts.js
-                  (compose prompt assembly,
-                   12 conditional modules)
-                       │
-                  ai.js/composeResponse
-                  (Claude Haiku)
-                       │
-                  formatters.js (480-char)
-                       │
-                  twilio.js (send SMS)
+Daily scrape (10am ET)              Incoming SMS
+        │                                │
+        ▼                                ▼
+   sources/                         handler.js
+   (18 scrapers)                    (TCPA opt-out, dedup,        $0
+        │                            cost budget check)
+        │                                │
+        ├─► venues.js              pre-router.js ◄── session.js
+        │   (auto-learn             (mechanical        (12 fields,
+        │    coords,                 shortcuts)         2hr TTL)
+        │    persist)                    │
+        ▼                    ┌──────────┼──────────────┐
+   events.js            mechanical   filter detect   no match
+   (cache, dedup,       shortcuts    (comedy/time/   (85% of
+    source health)     (help, 1-5,   free/vibe/      messages)
+        │               more, bye)   clear)              │
+        │                  │            │                │
+        │                  ▼            │                │
+        │            intent-handlers    │                │
+        │            (help, details,    │                │
+        │             more, convo)      │                │
+        │                  │            └──► merge ◄────┘
+        │                  │                  │
+        │                $0 AI           pipeline.js
+        │                                mergeFilters()         $0
+        │                                buildTaggedPool()
+        │                     ┌── [MATCH] + unmatched events
+        │                     │   + ACTIVE_FILTER / SPARSE
+        │                     ▼
+        └──────────►   ai.js/unifiedRespond
+                       (Claude Haiku, 1 call)          ~$0.001
+                       skills/ + prompts.js
+                       (12 conditional modules)
+                              │
+                              ▼
+                       handler saves                    $0
+                       activeFilters → lastFilters
+                       (deterministic, not LLM-derived)
+                              │
+                       formatters.js (480-char)
+                              │
+                       twilio.js (send SMS)            ~$0.008
 
 ──── observability ────
 traces.js — per-request JSONL + 200-trace ring buffer
@@ -77,6 +86,17 @@ evals/     — code checks, LLM judges, extraction audit
 scripts/   — pipeline, scenario, regression, A/B evals
 ```
 
+**Cost per message:**
+
+| Path | AI calls | AI cost | Twilio | Total |
+|------|----------|---------|--------|-------|
+| Mechanical shortcut (help, 1-5, more, greetings) | 0 | $0 | ~$0.008 | ~$0.008 |
+| Details (with AI-composed detail card) | 1 Haiku | ~$0.001 | ~$0.008 | ~$0.009 |
+| Filter follow-up ("how about comedy") | 1 Haiku | ~$0.001 | ~$0.008 | ~$0.009 |
+| Neighborhood / compound / semantic | 1 Haiku | ~$0.001 | ~$0.008 | ~$0.009 |
+
+Typical 5-message session: ~$0.004 AI + ~$0.040 Twilio = ~$0.044 total. Well under $0.10/day budget.
+
 ## File Map
 
 All paths are relative to `src/` unless prefixed with a directory.
@@ -86,19 +106,19 @@ All paths are relative to `src/` unless prefixed with a directory.
 | File | Purpose |
 |------|---------|
 | `server.js` | Express setup, routes, health check, daily schedule, graceful shutdown |
-| `handler.js` | Twilio webhook, TCPA opt-out (STOP/UNSUBSCRIBE/CANCEL/QUIT), dedup, per-user daily cost budget ($0.10/day), intent dispatch to `intent-handlers.js` |
-| `pre-router.js` | Deterministic intent matching — greetings, details, more, free, bare neighborhoods, boroughs, and session-aware follow-up filters (category/time/vibe) |
-| `intent-handlers.js` | Intent dispatch — `handleHelp`, `handleConversational`, `handleDetails`, `handleMore`, `handleFree`, `handleNudgeAccept`, `handleEventsDefault`; each receives context and orchestrates event fetching, filtering, compose, session writes, and trace finalization |
+| `handler.js` | Twilio webhook, TCPA opt-out (STOP/UNSUBSCRIBE/CANCEL/QUIT), dedup, per-user daily cost budget ($0.10/day). Orchestrates the full pipeline: pre-router → filter resolution (`mergeFilters`) → tagged pool (`buildTaggedPool`) → unified LLM call → deterministic session save (`activeFilters` as `lastFilters`). Handles `clear_filters` intent by wiping filter state before unified branch. |
+| `pre-router.js` | Deterministic intent matching (~15% of messages) — help, numbers 1-5, more, event name match, greetings/thanks/bye. Session-aware filter detection (category/time/vibe/free) returns `intent: 'events'` with detected filters for handler injection. `clear_filters` intent when user explicitly drops filters ("forget the comedy", "show me everything"). Everything else returns `null` → unified LLM. |
+| `intent-handlers.js` | Mechanical intent handlers — `handleHelp`, `handleConversational`, `handleDetails`, `handleMore`. Each receives context and handles response + session writes. Only used for pre-router mechanical shortcuts; all semantic messages go through `unifiedRespond`. |
 | `session.js` | Per-phone session store with 2hr TTL — 12 fields: `lastPicks`, `lastEvents`, `lastNeighborhood`, `lastFilters`, `conversationHistory`, `allPicks`, `allOfferedIds`, `visitedHoods`, `pendingNearby`, `pendingNearbyEvents`, `pendingFilters`, `pendingMessage` |
 
 **AI & prompts:**
 
 | File | Purpose |
 |------|---------|
-| `ai.js` | AI calls: `routeMessage` (Gemini Flash or Claude Haiku), `composeResponse` (Claude Haiku), `extractEvents` (Claude Haiku), `unifiedRespond` (single-call route+compose for pre-router misses) |
-| `prompts.js` | System prompts for routing, composition, extraction, and details — centralized prompt strings used by `ai.js` |
-| `skills/build-compose-prompt.js` | Dynamic compose prompt assembly — `buildComposePrompt(events, options)` conditionally appends skill modules based on context |
-| `skills/compose-skills.js` | 12 composable prompt fragments: `core`, `tonightPriority`, `sourceTiers`, `neighborhoodMismatch`, `perennialFraming`, `venueFraming`, `lastBatch`, `freeEmphasis`, `activityAdherence`, `conversationAwareness`, `pendingIntent` |
+| `ai.js` | AI calls: `unifiedRespond` (Claude Haiku — single call for routing + composition, receives tagged event pool with `[MATCH]` tags, `ACTIVE_FILTER`/`SPARSE` context, returns `clear_filters` boolean), `composeResponse` (Claude Haiku — used by handleMore), `extractEvents` (Claude Haiku — scrape-time extraction), `routeMessage` (legacy, still used by handleMore) |
+| `prompts.js` | System prompts: `UNIFIED_SYSTEM` (primary — understanding + composition + filter-aware selection rules + `clear_filters` schema), `COMPOSE_SYSTEM` (used by handleMore), `ROUTE_SYSTEM`, `EXTRACTION_PROMPT`, `DETAILS_SYSTEM` |
+| `skills/build-compose-prompt.js` | Dynamic prompt assembly — `buildUnifiedPrompt(events, options)` assembles `UNIFIED_SYSTEM` + conditional skill modules, `buildComposePrompt(events, options)` does the same for the compose-only flow |
+| `skills/compose-skills.js` | 12 composable prompt fragments: `core`, `tonightPriority`, `sourceTiers`, `neighborhoodMismatch`, `perennialFraming`, `venueFraming`, `lastBatch`, `freeEmphasis`, `activityAdherence`, `conversationAwareness`, `nearbySuggestion`, `pendingIntent` |
 
 **Event data:**
 
@@ -106,7 +126,7 @@ All paths are relative to `src/` unless prefixed with a directory.
 |------|---------|
 | `events.js` | Daily event cache with disk persistence (`data/events-cache.json`), source health tracking, cross-source dedup, venue persistence, scrape-time date filtering (today through 7 days out) + kids filtering, `getEvents()`, `isCacheFresh()` (skips startup scrape when <20hr old) |
 | `curation.js` | Pre-compose deterministic filters — `filterKidsEvents` (drops children's events from all sources), `filterIncomplete` (below completeness threshold), `validatePerennialActivity` (removes bare-venue perennials) |
-| `pipeline.js` | Shared event pipeline helpers — `applyFilters` (free/category/time), `resolveActiveFilters` (merges route + pending + session filters), `saveResponseFrame` (atomic session writes), `buildExhaustionMessage` |
+| `pipeline.js` | Event pipeline — `mergeFilters` (compounds filters: incoming truthy values override, falsy fall back to existing), `buildTaggedPool` (returns `{pool, matchCount, isSparse}` with `[MATCH]`-tagged events first, padded to 15), `eventMatchesFilters` (checks category/free/time with after-midnight wrapping), `applyFilters` (legacy soft-mode filtering), `resolveActiveFilters`, `saveResponseFrame` (atomic session writes), `buildExhaustionMessage` |
 | `perennial.js` | Perennial picks loader — `getPerennialPicks(hood, opts)`, caches JSON, filters by day, checks adjacent neighborhoods |
 | `venues.js` | Shared venue coord map, auto-learning from sources, Nominatim geocoding fallback, persistence (export/import learned venues) |
 | `geo.js` | `resolveNeighborhood`, proximity ranking, haversine, time filtering |
@@ -200,11 +220,10 @@ Required:
 Optional:
 - `PORT` — Server port (default: 3000)
 - `PULSE_TEST_MODE=true` — Enables `/test` simulator UI and `/api/sms/test` endpoint
-- `PULSE_AI_ROUTING=false` — Disable AI routing (unused now that legacy is removed)
-- `GEMINI_API_KEY` — Google Gemini API key (optional; enables Gemini Flash for routing — ~10x cheaper than Haiku)
-- `PULSE_ROUTE_PROVIDER` — Routing provider: "gemini" or "anthropic" (default: "gemini" if GEMINI_API_KEY set, else "anthropic")
-- `PULSE_MODEL_ROUTE` — Claude model for routing (default: claude-haiku-4-5-20251001, used when provider=anthropic)
-- `PULSE_MODEL_ROUTE_GEMINI` — Gemini model for routing (default: gemini-2.5-flash)
+- `GEMINI_API_KEY` — Google Gemini API key (optional; used as fallback provider for routing in legacy `routeMessage` path)
+- `PULSE_ROUTE_PROVIDER` — Routing provider for legacy path: "gemini" or "anthropic" (default: "gemini" if GEMINI_API_KEY set)
+- `PULSE_MODEL_ROUTE` — Claude model for legacy routing (default: claude-haiku-4-5-20251001)
+- `PULSE_MODEL_ROUTE_GEMINI` — Gemini model for legacy routing (default: gemini-2.5-flash)
 - `PULSE_MODEL_COMPOSE` — Claude model for composition (default: claude-haiku-4-5-20251001)
 - `PULSE_MODEL_EXTRACT` — Claude model for extraction (default: claude-haiku-4-5-20251001)
 - `TICKETMASTER_API_KEY` — Ticketmaster Discovery API key (optional; scraper returns [] if missing)
@@ -238,10 +257,11 @@ npm run eval:gen       # generate synthetic test scenarios
 
 ## Key Design Decisions
 
-- **Two-tier routing**: Common patterns (greetings, neighborhoods, "more", follow-up filters) are handled deterministically by the pre-router at zero latency and zero AI cost. Only ambiguous or compound messages reach the AI router. This keeps ~60% of messages off the AI path while still supporting natural conversation.
-- **Conversational UX**: Users text naturally — no slash commands or rigid syntax. The router (pre-router + AI) figures out intent, neighborhood, and filters. Follow-up messages like "how about comedy" or "later tonight" modify filters on the active session rather than starting over.
+- **Pre-router + unified LLM**: The pre-router handles ~15% of messages (mechanical shortcuts) at zero AI cost. Everything semantic — neighborhoods, compound requests, off-topic, nudge accepts — goes through a single `unifiedRespond` Claude Haiku call (~$0.001) that both understands intent AND composes the SMS response. Simple filter follow-ups ("how about comedy") are detected by the pre-router and injected into the unified branch as `preDetectedFilters`, so the LLM sees them in the tagged event pool.
+- **Tagged event pool + deterministic filter state**: The handler owns all filter state. `mergeFilters(lastFilters, preDetectedFilters)` compounds filters across turns. `buildTaggedPool(events, activeFilters)` tags matching events with `[MATCH]` (up to 10 matched first, padded to 15 with unmatched) and provides `matchCount` + `isSparse` flag. The LLM receives the tagged pool and FILTER-AWARE SELECTION rules — it composes from what it sees but never manages filter state. After the LLM responds, the handler saves `activeFilters` as `lastFilters` (not the LLM's guess). This fixes filter drift across neighborhood switches without over-narrowing event pools.
+- **Conversational UX**: Users text naturally — no slash commands or rigid syntax. Follow-up messages like "how about comedy" or "later tonight" compound with existing filters rather than replacing them. Filters persist across neighborhood switches ("try bushwick" keeps the comedy filter). Users can clear filters explicitly ("forget the comedy") via pre-router regex, or semantically ("just show me what's good") via the LLM's `clear_filters: true` response field.
 - **Daily cache with disk persistence**: Events are scraped once at 10am ET and cached in memory + persisted to `data/events-cache.json`. On boot, the persisted cache loads instantly. If the cache is <20 hours old (`isCacheFresh()`), the startup scrape is skipped entirely. This avoids the ~8-minute cold start on Railway redeploys. A Railway volume at `/app/data` ensures the cache survives across deploys.
-- **Two-call AI flow**: Call 1 routes intent + neighborhood. Call 2 picks events + writes the SMS. This keeps each call focused and fast. Both calls use Haiku — A/B eval showed Haiku matches or beats Sonnet on compose quality (71% preference, 89% tone pass) at 73% lower cost.
+- **Single-call AI flow**: `unifiedRespond` handles both routing and composition in one Claude Haiku call. This replaced the old two-call flow (route + compose) which had filter state disagreements between calls. A/B eval showed Haiku matches or beats Sonnet on compose quality (71% preference, 89% tone pass) at 73% lower cost. The `handleMore` path still uses the legacy `composeResponse` two-call flow.
 - **No Tavily in hot path**: Tavily was removed from the live request path. All event data comes from the daily scrape.
 - **Cross-source dedup**: Event IDs are hashed from name + venue + date (not source), so the same event from Dice and BrooklynVegan merges automatically. Sources are processed in weight order, so the higher-trust version wins.
 - **Source trust** (weight 0.6-0.9): Controls dedup merge order — higher-weight source wins when the same event appears in multiple sources. Skint (0.9) = Nonsense NYC (0.9) > RA (0.85) = Oh My Rockness (0.85) > Dice (0.8) = BrooklynVegan (0.8) = BAM (0.8) = SmallsLIVE (0.8) = Yutori (0.8) > NYC Parks (0.75) = DoNYC (0.75) = Songkick (0.75) = Ticketmaster (0.75) > Eventbrite (0.7) = NYPL (0.7) > Tavily (0.6). Not visible to compose Claude.
@@ -249,11 +269,11 @@ npm run eval:gen       # generate synthetic test scenarios
 - **Source tiers** (unstructured/primary/secondary): Soft signal passed to compose Claude via `source_tier` field. Claude prefers unstructured and primary over secondary when choosing between similar events. `extraction_confidence` is also passed as a soft signal for tie-breaking.
 - **Venue auto-learning**: Sources with lat/lng (BrooklynVegan, Dice, Songkick, Eventbrite, Ticketmaster) teach venue coords to the shared venue map at scrape time. This helps sources without geo data (RA, Skint, Nonsense NYC) resolve neighborhoods.
 - **Venue persistence**: Learned venues are saved to `data/venues-learned.json` after each scrape and loaded on boot, so knowledge compounds across restarts.
-- **Session-aware follow-ups**: The session stores `lastFilters` alongside picks and neighborhood, so the router sees what the user already asked for. This lets follow-ups like "how about theater" or "later tonight" modify the active session rather than being misclassified as conversational. The pre-router catches simple filter changes deterministically; the AI router handles compound requests ("any more free comedy stuff") with few-shot examples.
+- **Session-aware follow-ups**: The session stores `lastFilters` alongside picks and neighborhood. The pre-router detects simple filter follow-ups ("how about comedy", "free", "later tonight") and injects them as `preDetectedFilters`. The handler compounds them with existing filters via `mergeFilters`. Compound requests ("any more free comedy stuff") fall through to the unified LLM. Filter clearing uses a hybrid approach: common phrases ("forget the comedy") are caught by pre-router regex, semantic clearing ("just show me what's good") by the LLM's `clear_filters` response field.
 - **Scrape-time quality gates**: Events are filtered at scrape time before entering the cache: (1) date window filter keeps only today through 7 days out, (2) kids event filter drops children's/family events from all sources. This keeps the cache focused and reduces noise for compose Claude.
 - **480-char SMS limit**: All responses are capped at 480 chars. Claude is prompted to write concisely.
 - **TCPA opt-out compliance**: Messages starting with STOP, UNSUBSCRIBE, CANCEL, or QUIT are silently dropped (no reply sent). Twilio manages the actual opt-out list; Pulse ensures no response leaks through.
 - **Per-user daily AI budget**: Each phone number gets $0.10/day of AI spend. `trackAICost` accumulates per-user cost with provider-aware pricing (Haiku vs Gemini). `isOverBudget` blocks further AI calls with a friendly message. Resets daily (NYC timezone).
-- **Composable prompt skills**: The compose prompt is assembled dynamically from 12 conditional skill modules (`skills/compose-skills.js`). `build-compose-prompt.js` selects which skills to include based on context — tonight priority, neighborhood mismatch, perennial framing, free emphasis, conversation awareness, etc.
+- **Composable prompt skills**: The unified system prompt is assembled dynamically from `UNIFIED_SYSTEM` base + 12 conditional skill modules (`skills/compose-skills.js`). `buildUnifiedPrompt(events, options)` selects which skills to include based on context — tonight priority, neighborhood mismatch, perennial framing, free emphasis, conversation awareness, nearby suggestion, etc. A first-message-to-Williamsburg prompt activates ~5 skills; a follow-up with history activates ~7. This keeps prompts focused (~800 tokens vs ~1,400 with everything on).
 - **Request tracing**: Every request writes a JSONL trace to `data/traces/` (daily rotation, 4-file max). A 200-entry in-memory ring buffer powers the eval UI. Traces capture intent, neighborhood, picked events, AI costs, timing, and the full SMS response.
-- **Intent dispatch separation**: `handler.js` handles TCPA, dedup, budget, and routing. `intent-handlers.js` handles the actual intent logic (7 handlers). This keeps handler.js focused on request lifecycle and intent-handlers.js focused on business logic.
+- **Intent dispatch separation**: `handler.js` handles TCPA, dedup, budget, routing, filter resolution, tagged pool building, and the unified LLM call. `intent-handlers.js` handles 4 mechanical intent handlers (help, conversational, details, more). The unified branch in handler.js handles all semantic messages directly.
