@@ -3,6 +3,29 @@ const { extractEvents } = require('../ai');
 const { FETCH_HEADERS, normalizeExtractedEvent } = require('./shared');
 const { captureExtractionInput } = require('../extraction-capture');
 
+/**
+ * Resolve a day name to the next upcoming date (today or later) in ET.
+ * Returns "FRIDAY, FEBRUARY 21, 2026" style string.
+ */
+function resolveUpcomingDate(dayName) {
+  const dayIndex = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday']
+    .indexOf(dayName.toLowerCase());
+  if (dayIndex === -1) return null;
+
+  const now = new Date();
+  // Get current NYC date
+  const nycStr = now.toLocaleDateString('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
+  const [m, d, y] = nycStr.split('/').map(Number);
+  const nycDate = new Date(y, m - 1, d);
+  const todayDow = nycDate.getDay();
+
+  let daysAhead = dayIndex - todayDow;
+  if (daysAhead < 0) daysAhead += 7; // always look forward (or today if same day)
+
+  const target = new Date(y, m - 1, d + daysAhead);
+  return target.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase();
+}
+
 async function fetchSkintEvents() {
   console.log('Fetching The Skint...');
   try {
@@ -32,9 +55,15 @@ async function fetchSkintEvents() {
     entry.find('p').each((i, el) => {
       const text = $(el).text().trim();
       if (!text) return;
-      // Keep day headers as section markers for Claude
+      // Resolve day headers to explicit dates so Claude doesn't have to guess
       if (dayHeaderPattern.test(text)) {
-        eventParagraphs.push(`\n--- ${text.toUpperCase()} ---`);
+        const dayName = text.toLowerCase();
+        if (dayName === 'ongoing') {
+          eventParagraphs.push(`\n--- ONGOING ---`);
+        } else {
+          const resolved = resolveUpcomingDate(dayName);
+          eventParagraphs.push(`\n--- ${resolved || text.toUpperCase()} ---`);
+        }
         return;
       }
       if (text.length < 30) return;
@@ -44,7 +73,7 @@ async function fetchSkintEvents() {
       }
     });
 
-    // Prepend today's date so Claude can resolve "friday" → actual date
+    // Prepend today's date for context
     const today = new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     let content = `Published: ${today}\n\n` + eventParagraphs.slice(0, 20).join('\n\n');
     if (content.length < 50) {
