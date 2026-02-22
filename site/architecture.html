@@ -494,7 +494,7 @@
 <header class="page-header">
   <div class="container">
     <h1>How Pulse <em>works</em></h1>
-    <p class="subtitle">A text message comes in. 18 scrapers, two routing layers, a prompt assembly system, and a 480-character limit later, a recommendation goes out.</p>
+    <p class="subtitle">A text message comes in. 18 scrapers, a unified AI layer, a tagged event pool, and a 480-character limit later, a recommendation goes out.</p>
   </div>
 </header>
 
@@ -505,14 +505,14 @@
     <h2 class="section-title">Text in, picks out</h2>
     <div class="section-body">
       <p>Pulse is an SMS-based AI assistant that recommends NYC nightlife and events. A user texts a neighborhood name and gets back curated picks within seconds. The entire experience happens in a single SMS thread &mdash; no app, no account, no links until asked.</p>
-      <p>Behind the scenes, Pulse scrapes <strong>18 event sources</strong> every morning, deduplicates and caches them in memory, then uses a <strong>two-tier routing system</strong> to understand incoming messages and an <strong>AI compose step</strong> to write opinionated, concise recommendations that fit in a text message.</p>
+      <p>Behind the scenes, Pulse scrapes <strong>18 event sources</strong> every morning, deduplicates and caches them in memory, then uses a lightweight <strong>pre-router</strong> for mechanical shortcuts and a <strong>unified AI call</strong> (Claude Haiku) for everything semantic &mdash; understanding intent, picking events from a tagged pool, and writing the SMS in a single pass.</p>
     </div>
 
     <div class="stats">
       <span class="stat"><em>18</em> event sources</span>
       <span class="stat"><em>36</em> neighborhoods</span>
       <span class="stat"><em>480</em> char SMS cap</span>
-      <span class="stat"><em>~60%</em> pre-routed (zero AI)</span>
+      <span class="stat"><em>~15%</em> pre-routed (zero AI)</span>
       <span class="stat"><em>2hr</em> session TTL</span>
     </div>
   </div>
@@ -541,49 +541,45 @@
     </details>
 
     <details>
-      <summary><span class="step-label">Step 2</span> Routing &mdash; pre-router match <span class="step-preview">0ms, $0</span></summary>
+      <summary><span class="step-label">Step 2</span> Routing &mdash; pre-router miss, unified LLM <span class="step-preview">~400ms, ~$0.001</span></summary>
       <div class="detail-body">
-        <p><code>pre-router.js</code> checks the message against pattern rules, using the session (empty in this case) for context. "williamsburg" matches the bare-neighborhood pattern &mdash; it's a recognized name in our 36-neighborhood map.</p>
-        <p>Returns: <code>{ intent: "events", neighborhood: "Williamsburg", confidence: 0.95 }</code></p>
-        <p><strong style="color: var(--green);">No AI call needed.</strong> The pre-router handles this at zero latency and zero cost. This is why ~60% of messages never touch the AI router &mdash; most texts are just neighborhood names, "more", numbers, or simple filter words.</p>
+        <p><code>pre-router.js</code> checks the message against mechanical shortcuts: help, numbers 1-5, "more", greetings, thanks, bye, impatient follow-ups, and event name matches from session picks. "williamsburg" doesn't match any of these &mdash; it's a semantic request that needs real understanding.</p>
+        <p>The message falls through to the <strong>unified LLM</strong> path. Before calling the LLM, the handler resolves the neighborhood from the message, fetches events, builds a tagged pool, and assembles the full context. The LLM handles intent understanding, event selection, and SMS composition in a single call.</p>
+        <p>The pre-router only handles ~15% of messages &mdash; purely mechanical patterns where no AI is needed. Everything semantic (neighborhoods, categories, vibes, compound queries, off-topic deflection) goes through the unified LLM for better understanding.</p>
       </div>
     </details>
 
     <details>
-      <summary><span class="step-label">Step 3</span> Intent dispatch <span class="step-preview">7 handlers</span></summary>
+      <summary><span class="step-label">Step 3</span> Filter resolution &amp; tagged pool <span class="step-preview">deterministic, $0</span></summary>
       <div class="detail-body">
-        <p><code>handler.js</code> dispatches to <code>handleEventsDefault()</code> in <code>intent-handlers.js</code> based on the <code>intent: "events"</code> result. Each intent has its own handler:</p>
-        <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;">
-          <span class="stat"><em>help</em> &rarr; usage guide</span>
-          <span class="stat"><em>conversational</em> &rarr; chitchat deflection</span>
-          <span class="stat"><em>details</em> &rarr; expand a pick</span>
-          <span class="stat"><em>more</em> &rarr; next batch</span>
-          <span class="stat"><em>free</em> &rarr; free events only</span>
-          <span class="stat"><em>nudge_accept</em> &rarr; "yes" to a travel suggestion</span>
-          <span class="stat"><em>events</em> &rarr; main recommendation flow</span>
-        </div>
-        <p style="margin-top: 12px;">Why separate handlers? Each intent has different data needs. "details" only needs the session's last picks. "more" needs to exclude already-shown events. "events" needs to fetch from the cache, run curation, and compose. Separating them keeps each handler focused and testable.</p>
+        <p>Before calling the LLM, the handler builds the event context deterministically:</p>
+        <ul>
+          <li><strong>Neighborhood extraction</strong> &mdash; <code>extractNeighborhood("williamsburg")</code> resolves the alias to "Williamsburg" from the 36-neighborhood map, including aliases and landmarks.</li>
+          <li><strong>Filter resolution</strong> &mdash; <code>mergeFilters(session.lastFilters, incoming)</code> compounds active filters. For a first message, filters are empty. On follow-ups like "how about comedy", the category filter is merged with any existing filters.</li>
+          <li><strong>Tagged pool</strong> &mdash; <code>buildTaggedPool(events, activeFilters)</code> tags each event with <code>filter_match: true/false</code>. Matched events come first (up to 10), padded to 15 with unmatched events. The LLM sees <code>[MATCH]</code> tags on matching events but gets the full pool.</li>
+        </ul>
+        <p style="margin-top: 12px;">This is the key architectural decision: <strong>the handler owns all filter state</strong>. The LLM never manages filters &mdash; it just sees a tagged pool and composes from it. Filters persist deterministically across neighborhood switches, nudge accepts, and conversational responses.</p>
       </div>
     </details>
 
     <details>
-      <summary><span class="step-label">Step 4</span> Event fetching &amp; curation <span class="step-preview">14 &rarr; 8 events</span></summary>
+      <summary><span class="step-label">Step 4</span> Event fetching &amp; curation <span class="step-preview">14 &rarr; 15 tagged events</span></summary>
       <div class="detail-body">
         <p><code>getEvents("Williamsburg")</code> queries the in-memory cache. The cache was built at 10am from 18 scrapers. Events are already deduped and sorted by proximity to Williamsburg's center coordinates.</p>
-        <p>Say it returns 14 events. Before Claude sees them, <code>curation.js</code> runs three deterministic filters:</p>
+        <p>Say it returns 14 events. Before entering the tagged pool, <code>curation.js</code> runs deterministic quality filters:</p>
         <ul>
           <li><strong>filterKidsEvents</strong> &mdash; Drops NYC Parks events that match children's patterns ("storytime", "toddler", "ages 3-5"). Without this, Claude would occasionally recommend a toddler puppet show alongside a DJ set.</li>
           <li><strong>filterIncomplete</strong> &mdash; Drops events below a completeness threshold (missing name, venue, or time). Prevents Claude from recommending "TBA at TBD".</li>
           <li><strong>validatePerennialActivity</strong> &mdash; Perennial picks (always-good bars/venues) are only included if they have a specific activity tonight (trivia, live jazz, DJ). Removes generic "nice bar" suggestions that don't answer "what's happening tonight?"</li>
         </ul>
-        <p>After curation: 12 events remain. Plus 2 perennial picks with tonight activities. The top 8 are sent to Claude.</p>
+        <p>After curation: 12 events remain. Plus 2 perennial picks with tonight activities. <code>buildTaggedPool()</code> tags each event as <code>[MATCH]</code> or unmatched based on active filters, then sends up to 15 to the unified LLM (matched first, padded with unmatched). For this filterless first message, all events are unmatched &mdash; the LLM picks freely.</p>
       </div>
     </details>
 
     <details>
       <summary><span class="step-label">Step 5</span> Prompt assembly <span class="step-preview">5 of 12 skills ON</span></summary>
       <div class="detail-body">
-        <p><code>build-compose-prompt.js</code> looks at the request context and assembles a prompt from skill modules. For this first-message-to-Williamsburg request:</p>
+        <p><code>buildUnifiedPrompt()</code> assembles the system prompt from the <code>UNIFIED_SYSTEM</code> base plus conditional skill modules. The user prompt includes the tagged event pool (with <code>[MATCH]</code> tags), any active filter context (<code>ACTIVE_FILTER</code>, <code>MATCH_COUNT</code>, <code>SPARSE</code>), conversation history, and the user's message. For this first-message-to-Williamsburg request:</p>
         <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
           <div style="display: flex; gap: 8px; align-items: baseline;">
             <span style="color: var(--green); font-size: 0.82rem; font-weight: 700; min-width: 18px;">ON</span>
@@ -626,30 +622,32 @@
     </details>
 
     <details>
-      <summary><span class="step-label">Step 6</span> Claude composes the SMS <span class="step-preview">~800ms, $0.003</span></summary>
+      <summary><span class="step-label">Step 6</span> Unified LLM call <span class="step-preview">~800ms, ~$0.001</span></summary>
       <div class="detail-body">
-        <p><code>composeResponse()</code> sends the assembled prompt, the 8 candidate events (as structured JSON), and the user's message to <strong>Claude Haiku</strong>. Claude picks 2-3 events and writes the SMS text.</p>
+        <p><code>unifiedRespond()</code> sends the assembled system prompt (base + skills), the tagged event pool, filter context, conversation history, and the user's message to <strong>Claude Haiku</strong> in a single call. Claude understands the intent, picks 2-3 events from the pool, and writes the SMS text &mdash; all in one pass.</p>
         <p>Claude returns structured JSON:</p>
         <div class="code-block" style="margin-top: 8px;">{
-  "sms_text": "Tonight in Williamsburg:\n\n1) DJ set at Good Room — always goes off on Fridays. 10pm, $15\n\n2) Indie at Baby's All Right — solid lineup tonight. 8pm, $18\n\n3) Free comedy at Muchmore's — underground standup, BYOB vibes. 9pm\n\nReply 1-3 for details, MORE for extra picks, or FREE for free events",
+  "sms_text": "Tonight in Williamsburg:\n\n1) DJ set at Good Room — always goes off on Fridays. 10pm, $15\n\n2) Indie at Baby's All Right — solid lineup tonight. 8pm, $18\n\n3) Free comedy at Muchmore's — underground standup, BYOB vibes. 9pm\n\nReply 1-3 for details or MORE for extra picks",
   "picks": [
     { "rank": 1, "event_id": "dice-good-room-0221", "why": "reliable Friday DJ night" },
     { "rank": 2, "event_id": "bv-babys-0221", "why": "strong indie lineup" },
     { "rank": 3, "event_id": "skint-muchmores-0221", "why": "free comedy, unique" }
   ],
-  "neighborhood_used": "Williamsburg"
+  "neighborhood_used": "Williamsburg",
+  "filters_used": { "category": null, "free_only": false, "vibe": null, "time_after": null },
+  "clear_filters": false
 }</div>
-        <p>Notice the picks: #1 from Dice (weight 0.8), #2 from BrooklynVegan (0.8), #3 from Skint (0.9). The <code>sourceTiers</code> skill told Claude to prefer the Skint pick, and it was chosen despite being free &mdash; the curation taste in <code>core</code> favors "unique one-off events."</p>
-        <p>Cost: ~$0.003 (Haiku). Latency: ~800ms.</p>
+        <p>The <code>sourceTiers</code> skill told Claude to prefer the Skint pick (#3), and it was chosen despite being free &mdash; the curation taste in <code>core</code> favors "unique one-off events."</p>
+        <p>Cost: ~$0.001 (Haiku, single call). Latency: ~800ms. This is cheaper than the old two-call flow (route + compose) because everything happens in one pass.</p>
       </div>
     </details>
 
     <details>
-      <summary><span class="step-label">Step 7</span> Send &amp; save <span class="step-preview">289 of 480 chars</span></summary>
+      <summary><span class="step-label">Step 7</span> Send, save &amp; persist filters <span class="step-preview">289 of 480 chars</span></summary>
       <div class="detail-body">
-        <p>The SMS text (289 characters, under the 480-char cap) is sent via Twilio. The session is written with the picks, event map, neighborhood, and filters. A JSONL trace captures the full request for evals.</p>
-        <p>Now when the user texts <strong>"2"</strong>, the pre-router matches it as <code>intent: "details"</code>, looks up pick #2 (Baby's All Right) from <code>session.lastPicks</code>, and sends the full event details with a link. No AI call needed.</p>
-        <p>When they text <strong>"how about comedy"</strong>, the pre-router sees an active session in Williamsburg and matches the category filter change. It re-runs the events flow with <code>{ category: "comedy" }</code> &mdash; same neighborhood, filtered events, new compose call.</p>
+        <p>The SMS text (289 characters, under the 480-char cap) is sent via Twilio. The handler saves the session atomically via <code>saveResponseFrame()</code> &mdash; picks, event map, neighborhood, and <strong>active filters</strong>. Filters are persisted deterministically by the handler, not from the LLM's output. A JSONL trace captures the full request for evals.</p>
+        <p>Now when the user texts <strong>"2"</strong>, the pre-router matches it as <code>intent: "details"</code>, looks up pick #2 (Baby's All Right) from <code>session.lastPicks</code>, and sends the full event details with a link. No AI call needed ($0).</p>
+        <p>When they text <strong>"how about comedy"</strong>, it falls through to the unified LLM. The handler merges <code>{ category: "comedy" }</code> with any existing filters, builds a new tagged pool with comedy events marked <code>[MATCH]</code>, and the LLM composes picks that prefer the matches (~$0.001).</p>
       </div>
     </details>
 
@@ -657,16 +655,16 @@
       <h3>Total cost &amp; timing</h3>
       <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 4px;">
         <div>
-          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">~$0.003</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">AI cost (1 Haiku call)</div>
+          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">~$0.001</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">AI cost (1 unified Haiku call)</div>
         </div>
         <div>
           <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">~1.2s</div>
           <div style="font-size: 0.78rem; color: var(--text-muted);">total latency</div>
         </div>
         <div>
-          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">0ms</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">routing (pre-router)</div>
+          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">1</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">AI call (unified)</div>
         </div>
         <div>
           <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">289</div>
@@ -711,9 +709,9 @@
 <section id="message-flow">
   <div class="container">
     <p class="section-label">Message Flow</p>
-    <h2 class="section-title">The eight layers</h2>
+    <h2 class="section-title">Two paths, seven layers</h2>
     <div class="section-body">
-      <p>Each message passes through up to 8 layers. Not every layer runs on every request &mdash; "more" skips the cache fetch, "details" skips curation and compose. The walkthrough above shows which layers fire for a typical request.</p>
+      <p>Each message takes one of two paths. ~15% are <strong>mechanical shortcuts</strong> (help, numbers, "more", greetings) handled instantly by the pre-router with zero AI cost. The other ~85% go through the <strong>unified LLM path</strong> where a single Claude Haiku call handles intent, event selection, and SMS composition. Not every layer runs on every request &mdash; "details" only needs the session, "more" reuses the existing pool.</p>
     </div>
 
     <div class="flow">
@@ -728,55 +726,50 @@
       </div>
       <div class="flow-arrow"></div>
       <div class="flow-node node-blue">
-        <strong>3. Routing</strong>
-        <div class="label">Pre-router (deterministic, ~60%) or AI router (Gemini Flash / Haiku, ~40%)</div>
-      </div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-yellow">
-        <strong>4. Intent dispatch</strong>
-        <div class="label">7 handlers: help, conversational, details, more, free, nudge_accept, events</div>
+        <strong>3. Pre-router</strong>
+        <div class="label">Mechanical shortcuts (~15%): help, numbers 1-5, "more", greetings, event name match. $0.</div>
       </div>
       <div class="flow-arrow"></div>
       <div class="flow-node node-green">
-        <strong>5. Event fetch &amp; curation</strong>
-        <div class="label">In-memory cache query &rarr; filter kids &rarr; filter incomplete &rarr; validate perennials</div>
+        <strong>4. Filter resolution &amp; tagged pool</strong>
+        <div class="label">mergeFilters() &rarr; getEvents() &rarr; curation &rarr; buildTaggedPool() with [MATCH] tags. $0.</div>
       </div>
       <div class="flow-arrow"></div>
-      <div class="flow-node node-blue">
-        <strong>6. Prompt assembly</strong>
-        <div class="label">Conditional skill modules assembled into the compose prompt (~800 tokens)</div>
+      <div class="flow-node node-yellow">
+        <strong>5. Prompt assembly</strong>
+        <div class="label">UNIFIED_SYSTEM base + conditional skill modules + ACTIVE_FILTER/SPARSE context</div>
       </div>
       <div class="flow-arrow"></div>
       <div class="flow-node node-purple">
-        <strong>7. AI compose</strong>
-        <div class="label">Claude Haiku picks 2-3 events + writes the SMS. Returns structured JSON.</div>
+        <strong>6. Unified LLM call</strong>
+        <div class="label">Claude Haiku: intent + event selection + SMS text in one pass. ~$0.001.</div>
       </div>
       <div class="flow-arrow"></div>
       <div class="flow-node node-coral">
-        <strong>8. Send &amp; trace</strong>
-        <div class="label">SMS via Twilio &rarr; session update &rarr; JSONL trace saved</div>
+        <strong>7. Send, save &amp; persist filters</strong>
+        <div class="label">SMS via Twilio &rarr; saveResponseFrame() (picks, filters, neighborhood) &rarr; JSONL trace</div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- 4. Two-Tier Routing -->
+<!-- 4. Routing & Filters -->
 <section id="routing">
   <div class="container">
     <p class="section-label">Routing</p>
-    <h2 class="section-title">Two-tier intent resolution</h2>
+    <h2 class="section-title">Pre-router + unified LLM</h2>
     <div class="section-body">
-      <p>Most messages follow predictable patterns. The <strong>pre-router</strong> catches them deterministically &mdash; instant, free, and reliable. Only ambiguous or compound messages reach the <strong>AI router</strong>, which uses Gemini Flash (~10x cheaper than Haiku) with Claude Haiku as fallback.</p>
+      <p>The <strong>pre-router</strong> handles only mechanical shortcuts &mdash; patterns that need zero semantic understanding. Everything else goes through a <strong>single unified Claude Haiku call</strong> that handles intent, event selection, and SMS composition in one pass. Filter state is owned entirely by the handler, not the LLM.</p>
     </div>
 
     <div class="card-grid">
       <div class="card">
-        <h3>Pre-router (deterministic)</h3>
-        <p>Pattern-matches greetings, bare neighborhood names, "more", "free", number replies for details, and session-aware filter modifications (category, time, vibe changes on an active session). Handles ~60% of all traffic.</p>
+        <h3>Pre-router (~15%, $0)</h3>
+        <p>Mechanical shortcuts only: help, numbers 1-5 for details, "more" for next batch, greetings/thanks/bye, event name match from session, impatient follow-ups ("hello??"), and explicit filter clearing ("forget the comedy").</p>
       </div>
       <div class="card">
-        <h3>AI router (semantic)</h3>
-        <p>Handles ambiguous messages: "any good jazz shows near prospect park tonight", compound filters like "any more free comedy stuff", and off-topic deflection. Uses few-shot examples for accuracy.</p>
+        <h3>Unified LLM (~85%, ~$0.001)</h3>
+        <p>Everything semantic: neighborhoods, categories, vibes, time, free events, compound queries ("free jazz in williamsburg tonight"), nudge accepts, borough handling, off-topic deflection. Single Claude Haiku call with a tagged event pool.</p>
       </div>
     </div>
 
@@ -784,28 +777,39 @@
       <div class="example-turn">
         <span class="turn-user">User</span>
         <span class="turn-msg">"williamsburg"</span>
-        <span class="turn-route">pre-router &rarr; events</span>
+        <span class="turn-route">unified LLM &rarr; ~$0.001</span>
       </div>
       <div class="example-turn">
         <span class="turn-user">User</span>
         <span class="turn-msg">"how about comedy"</span>
-        <span class="turn-route">pre-router &rarr; filter change</span>
+        <span class="turn-route">unified LLM + [MATCH] tags &rarr; ~$0.001</span>
       </div>
       <div class="example-turn">
         <span class="turn-user">User</span>
         <span class="turn-msg">"2"</span>
-        <span class="turn-route">pre-router &rarr; details</span>
+        <span class="turn-route">pre-router &rarr; details &rarr; $0</span>
       </div>
       <div class="example-turn">
         <span class="turn-user">User</span>
-        <span class="turn-msg">"later tonight"</span>
-        <span class="turn-route">pre-router &rarr; time filter</span>
+        <span class="turn-msg">"more"</span>
+        <span class="turn-route">pre-router &rarr; more &rarr; ~$0.001</span>
       </div>
       <div class="example-turn">
         <span class="turn-user">User</span>
-        <span class="turn-msg">"any more free stuff"</span>
-        <span class="turn-route">AI router &rarr; compound</span>
+        <span class="turn-msg">"any more free comedy stuff"</span>
+        <span class="turn-route">unified LLM + compound filters &rarr; ~$0.001</span>
       </div>
+      <div class="example-turn">
+        <span class="turn-user">User</span>
+        <span class="turn-msg">"forget the comedy"</span>
+        <span class="turn-route">pre-router &rarr; clear_filters &rarr; ~$0.001</span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 20px;">
+      <h3>Tagged event pool &amp; deterministic filter state</h3>
+      <p>When a user applies filters (category, time, vibe, free), the handler compounds them deterministically via <code>mergeFilters()</code> and builds a tagged pool via <code>buildTaggedPool()</code>. Each event is tagged <code>[MATCH]</code> or unmatched. The LLM sees the full pool but prefers <code>[MATCH]</code> events. When matches are sparse (&lt;3), the LLM gets a <code>SPARSE</code> flag and honestly acknowledges limited options instead of silently omitting the filter.</p>
+      <p style="margin-top: 8px;">Filters persist across neighborhood switches, nudge accepts, and conversational responses. The LLM never manages filter state &mdash; it only composes from what the handler provides.</p>
     </div>
   </div>
 </section>
@@ -1021,10 +1025,10 @@
 <section id="prompts">
   <div class="container">
     <p class="section-label">Prompts</p>
-    <h2 class="section-title">Composable prompt skills</h2>
+    <h2 class="section-title">Unified prompt + composable skills</h2>
     <div class="section-body">
-      <p>The compose prompt is assembled dynamically from <strong>12 conditional skill modules</strong>. Rather than one monolithic prompt, <code>build-compose-prompt.js</code> checks the request context and includes only the relevant instructions. This keeps prompts focused (~800 tokens instead of ~1,400) and prevents Claude from applying rules that don't apply.</p>
-      <p><strong>Why not one big prompt?</strong> We tried that first. The problem: when Claude sees "ACTIVITY ADHERENCE: if none match, say honestly you don't have that tonight" on a request where the user didn't ask for an activity, it sometimes over-filters and returns fewer picks. Including "NEIGHBORHOOD MISMATCH: acknowledge this upfront" when events ARE in the right neighborhood caused Claude to add unnecessary disclaimers. Each skill solves a specific failure mode, and only fires when that failure mode is possible.</p>
+      <p>The unified LLM call uses a base system prompt (<code>UNIFIED_SYSTEM</code>) that handles intent understanding, event selection, and SMS composition. On top of this, <strong>12 conditional skill modules</strong> are appended based on request context. The user prompt includes the tagged event pool with <code>[MATCH]</code> tags, filter context (<code>ACTIVE_FILTER</code>, <code>MATCH_COUNT</code>, <code>SPARSE</code>), and conversation history.</p>
+      <p><strong>Why conditional skills?</strong> When Claude sees "ACTIVITY ADHERENCE: if none match, say honestly you don't have that tonight" on a request where the user didn't ask for an activity, it sometimes over-filters and returns fewer picks. Including "NEIGHBORHOOD MISMATCH: acknowledge this upfront" when events ARE in the right neighborhood caused Claude to add unnecessary disclaimers. Each skill solves a specific failure mode, and only fires when that failure mode is possible.</p>
     </div>
 
     <details open style="margin-top: 24px;">
@@ -1096,10 +1100,9 @@ DAY-SPECIFIC CLAIMS: NEVER say an event happens on a particular day (e.g. "trivi
     <details>
       <summary>conversationAwareness <span class="skill-condition">&mdash; when session has conversation history</span></summary>
       <div class="detail-body">
-        <p><strong>Problem it solves:</strong> Three specific bugs: (1) User asks for "tomorrow" events but Claude defaults to tonight-first priority &mdash; this skill overrides that. (2) User asked for "free comedy" earlier, then says "yes" to a neighborhood redirect &mdash; without this skill, Claude drops the filters. (3) Claude recommends events it already showed in earlier turns.</p>
+        <p><strong>Problem it solves:</strong> Two specific bugs: (1) User asks for "tomorrow" events but Claude defaults to tonight-first priority &mdash; this skill overrides that. (2) Claude recommends events it already showed in earlier turns. (Filter persistence is now handled deterministically by the handler via <code>mergeFilters()</code>, not the LLM.)</p>
         <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">CONVERSATION AWARENESS:
 - TEMPORAL INTENT: If user asks about "tomorrow", prefer TOMORROW events. Override the "tonight first" rule.
-- FILTER PERSISTENCE: If user asked for "free comedy" earlier and is now accepting a redirect, maintain BOTH filters.
 - REPEAT AVOIDANCE: Do not recommend events already mentioned in conversation history.</div>
       </div>
     </details>
