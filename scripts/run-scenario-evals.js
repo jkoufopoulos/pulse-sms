@@ -189,7 +189,9 @@ async function main() {
 
   for (let i = 0; i < scenarios.length; i++) {
     const scenario = scenarios[i];
-    const phoneNumber = `+1555${String(i).padStart(7, '0')}`;
+    // Use hash of scenario name for unique phone — avoids collisions when filtering by --name
+    const nameHash = scenario.name.split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0) >>> 0;
+    const phoneNumber = `+1555${String(nameHash % 10000000).padStart(7, '0')}`;
     const userTurnCount = scenario.turns.filter(t => t.sender === 'user').length;
 
     process.stdout.write(`[${i + 1}/${scenarios.length}] ${scenario.name} (${userTurnCount} user turns)... `);

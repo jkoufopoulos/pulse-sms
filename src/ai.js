@@ -529,19 +529,25 @@ function isSearchUrl(url) {
  *
  * Returns { type, sms_text, picks, neighborhood_used, filters_used, suggested_neighborhood, pending_filters }
  */
-async function unifiedRespond(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime, validNeighborhoods }) {
+async function unifiedRespond(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime, validNeighborhoods, activeFilters, isSparse, matchCount }) {
   const now = currentTime || new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   const todayNyc = getNycDateString(0);
   const tomorrowNyc = getNycDateString(1);
 
-  // Build event list string (same format as composeResponse)
+  // Build event list string with [MATCH] tags for filter-matched events
+  const hasActiveFilter = activeFilters && Object.values(activeFilters).some(Boolean);
+  const filterLabel = hasActiveFilter
+    ? Object.entries(activeFilters).filter(([,v]) => v).map(([k,v]) => `${k}=${v}`).join(', ')
+    : 'none';
+
   let eventListStr = '';
   if (events && events.length > 0) {
     eventListStr = events.map(e => {
       const eventDate = getEventDate(e);
       const dayLabel = eventDate === todayNyc ? 'TODAY' : eventDate === tomorrowNyc ? 'TOMORROW' : eventDate;
-      return JSON.stringify({
+      const tag = e.filter_match ? '[MATCH] ' : '';
+      return tag + JSON.stringify({
         id: e.id,
         name: e.name && e.name.length > 80 ? e.name.slice(0, 77) + '...' : e.name,
         venue_name: e.venue_name,
@@ -584,11 +590,15 @@ async function unifiedRespond(message, { session, events, neighborhood, nearbyHo
     ? `\nVALID_NEIGHBORHOODS: ${validNeighborhoods.join(', ')}`
     : '';
 
+  const filterContextBlock = hasActiveFilter
+    ? `\nACTIVE_FILTER: ${filterLabel}\nMATCH_COUNT: ${matchCount || 0} of ${events?.length || 0} events match\nSPARSE: ${isSparse ? 'true — few matches, acknowledge honestly' : 'false'}`
+    : '';
+
   const userPrompt = `Current time (NYC): ${now}
 <user_message>${message}</user_message>
 Session context: ${sessionContext}
 Neighborhood: ${neighborhood || 'not specified'}
-${historyBlock}${nearbyBlock}${validNeighborhoodsBlock}
+${historyBlock}${nearbyBlock}${validNeighborhoodsBlock}${filterContextBlock}
 ${eventListStr ? `EVENT_LIST (${events.length} events):\n${eventListStr}` : 'No events available for this area.'}
 
 Respond now.`;
@@ -675,6 +685,7 @@ Respond now.`;
     filters_used: parsed.filters_used || null,
     suggested_neighborhood: parsed.suggested_neighborhood || null,
     pending_filters: parsed.pending_filters || null,
+    clear_filters: parsed.clear_filters === true,
     _raw: text,
     _usage: usage,
     _provider: 'anthropic',

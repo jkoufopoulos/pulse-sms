@@ -108,6 +108,35 @@ check('later tonight → events+time', late?.intent === 'events' && late?.filter
 const chill = preRoute('something chill', followUpSession);
 check('something chill → events+vibe', chill?.intent === 'events' && chill?.filters?.vibe === 'chill');
 
+// Clear filters — requires lastFilters with active values
+console.log('\npreRoute clear_filters:');
+const filterSession = {
+  lastPicks: [{ event_id: 'e1' }],
+  lastEvents: { e1: { name: 'Jazz Night' } },
+  lastNeighborhood: 'East Village',
+  lastFilters: { category: 'comedy', free_only: false, vibe: null, time_after: null },
+};
+check('forget the comedy → clear_filters', preRoute('forget the comedy', filterSession)?.intent === 'clear_filters');
+check('show me everything → clear_filters', preRoute('show me everything', filterSession)?.intent === 'clear_filters');
+check('everything → clear_filters', preRoute('everything', filterSession)?.intent === 'clear_filters');
+check('clear filter → clear_filters', preRoute('clear filter', filterSession)?.intent === 'clear_filters');
+check('clear filters → clear_filters', preRoute('clear filters', filterSession)?.intent === 'clear_filters');
+check('no filter → clear_filters', preRoute('no filter', filterSession)?.intent === 'clear_filters');
+check('drop the filter → clear_filters', preRoute('drop the filter', filterSession)?.intent === 'clear_filters');
+check('never mind the comedy → clear_filters', preRoute('never mind the comedy', filterSession)?.intent === 'clear_filters');
+check('show all → clear_filters', preRoute('show all', filterSession)?.intent === 'clear_filters');
+check('just regular stuff → clear_filters', preRoute('just regular stuff', filterSession)?.intent === 'clear_filters');
+check('all events → clear_filters', preRoute('all events', filterSession)?.intent === 'clear_filters');
+check('clear_filters preserves neighborhood', preRoute('forget the comedy', filterSession)?.neighborhood === 'East Village');
+
+// No active filters → falls through (not clear_filters)
+const noFilterSession = { lastPicks: [{ event_id: 'e1' }], lastEvents: { e1: { name: 'Jazz Night' } }, lastNeighborhood: 'East Village', lastFilters: {} };
+check('no active filters → null', preRoute('forget the comedy', noFilterSession) === null);
+check('null lastFilters → null', preRoute('show me everything', { ...noFilterSession, lastFilters: null }) === null);
+
+// No session → falls through
+check('no session → null', preRoute('forget the comedy', null) === null);
+
 // Compound and complex → still null (unchanged)
 check('free comedy stuff → null', preRoute('any more free comedy stuff', followUpSession) === null);
 check('complex request → null', preRoute('any good jazz shows in williamsburg tonight', null) === null);

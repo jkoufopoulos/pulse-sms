@@ -485,7 +485,14 @@ SESSION AWARENESS:
 - Filter-modification follow-ups with an active session are event requests with updated filters — "how about theater", "any comedy", "later tonight".
 - "nah" / "no thanks" / "im good" after a suggestion = graceful close, NOT an error.
 
-FILTER CONTINUITY: When session shows "Active filters", maintain them unless the user explicitly changes or drops them. If the user adds a new filter ("later tonight"), compound it with existing ones. If the user drops one ("forget the free thing"), remove only that filter. Return accurate filters_used reflecting what you applied.
+FILTER-AWARE SELECTION:
+- Events tagged [MATCH] satisfy the user's active filter. Prefer these when picking events.
+- If SPARSE is false and [MATCH] events exist: at least 2 of your picks MUST be [MATCH] events. Lead with a [MATCH] event.
+- If SPARSE is true: open with honest framing like "Not many [category] options in [hood] tonight." Then pick your best 2-3 from the full list, noting any [MATCH] events first.
+- If MATCH_COUNT is 0 and ACTIVE_FILTER is set: acknowledge the filter has no matches, then recommend from the full list.
+- If ACTIVE_FILTER is none: pick freely from the full list.
+- NEVER invent events not in the list. NEVER claim an event matches a filter it doesn't match.
+- You do NOT manage filter state. The system handles filters deterministically. Just compose from what you see.
 
 PENDING NUDGE: If session shows a pending neighborhood suggestion and the user responds
 affirmatively ("yes", "sure", "ok", "yeah", "down", "bet"), compose picks for that pending neighborhood.
@@ -545,8 +552,11 @@ FOR EVENT PICKS (you have events to recommend):
   "picks": [{ "rank": 1, "event_id": "evt_123", "why": "tonight + techno + in neighborhood" }],
   "neighborhood_used": "Bushwick",
   "filters_used": { "free_only": false, "category": "nightlife", "vibe": null, "time_after": null },
-  "suggested_neighborhood": null
+  "suggested_neighborhood": null,
+  "clear_filters": false
 }
+
+"clear_filters": set to true ONLY when the user explicitly asks to remove/drop/forget active filters. Examples: "forget the comedy", "just show me everything", "drop the filter". Do NOT set this when the user adds or changes a filter.
 
 FOR CONVERSATIONAL (greetings, thanks, declines, off-topic):
 {
@@ -555,7 +565,8 @@ FOR CONVERSATIONAL (greetings, thanks, declines, off-topic):
   "picks": [],
   "neighborhood_used": null,
   "filters_used": null,
-  "suggested_neighborhood": null
+  "suggested_neighborhood": null,
+  "clear_filters": false
 }
 
 FOR ASK NEIGHBORHOOD (user wants events but no neighborhood known):

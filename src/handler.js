@@ -11,7 +11,7 @@ const { sendRuntimeAlert } = require('./alerts');
 const { getEvents } = require('./events');
 const { filterKidsEvents, validatePerennialActivity } = require('./curation');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
-const { applyFilters, buildEventMap, saveResponseFrame } = require('./pipeline');
+const { applyFilters, buildEventMap, saveResponseFrame, mergeFilters, buildTaggedPool } = require('./pipeline');
 
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
 
@@ -282,7 +282,17 @@ async function handleMessageAI(phone, message) {
     console.log(`Pre route (pre): intent=${preRouted.intent}, neighborhood=${preRouted.neighborhood} → unified with filters`);
   }
 
-  if (preRouted && !preDetectedFilters) {
+  // Pre-router clear_filters: wipe filters and fall through to unified branch
+  if (preRouted && preRouted.intent === 'clear_filters') {
+    setSession(phone, { lastFilters: null, pendingFilters: null });
+    session = getSession(phone);
+    trace.routing.pre_routed = true;
+    trace.routing.result = { intent: 'clear_filters', neighborhood: preRouted.neighborhood, confidence: 1.0 };
+    trace.routing.latency_ms = 0;
+    console.log(`Pre route (pre): intent=clear_filters → unified with no filters`);
+  }
+
+  if (preRouted && !preDetectedFilters && preRouted.intent !== 'clear_filters') {
     // =============================================================
     // Pre-router matched — mechanical shortcuts
     // (help, numbers, more, event name match, greetings, thanks, bye)
@@ -370,19 +380,31 @@ async function handleMessageAI(phone, message) {
     }
     trace.routing.resolved_neighborhood = hood;
 
+    // Resolve active filters: merge persisted filters with newly detected ones
+    const activeFilters = mergeFilters(
+      session?.lastFilters,
+      preDetectedFilters || session?.pendingFilters || null
+    );
+    let matchCount = 0;
+    let isSparse = false;
+
     // Fetch events if we have a neighborhood
     let events = [];
     if (hood) {
       const eventsStart = Date.now();
       const raw = await getEvents(hood);
       trace.events.getEvents_ms = Date.now() - eventsStart;
-      const pendingFilters = session?.pendingFilters || {};
-      events = filterKidsEvents(applyFilters(raw, pendingFilters));
-      // Merge perennial picks
+      const curated = filterKidsEvents(raw);
+      const taggedResult = buildTaggedPool(curated, activeFilters);
+      events = taggedResult.pool;
+      matchCount = taggedResult.matchCount;
+      isSparse = taggedResult.isSparse;
+      // Merge perennial picks (marked as unmatched)
       const perennialPicks = getPerennialPicks(hood);
       const localPerennials = validatePerennialActivity(toEventObjects(perennialPicks.local, hood));
       const perennialCap = Math.min(4, 15 - Math.min(events.length, 15));
-      events = [...events.slice(0, 15), ...localPerennials.slice(0, perennialCap)];
+      const taggedPerennials = localPerennials.slice(0, perennialCap).map(e => ({ ...e, filter_match: false }));
+      events = [...events, ...taggedPerennials];
     }
     const nearbyHoods = hood ? getAdjacentNeighborhoods(hood, 3) : [];
 
@@ -402,6 +424,9 @@ async function handleMessageAI(phone, message) {
       conversationHistory: history,
       currentTime: now,
       validNeighborhoods: NEIGHBORHOOD_NAMES,
+      activeFilters,
+      isSparse,
+      matchCount,
     });
     trace.routing.latency_ms = Date.now() - composeStart; // unified call replaces both route + compose
     trace.composition.latency_ms = trace.routing.latency_ms;
@@ -415,8 +440,11 @@ async function handleMessageAI(phone, message) {
     trace.composition.neighborhood_used = result.neighborhood_used || hood;
     trackAICost(phone, result._usage, result._provider);
 
-    // Clear pending state after unified call
-    if (session?.pendingNearby || session?.pendingFilters) {
+    // Filter state management after unified call
+    if (result.clear_filters) {
+      // LLM detected user wants to drop filters (semantic clearing)
+      setSession(phone, { lastFilters: null, pendingFilters: null, pendingMessage: null, pendingNearby: null });
+    } else if (session?.pendingNearby || session?.pendingFilters) {
       setSession(phone, { pendingNearby: null, pendingFilters: null, pendingMessage: null });
     }
 
@@ -431,10 +459,12 @@ async function handleMessageAI(phone, message) {
     }
 
     if (result.type === 'conversational') {
-      // Persist neighborhood context so follow-ups keep the hood
+      // Persist neighborhood + active filters so follow-ups keep context
       if (hood) {
         const sessionUpdate = { lastNeighborhood: hood };
-        // Save suggested neighborhood for nudge chain (but not filters — those come from event_picks)
+        if (Object.values(activeFilters).some(Boolean)) {
+          sessionUpdate.lastFilters = activeFilters;
+        }
         const suggestedHood = result.suggested_neighborhood && nearbyHoods.includes(result.suggested_neighborhood)
           ? result.suggested_neighborhood : null;
         if (suggestedHood) sessionUpdate.pendingNearby = suggestedHood;
@@ -451,7 +481,9 @@ async function handleMessageAI(phone, message) {
     if (!result.picks || result.picks.length === 0) {
       if (hood) {
         const sessionUpdate = { lastNeighborhood: hood };
-        if (result.filters_used) sessionUpdate.lastFilters = result.filters_used;
+        if (Object.values(activeFilters).some(Boolean)) {
+          sessionUpdate.lastFilters = activeFilters;
+        }
         const suggestedHoodEmpty = result.suggested_neighborhood && nearbyHoods.includes(result.suggested_neighborhood)
           ? result.suggested_neighborhood : null;
         if (suggestedHoodEmpty) sessionUpdate.pendingNearby = suggestedHoodEmpty;
@@ -462,6 +494,9 @@ async function handleMessageAI(phone, message) {
       return;
     }
 
+    // Send SMS first — ensures user always gets a response even if session save fails
+    await sendSMS(phone, result.sms_text);
+
     const eventMap = buildEventMap(events);
     const suggestedHood = result.suggested_neighborhood && nearbyHoods.includes(result.suggested_neighborhood)
       ? result.suggested_neighborhood : null;
@@ -469,14 +504,13 @@ async function handleMessageAI(phone, message) {
       picks: result.picks,
       eventMap,
       neighborhood: result.neighborhood_used || hood,
-      filters: result.filters_used || null,
+      filters: activeFilters,
       offeredIds: events.map(e => e.id),
       pending: suggestedHood ? {
         neighborhood: suggestedHood,
-        filters: result.filters_used,
+        filters: activeFilters,
       } : null,
     });
-    await sendSMS(phone, result.sms_text);
     finalizeTrace(result.sms_text, 'events');
   }
 }

@@ -87,6 +87,13 @@ function preRoute(message, session) {
     return { ...base, intent: 'conversational', neighborhood: null, reply: "Hey! Text me a neighborhood and I'll find you something good tonight." };
   }
 
+  // Explicit filter clearing — requires active filters in session
+  if (session?.lastFilters && Object.values(session.lastFilters).some(Boolean)) {
+    if (/^(show me everything|all events|no filter|drop the filter|clear filters?|forget the .+|never mind the .+|just regular stuff|everything|show all)$/i.test(msg)) {
+      return { ...base, intent: 'clear_filters', neighborhood: session.lastNeighborhood };
+    }
+  }
+
   // --- Session-aware filter follow-ups (deterministic detection → unified LLM composition) ---
   // These return intent='events' with filters; the handler injects filters and uses the unified branch.
   if (session?.lastNeighborhood && session?.lastPicks?.length > 0) {

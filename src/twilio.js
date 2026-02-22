@@ -28,6 +28,12 @@ async function sendSMS(to, body, { maxRetries = 2 } = {}) {
     return { sid: 'TEST_' + Date.now() };
   }
 
+  // Safety: if phone looks like a test phone but capture is disabled, log warning and short-circuit
+  if (/^\+1555\d{7}$/.test(to)) {
+    console.warn(`[BUG] sendSMS called for test phone ${maskPhone(to)} without active capture — skipping Twilio call`);
+    return { sid: 'SKIPPED_' + Date.now() };
+  }
+
   const masked = maskPhone(to);
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
