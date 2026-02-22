@@ -87,6 +87,46 @@ function preRoute(message, session) {
     return { ...base, intent: 'conversational', neighborhood: null, reply: "Hey! Text me a neighborhood and I'll find you something good tonight." };
   }
 
+  // --- Session-aware filter follow-ups (deterministic detection → unified LLM composition) ---
+  // These return intent='events' with filters; the handler injects filters and uses the unified branch.
+  if (session?.lastNeighborhood && session?.lastPicks?.length > 0) {
+    // Free
+    if (/^(free|free stuff|free events|free tonight|anything free)$/i.test(msg)) {
+      return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, free_only: true } };
+    }
+
+    // Category follow-ups
+    const catMap = {
+      'comedy|standup|stand-up|improv': 'comedy',
+      'theater|theatre': 'theater',
+      'jazz|music|live music|rock|punk|metal|folk|indie|hip hop|hip-hop|r&b|soul|funk|rap': 'live_music',
+      'techno|house|electronic|dj': 'nightlife',
+      'art': 'art',
+      'nightlife': 'nightlife',
+      'dance': 'nightlife',
+      'trivia|bingo|open mic|poetry|karaoke|drag|burlesque': 'community',
+      'salsa|bachata|swing': 'nightlife',
+    };
+    for (const [pattern, category] of Object.entries(catMap)) {
+      const catRegex = new RegExp(`^(?:how about|what about|any|show me|got any|have any|know any)\\s+(?:${pattern})(?:\\s+(?:night|stuff|shows?|events?|tonight|picks?|options?))*$`, 'i');
+      if (catRegex.test(msg)) {
+        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, category } };
+      }
+    }
+
+    // Time follow-ups
+    if (/^(?:how about\s+)?(?:later(?:\s+tonight)?|after\s+midnight|late(?:r)?\s*night|anything?\s+late)$/i.test(msg)) {
+      const timeAfter = /midnight/i.test(msg) ? '00:00' : '22:00';
+      return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, time_after: timeAfter } };
+    }
+
+    // Vibe follow-ups
+    const vibeMatch = msg.match(/^(?:something|anything|how about something|got anything)\s+(chill|wild|weird|romantic|low-key|fun|crazy|mellow|cozy|rowdy|intimate|energetic|upbeat|laid-back)$/i);
+    if (vibeMatch) {
+      return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, vibe: vibeMatch[1].toLowerCase() } };
+    }
+  }
+
   return null; // Fall through to unified LLM
 }
 

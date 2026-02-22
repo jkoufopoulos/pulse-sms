@@ -371,6 +371,94 @@ async function refreshCache() {
 }
 
 // ============================================================
+// Selective source refresh — re-scrape specific sources only
+// ============================================================
+
+async function refreshSources(sourceNames) {
+  const targets = SOURCES.filter(s => sourceNames.includes(s.label.toLowerCase()));
+  if (targets.length === 0) {
+    console.warn(`refreshSources: no matching sources for [${sourceNames.join(', ')}]`);
+    return;
+  }
+
+  console.log(`Refreshing ${targets.length} source(s): ${targets.map(s => s.label).join(', ')}`);
+  const targetLabels = new Set(targets.map(s => s.label));
+
+  // Fetch only the targeted sources
+  const results = await Promise.allSettled(
+    targets.map(s => timedFetch(s.fetch, s.label, s.weight))
+  );
+
+  // Remove old events from targeted sources, keep everything else
+  const kept = eventCache.filter(e => {
+    for (const t of targets) {
+      if (e.source_name === t.label.toLowerCase() || e.source_name === t.label) return false;
+    }
+    return true;
+  });
+
+  // Merge in new events
+  const seen = new Set(kept.map(e => e.id));
+  const newEvents = [];
+
+  for (let i = 0; i < targets.length; i++) {
+    const label = targets[i].label;
+    const settled = results[i];
+    const { events, durationMs, status, error } = settled.status === 'fulfilled'
+      ? settled.value
+      : { events: [], durationMs: 0, status: 'error', error: settled.reason?.message };
+
+    // Update health tracking
+    const health = sourceHealth[label];
+    if (health) {
+      health.lastCount = events.length;
+      health.lastStatus = status;
+      health.lastError = error;
+      health.lastDurationMs = durationMs;
+      health.lastScrapeAt = new Date().toISOString();
+      health.totalScrapes++;
+      if (events.length > 0) {
+        health.totalSuccesses++;
+        health.consecutiveZeros = 0;
+      } else {
+        health.consecutiveZeros++;
+      }
+    }
+
+    for (const e of events) {
+      if (!seen.has(e.id)) {
+        seen.add(e.id);
+        newEvents.push(e);
+      }
+    }
+
+    console.log(`  ${label}: ${events.length} events (${status})`);
+  }
+
+  // Apply date + kids filters to new events only
+  const today = getNycDateString(0);
+  const weekOut = getNycDateString(7);
+  const dateFiltered = newEvents.filter(e => {
+    const d = getEventDate(e);
+    if (!d) return true;
+    return d >= today && d <= weekOut;
+  });
+  const validNew = filterKidsEvents(dateFiltered);
+
+  eventCache = [...kept, ...validNew];
+  cacheTimestamp = Date.now();
+
+  // Persist updated cache
+  try {
+    fs.writeFileSync(CACHE_FILE, JSON.stringify({ events: eventCache, timestamp: cacheTimestamp }, null, 2));
+  } catch (err) {
+    console.warn('Failed to persist cache after selective refresh:', err.message);
+  }
+
+  console.log(`Selective refresh done: ${validNew.length} new events merged, ${eventCache.length} total`);
+}
+
+// ============================================================
 // Main entry: get events for a neighborhood (reads from cache)
 // ============================================================
 
@@ -512,4 +600,4 @@ function isCacheFresh() {
   return eventCache.length > 0 && cacheTimestamp > 0 && (Date.now() - cacheTimestamp) < STALE_THRESHOLD_MS;
 }
 
-module.exports = { SOURCES, SOURCE_TIERS, refreshCache, getEvents, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs };
+module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, getEvents, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs };

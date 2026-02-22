@@ -101,14 +101,30 @@ if (process.env.PULSE_TEST_MODE === 'true') {
     }
   });
 
-  // API: force cache refresh
+  // API: return current cache (no scrape — use POST /api/scrape to force)
   app.post('/api/eval/refresh', async (req, res) => {
     try {
-      const { refreshCache, getRawCache } = require('./events');
-      await refreshCache();
+      const { getRawCache } = require('./events');
       res.json(getRawCache());
     } catch (err) {
       console.error('Eval refresh error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API: force scrape — all sources or selective (?sources=skint,yutori)
+  app.post('/api/scrape', async (req, res) => {
+    try {
+      const { refreshCache, refreshSources, getRawCache } = require('./events');
+      const sourceFilter = req.query.sources?.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+      if (sourceFilter?.length > 0) {
+        await refreshSources(sourceFilter);
+      } else {
+        await refreshCache();
+      }
+      res.json(getRawCache());
+    } catch (err) {
+      console.error('Scrape error:', err.message);
       res.status(500).json({ error: err.message });
     }
   });

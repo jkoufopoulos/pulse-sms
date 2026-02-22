@@ -93,16 +93,20 @@ check('bk → null (unified)', preRoute('bk', null) === null);
 // Unsupported areas → now handled by unified LLM
 check('bay ridge → null (unified)', preRoute('bay ridge', null) === null);
 
-// Follow-up filters → now handled by unified LLM
+// Follow-up filters → pre-detected deterministically, injected into unified LLM branch
 const followUpSession = {
   lastPicks: [{ event_id: 'e1' }, { event_id: 'e2' }],
   lastEvents: { e1: { name: 'DJ Honeypot' }, e2: { name: 'Jazz at Smalls' } },
   lastNeighborhood: 'East Village',
 };
-check('how about theater → null (unified)', preRoute('how about theater', followUpSession) === null);
-check('any comedy → null (unified)', preRoute('any comedy', followUpSession) === null);
-check('later tonight → null (unified)', preRoute('later tonight', followUpSession) === null);
-check('something chill → null (unified)', preRoute('something chill', followUpSession) === null);
+const theater = preRoute('how about theater', followUpSession);
+check('how about theater → events+theater', theater?.intent === 'events' && theater?.filters?.category === 'theater');
+const comedy = preRoute('any comedy', followUpSession);
+check('any comedy → events+comedy', comedy?.intent === 'events' && comedy?.filters?.category === 'comedy');
+const late = preRoute('later tonight', followUpSession);
+check('later tonight → events+time', late?.intent === 'events' && late?.filters?.time_after === '22:00');
+const chill = preRoute('something chill', followUpSession);
+check('something chill → events+vibe', chill?.intent === 'events' && chill?.filters?.vibe === 'chill');
 
 // Compound and complex → still null (unchanged)
 check('free comedy stuff → null', preRoute('any more free comedy stuff', followUpSession) === null);
