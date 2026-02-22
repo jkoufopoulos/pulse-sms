@@ -1,12 +1,12 @@
 const express = require('express');
 const twilio = require('twilio');
 const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
-const { routeMessage, composeResponse, unifiedRespond } = require('./ai');
+const { composeResponse, unifiedRespond } = require('./ai');
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
 const { startTrace, saveTrace } = require('./traces');
 const { getSession, setSession, clearSession, addToHistory, clearSessionInterval } = require('./session');
 const { preRoute, getAdjacentNeighborhoods } = require('./pre-router');
-const { handleHelp, handleConversational, handleDetails, handleMore, handleFree, handleNudgeAccept, handleEventsDefault } = require('./intent-handlers');
+const { handleHelp, handleConversational, handleDetails, handleMore } = require('./intent-handlers');
 const { sendRuntimeAlert } = require('./alerts');
 const { getEvents } = require('./events');
 const { filterKidsEvents, validatePerennialActivity } = require('./curation');
@@ -273,7 +273,8 @@ async function handleMessageAI(phone, message) {
 
   if (preRouted) {
     // =============================================================
-    // Pre-router matched — use existing handler dispatch
+    // Pre-router matched — mechanical shortcuts only
+    // (help, numbers, more, event name match, greetings, thanks, bye)
     // =============================================================
     const route = preRouted;
     trace.routing.pre_routed = true;
@@ -281,7 +282,7 @@ async function handleMessageAI(phone, message) {
     trace.routing.latency_ms = 0;
     console.log(`Pre route (pre): intent=${route.intent}, neighborhood=${route.neighborhood}, confidence=${route.confidence}`);
 
-    // Shared compose helper (closure over message + trace)
+    // Shared compose helper (closure over message + trace) — needed by handleMore
     async function composeAndSend(composeEvents, hood, filters, intentLabel, { excludeIds, skills } = {}) {
       const enrichedSkills = { ...(skills || {}), hasConversationHistory: history.length > 0 };
       trace.events.sent_to_claude = composeEvents.length;
@@ -302,114 +303,49 @@ async function handleMessageAI(phone, message) {
 
     const ctx = { phone, message, masked, session, trace, route, finalizeTrace, composeAndSend, trackAICost: (usage) => trackAICost(phone, usage) };
 
-    // Clear stale nudge state when intent isn't a nudge response
-    if (route.intent !== 'nudge_accept' && session?.pendingNearby) {
-      setSession(phone, { pendingNearby: null });
+    // Clear pending state on any pre-routed intent
+    if (session?.pendingNearby) {
+      setSession(phone, { pendingNearby: null, pendingFilters: null, pendingMessage: null });
     }
 
-    // --- Simple intents (no neighborhood needed) ---
     if (route.intent === 'help') return handleHelp(ctx);
     if (route.intent === 'conversational') return handleConversational(ctx);
     if (route.intent === 'details') return handleDetails(ctx);
 
-    // --- Resolve neighborhood ---
-    const extracted = extractNeighborhood(message);
-    let neighborhood = extracted || route.neighborhood;
-    if (neighborhood && !NEIGHBORHOOD_NAMES.includes(neighborhood)) {
-      const validated = extractNeighborhood(neighborhood);
-      neighborhood = validated || null;
-    }
-    if (!neighborhood) neighborhood = session?.lastNeighborhood || null;
-    trace.routing.resolved_neighborhood = neighborhood;
-    ctx.neighborhood = neighborhood;
-
-    // No neighborhood for events intent — ask the user
-    if (!neighborhood && route.intent === 'events') {
-      if (route.filters?.free_only || route.filters?.category) {
-        setSession(phone, { pendingFilters: route.filters, pendingMessage: message });
-      }
-      const sms = "Where are you headed? Drop me a neighborhood like East Village, Williamsburg, or LES.";
-      await sendSMS(phone, sms);
-      finalizeTrace(sms, 'events');
-      return;
-    }
-
-    // Intent-specific error messages
-    const INTENT_ERROR_MSGS = {
-      more: "Couldn't load more picks right now — try again in a sec!",
-      free: "Couldn't find free events right now — try again in a sec!",
-      events: "Couldn't load events right now — try again in a sec!",
-    };
-
-    async function dispatchWithFallback(handler, intentLabel) {
+    if (route.intent === 'more') {
+      ctx.neighborhood = session?.lastNeighborhood || null;
       try {
-        return await handler(ctx);
+        return await handleMore(ctx);
       } catch (err) {
-        console.error(`${intentLabel} handler error:`, err.message);
-        const sms = INTENT_ERROR_MSGS[intentLabel] || "Pulse hit a snag — try again in a sec!";
+        console.error('more handler error:', err.message);
+        const sms = "Couldn't load more picks right now — try again in a sec!";
         await sendSMS(phone, sms);
-        finalizeTrace(sms, intentLabel);
+        finalizeTrace(sms, 'more');
       }
-    }
-
-    if (route.intent === 'more') return dispatchWithFallback(handleMore, 'more');
-    if (route.intent === 'free') return dispatchWithFallback(handleFree, 'free');
-
-    // --- Restore pending filters (only for events/nudge_accept) ---
-    const pendingFilters = session?.pendingFilters;
-    if (pendingFilters) {
-      if (pendingFilters.free_only && !route.filters?.free_only) {
-        route.filters = { ...route.filters, free_only: true };
-      }
-      if (pendingFilters.category && !route.filters?.category) {
-        route.filters = { ...route.filters, category: pendingFilters.category };
-      }
-      if (pendingFilters.time_after && !route.filters?.time_after) {
-        route.filters = { ...route.filters, time_after: pendingFilters.time_after };
-      }
-      if (session?.pendingMessage) {
-        ctx.pendingMessage = session.pendingMessage;
-      }
-      setSession(phone, { pendingFilters: null, pendingMessage: null });
-    }
-
-    // Pending filters may redirect events→free
-    if (route.filters?.free_only && route.intent === 'events') {
-      return dispatchWithFallback(handleFree, 'free');
-    }
-
-    if (route.intent === 'nudge_accept') {
-      try {
-        const handled = await handleNudgeAccept(ctx);
-        if (handled) return;
-      } catch (err) {
-        console.error('nudge_accept handler error:', err.message);
-      }
-    }
-
-    // Unknown intent guard
-    if (!['events', 'nudge_accept'].includes(route.intent)) {
-      console.warn(`Unknown intent "${route.intent}", treating as events`);
-    }
-
-    // Ask for neighborhood if we still don't have one
-    if (!neighborhood) {
-      const sms = "Where are you headed? Drop me a neighborhood like East Village, Williamsburg, or LES.";
-      await sendSMS(phone, sms);
-      finalizeTrace(sms, route.intent);
       return;
     }
-
-    return dispatchWithFallback(handleEventsDefault, 'events');
   } else {
     // =============================================================
     // Pre-router didn't match — use unified LLM call
     // =============================================================
     trace.routing.pre_routed = false;
 
-    // Resolve neighborhood deterministically before the LLM call
+    // Resolve neighborhood: explicit in message > affirmative nudge response > session fallback
     const extracted = extractNeighborhood(message);
-    let hood = extracted || session?.lastNeighborhood || null;
+    let hood = extracted || null;
+    if (!hood && session?.pendingNearby) {
+      if (/^(yes|yeah|ya|yep|yup|sure|ok|okay|down|bet|absolutely|definitely|why not|i'm down|im down)\b/i.test(message.trim())) {
+        hood = session.pendingNearby;
+      }
+    }
+    // If user provides explicit new neighborhood while having an active session,
+    // clear pending filters to avoid stale pre-filtering (e.g. "try fort greene" after "no free comedy in Park Slope")
+    // But keep pending filters when answering an ask_neighborhood prompt (no lastNeighborhood yet)
+    if (extracted && session?.pendingFilters && session?.lastNeighborhood) {
+      setSession(phone, { pendingFilters: null, pendingMessage: null });
+      session = getSession(phone);
+    }
+    if (!hood) hood = session?.lastNeighborhood || null;
     if (hood && !NEIGHBORHOOD_NAMES.includes(hood)) {
       const validated = extractNeighborhood(hood);
       hood = validated || null;
@@ -422,7 +358,8 @@ async function handleMessageAI(phone, message) {
       const eventsStart = Date.now();
       const raw = await getEvents(hood);
       trace.events.getEvents_ms = Date.now() - eventsStart;
-      events = filterKidsEvents(applyFilters(raw, {}));
+      const pendingFilters = session?.pendingFilters || {};
+      events = filterKidsEvents(applyFilters(raw, pendingFilters));
       // Merge perennial picks
       const perennialPicks = getPerennialPicks(hood);
       const localPerennials = validatePerennialActivity(toEventObjects(perennialPicks.local, hood));
@@ -446,6 +383,7 @@ async function handleMessageAI(phone, message) {
       nearbyHoods,
       conversationHistory: history,
       currentTime: now,
+      validNeighborhoods: NEIGHBORHOOD_NAMES,
     });
     trace.routing.latency_ms = Date.now() - composeStart; // unified call replaces both route + compose
     trace.composition.latency_ms = trace.routing.latency_ms;
@@ -459,6 +397,11 @@ async function handleMessageAI(phone, message) {
     trace.composition.neighborhood_used = result.neighborhood_used || hood;
     trackAICost(phone, result._usage, result._provider);
 
+    // Clear pending state after unified call
+    if (session?.pendingNearby || session?.pendingFilters) {
+      setSession(phone, { pendingNearby: null, pendingFilters: null, pendingMessage: null });
+    }
+
     // Handle response by type
     if (result.type === 'ask_neighborhood') {
       if (result.pending_filters) {
@@ -470,17 +413,34 @@ async function handleMessageAI(phone, message) {
     }
 
     if (result.type === 'conversational') {
+      // Persist neighborhood context so follow-ups keep the hood
+      if (hood) {
+        setSession(phone, { lastNeighborhood: hood });
+      }
       await sendSMS(phone, result.sms_text);
       finalizeTrace(result.sms_text, 'conversational');
       return;
     }
 
     // type === 'event_picks'
+    // If LLM said event_picks but returned 0 valid picks, treat as conversational
+    // to avoid wiping lastPicks (which breaks details references)
+    if (!result.picks || result.picks.length === 0) {
+      if (hood) {
+        const sessionUpdate = { lastNeighborhood: hood };
+        if (result.filters_used) sessionUpdate.lastFilters = result.filters_used;
+        setSession(phone, sessionUpdate);
+      }
+      await sendSMS(phone, result.sms_text);
+      finalizeTrace(result.sms_text, 'conversational');
+      return;
+    }
+
     const eventMap = buildEventMap(events);
     const suggestedHood = result.suggested_neighborhood && nearbyHoods.includes(result.suggested_neighborhood)
       ? result.suggested_neighborhood : null;
     saveResponseFrame(phone, {
-      picks: result.picks || [],
+      picks: result.picks,
       eventMap,
       neighborhood: result.neighborhood_used || hood,
       filters: result.filters_used || null,

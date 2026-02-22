@@ -1,4 +1,4 @@
-const { extractNeighborhood, detectBorough, detectUnsupported, NEIGHBORHOODS, BOROUGHS } = require('./neighborhoods');
+const { NEIGHBORHOODS, BOROUGHS } = require('./neighborhoods');
 
 // Build reverse map: neighborhood → borough
 const HOOD_TO_BOROUGH = {};
@@ -25,7 +25,9 @@ function getAdjacentNeighborhoods(hood, count = 3) {
     .map(d => d.name);
 }
 
-// --- Deterministic pre-router (skips Claude for obvious intents) ---
+// --- Deterministic pre-router (mechanical shortcuts only) ---
+// All semantic understanding (neighborhoods, categories, time, vibes, free,
+// nudge accepts, boroughs, off-topic) goes through the unified LLM call.
 function preRoute(message, session) {
   const msg = message.trim();
   const lower = msg.toLowerCase();
@@ -44,57 +46,9 @@ function preRoute(message, session) {
     return { ...base, intent: 'conversational', neighborhood: null, reply: "I don't have any picks loaded right now — text me a neighborhood and I'll find what's good tonight!" };
   }
 
-  // Affirmative reply to "would you travel to X?" nudge
-  if (session?.pendingNearby && /^(yes|yeah|ya|yea|yep|yup|sure|ok|okay|down|let's go|lets go|bet|absolutely|definitely|why not|i'm down|im down)\b/i.test(msg)) {
-    const counterHood = extractNeighborhood(msg);
-    return { ...base, intent: 'nudge_accept', neighborhood: counterHood || session.pendingNearby };
-  }
-
   // More
   if (/^(more|show me more|what else|anything else|what else you got|next|what's next)$/i.test(msg)) {
     return { ...base, intent: 'more', neighborhood: session?.lastNeighborhood || null };
-  }
-
-  // Free
-  if (/^(free|free stuff|free events|free tonight|anything free)$/i.test(msg)) {
-    return { ...base, intent: 'free', neighborhood: session?.lastNeighborhood || null, filters: { free_only: true, category: null, vibe: null } };
-  }
-
-  // --- Follow-up filter modifications (requires active session) ---
-  if (session?.lastNeighborhood && session?.lastPicks?.length > 0) {
-    const hood = session.lastNeighborhood;
-
-    // Category follow-ups: "how about theater", "any comedy", "what about jazz", "how about trivia night stuff"
-    const categoryMatch = lower.match(/^(?:how about|what about|any|show me|got any|have any|know any)\s+(comedy|standup|stand-up|improv|theater|theatre|jazz|music|art|nightlife|dance|live music|hip hop|hip-hop|rock|techno|house|electronic|punk|metal|folk|indie|r&b|soul|funk|rap|dj|trivia|karaoke|bingo|open mic|drag|burlesque|poetry|salsa|bachata|swing)(?:\s+(?:night|stuff|shows?|events?|tonight|picks?|options?))*$/i);
-    if (categoryMatch) {
-      const rawCat = categoryMatch[1].toLowerCase();
-      const catMap = {
-        'comedy': 'comedy', 'standup': 'comedy', 'stand-up': 'comedy', 'improv': 'comedy',
-        'theater': 'theater', 'theatre': 'theater',
-        'jazz': 'live_music', 'music': 'live_music', 'live music': 'live_music',
-        'rock': 'live_music', 'punk': 'live_music', 'metal': 'live_music', 'folk': 'live_music', 'indie': 'live_music',
-        'hip hop': 'live_music', 'hip-hop': 'live_music', 'r&b': 'live_music', 'soul': 'live_music', 'funk': 'live_music', 'rap': 'live_music',
-        'techno': 'nightlife', 'house': 'nightlife', 'electronic': 'nightlife', 'dj': 'nightlife',
-        'art': 'art', 'nightlife': 'nightlife', 'dance': 'nightlife',
-        'trivia': 'community', 'bingo': 'community', 'open mic': 'community', 'poetry': 'community',
-        'karaoke': 'community', 'drag': 'community', 'burlesque': 'community',
-        'salsa': 'nightlife', 'bachata': 'nightlife', 'swing': 'nightlife',
-      };
-      return { ...base, intent: 'events', neighborhood: hood, filters: { ...base.filters, category: catMap[rawCat] || rawCat } };
-    }
-
-    // Time follow-ups: "later tonight", "how about later", "after midnight"
-    const timeMatch = lower.match(/^(?:how about\s+)?(?:later(?:\s+tonight)?|after\s+midnight|late(?:r)?\s*night|anything?\s+late)$/i);
-    if (timeMatch) {
-      const time = /midnight/i.test(lower) ? '00:00' : '22:00';
-      return { ...base, intent: 'events', neighborhood: hood, filters: { ...base.filters, time_after: time } };
-    }
-
-    // Vibe follow-ups: "something chill", "anything wild"
-    const vibeMatch = lower.match(/^(?:something|anything|how about something|got anything)\s+(chill|wild|weird|romantic|low.?key|fun|crazy|mellow|cozy|rowdy|intimate|energetic|upbeat|laid.?back)$/i);
-    if (vibeMatch) {
-      return { ...base, intent: 'events', neighborhood: hood, filters: { ...base.filters, vibe: vibeMatch[1].toLowerCase() } };
-    }
   }
 
   // Event name match from session picks
@@ -133,46 +87,7 @@ function preRoute(message, session) {
     return { ...base, intent: 'conversational', neighborhood: null, reply: "Hey! Text me a neighborhood and I'll find you something good tonight." };
   }
 
-  // Off-topic deflection — catch common non-event questions before they reach Claude
-  // (Claude sometimes routes food/sports as events with a category filter)
-  if (/\b(score|knicks|yankees|mets|nets|rangers|giants|jets|nfl|nba|mlb|nhl|game score|who won|playoffs)\b/i.test(msg) && !(/\b(watch|viewing|bar|screen)\b/i.test(msg))) {
-    return { ...base, intent: 'conversational', neighborhood: null, reply: "Ha I wish I knew — I'm all about events and nightlife! Text me a neighborhood and I'll find you something fun tonight." };
-  }
-  if (/\b(restaurant|dinner|lunch|brunch|eat|food rec|where.*eat|where.*get (food|dinner|lunch|brunch)|best (food|pizza|tacos|sushi|ramen|burgers?))\b/i.test(msg) && !(/\b(event|show|fest|festival|pop.?up|tasting)\b/i.test(msg))) {
-    return { ...base, intent: 'conversational', neighborhood: null, reply: "I'm more of a nightlife expert than a food guide! But text me a neighborhood and I'll find you something fun to do after dinner." };
-  }
-  if (/\b(weather|forecast|temperature|degrees|rain|sunny|umbrella)\b/i.test(msg)) {
-    return { ...base, intent: 'conversational', neighborhood: null, reply: "No clue but I know what's happening indoors! Text me a neighborhood and I'll hook you up." };
-  }
-
-  // Bare neighborhood — check BEFORE borough detection
-  const CATEGORY_KEYWORDS = /\b(comedy|standup|stand-up|music|jazz|rock|techno|house|art|gallery|theater|theatre|dance|food|drink|free|cheap|underground|improv|hip hop|hip-hop|rap|r&b|soul|funk|punk|metal|folk|indie|electronic|dj|trivia|karaoke|bingo|open mic|drag|burlesque|poetry|salsa|bachata|swing)\b/i;
-  if (msg.length <= 25 && !CATEGORY_KEYWORDS.test(msg)) {
-    const hood = extractNeighborhood(msg);
-    if (hood) {
-      return { ...base, intent: 'events', neighborhood: hood };
-    }
-  }
-
-  // Borough detection — ask user to narrow down
-  // But if message contains a category/activity keyword, let Claude handle it
-  // (e.g. "any trivia options in bk" should route to AI, not just ask "which neighborhood?")
-  const borough = detectBorough(msg);
-  if (borough && !CATEGORY_KEYWORDS.test(msg)) {
-    const name = borough.borough.charAt(0).toUpperCase() + borough.borough.slice(1);
-    return { ...base, intent: 'conversational', neighborhood: null, reply: `${name}'s a big place! Which neighborhood?\n\n${borough.neighborhoods.join(', ')}` };
-  }
-
-  // Unsupported but recognized NYC neighborhood
-  const unsupported = detectUnsupported(msg);
-  if (unsupported) {
-    const suggestion = unsupported.nearby.length > 0
-      ? `Closest I've got is ${unsupported.nearby.join(' or ')}. Want picks from ${unsupported.nearby.length === 1 ? 'there' : 'either of those'}?`
-      : 'Try East Village, Williamsburg, or LES — I know those areas well!';
-    return { ...base, intent: 'conversational', neighborhood: null, reply: `Hmm ${unsupported.name} isn't on my radar yet — still expanding! ${suggestion}` };
-  }
-
-  return null; // Fall through to Claude
+  return null; // Fall through to unified LLM
 }
 
 module.exports = { getAdjacentNeighborhoods, preRoute };

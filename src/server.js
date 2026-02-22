@@ -57,6 +57,16 @@ app.get('/architecture', (req, res) => {
   res.sendFile(require('path').join(__dirname, 'architecture.html'));
 });
 
+// Events browser (read-only, always available)
+app.get('/events', (req, res) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
+  res.sendFile(require('path').join(__dirname, 'events-ui.html'));
+});
+app.get('/api/events', (req, res) => {
+  const { getRawCache } = require('./events');
+  res.json(getRawCache());
+});
+
 // SMS simulator UI + Eval dashboard (test mode only)
 if (process.env.PULSE_TEST_MODE === 'true') {
   app.get('/test', (req, res) => {

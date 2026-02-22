@@ -529,7 +529,7 @@ function isSearchUrl(url) {
  *
  * Returns { type, sms_text, picks, neighborhood_used, filters_used, suggested_neighborhood, pending_filters }
  */
-async function unifiedRespond(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime }) {
+async function unifiedRespond(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime, validNeighborhoods }) {
   const now = currentTime || new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   const todayNyc = getNycDateString(0);
@@ -567,7 +567,7 @@ async function unifiedRespond(message, { session, events, neighborhood, nearbyHo
     ? `Last neighborhood: ${session.lastNeighborhood || 'none'}. Last picks: ${(session.lastPicks || []).map((p, i) => {
         const evt = session.lastEvents?.[p.event_id];
         return evt ? `#${i + 1} "${evt.name}"` : `#${i + 1}`;
-      }).join(', ') || 'none'}.${session.lastFilters && Object.values(session.lastFilters).some(Boolean) ? ` Last filters: ${JSON.stringify(session.lastFilters)}.` : ''}`
+      }).join(', ') || 'none'}.${session.lastFilters && Object.values(session.lastFilters).some(Boolean) ? ` Active filters: ${JSON.stringify(session.lastFilters)}.` : ''}${session.pendingNearby ? ` Pending suggestion: "${session.pendingNearby}" (user was asked if they want picks there).` : ''}${session.pendingFilters ? ` Pending filters: ${JSON.stringify(session.pendingFilters)}.` : ''}${session.pendingMessage ? ` Original request: "${session.pendingMessage}".` : ''}`
     : 'No prior session.';
 
   const historyBlock = conversationHistory?.length > 0
@@ -580,11 +580,15 @@ async function unifiedRespond(message, { session, events, neighborhood, nearbyHo
     ? `\nNearby neighborhoods: ${nearbyHoods.join(', ')}`
     : '';
 
+  const validNeighborhoodsBlock = validNeighborhoods?.length > 0
+    ? `\nVALID_NEIGHBORHOODS: ${validNeighborhoods.join(', ')}`
+    : '';
+
   const userPrompt = `Current time (NYC): ${now}
 <user_message>${message}</user_message>
 Session context: ${sessionContext}
 Neighborhood: ${neighborhood || 'not specified'}
-${historyBlock}${nearbyBlock}
+${historyBlock}${nearbyBlock}${validNeighborhoodsBlock}
 ${eventListStr ? `EVENT_LIST (${events.length} events):\n${eventListStr}` : 'No events available for this area.'}
 
 Respond now.`;

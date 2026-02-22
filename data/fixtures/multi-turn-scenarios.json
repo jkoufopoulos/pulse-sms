@@ -1209,6 +1209,559 @@
         "Drops the trivia filter on follow-up requests",
         "Returns trivia events that already started and are likely over"
       ]
+    },
+    {
+      "name": "Extended: full evening flow — browse, filter, switch neighborhoods",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in East Village:\n\n1) Steve Lehman Trio at Nublu — avant-garde jazz, unreal energy. 9pm, $20\n\n2) Comedy at Caveat — stand-up showcase, always good. 8pm, $12\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "Caveat is this cool spot on Rivington — part comedy club, part lecture hall. Tonight's stand-up showcase usually has 5-6 comics, good mix. $12 and doors open at 7:30. https://caveat.nyc"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More East Village picks:\n\n1) DJ set at Nublu 151 — house music, free before 11. Goes late\n\n2) Poetry open mic at KGB Bar — free, always a scene. 7pm\n\nReply 1-2 for details"
+        },
+        {
+          "sender": "user",
+          "message": "how about something chill"
+        },
+        {
+          "sender": "pulse",
+          "message": "Chill vibes in East Village:\n\n1) Jazz at Smalls — intimate, always good. 9:30pm\n\n2) Acoustic night at Sidewalk Cafe — singer-songwriter stuff, low-key. 8pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "actually lets try LES"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight on LES:\n\n1) Indie show at Bowery Ballroom — great sound, stacked lineup. 8pm, $20\n\n2) Gallery opening at Sperone Westwater — free, wine. 6-8pm\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "Bowery Ballroom is one of the best mid-size rooms in the city — perfect sightlines and sound from anywhere. Tonight's show is going to be packed. 8pm doors. https://boweryballroom.com"
+        },
+        {
+          "sender": "user",
+          "message": "free"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free tonight on LES:\n\n1) Gallery opening at Sperone Westwater — wine and art, hard to beat free. 6-8pm\n\nReply 1 for details"
+        },
+        {
+          "sender": "user",
+          "message": "thanks, thats what i needed"
+        },
+        {
+          "sender": "pulse",
+          "message": "Anytime! Have a great night."
+        }
+      ],
+      "testing": "Full 8-turn evening flow: browse → details → more → vibe filter → neighborhood switch → details → free filter → sign-off. Tests session continuity, filter changes, neighborhood switches, and graceful close across a long conversation.",
+      "expected_behavior": "Each turn responds appropriately: details match the picked event, MORE shows new events (not repeats), vibe filter narrows picks, neighborhood switch resets to new hood, free filter works on new hood, thanks gets graceful close. Session state persists correctly throughout.",
+      "failure_modes": [
+        "Repeats events already shown",
+        "Loses neighborhood context after switch to LES",
+        "Vibe filter ignored or returns non-chill events",
+        "Free filter shows paid events",
+        "Details don't match the requested pick number",
+        "Confused or error response at any turn",
+        "Session state lost mid-conversation"
+      ]
+    },
+    {
+      "name": "Extended: vague opener through full session",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "whats good tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "Where are you looking tonight? Drop me a neighborhood — East Village, Williamsburg, LES, wherever."
+        },
+        {
+          "sender": "user",
+          "message": "bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Bushwick:\n\n1) DJ set at Bossa Nova Civic Club — always a good time. 10pm, free\n\n2) Helena Hauff at Elsewhere — techno, goes late. $25\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "whats the weather like"
+        },
+        {
+          "sender": "pulse",
+          "message": "Ha, I just do events! Text MORE for more Bushwick picks or try a different neighborhood."
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More Bushwick picks:\n\n1) Live band at Sultan Room — rock showcase. 9pm, $15\n\n2) Art opening at Luhring Augustine — free, 6-8pm\n\nReply 1-2 for details"
+        },
+        {
+          "sender": "user",
+          "message": "any comedy"
+        },
+        {
+          "sender": "pulse",
+          "message": "Comedy in Bushwick tonight:\n\n1) Stand-up at Tiny Cupboard — intimate room, always funny. 8pm, $10\n\nReply 1 for details"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tiny Cupboard is this hilarious little spot — literally a tiny room above a bar. Good mix of up-and-comers. $10, 8pm. https://tinycupboard.com"
+        },
+        {
+          "sender": "user",
+          "message": "cool thanks"
+        },
+        {
+          "sender": "pulse",
+          "message": "Have fun! Text me a neighborhood anytime."
+        }
+      ],
+      "testing": "7-turn flow starting from a vague opener: vague start → neighborhood → picks → off-topic deflection → more → category filter → details → sign-off. Tests that session survives an off-topic interruption and that category filter works after MORE.",
+      "expected_behavior": "Vague opener asks for neighborhood. After getting Bushwick, serves picks. Off-topic gets playful deflection WITHOUT losing session. MORE returns new Bushwick events. Comedy filter narrows to comedy. Details work. Thanks gets graceful close.",
+      "failure_modes": [
+        "Vague opener returns an error instead of asking for neighborhood",
+        "Off-topic message resets session or loses Bushwick context",
+        "MORE after off-topic fails or returns wrong neighborhood",
+        "Comedy filter ignored — returns non-comedy events",
+        "Details don't work after category filter",
+        "Error or confused response at any turn"
+      ]
+    },
+    {
+      "name": "Extended: decline, off-topic, then re-engage",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Williamsburg:\n\n1) Indie show at Music Hall — great headliner. 8pm, $25\n\n2) DJ night at Output — techno til 4am. $20\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "nah not feeling it"
+        },
+        {
+          "sender": "pulse",
+          "message": "No worries! Text me whenever you want to check out something else."
+        },
+        {
+          "sender": "user",
+          "message": "who won the knicks game"
+        },
+        {
+          "sender": "pulse",
+          "message": "I only know about events! But if you want to watch the game somewhere, text me a neighborhood and I'll find a spot."
+        },
+        {
+          "sender": "user",
+          "message": "lol ok how about greenpoint"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Greenpoint:\n\n1) Live jazz at Troost — chill vibes, great beer. 8pm, free\n\n2) DJ set at Good Room — solid lineup. 11pm, $15\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "Troost is a Greenpoint staple — part bar, part jazz club. Great beer list and tonight's set is free. 8pm. https://troostnyc.com"
+        },
+        {
+          "sender": "user",
+          "message": "any free stuff in greenpoint"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free in Greenpoint tonight:\n\n1) Jazz at Troost — already mentioned but it's the move. 8pm\n\n2) Open mic at word — free, sign up starts 7pm\n\nReply 1-2 for details"
+        }
+      ],
+      "testing": "6-turn flow: picks → decline → off-topic → new neighborhood → details → free filter. Tests that decline doesn't break session, off-topic doesn't cause errors, and re-engagement with a new neighborhood works. Also tests free filter on the new neighborhood.",
+      "expected_behavior": "Decline gets graceful response (not error). Off-topic gets playful deflection. New neighborhood serves fresh picks (not Williamsburg events). Details work on new picks. Free filter works on Greenpoint. No session confusion between Williamsburg and Greenpoint.",
+      "failure_modes": [
+        "Decline causes error or confused response",
+        "Off-topic resets session entirely",
+        "Re-engagement with Greenpoint shows Williamsburg events",
+        "Details reference wrong pick or wrong neighborhood",
+        "Free filter fails or shows paid events",
+        "Session bleed between Williamsburg and Greenpoint"
+      ]
+    },
+    {
+      "name": "Extended: progressive filter refinement",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "prospect park"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight near Prospect Park (Park Slope):\n\n1) Live band at Barbès — world music, always interesting. 8pm, $10\n\n2) Comedy at Union Hall — stand-up showcase, great basement room. 8pm, $10\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "how about comedy"
+        },
+        {
+          "sender": "pulse",
+          "message": "Comedy in Park Slope tonight:\n\n1) Stand-up at Union Hall — always a good crowd. 8pm, $10\n\nReply 1 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "any free comedy"
+        },
+        {
+          "sender": "pulse",
+          "message": "No free comedy near Park Slope tonight. Fort Greene or Williamsburg might have something — want me to check?"
+        },
+        {
+          "sender": "user",
+          "message": "try fort greene"
+        },
+        {
+          "sender": "pulse",
+          "message": "Comedy in Fort Greene tonight:\n\n1) Open mic at Putnam's Pub — free, good local comics. 8:30pm\n\nReply 1 for details"
+        },
+        {
+          "sender": "user",
+          "message": "anything later tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "Nothing starting late in Fort Greene for comedy. Crown Heights or Bed-Stuy might have late-night options — want me to check?"
+        },
+        {
+          "sender": "user",
+          "message": "nah im good"
+        },
+        {
+          "sender": "pulse",
+          "message": "No worries! Text me anytime."
+        }
+      ],
+      "testing": "6-turn progressive filter refinement: broad → category → free+category → neighborhood switch → time filter → graceful decline. Tests that filters compound correctly and that honest 'no results' responses offer helpful suggestions without substituting wrong categories.",
+      "expected_behavior": "Each filter narrows correctly. Comedy filter returns comedy events. Free+comedy compound is handled — either finds free comedy or honestly says none. Neighborhood switch preserves comedy filter. Time filter compounds with comedy. Final decline gets graceful close. No filter drift at any step.",
+      "failure_modes": [
+        "Comedy filter returns non-comedy events",
+        "Free comedy request serves paid events",
+        "Neighborhood switch drops the comedy filter",
+        "Time filter compounds incorrectly with existing filters",
+        "Substitutes music/art events for comedy at any step",
+        "Decline causes error instead of graceful close"
+      ]
+    },
+    {
+      "name": "Extended: neighborhood hopping with session memory",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "chelsea"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Chelsea:\n\n1) Gallery opening at Gagosian — free, big name artist. 6-8pm\n\n2) DJ at Le Bain — rooftop at The Standard, views + vibes. 10pm, free before midnight\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More Chelsea picks:\n\n1) Comedy at Gotham — prime time showcase. 9pm, $25\n\nReply 1 for details. That's everything in Chelsea! Flatiron is right nearby — want picks from there?"
+        },
+        {
+          "sender": "user",
+          "message": "actually try soho"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in SoHo:\n\n1) Art opening at Drawing Center — free, experimental work. 6-8pm\n\n2) Live jazz at Blue Note — legends play here nightly. 8pm & 10:30pm, $30\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "Blue Note is one of the most iconic jazz clubs in the world — you'll hear world-class players every night. Two sets: 8pm and 10:30pm. Covers vary but worth it. https://bluenotejazz.com"
+        },
+        {
+          "sender": "user",
+          "message": "how about lower east side"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight on LES:\n\n1) Rock show at Bowery Ballroom — indie headliner. 8pm, $20\n\n2) DJ set at Pianos — free downstairs. 10pm\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More LES picks:\n\n1) Comedy at Caveat — smart comedy showcase. 8pm, $15\n\n2) Vinyl night at Berlin — low-key bar, great records. 9pm, free\n\nReply 1-2 for details"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "Caveat is this cool spot on Rivington — stand-up, science talks, game shows, all kinds of stuff. Tonight's comedy show is solid. $15. https://caveat.nyc"
+        }
+      ],
+      "testing": "7-turn neighborhood hopping: Chelsea → more → SoHo (counter to suggestion) → details → LES → more → details. Tests that each neighborhood switch fully resets event context, details always reference the current neighborhood's picks, and MORE works correctly after each switch.",
+      "expected_behavior": "Each neighborhood switch serves fresh events for that neighborhood. MORE after Chelsea shows new Chelsea events, not SoHo/LES events. Details in SoHo reference SoHo picks. After switching to LES, no Chelsea or SoHo events bleed through. MORE in LES shows new LES events. Details reference LES picks.",
+      "failure_modes": [
+        "Events from previous neighborhood appear after switch",
+        "Details reference wrong neighborhood's picks",
+        "MORE shows events from a different neighborhood",
+        "Session state confused between neighborhoods",
+        "Counter-suggestion to SoHo ignored or fails",
+        "Error or confused response during any switch"
+      ]
+    },
+    {
+      "name": "Extended: session survives disruption and recovers",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "greenpoint"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Greenpoint:\n\n1) Live jazz at Troost — chill vibes, free. 8pm\n\n2) DJ at Good Room — house music, goes late. 11pm, $15\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "asdfghjkl"
+        },
+        {
+          "sender": "pulse",
+          "message": "Didn't catch that! Reply 1-2 for details on those Greenpoint picks, or text a different neighborhood."
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "Troost is great — chill bar with live jazz on weekends. Free, 8pm. Good beer selection too. https://troostnyc.com"
+        },
+        {
+          "sender": "user",
+          "message": "STOP"
+        },
+        {
+          "sender": "pulse",
+          "message": ""
+        },
+        {
+          "sender": "user",
+          "message": "how about later tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "Late night in Greenpoint:\n\n1) Good Room — the late set is always worth it. 11pm\n\nReply 1 for details"
+        },
+        {
+          "sender": "user",
+          "message": "any art stuff"
+        },
+        {
+          "sender": "pulse",
+          "message": "Art in Greenpoint tonight:\n\n1) Opening at Transmitter Gallery — group show, free wine. 6-9pm\n\nReply 1 for details"
+        },
+        {
+          "sender": "user",
+          "message": "thanks!"
+        },
+        {
+          "sender": "pulse",
+          "message": "Enjoy! Text me anytime."
+        }
+      ],
+      "testing": "7-turn resilience test: picks → gibberish → details still work → STOP (opt-out) → time filter → category filter → sign-off. Tests that session survives gibberish, TCPA opt-out is handled, and filters work after disruptions. Note: after STOP, user may not receive responses depending on Twilio opt-out list — the key test is that Pulse handles it correctly (silence for STOP).",
+      "expected_behavior": "Gibberish gets helpful redirect without losing session. Details still work after gibberish. STOP gets silence (TCPA compliance). Subsequent messages still work if user re-opts in. Time filter and category filter work on the active Greenpoint session. Thanks gets graceful close.",
+      "failure_modes": [
+        "Gibberish resets session or loses Greenpoint context",
+        "Details fail after gibberish",
+        "STOP gets a response (TCPA violation)",
+        "Time filter doesn't work after disruptions",
+        "Category filter returns wrong type of events",
+        "Session lost between disruptions"
+      ]
+    },
+    {
+      "name": "Extended: thin neighborhood nudge chain",
+      "category": "poor_experience",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "washington heights"
+        },
+        {
+          "sender": "pulse",
+          "message": "Not much going on in Washington Heights tonight. Harlem is right nearby and usually has stuff — want picks from there?"
+        },
+        {
+          "sender": "user",
+          "message": "yeah sure"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Harlem:\n\n1) Jazz at Bill's Place — legendary speakeasy, BYOB. 9pm, $25\n\n2) Open mic at Silvana — free, always a good mix. 8pm\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More Harlem picks:\n\n1) DJ set at Ginny's Supper Club — soul and R&B vibes under Red Rooster. 10pm, $20\n\nReply 1 for details"
+        },
+        {
+          "sender": "user",
+          "message": "how about free stuff"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free in Harlem tonight:\n\n1) Open mic at Silvana — always a good time. 8pm\n\nReply 1 for details"
+        },
+        {
+          "sender": "user",
+          "message": "how about bed stuy"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Bed-Stuy:\n\n1) Live music at Ode to Babel — rooftop vibes. 9pm, free\n\n2) Comedy at Bed-Stuy Comedy — neighborhood spot. 8pm, $10\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "Local comedy spot with a real neighborhood feel — small room, good comics. $10 at the door, 8pm."
+        }
+      ],
+      "testing": "6-turn nudge chain flow: thin neighborhood → nudge accept → more → free filter → neighborhood switch → details. Tests that nudge redirect works, MORE works in the redirected neighborhood, free filter works after nudge, and a second neighborhood switch properly resets context.",
+      "expected_behavior": "Washington Heights gets honest thin-cache response with nearby suggestion. Nudge accept serves Harlem picks. MORE shows new Harlem events (not repeats). Free filter works on Harlem. Switch to Bed-Stuy resets cleanly — no Harlem events. Details reference Bed-Stuy picks.",
+      "failure_modes": [
+        "Nudge accept fails or shows wrong neighborhood",
+        "MORE after nudge shows Washington Heights events",
+        "Free filter doesn't work after nudge chain",
+        "Second neighborhood switch bleeds Harlem events into Bed-Stuy",
+        "Details reference wrong neighborhood's picks",
+        "Session confused by multiple neighborhood transitions"
+      ]
+    },
+    {
+      "name": "Extended: compound filters through conversation",
+      "category": "poor_experience",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "any good jazz shows near prospect park tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "Jazz near Prospect Park (Park Slope) tonight:\n\n1) Barbès has live jazz — world jazz, eclectic. 8pm, $10\n\nReply 1 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "how about free jazz"
+        },
+        {
+          "sender": "pulse",
+          "message": "No free jazz near Park Slope tonight. Fort Greene has some good jazz spots — want me to check?"
+        },
+        {
+          "sender": "user",
+          "message": "sure"
+        },
+        {
+          "sender": "pulse",
+          "message": "[Should serve free jazz in Fort Greene if available, or honestly say none found]"
+        },
+        {
+          "sender": "user",
+          "message": "forget the free thing, just jazz anywhere in brooklyn"
+        },
+        {
+          "sender": "pulse",
+          "message": "[Should serve jazz picks from Brooklyn neighborhoods, dropping the free filter but keeping jazz]"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "[Details on pick #2 from the jazz results]"
+        },
+        {
+          "sender": "user",
+          "message": "how about later tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "[Should add time filter to jazz, showing late-night jazz options]"
+        }
+      ],
+      "testing": "6-turn compound filter conversation: jazz query → add free → nudge redirect → drop free, keep jazz, broaden geography → details → add time filter. Tests that the user can progressively add, remove, and modify filters through natural language, and that Pulse tracks which filters to keep vs drop.",
+      "expected_behavior": "Initial jazz request returns jazz events. Adding 'free' compounds the filter. After redirect, free+jazz maintained. When user says 'forget the free thing', free is dropped but jazz is kept. Details work on current picks. 'Later tonight' adds time filter on top of jazz. No filter drift — jazz never silently changes to a different category.",
+      "failure_modes": [
+        "Jazz filter dropped at any point — returns non-jazz events",
+        "Free filter not dropped when user explicitly says 'forget the free thing'",
+        "Redirect loses both filters",
+        "Time filter replaces jazz filter instead of compounding",
+        "Details reference wrong picks after filter changes",
+        "Borough-level 'brooklyn' request fails to resolve"
+      ]
     }
   ]
 }

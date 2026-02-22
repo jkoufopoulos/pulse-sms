@@ -485,6 +485,8 @@ SESSION AWARENESS:
 - Filter-modification follow-ups with an active session are event requests with updated filters — "how about theater", "any comedy", "later tonight".
 - "nah" / "no thanks" / "im good" after a suggestion = graceful close, NOT an error.
 
+FILTER CONTINUITY: When session shows "Active filters", maintain them unless the user explicitly changes or drops them. If the user adds a new filter ("later tonight"), compound it with existing ones. If the user drops one ("forget the free thing"), remove only that filter. Return accurate filters_used reflecting what you applied.
+
 PENDING NUDGE: If session shows a pending neighborhood suggestion and the user responds
 affirmatively ("yes", "sure", "ok", "yeah", "down", "bet"), compose picks for that pending neighborhood.
 If user declines ("nah", "no", "pass"), respond gracefully.
