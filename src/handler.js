@@ -207,9 +207,9 @@ async function handleMessage(phone, message) {
   try {
     await handleMessageAI(phone, message);
   } catch (err) {
-    console.error('AI flow error:', err.message, err.stack);
+    console.error('AI flow error:', err.message);
     try {
-      await sendSMS(phone, `Pulse hit a snag — try again in a sec! [DEBUG: ${err.message}]`);
+      await sendSMS(phone, "Pulse hit a snag — try again in a sec!");
     } catch (smsErr) {
       console.error(`[CRITICAL] Double failure for ${masked}: AI error="${err.message}", SMS error="${smsErr.message}" — user received nothing`);
     }
