@@ -529,7 +529,7 @@ function isSearchUrl(url) {
  *
  * Returns { type, sms_text, picks, neighborhood_used, filters_used, suggested_neighborhood, pending_filters }
  */
-async function unifiedRespond(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime, validNeighborhoods, activeFilters, isSparse, matchCount }) {
+async function unifiedRespond(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime, validNeighborhoods, activeFilters, isSparse, matchCount, excludeIds }) {
   const now = currentTime || new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   const todayNyc = getNycDateString(0);
@@ -594,11 +594,15 @@ async function unifiedRespond(message, { session, events, neighborhood, nearbyHo
     ? `\nACTIVE_FILTER: ${filterLabel}\nMATCH_COUNT: ${matchCount || 0} of ${events?.length || 0} events match\nSPARSE: ${isSparse ? 'true — few matches, acknowledge honestly' : 'false'}`
     : '';
 
+  const excludeNote = excludeIds && excludeIds.length > 0
+    ? `\nEXCLUDED (already shown to user — do NOT pick these): ${excludeIds.join(', ')}`
+    : '';
+
   const userPrompt = `Current time (NYC): ${now}
 <user_message>${message}</user_message>
 Session context: ${sessionContext}
 Neighborhood: ${neighborhood || 'not specified'}
-${historyBlock}${nearbyBlock}${validNeighborhoodsBlock}${filterContextBlock}
+${historyBlock}${nearbyBlock}${validNeighborhoodsBlock}${filterContextBlock}${excludeNote}
 ${eventListStr ? `EVENT_LIST (${events.length} events):\n${eventListStr}` : 'No events available for this area.'}
 
 Respond now.`;

@@ -417,6 +417,11 @@ async function handleMessageAI(phone, message) {
 
     console.log(`Unified flow: hood=${hood}, events=${events.length}, nearby=${nearbyHoods.join(',')}`);
 
+    // Build exclude list from previously shown events
+    const prevPickIds = (session?.allPicks || session?.lastPicks || []).map(p => p.event_id);
+    const prevOfferedIds = session?.allOfferedIds || [];
+    const excludeIds = [...new Set([...prevPickIds, ...prevOfferedIds])];
+
     const composeStart = Date.now();
     const result = await unifiedRespond(message, {
       session,
@@ -429,6 +434,7 @@ async function handleMessageAI(phone, message) {
       activeFilters,
       isSparse,
       matchCount,
+      excludeIds,
     });
     trace.routing.latency_ms = Date.now() - composeStart; // unified call replaces both route + compose
     trace.composition.latency_ms = trace.routing.latency_ms;
