@@ -174,6 +174,22 @@ async function fetchYutoriEvents() {
         console.log(`Yutori: returning ${cached.events.length} cached events (no new files)`);
         return cached.events;
       }
+
+      // No cache exists — bootstrap by re-processing most recent file from processed/
+      if (fs.existsSync(PROCESSED_DIR)) {
+        const processed = fs.readdirSync(PROCESSED_DIR)
+          .filter(f => /\.(txt|html?)$/i.test(f))
+          .sort();
+        if (processed.length > 0) {
+          const latest = processed[processed.length - 1];
+          console.log(`Yutori: bootstrapping cache from processed/${latest}`);
+          // Move latest back to main dir for processing
+          fs.renameSync(path.join(PROCESSED_DIR, latest), path.join(YUTORI_DIR, latest));
+          // Re-run — will find the file, process it, cache, and move back
+          return fetchYutoriEvents();
+        }
+      }
+
       console.log('Yutori: no briefing files found and no cache');
       return [];
     }
