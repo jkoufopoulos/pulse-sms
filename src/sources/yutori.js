@@ -8,6 +8,7 @@ const { captureExtractionInput } = require('../extraction-capture');
 const YUTORI_DIR = path.join(__dirname, '../../data/yutori');
 const PROCESSED_DIR = path.join(YUTORI_DIR, 'processed');
 const PROCESSED_IDS_FILE = path.join(YUTORI_DIR, 'processed-ids.json');
+const CACHE_FILE = path.join(YUTORI_DIR, 'cached-events.json');
 
 /**
  * Strip HTML to plain text, preserving <a href> URLs as "text (URL)" format.
@@ -37,6 +38,32 @@ function stripHtml(html) {
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+/**
+ * Load cached events from previously processed briefings.
+ */
+function loadCachedEvents() {
+  try {
+    if (fs.existsSync(CACHE_FILE)) {
+      return JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+    }
+  } catch (err) {
+    console.warn('Yutori: failed to load cached-events.json:', err.message);
+  }
+  return null;
+}
+
+/**
+ * Save extracted events for reuse across scrapes.
+ */
+function saveCachedEvents(events) {
+  try {
+    fs.mkdirSync(YUTORI_DIR, { recursive: true });
+    fs.writeFileSync(CACHE_FILE, JSON.stringify({ events, timestamp: Date.now() }, null, 2));
+  } catch (err) {
+    console.warn('Yutori: failed to save cached-events.json:', err.message);
+  }
 }
 
 /**
@@ -141,7 +168,13 @@ async function fetchYutoriEvents() {
       .sort();
 
     if (files.length === 0) {
-      console.log('Yutori: no briefing files found');
+      // No new files — return cached events from last extraction
+      const cached = loadCachedEvents();
+      if (cached?.events?.length > 0) {
+        console.log(`Yutori: returning ${cached.events.length} cached events (no new files)`);
+        return cached.events;
+      }
+      console.log('Yutori: no briefing files found and no cache');
       return [];
     }
 
@@ -198,6 +231,7 @@ async function fetchYutoriEvents() {
       }
     }
 
+    saveCachedEvents(events);
     console.log(`Yutori: ${events.length} events from ${files.length} briefings`);
     return events;
   } catch (err) {
