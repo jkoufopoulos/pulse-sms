@@ -85,6 +85,7 @@ const VENUE_MAP = {
   'The Triad': { lat: 40.7805, lng: -73.9810 },
   'Gin Mill': { lat: 40.7834, lng: -73.9787 },
   'George Keeley': { lat: 40.7840, lng: -73.9786 },
+  'New York Public Library - Morningside Heights Branch': { lat: 40.8063, lng: -73.9625 },
 
   // === West Village / Greenwich Village ===
   '154 Christopher St': { lat: 40.7331, lng: -74.0045 },
@@ -194,6 +195,7 @@ const VENUE_MAP = {
   'Industry City': { lat: 40.6553, lng: -74.0069 },
   'The Green-Wood Cemetery': { lat: 40.6584, lng: -73.9944 },
   'Green-Wood Cemetery': { lat: 40.6584, lng: -73.9944 },
+  'Sunset Park Recreation Center': { lat: 40.6462, lng: -74.0024 },
 
   // === Downtown Brooklyn ===
   'Public Records': { lat: 40.6807, lng: -73.9576 },
@@ -206,6 +208,7 @@ const VENUE_MAP = {
   'Shrine': { lat: 40.8138, lng: -73.9515 },
   'Minton\'s Playhouse': { lat: 40.8089, lng: -73.9469 },
   'Native Harlem': { lat: 40.8046, lng: -73.9502 },
+  'NYPL - Hamilton Grange Library': { lat: 40.8237, lng: -73.9476 },
 
   // === Washington Heights ===
   'United Palace': { lat: 40.8399, lng: -73.9395 },
