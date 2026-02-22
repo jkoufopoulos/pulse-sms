@@ -375,7 +375,10 @@ async function refreshCache() {
 // ============================================================
 
 async function refreshSources(sourceNames) {
-  const targets = SOURCES.filter(s => sourceNames.includes(s.label.toLowerCase()));
+  // Match flexibly: strip non-alpha so "nyc_parks", "nyc-parks", "nycparks" all match "NYCParks"
+  const normalize = s => s.toLowerCase().replace(/[^a-z]/g, '');
+  const normalizedInputs = sourceNames.map(normalize);
+  const targets = SOURCES.filter(s => normalizedInputs.includes(normalize(s.label)));
   if (targets.length === 0) {
     console.warn(`refreshSources: no matching sources for [${sourceNames.join(', ')}]`);
     return;
@@ -447,6 +450,9 @@ async function refreshSources(sourceNames) {
 
   eventCache = [...kept, ...validNew];
   cacheTimestamp = Date.now();
+
+  // Resolve neighborhoods for new events via venue map + geocoding
+  await batchGeocodeEvents(eventCache);
 
   // Persist updated cache
   try {
