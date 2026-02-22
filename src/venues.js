@@ -26,6 +26,8 @@ const VENUE_MAP = {
   'Outer Heaven': { lat: 40.7058, lng: -73.9216 },
   'Pine Box Rock Shop': { lat: 40.7054, lng: -73.9216 },
   'Cobra Club': { lat: 40.7055, lng: -73.9234 },
+  'Eris Main Stage': { lat: 40.7135, lng: -73.9438 },
+  'Eris': { lat: 40.7135, lng: -73.9438 },
 
   // === Williamsburg ===
   'Baby\'s All Right': { lat: 40.7095, lng: -73.9591 },
@@ -41,8 +43,10 @@ const VENUE_MAP = {
   'National Sawdust': { lat: 40.7116, lng: -73.9625 },
   'Pete\'s Candy Store': { lat: 40.7126, lng: -73.9558 },
   'Knitting Factory Brooklyn': { lat: 40.7112, lng: -73.9604 },
+  'Sleepwalk': { lat: 40.7130, lng: -73.9608 },
 
   // === Greenpoint ===
+  'McCarren Parkhouse': { lat: 40.7206, lng: -73.9515 },
   'Good Room': { lat: 40.7268, lng: -73.9516 },
   'Lot Radio': { lat: 40.7116, lng: -73.9383 },
   'The Lot Radio': { lat: 40.7116, lng: -73.9383 },
@@ -74,11 +78,14 @@ const VENUE_MAP = {
   'Smoke Jazz Club': { lat: 40.8020, lng: -73.9680 },
   'Lincoln Center': { lat: 40.7725, lng: -73.9835 },
   'Jazz at Lincoln Center': { lat: 40.7686, lng: -73.9832 },
+  'Lincoln Center Presents': { lat: 40.7725, lng: -73.9835 },
+  'Film Society of Lincoln Center': { lat: 40.7725, lng: -73.9835 },
   'The Triad': { lat: 40.7805, lng: -73.9810 },
   'Gin Mill': { lat: 40.7834, lng: -73.9787 },
   'George Keeley': { lat: 40.7840, lng: -73.9786 },
 
   // === West Village / Greenwich Village ===
+  '154 Christopher St': { lat: 40.7331, lng: -74.0045 },
   'Smalls Jazz Club': { lat: 40.7346, lng: -74.0027 },
   'Village Vanguard': { lat: 40.7360, lng: -74.0010 },
   'Comedy Cellar': { lat: 40.7304, lng: -74.0003 },
@@ -115,16 +122,22 @@ const VENUE_MAP = {
   'Tompkins Square Park': { lat: 40.7265, lng: -73.9817 },
   'Niagara': { lat: 40.7249, lng: -73.9829 },
   'Club Cumming': { lat: 40.7233, lng: -73.9849 },
+  'Village East by Angelika': { lat: 40.7313, lng: -73.9874 },
+  'New York Public Library, Tompkins Square Branch': { lat: 40.7270, lng: -73.9810 },
+  'The Alchemist\'s Kitchen Elixir Bar': { lat: 40.7245, lng: -73.9914 },
 
   // === Flatiron / Union Square ===
   'Green Room NYC': { lat: 40.7424, lng: -73.9927 },
   'Paragon': { lat: 40.7187, lng: -73.9904 },
   'Irving Plaza': { lat: 40.7349, lng: -73.9882 },
   'Gramercy Theatre': { lat: 40.7348, lng: -73.9863 },
+  'New York Comedy Club': { lat: 40.7394, lng: -73.9819 },
+  'People\'s Improv Theater': { lat: 40.7400, lng: -73.9849 },
 
   // === SoHo / NoHo ===
   'Joe\'s Pub': { lat: 40.7290, lng: -73.9913 },
   'SOB\'s': { lat: 40.7258, lng: -74.0053 },
+  'Arlo Hotel Soho': { lat: 40.7265, lng: -74.0073 },
 
   // === Midtown / Hell\'s Kitchen ===
   'Terminal 5': { lat: 40.7690, lng: -73.9930 },
@@ -133,6 +146,11 @@ const VENUE_MAP = {
   'Town Hall': { lat: 40.7574, lng: -73.9860 },
   'The Cutting Room': { lat: 40.7477, lng: -73.9826 },
   'Madison Square Garden': { lat: 40.7505, lng: -73.9934 },
+  'New York Comedy Club Midtown': { lat: 40.7638, lng: -73.9882 },
+  'Arlo Hotel Midtown': { lat: 40.7562, lng: -73.9931 },
+  'VERSA': { lat: 40.7495, lng: -73.9913 },
+  'Pershing Square': { lat: 40.7520, lng: -73.9774 },
+  'Brooklyn Delicatessen Times Square': { lat: 40.7580, lng: -73.9855 },
 
   // === Cobble Hill / Brooklyn Heights / Boerum Hill ===
   'Jalopy Theatre': { lat: 40.6771, lng: -74.0012 },
@@ -140,6 +158,7 @@ const VENUE_MAP = {
   'Henry Public': { lat: 40.6880, lng: -73.9940 },
   'Floyd': { lat: 40.6860, lng: -73.9930 },
   'St. Ann\'s Warehouse': { lat: 40.7010, lng: -73.9930 },
+  'St. Ann & the Holy Trinity Church': { lat: 40.6930, lng: -73.9943 },
 
   // === Fort Greene / Clinton Hill ===
   'BAM': { lat: 40.6861, lng: -73.9781 },
@@ -167,6 +186,8 @@ const VENUE_MAP = {
 
   // === Sunset Park ===
   'Industry City': { lat: 40.6553, lng: -74.0069 },
+  'The Green-Wood Cemetery': { lat: 40.6584, lng: -73.9944 },
+  'Green-Wood Cemetery': { lat: 40.6584, lng: -73.9944 },
 
   // === Downtown Brooklyn ===
   'Public Records': { lat: 40.6807, lng: -73.9576 },
@@ -178,6 +199,7 @@ const VENUE_MAP = {
   'Silvana': { lat: 40.8097, lng: -73.9497 },
   'Shrine': { lat: 40.8138, lng: -73.9515 },
   'Minton\'s Playhouse': { lat: 40.8089, lng: -73.9469 },
+  'Native Harlem': { lat: 40.8046, lng: -73.9502 },
 
   // === Washington Heights ===
   'United Palace': { lat: 40.8399, lng: -73.9395 },
@@ -185,6 +207,7 @@ const VENUE_MAP = {
   // === Astoria ===
   'QED Astoria': { lat: 40.7713, lng: -73.9318 },
   'Bohemian Hall & Beer Garden': { lat: 40.7624, lng: -73.9186 },
+  'FD Photo Studio Astoria': { lat: 40.7700, lng: -73.9230 },
 
   // === Long Island City ===
   'MoMA PS1': { lat: 40.7454, lng: -73.9471 },
