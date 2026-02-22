@@ -80,12 +80,15 @@ const VENUE_MAP = {
   'Jazz at Lincoln Center': { lat: 40.7686, lng: -73.9832 },
   'Lincoln Center Presents': { lat: 40.7725, lng: -73.9835 },
   'Film Society of Lincoln Center': { lat: 40.7725, lng: -73.9835 },
+  'The New York Public Library for the Performing Arts': { lat: 40.7730, lng: -73.9837 },
+  'Chamber Music Society of Lincoln Center': { lat: 40.7725, lng: -73.9835 },
   'The Triad': { lat: 40.7805, lng: -73.9810 },
   'Gin Mill': { lat: 40.7834, lng: -73.9787 },
   'George Keeley': { lat: 40.7840, lng: -73.9786 },
 
   // === West Village / Greenwich Village ===
   '154 Christopher St': { lat: 40.7331, lng: -74.0045 },
+  'The New School\'s College of Performing Arts': { lat: 40.7361, lng: -73.9955 },
   'Smalls Jazz Club': { lat: 40.7346, lng: -74.0027 },
   'Village Vanguard': { lat: 40.7360, lng: -74.0010 },
   'Comedy Cellar': { lat: 40.7304, lng: -74.0003 },
@@ -151,6 +154,7 @@ const VENUE_MAP = {
   'VERSA': { lat: 40.7495, lng: -73.9913 },
   'Pershing Square': { lat: 40.7520, lng: -73.9774 },
   'Brooklyn Delicatessen Times Square': { lat: 40.7580, lng: -73.9855 },
+  'Sheraton New York Times Square Hotel': { lat: 40.7625, lng: -73.9820 },
 
   // === Cobble Hill / Brooklyn Heights / Boerum Hill ===
   'Jalopy Theatre': { lat: 40.6771, lng: -74.0012 },
@@ -165,6 +169,8 @@ const VENUE_MAP = {
   'BAM Howard Gilman Opera House': { lat: 40.6861, lng: -73.9781 },
   'BAM Harvey Theater': { lat: 40.6877, lng: -73.9761 },
   'BRIC': { lat: 40.6865, lng: -73.9772 },
+  'BRIC House Media Center': { lat: 40.6865, lng: -73.9772 },
+  'BRIC House': { lat: 40.6865, lng: -73.9772 },
 
   // === Prospect Heights / Crown Heights ===
   'Brooklyn Museum': { lat: 40.6712, lng: -73.9636 },
