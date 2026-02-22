@@ -415,7 +415,12 @@ async function handleMessageAI(phone, message) {
     if (result.type === 'conversational') {
       // Persist neighborhood context so follow-ups keep the hood
       if (hood) {
-        setSession(phone, { lastNeighborhood: hood });
+        const sessionUpdate = { lastNeighborhood: hood };
+        // Save suggested neighborhood for nudge chain (but not filters — those come from event_picks)
+        const suggestedHood = result.suggested_neighborhood && nearbyHoods.includes(result.suggested_neighborhood)
+          ? result.suggested_neighborhood : null;
+        if (suggestedHood) sessionUpdate.pendingNearby = suggestedHood;
+        setSession(phone, sessionUpdate);
       }
       await sendSMS(phone, result.sms_text);
       finalizeTrace(result.sms_text, 'conversational');
@@ -429,6 +434,9 @@ async function handleMessageAI(phone, message) {
       if (hood) {
         const sessionUpdate = { lastNeighborhood: hood };
         if (result.filters_used) sessionUpdate.lastFilters = result.filters_used;
+        const suggestedHoodEmpty = result.suggested_neighborhood && nearbyHoods.includes(result.suggested_neighborhood)
+          ? result.suggested_neighborhood : null;
+        if (suggestedHoodEmpty) sessionUpdate.pendingNearby = suggestedHoodEmpty;
         setSession(phone, sessionUpdate);
       }
       await sendSMS(phone, result.sms_text);
