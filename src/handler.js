@@ -390,11 +390,13 @@ async function handleMessageAI(phone, message) {
 
     // Fetch events if we have a neighborhood
     let events = [];
+    let curated = [];
+    let taggedPerennials = [];
     if (hood) {
       const eventsStart = Date.now();
       const raw = await getEvents(hood);
       trace.events.getEvents_ms = Date.now() - eventsStart;
-      const curated = filterKidsEvents(raw);
+      curated = filterKidsEvents(raw);
       const taggedResult = buildTaggedPool(curated, activeFilters);
       events = taggedResult.pool;
       matchCount = taggedResult.matchCount;
@@ -403,7 +405,7 @@ async function handleMessageAI(phone, message) {
       const perennialPicks = getPerennialPicks(hood);
       const localPerennials = validatePerennialActivity(toEventObjects(perennialPicks.local, hood));
       const perennialCap = Math.min(4, 15 - Math.min(events.length, 15));
-      const taggedPerennials = localPerennials.slice(0, perennialCap).map(e => ({ ...e, filter_match: false }));
+      taggedPerennials = localPerennials.slice(0, perennialCap).map(e => ({ ...e, filter_match: false }));
       events = [...events, ...taggedPerennials];
     }
     const nearbyHoods = hood ? getAdjacentNeighborhoods(hood, 3) : [];
@@ -497,7 +499,7 @@ async function handleMessageAI(phone, message) {
     // Send SMS first — ensures user always gets a response even if session save fails
     await sendSMS(phone, result.sms_text);
 
-    const eventMap = buildEventMap(events);
+    const eventMap = buildEventMap([...curated, ...taggedPerennials]);
     const suggestedHood = result.suggested_neighborhood && nearbyHoods.includes(result.suggested_neighborhood)
       ? result.suggested_neighborhood : null;
     saveResponseFrame(phone, {
@@ -505,7 +507,7 @@ async function handleMessageAI(phone, message) {
       eventMap,
       neighborhood: result.neighborhood_used || hood,
       filters: activeFilters,
-      offeredIds: events.map(e => e.id),
+      offeredIds: (result.picks || []).map(p => p.event_id),
       pending: suggestedHood ? {
         neighborhood: suggestedHood,
         filters: activeFilters,
