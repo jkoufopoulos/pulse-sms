@@ -12,7 +12,7 @@ Pulse uses a two-tier routing system to understand messages:
 
 1. **Pre-router (deterministic)** — Pattern-matches common intents instantly with zero latency or AI cost: greetings, bare neighborhood names, "more", "free", number replies for details, and follow-up filter modifications (category/time/vibe changes when the user has an active session).
 
-2. **AI router (semantic)** — Handles ambiguous messages that need real understanding: "any good jazz shows near prospect park tonight", compound filters like "any more free comedy stuff", off-topic deflection. Uses Gemini Flash by default (~10x cheaper than Haiku), falls back to Claude Haiku.
+2. **AI router (semantic)** — Handles ambiguous messages that need real understanding: "any good jazz shows near prospect park tonight", compound filters like "any more free comedy stuff", off-topic deflection. Uses Gemini Flash by default (~10x cheaper than Haiku), falls back to Claude Haiku. When the pre-router doesn't match, `unifiedRespond` in `ai.js` handles routing + composition in a single call flow.
 
 A typical multi-turn conversation:
 ```
@@ -95,7 +95,7 @@ All paths are relative to `src/` unless prefixed with a directory.
 
 | File | Purpose |
 |------|---------|
-| `ai.js` | 3 AI calls: `routeMessage` (Gemini Flash or Claude Haiku), `composeResponse` (Claude Haiku), `extractEvents` (Claude Haiku) |
+| `ai.js` | AI calls: `routeMessage` (Gemini Flash or Claude Haiku), `composeResponse` (Claude Haiku), `extractEvents` (Claude Haiku), `unifiedRespond` (single-call route+compose for pre-router misses) |
 | `prompts.js` | System prompts for routing, composition, extraction, and details — centralized prompt strings used by `ai.js` |
 | `skills/build-compose-prompt.js` | Dynamic compose prompt assembly — `buildComposePrompt(events, options)` conditionally appends skill modules based on context |
 | `skills/compose-skills.js` | 12 composable prompt fragments: `core`, `tonightPriority`, `sourceTiers`, `neighborhoodMismatch`, `perennialFraming`, `venueFraming`, `lastBatch`, `freeEmphasis`, `activityAdherence`, `conversationAwareness`, `pendingIntent` |
@@ -104,8 +104,9 @@ All paths are relative to `src/` unless prefixed with a directory.
 
 | File | Purpose |
 |------|---------|
-| `events.js` | Daily event cache, source health tracking, cross-source dedup, venue persistence, `getEvents()` |
-| `curation.js` | Pre-compose deterministic filters — `filterKidsEvents` (drops NYC Parks children's events), `filterIncomplete` (below completeness threshold), `validatePerennialActivity` (removes bare-venue perennials) |
+| `events.js` | Daily event cache with disk persistence (`data/events-cache.json`), source health tracking, cross-source dedup, venue persistence, scrape-time date filtering (today through 7 days out) + kids filtering, `getEvents()`, `isCacheFresh()` (skips startup scrape when <20hr old) |
+| `curation.js` | Pre-compose deterministic filters — `filterKidsEvents` (drops children's events from all sources), `filterIncomplete` (below completeness threshold), `validatePerennialActivity` (removes bare-venue perennials) |
+| `pipeline.js` | Shared event pipeline helpers — `applyFilters` (free/category/time), `resolveActiveFilters` (merges route + pending + session filters), `saveResponseFrame` (atomic session writes), `buildExhaustionMessage` |
 | `perennial.js` | Perennial picks loader — `getPerennialPicks(hood, opts)`, caches JSON, filters by day, checks adjacent neighborhoods |
 | `venues.js` | Shared venue coord map, auto-learning from sources, Nominatim geocoding fallback, persistence (export/import learned venues) |
 | `geo.js` | `resolveNeighborhood`, proximity ranking, haversine, time filtering |
@@ -133,14 +134,14 @@ All paths are relative to `src/` unless prefixed with a directory.
 |------|---------|
 | `sources/` | 18 scrapers split into individual modules with barrel `index.js` |
 | `sources/shared.js` | `FETCH_HEADERS`, `makeEventId`, `normalizeExtractedEvent` |
-| `sources/skint.js` | Skint (HTML→Claude extraction) |
+| `sources/skint.js` | Skint (HTML→Claude extraction, skips past-day sections, resolves day headers to explicit dates) |
 | `sources/eventbrite.js` | Eventbrite (JSON-LD + __SERVER_DATA__), Comedy, Arts — 5 functions, 2 internal parsers |
 | `sources/songkick.js` | Songkick (JSON-LD) |
 | `sources/dice.js` | Dice (__NEXT_DATA__ JSON) |
 | `sources/ra.js` | Resident Advisor (GraphQL) |
 | `sources/nyc-parks.js` | NYC Parks (Schema.org) |
 | `sources/brooklynvegan.js` | BrooklynVegan (DoStuff JSON) |
-| `sources/nonsense.js` | Nonsense NYC (Gmail newsletter→Claude extraction, split by day) |
+| `sources/nonsense.js` | Nonsense NYC (Gmail newsletter→Claude extraction, split by day, caches events alongside newsletter ID for inter-scrape reuse) |
 | `sources/ohmyrockness.js` | Oh My Rockness (HTML→Claude extraction) |
 | `sources/donyc.js` | DoNYC (Cheerio HTML scraping — music, comedy, theater) |
 | `sources/bam.js` | BAM (JSON API — film, theater, music, dance) |
@@ -172,8 +173,20 @@ All paths are relative to `src/` unless prefixed with a directory.
 | File | Purpose |
 |------|---------|
 | `test-ui.html` | Browser-based SMS simulator for testing (served at `/test`) |
+| `public/test-ui.js` | Client-side JS for the SMS simulator |
 | `health-ui.html` | Source health dashboard — per-source timing, status, history sparklines, extraction quality (served at `/health`) |
 | `eval-ui.html` | Eval results dashboard — trace viewer with eval scores (served at `/evals`) |
+| `events-ui.html` | Event browser/explorer UI (served at `/events`) |
+
+**Site** (GitHub Pages, `site/` directory — deployed to `gh-pages` branch):
+
+| File | Purpose |
+|------|---------|
+| `site/index.html` | Landing page with live demo (connects to Railway test endpoint) |
+| `site/architecture.html` | Public architecture overview (not linked from nav, direct URL only) |
+| `site/privacy.html` | Privacy policy |
+| `site/terms.html` | Terms of service |
+| `site/evals.html` | Eval system overview |
 
 ## Env Vars
 
@@ -200,6 +213,7 @@ Optional:
 - `GMAIL_REFRESH_TOKEN` — Gmail refresh token (run `scripts/gmail-auth.js` to obtain)
 - `RESEND_API_KEY` — Resend API key for email alerts (optional; alerts no-op if unset)
 - `ALERT_EMAIL` — Alert recipient email address
+- `PULSE_NO_RATE_LIMIT=true` — Disable test endpoint rate limiting (30 req/hr/IP default)
 
 ## Running Locally
 
@@ -226,7 +240,7 @@ npm run eval:gen       # generate synthetic test scenarios
 
 - **Two-tier routing**: Common patterns (greetings, neighborhoods, "more", follow-up filters) are handled deterministically by the pre-router at zero latency and zero AI cost. Only ambiguous or compound messages reach the AI router. This keeps ~60% of messages off the AI path while still supporting natural conversation.
 - **Conversational UX**: Users text naturally — no slash commands or rigid syntax. The router (pre-router + AI) figures out intent, neighborhood, and filters. Follow-up messages like "how about comedy" or "later tonight" modify filters on the active session rather than starting over.
-- **Daily cache**: Events are scraped once at 10am ET and cached in memory. Incoming messages read from cache — no scraping in the hot path.
+- **Daily cache with disk persistence**: Events are scraped once at 10am ET and cached in memory + persisted to `data/events-cache.json`. On boot, the persisted cache loads instantly. If the cache is <20 hours old (`isCacheFresh()`), the startup scrape is skipped entirely. This avoids the ~8-minute cold start on Railway redeploys. A Railway volume at `/app/data` ensures the cache survives across deploys.
 - **Two-call AI flow**: Call 1 routes intent + neighborhood. Call 2 picks events + writes the SMS. This keeps each call focused and fast. Both calls use Haiku — A/B eval showed Haiku matches or beats Sonnet on compose quality (71% preference, 89% tone pass) at 73% lower cost.
 - **No Tavily in hot path**: Tavily was removed from the live request path. All event data comes from the daily scrape.
 - **Cross-source dedup**: Event IDs are hashed from name + venue + date (not source), so the same event from Dice and BrooklynVegan merges automatically. Sources are processed in weight order, so the higher-trust version wins.
@@ -236,6 +250,7 @@ npm run eval:gen       # generate synthetic test scenarios
 - **Venue auto-learning**: Sources with lat/lng (BrooklynVegan, Dice, Songkick, Eventbrite, Ticketmaster) teach venue coords to the shared venue map at scrape time. This helps sources without geo data (RA, Skint, Nonsense NYC) resolve neighborhoods.
 - **Venue persistence**: Learned venues are saved to `data/venues-learned.json` after each scrape and loaded on boot, so knowledge compounds across restarts.
 - **Session-aware follow-ups**: The session stores `lastFilters` alongside picks and neighborhood, so the router sees what the user already asked for. This lets follow-ups like "how about theater" or "later tonight" modify the active session rather than being misclassified as conversational. The pre-router catches simple filter changes deterministically; the AI router handles compound requests ("any more free comedy stuff") with few-shot examples.
+- **Scrape-time quality gates**: Events are filtered at scrape time before entering the cache: (1) date window filter keeps only today through 7 days out, (2) kids event filter drops children's/family events from all sources. This keeps the cache focused and reduces noise for compose Claude.
 - **480-char SMS limit**: All responses are capped at 480 chars. Claude is prompted to write concisely.
 - **TCPA opt-out compliance**: Messages starting with STOP, UNSUBSCRIBE, CANCEL, or QUIT are silently dropped (no reply sent). Twilio manages the actual opt-out list; Pulse ensures no response leaks through.
 - **Per-user daily AI budget**: Each phone number gets $0.10/day of AI spend. `trackAICost` accumulates per-user cost with provider-aware pricing (Haiku vs Gemini). `isOverBudget` blocks further AI calls with a friendly message. Resets daily (NYC timezone).
