@@ -12,6 +12,7 @@ const { getEvents } = require('./events');
 const { filterKidsEvents, validatePerennialActivity } = require('./curation');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
 const { applyFilters, buildEventMap, saveResponseFrame, mergeFilters, buildTaggedPool } = require('./pipeline');
+const { updateProfile } = require('./preference-profile');
 
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
 
@@ -479,6 +480,8 @@ async function handleMessageAI(phone, message) {
         },
         pendingMessage: message,
       });
+      updateProfile(phone, { neighborhood: hood, filters: activeFilters, responseType: 'ask_neighborhood' })
+        .catch(err => console.error('profile update failed:', err.message));
       await sendSMS(phone, result.sms_text);
       finalizeTrace(result.sms_text, 'events');
       return;
@@ -497,6 +500,8 @@ async function handleMessageAI(phone, message) {
         visitedHoods: session?.visitedHoods || [],
         pending: suggestedHood ? { neighborhood: suggestedHood, filters: activeFilters } : null,
       });
+      updateProfile(phone, { neighborhood: hood, filters: activeFilters, responseType: 'conversational' })
+        .catch(err => console.error('profile update failed:', err.message));
       await sendSMS(phone, result.sms_text);
       finalizeTrace(result.sms_text, 'conversational');
       return;
@@ -518,6 +523,8 @@ async function handleMessageAI(phone, message) {
         filters: activeFilters,
       } : null,
     });
+    updateProfile(phone, { neighborhood: hood, filters: activeFilters, responseType: 'event_picks' })
+      .catch(err => console.error('profile update failed:', err.message));
     finalizeTrace(result.sms_text, 'events');
   }
 }

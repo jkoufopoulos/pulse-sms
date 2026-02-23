@@ -211,6 +211,18 @@ Users saying "forget the comedy" or "show me everything" should clear filters. T
 
 ## Completed Work
 
+### User Preference Profile (2026-02-22)
+
+- `src/preference-profile.js` — silent background signal capture across sessions
+- Tracks neighborhoods, categories, subcategories, price preference, time preference per phone number
+- Fire-and-forget `updateProfile` after each `saveResponseFrame` — never blocks SMS response
+- Signal only increments on `event_picks` and `more` responses (user got actual picks); `sessionCount` increments on every response
+- Derived fields: `pricePreference` (free if >50% of picks sessions), `timePreference` (late/early if >50% of timed sessions)
+- Persistence: `data/profiles.json` with debounced disk writes (1s), loaded at boot
+- Helper functions: `deriveFiltersFromProfile`, `getTopNeighborhood`, `getTopCategories`, `getOptInEligibleUsers`
+- Foundation for proactive Friday picks, personalization, and paid tier differentiation
+- 30+ unit tests covering signal extraction, derivation rules, error handling, persistence
+
 ### Hard Time Gate — P5 Fix (2026-02-22)
 
 - `failsTimeGate(event, timeAfter)` extracted in pipeline.js — same after-midnight wrapping logic, events without parseable times pass through
@@ -354,7 +366,7 @@ Users saying "forget the comedy" or "show me everything" should clear filters. T
 ### Long-term — Infrastructure + Product
 
 - PostgreSQL — Persistent event storage, user sessions, conversation history
-- Preference learning — Track detail requests and revisits, adjust taste profile
+- Preference learning — Profile capture done; next: inject profile into compose prompt for personalized picks
 - Paid tier — Stripe billing, $5-10/month unlimited
 - Push notifications — "Free rooftop thing near you starting in 30 min"
 - Multi-city — Same architecture, different sources

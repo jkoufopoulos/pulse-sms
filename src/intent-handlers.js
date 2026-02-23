@@ -7,6 +7,7 @@ const { filterByTimeAfter } = require('./geo');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
 const { validatePerennialActivity } = require('./curation');
 const { resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage } = require('./pipeline');
+const { updateProfile } = require('./preference-profile');
 
 // --- Send compose result (picks only, no link messages) ---
 // Links are sent only when the user requests details (texts a number).
@@ -169,6 +170,8 @@ async function handleMore(ctx) {
         filters: activeFilters,
         offeredIds: composeRemaining.map(e => e.id),
       });
+      updateProfile(ctx.phone, { neighborhood: hood, filters: activeFilters, responseType: 'more' })
+        .catch(err => console.error('profile update failed:', err.message));
       await sendComposeWithLinks(ctx.phone, result, ctx.session.lastEvents);
 
       console.log(`More sent to ${ctx.masked} (${timeGated.length} remaining in ${hood}${isLastBatch ? ', last batch' : ''})`);
@@ -213,6 +216,8 @@ async function handleMore(ctx) {
       filters: activeFilters,
       offeredIds: perennialBatch.map(e => e.id),
     });
+    updateProfile(ctx.phone, { neighborhood: hood, filters: activeFilters, responseType: 'more' })
+      .catch(err => console.error('profile update failed:', err.message));
     await sendComposeWithLinks(ctx.phone, result, eventMap);
     console.log(`Perennial picks sent to ${ctx.masked} after events exhausted in ${hood}`);
     ctx.finalizeTrace(result.sms_text, 'more');

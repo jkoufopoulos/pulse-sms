@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const smsRoutes = require('./handler');
 const { clearSmsIntervals } = require('./handler');
 const { refreshCache, getCacheStatus, getHealthStatus, isCacheFresh, scheduleDailyScrape, clearSchedule } = require('./events');
+const { loadProfiles } = require('./preference-profile');
 
 // Validate required env vars — exit if critical ones are missing
 const required = ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER', 'ANTHROPIC_API_KEY', 'TAVILY_API_KEY'];
@@ -253,6 +254,7 @@ if (process.env.PULSE_TEST_MODE === 'true') {
 
 const server = app.listen(PORT, () => {
   console.log(`Pulse listening on port ${PORT}`);
+  loadProfiles();
 
   // Scrape on startup only if no fresh persisted cache — saves time and tokens on restarts
   if (isCacheFresh()) {
