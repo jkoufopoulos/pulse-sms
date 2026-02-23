@@ -248,7 +248,7 @@ function filterUpcomingEvents(events, { refTimeMs } = {}) {
 /**
  * Filter events to those starting at or after a given HH:MM time (NYC timezone).
  * Events without parseable start times are kept (let Claude decide).
- * Returns original array if no events match the filter (soft filter).
+ * Returns empty array if no events match (hard filter — P5).
  */
 function filterByTimeAfter(events, timeAfterHHMM) {
   if (!timeAfterHHMM || !/^\d{2}:\d{2}$/.test(timeAfterHHMM)) return events;
@@ -270,7 +270,7 @@ function filterByTimeAfter(events, timeAfterHHMM) {
     } catch { return true; }
   });
 
-  return filtered.length > 0 ? filtered : events; // soft filter
+  return filtered; // hard filter (P5)
 }
 
 module.exports = { resolveNeighborhood, rankEventsByProximity, getNycDateString, getNycUtcOffset, inferCategory, haversine, filterUpcomingEvents, getEventDate, parseAsNycTime, filterByTimeAfter };

@@ -1,5 +1,5 @@
 const { check } = require('../helpers');
-const { mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters } = require('../../src/pipeline');
+const { mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, failsTimeGate } = require('../../src/pipeline');
 
 // ---- mergeFilters ----
 console.log('\nmergeFilters:');
@@ -79,16 +79,10 @@ check('free_only false → hard', eventMatchesFilters(comedyPaid, { free_only: f
 check('comedy+free match → hard', eventMatchesFilters(comedyFree, { category: 'comedy', free_only: true }) === 'hard');
 check('comedy+free mismatch (paid) → false', eventMatchesFilters(comedyPaid, { category: 'comedy', free_only: true }) === false);
 
-// Time filter
-check('time 22:00 passes 23:30 → hard', eventMatchesFilters(musicLate, { time_after: '22:00' }) === 'hard');
-check('time 22:00 fails 18:00 → false', eventMatchesFilters(musicEarly, { time_after: '22:00' }) === false);
-check('time 22:00 passes 20:00? no', eventMatchesFilters(comedyFree, { time_after: '22:00' }) === false);
-
-// After-midnight wrapping: 01:30 should pass time_after 22:00
-check('after-midnight 01:30 passes 22:00 → hard', eventMatchesFilters(lateNight, { time_after: '22:00' }) === 'hard');
-
-// No time on event → passes (soft)
-check('no start_time → passes time filter → hard', eventMatchesFilters(artNoTime, { time_after: '22:00' }) === 'hard');
+// Time filter — no longer checked in eventMatchesFilters (enforced upstream by failsTimeGate in buildTaggedPool)
+check('time_after ignored: early event → hard', eventMatchesFilters(musicEarly, { time_after: '22:00' }) === 'hard');
+check('time_after ignored: late event → hard', eventMatchesFilters(musicLate, { time_after: '22:00' }) === 'hard');
+check('time_after ignored: no start_time → hard', eventMatchesFilters(artNoTime, { time_after: '22:00' }) === 'hard');
 
 // Empty filters → hard
 check('empty filters → hard', eventMatchesFilters(comedyPaid, {}) === 'hard');
@@ -341,3 +335,92 @@ check('invalid format → null', normalizeFilters({ time_after: 'late' }).time_a
 
 // Vibe passthrough
 check('vibe passes through', normalizeFilters({ vibe: 'chill' }).vibe === 'chill');
+
+
+// ---- failsTimeGate ----
+console.log('\nfailsTimeGate:');
+
+// Event before filter time → fails
+check('18:00 event fails 22:00 gate', failsTimeGate(
+  { start_time_local: '2026-02-22T18:00:00' }, '22:00') === true);
+check('20:00 event fails 22:00 gate', failsTimeGate(
+  { start_time_local: '2026-02-22T20:00:00' }, '22:00') === true);
+
+// Event at or after filter time → passes
+check('22:00 event passes 22:00 gate', failsTimeGate(
+  { start_time_local: '2026-02-22T22:00:00' }, '22:00') === false);
+check('23:30 event passes 22:00 gate', failsTimeGate(
+  { start_time_local: '2026-02-22T23:30:00' }, '22:00') === false);
+
+// After-midnight wrapping: 01:00 treated as next-day, passes 22:00
+check('01:00 after-midnight passes 22:00 gate', failsTimeGate(
+  { start_time_local: '2026-02-23T01:00:00' }, '22:00') === false);
+check('01:30 after-midnight passes 22:00 gate', failsTimeGate(
+  { start_time_local: '2026-02-23T01:30:00' }, '22:00') === false);
+check('05:00 after-midnight passes 22:00 gate', failsTimeGate(
+  { start_time_local: '2026-02-23T05:00:00' }, '22:00') === false);
+
+// After-midnight filter: 00:00 excludes 22:00 but includes 01:00
+check('22:00 event fails 00:00 gate', failsTimeGate(
+  { start_time_local: '2026-02-22T22:00:00' }, '00:00') === true);
+check('01:00 event passes 00:00 gate', failsTimeGate(
+  { start_time_local: '2026-02-23T01:00:00' }, '00:00') === false);
+
+// No start_time → passes (does not fail)
+check('no start_time → passes', failsTimeGate({}, '22:00') === false);
+check('null start_time → passes', failsTimeGate({ start_time_local: null }, '22:00') === false);
+
+// Non-parseable time format → passes
+check('date-only → passes', failsTimeGate(
+  { start_time_local: '2026-02-22' }, '22:00') === false);
+
+
+// ---- buildTaggedPool time gate ----
+console.log('\nbuildTaggedPool time gate:');
+
+const timeEvents = [
+  { id: 't1', name: 'Early Show', category: 'comedy', is_free: false, start_time_local: '2026-02-22T18:00:00' },
+  { id: 't2', name: 'Dinner Show', category: 'comedy', is_free: false, start_time_local: '2026-02-22T20:00:00' },
+  { id: 't3', name: 'Late Show', category: 'comedy', is_free: false, start_time_local: '2026-02-22T23:00:00' },
+  { id: 't4', name: 'After Midnight', category: 'comedy', is_free: false, start_time_local: '2026-02-23T01:30:00' },
+  { id: 't5', name: 'No Time Event', category: 'comedy', is_free: false },
+];
+
+// time_after: 22:00 — should exclude t1 (18:00) and t2 (20:00), keep t3, t4, t5
+const timeGatedResult = buildTaggedPool(timeEvents, { time_after: '22:00' });
+check('time gate: pool excludes early events', timeGatedResult.pool.every(e => e.id !== 't1' && e.id !== 't2'));
+check('time gate: 23:00 event in pool', timeGatedResult.pool.some(e => e.id === 't3'));
+check('time gate: after-midnight in pool', timeGatedResult.pool.some(e => e.id === 't4'));
+check('time gate: no-time event in pool', timeGatedResult.pool.some(e => e.id === 't5'));
+check('time gate: pool size 3', timeGatedResult.pool.length === 3);
+
+// time_after + category: 22:00 + comedy — hard gates time, then matches category
+const timeCatEvents = [
+  { id: 'tc1', name: 'Early Comedy', category: 'comedy', is_free: false, start_time_local: '2026-02-22T18:00:00' },
+  { id: 'tc2', name: 'Late Comedy', category: 'comedy', is_free: false, start_time_local: '2026-02-22T23:00:00' },
+  { id: 'tc3', name: 'Late Music', category: 'live_music', is_free: false, start_time_local: '2026-02-22T23:30:00' },
+  { id: 'tc4', name: 'Early Music', category: 'live_music', is_free: false, start_time_local: '2026-02-22T19:00:00' },
+];
+const timeCatResult = buildTaggedPool(timeCatEvents, { category: 'comedy', time_after: '22:00' });
+check('time+cat: early comedy excluded', timeCatResult.pool.every(e => e.id !== 'tc1'));
+check('time+cat: early music excluded', timeCatResult.pool.every(e => e.id !== 'tc4'));
+check('time+cat: late comedy is hard match', timeCatResult.pool.find(e => e.id === 'tc2')?.filter_match === 'hard');
+check('time+cat: late music is unmatched', timeCatResult.pool.find(e => e.id === 'tc3')?.filter_match === false);
+check('time+cat: matchCount 1', timeCatResult.matchCount === 1);
+
+// After-midnight filter: 00:00 — excludes 22:00 but includes 01:00
+const midnightEvents = [
+  { id: 'mn1', name: '10pm Event', category: 'nightlife', is_free: false, start_time_local: '2026-02-22T22:00:00' },
+  { id: 'mn2', name: '1am Event', category: 'nightlife', is_free: false, start_time_local: '2026-02-23T01:00:00' },
+  { id: 'mn3', name: '3am Event', category: 'nightlife', is_free: false, start_time_local: '2026-02-23T03:00:00' },
+];
+const midnightResult = buildTaggedPool(midnightEvents, { time_after: '00:00' });
+check('midnight gate: 22:00 excluded', midnightResult.pool.every(e => e.id !== 'mn1'));
+check('midnight gate: 01:00 included', midnightResult.pool.some(e => e.id === 'mn2'));
+check('midnight gate: 03:00 included', midnightResult.pool.some(e => e.id === 'mn3'));
+check('midnight gate: pool size 2', midnightResult.pool.length === 2);
+
+// No time filter → no time gating (events still classified normally)
+const noTimeFilterResult = buildTaggedPool(timeEvents, { category: 'comedy' });
+check('no time filter: all events in pool', noTimeFilterResult.pool.length === 5);
+check('no time filter: all hard matched', noTimeFilterResult.pool.every(e => e.filter_match === 'hard'));

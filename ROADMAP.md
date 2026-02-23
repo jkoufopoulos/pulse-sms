@@ -166,11 +166,15 @@ Users saying "forget the comedy" or "show me everything" should clear filters. T
 
 **Status:** Pre-router regex covers the common cases. LLM semantic clearing works when it fires. The 33% failure rate needs investigation — may be pre-router regex gaps or LLM inconsistency.
 
-### P5 — Temporal Accuracy (regression at 25%)
+### P5 — Temporal Accuracy (was 25%, expected fixed)
 
-Events labeled "tonight" that are actually tomorrow, or vice versa. Root cause unclear — may be timezone handling, scraper date tagging, or compose prompt confusion.
+**Fixed by hard time gate (2026-02-22).** When users say "later tonight" or "after midnight", the system correctly detected `time_after` and tagged matching events with `[MATCH]` — but the LLM still picked pre-time events because `buildTaggedPool` included time-failing events as unmatched padding and `filterByTimeAfter` was a soft filter that fell back to all events when zero passed.
 
-**Status:** Needs investigation. Not related to the filter persistence architecture.
+**Root cause:** Time was enforced as a soft signal (tagged pool + soft fallback) rather than a hard gate. Per P1 (code owns state), events before `time_after` should never reach the LLM.
+
+**Fix:** Three changes: (1) `failsTimeGate()` extracted in pipeline.js — `buildTaggedPool` pre-filters events before classification, so time-failing events never enter the pool. (2) `filterByTimeAfter` in geo.js made hard — returns empty array instead of falling back to all events. (3) `handleMore` now applies `filterByTimeAfter` after the in-hood filter, closing the MORE path leak.
+
+**Needs verification:** Run regression evals (`--principle P5`) against live server to confirm improvement from 25%.
 
 ### Medium Priority — Routing Gaps
 
@@ -206,6 +210,15 @@ Events labeled "tonight" that are actually tomorrow, or vice versa. Root cause u
 ---
 
 ## Completed Work
+
+### Hard Time Gate — P5 Fix (2026-02-22)
+
+- `failsTimeGate(event, timeAfter)` extracted in pipeline.js — same after-midnight wrapping logic, events without parseable times pass through
+- `buildTaggedPool` pre-filters events through `failsTimeGate` before classification — time-failing events never enter the pool or reach the LLM
+- Time check removed from `eventMatchesFilters` — enforced upstream, no double-checking
+- `filterByTimeAfter` in geo.js made hard — returns empty array instead of soft fallback to all events
+- `handleMore` in intent-handlers.js now applies `filterByTimeAfter` after in-hood filter, closing the MORE path time leak
+- 20+ unit tests for `failsTimeGate` and `buildTaggedPool` time gating (including after-midnight wrapping, midnight filter, no-time passthrough)
 
 ### Atomic Session Frames (2026-02-21)
 

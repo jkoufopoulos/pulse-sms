@@ -3,6 +3,7 @@ const { sendSMS } = require('./twilio');
 const { setSession } = require('./session');
 const { formatEventDetails, smartTruncate } = require('./formatters');
 const { getAdjacentNeighborhoods } = require('./pre-router');
+const { filterByTimeAfter } = require('./geo');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
 const { validatePerennialActivity } = require('./curation');
 const { resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage } = require('./pipeline');
@@ -125,18 +126,22 @@ async function handleMore(ctx) {
     // Only compose from events in the requested neighborhood — never from foreign events.
     // This prevents geographic bleed (e.g. "Not much tonight on the UWS" when user is in West Village).
     const inHoodRemaining = allRemaining.filter(e => e.neighborhood === hood);
+    // Hard time gate (P5): exclude events before time_after
+    const timeGated = activeFilters.time_after
+      ? filterByTimeAfter(inHoodRemaining, activeFilters.time_after)
+      : inHoodRemaining;
 
-    if (inHoodRemaining.length > 0) {
-      const composeRemaining = inHoodRemaining.slice(0, 8);
-      const isLastBatch = inHoodRemaining.length <= 8;
+    if (timeGated.length > 0) {
+      const composeRemaining = timeGated.slice(0, 8);
+      const isLastBatch = timeGated.length <= 8;
       const exhaust = isLastBatch ? buildExhaustionMessage(hood, {
         adjacentHoods: getAdjacentNeighborhoods(hood, 3),
         visitedHoods: ctx.session?.visitedHoods || [],
       }) : null;
 
       ctx.trace.events.cache_size = Object.keys(ctx.session.lastEvents).length;
-      ctx.trace.events.candidates_count = inHoodRemaining.length;
-      ctx.trace.events.candidate_ids = inHoodRemaining.map(e => e.id);
+      ctx.trace.events.candidates_count = timeGated.length;
+      ctx.trace.events.candidate_ids = timeGated.map(e => e.id);
       const skills = isLastBatch ? { isLastBatch: true, exhaustionSuggestion: exhaust.message } : {};
       const result = await ctx.composeAndSend(composeRemaining, hood, activeFilters, 'more', { excludeIds: [...allShownIds], skills });
 
@@ -166,7 +171,7 @@ async function handleMore(ctx) {
       });
       await sendComposeWithLinks(ctx.phone, result, ctx.session.lastEvents);
 
-      console.log(`More sent to ${ctx.masked} (${inHoodRemaining.length} remaining in ${hood}${isLastBatch ? ', last batch' : ''})`);
+      console.log(`More sent to ${ctx.masked} (${timeGated.length} remaining in ${hood}${isLastBatch ? ', last batch' : ''})`);
       ctx.finalizeTrace(result.sms_text, 'more');
       return;
     }

@@ -106,31 +106,36 @@ function mergeFilters(existing, incoming) {
 }
 
 /**
+ * Check if an event fails a time gate. Returns true if the event starts
+ * before the given HH:MM time (NYC timezone). Events without parseable
+ * start times pass through (return false = does not fail).
+ * Uses after-midnight wrapping: events before 6am are treated as next-day.
+ */
+function failsTimeGate(event, timeAfter) {
+  if (!event.start_time_local || !/T\d{2}:/.test(event.start_time_local)) return false;
+  try {
+    const ms = parseAsNycTime(event.start_time_local);
+    if (isNaN(ms)) return false;
+    const nycDate = new Date(ms).toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', hour12: false });
+    const [h, m] = nycDate.split(':').map(Number);
+    const eventMinutes = h * 60 + m;
+    const [filterH, filterM] = timeAfter.split(':').map(Number);
+    const filterMinutes = filterH * 60 + filterM;
+    // After-midnight wrapping: events before 6am treated as next-day
+    const adjustedEvent = eventMinutes < 6 * 60 ? eventMinutes + 24 * 60 : eventMinutes;
+    const adjustedFilter = filterMinutes < 6 * 60 ? filterMinutes + 24 * 60 : filterMinutes;
+    return adjustedEvent < adjustedFilter;
+  } catch { return false; }
+}
+
+/**
  * Check if an event matches ALL active filter dimensions.
  * Returns 'hard' (exact match), 'soft' (broad category match with subcategory),
- * or false (no match). Events without parseable times pass the time filter.
+ * or false (no match). Time is enforced upstream by failsTimeGate in buildTaggedPool.
  */
 function eventMatchesFilters(event, filters) {
   if (filters.free_only && !event.is_free) return false;
   if (filters.category && event.category !== filters.category) return false;
-  if (filters.time_after && /^\d{2}:\d{2}$/.test(filters.time_after)) {
-    if (event.start_time_local && /T\d{2}:/.test(event.start_time_local)) {
-      try {
-        const ms = parseAsNycTime(event.start_time_local);
-        if (!isNaN(ms)) {
-          const nycDate = new Date(ms).toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', hour12: false });
-          const [h, m] = nycDate.split(':').map(Number);
-          const eventMinutes = h * 60 + m;
-          const [filterH, filterM] = filters.time_after.split(':').map(Number);
-          const filterMinutes = filterH * 60 + filterM;
-          // After-midnight wrapping: events before 6am treated as next-day
-          const adjustedEvent = eventMinutes < 6 * 60 ? eventMinutes + 24 * 60 : eventMinutes;
-          const adjustedFilter = filterMinutes < 6 * 60 ? filterMinutes + 24 * 60 : filterMinutes;
-          if (adjustedEvent < adjustedFilter) return false;
-        }
-      } catch { /* no parseable time → pass */ }
-    }
-  }
   // vibe has no event field to match — LLM handles vibe selection
   // Determine hard vs soft: if subcategory is set, the category is a broad match
   // and the LLM should use judgment to find events matching the sub-genre
@@ -154,11 +159,18 @@ function buildTaggedPool(events, activeFilters) {
     };
   }
 
+  // Hard time gate (P5): pre-filter events before classification.
+  // Events before time_after never reach the LLM.
+  let candidates = events;
+  if (activeFilters.time_after && /^\d{2}:\d{2}$/.test(activeFilters.time_after)) {
+    candidates = events.filter(e => !failsTimeGate(e, activeFilters.time_after));
+  }
+
   const hard = [];
   const soft = [];
   const unmatched = [];
 
-  for (const e of events) {
+  for (const e of candidates) {
     const result = eventMatchesFilters(e, activeFilters);
     if (result === 'hard') {
       hard.push({ ...e, filter_match: 'hard' });
@@ -234,4 +246,4 @@ function normalizeFilters(filters) {
   return Object.keys(result).length > 0 ? result : null;
 }
 
-module.exports = { applyFilters, resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters };
+module.exports = { applyFilters, resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, failsTimeGate };
