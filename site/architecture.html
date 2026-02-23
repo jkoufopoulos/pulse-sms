@@ -627,17 +627,16 @@
         <p><code>unifiedRespond()</code> sends the assembled system prompt (base + skills), the tagged event pool, filter context, conversation history, and the user's message to <strong>Claude Haiku</strong> in a single call. Claude understands the intent, picks 2-3 events from the pool, and writes the SMS text &mdash; all in one pass.</p>
         <p>Claude returns structured JSON:</p>
         <div class="code-block" style="margin-top: 8px;">{
+  "type": "event_picks",
   "sms_text": "Tonight in Williamsburg:\n\n1) DJ set at Good Room — always goes off on Fridays. 10pm, $15\n\n2) Indie at Baby's All Right — solid lineup tonight. 8pm, $18\n\n3) Free comedy at Muchmore's — underground standup, BYOB vibes. 9pm\n\nReply 1-3 for details or MORE for extra picks",
   "picks": [
     { "rank": 1, "event_id": "dice-good-room-0221", "why": "reliable Friday DJ night" },
     { "rank": 2, "event_id": "bv-babys-0221", "why": "strong indie lineup" },
     { "rank": 3, "event_id": "skint-muchmores-0221", "why": "free comedy, unique" }
   ],
-  "neighborhood_used": "Williamsburg",
-  "filters_used": { "category": null, "free_only": false, "vibe": null, "time_after": null },
   "clear_filters": false
 }</div>
-        <p>The <code>sourceTiers</code> skill told Claude to prefer the Skint pick (#3), and it was chosen despite being free &mdash; the curation taste in <code>core</code> favors "unique one-off events."</p>
+        <p>The output contract is minimal: <code>type</code>, <code>sms_text</code>, <code>picks</code>, and <code>clear_filters</code>. All other state (neighborhood, filters, pending context) is derived deterministically by the handler &mdash; the LLM never reports state, only text and event selections.</p>
         <p>Cost: ~$0.001 (Haiku, single call). Latency: ~800ms. This is cheaper than the old two-call flow (route + compose) because everything happens in one pass.</p>
       </div>
     </details>

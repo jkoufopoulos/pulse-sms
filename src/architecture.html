@@ -1176,7 +1176,7 @@ CONSTRAINTS:
   <tr><th>File</th><th>Lines</th><th>Type</th><th>LLM?</th><th>Purpose</th></tr>
   <tr><td><code>server.js</code></td><td>~210</td><td><span class="badge badge-io">IO</span></td><td>No</td><td>Express setup, routes, health check, daily schedule</td></tr>
   <tr><td><code>handler.js</code></td><td>~332</td><td><span class="badge badge-logic">Logic</span></td><td>No</td><td>Twilio webhook, dedup, rate limiter, orchestrator</td></tr>
-  <tr><td><code>intent-handlers.js</code></td><td>~504</td><td><span class="badge badge-logic">Logic</span></td><td>Indirect</td><td>7 intent handlers — help, conversational, details, more, free, nudge, events</td></tr>
+  <tr><td><code>intent-handlers.js</code></td><td>~235</td><td><span class="badge badge-logic">Logic</span></td><td>Indirect</td><td>4 mechanical intent handlers — help, conversational, details, more</td></tr>
   <tr><td><code>pre-router.js</code></td><td>~175</td><td><span class="badge badge-logic">Logic</span></td><td>No</td><td>17 pattern groups (incl. session-aware follow-up filters), adjacent neighborhood helper</td></tr>
   <tr><td><code>ai.js</code></td><td>~407</td><td><span class="badge badge-llm">LLM</span></td><td>Yes</td><td>4 Claude calls: route, compose, details, extract</td></tr>
   <tr><td><code>prompts.js</code></td><td>~395</td><td><span class="badge badge-llm">LLM</span></td><td>Prompts</td><td>EXTRACTION_PROMPT, ROUTE_SYSTEM (slimmed), COMPOSE_SYSTEM (base), DETAILS_SYSTEM</td></tr>
