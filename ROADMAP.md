@@ -191,7 +191,7 @@ Users saying "forget the comedy" or "show me everything" should clear filters. T
 
 | Issue | Impact | Notes |
 |-------|--------|-------|
-| Scraper `source_weight` hardcoded in 14 files | Dead code — overridden by SOURCES registry | Remove hardcoded weights |
+| ~~Scraper `source_weight` hardcoded in 14 files~~ | ~~Dead code — overridden by SOURCES registry~~ | **Fixed** (2026-02-22) |
 | MORE sometimes repeats events from initial batch | Possible exclude-IDs gap in handleMore | Needs investigation |
 | "later tonight" time filter repeats same event | Time filter not excluding already-shown events | Needs investigation |
 | Comedy in Midtown — details fail after thin results | Session state gap: thin response may not save picks | May be fixed by step 1b |
@@ -210,6 +210,12 @@ Users saying "forget the comedy" or "show me everything" should clear filters. T
 ---
 
 ## Completed Work
+
+### Code Health: Steps 7, 8, Scraper Cleanup (2026-02-22)
+
+- **Decompose `handleMessageAI`** — Extracted 4 sub-functions (`dispatchPreRouterIntent`, `resolveUnifiedContext`, `callUnified`, `handleUnifiedResponse`) from the 331-line orchestrator. Orchestrator now ~80 lines. Zero behavior change.
+- **Break `ai.js` ↔ `formatters.js` circular dependency** — Moved `isSearchUrl` from `ai.js` to `formatters.js` (its natural home). Converted 3 deferred inline `require('./formatters')` calls in `ai.js` to a single top-level import. No more circular `require()`.
+- **Remove dead `source_weight` from scrapers** — Removed hardcoded `source_weight` from 11 scraper files (13 occurrences). The SOURCES registry in `events.js` overwrites these unconditionally. Left `perennial.js` alone (not in registry, its value is authoritative).
 
 ### Referral Card & Acquisition Loop (2026-02-22)
 
@@ -366,7 +372,7 @@ Users saying "forget the comedy" or "show me everything" should clear filters. T
 
 - Comedy source — Dedicated scraper for Comedy Cellar, UCB, Caveat, QED
 - Gallery/art source — Gallery listing aggregator or DoNYC art category
-- Scraper cleanup — Remove hardcoded `source_weight` from individual files
+- ~~Scraper cleanup — Remove hardcoded `source_weight` from individual files~~ **Done** (2026-02-22)
 
 ### Medium-term — Intelligence
 

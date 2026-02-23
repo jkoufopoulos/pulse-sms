@@ -1,5 +1,4 @@
 const { parseAsNycTime } = require('./geo');
-const { isSearchUrl } = require('./ai');
 
 function formatTime(isoStr) {
   // Bare date (no time component) — parse as local to avoid UTC midnight shift
@@ -152,4 +151,23 @@ function smartTruncate(text, maxLen = 480) {
   return truncated + '…';
 }
 
-module.exports = { formatTime, cleanUrl, formatEventDetails, smartTruncate };
+/**
+ * Check if a URL is a search/directory page rather than a direct venue/event link.
+ */
+function isSearchUrl(url) {
+  if (!url) return true;
+  try {
+    const u = new URL(url);
+    // Yelp search pages
+    if (u.hostname.includes('yelp.com') && u.pathname.startsWith('/search')) return true;
+    // Google search pages
+    if (u.hostname.includes('google.com') && (u.pathname === '/search' || u.pathname.startsWith('/search'))) return true;
+    // Generic search query indicators
+    if (u.searchParams.has('find_desc') || u.searchParams.has('q') && u.pathname.includes('search')) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+module.exports = { formatTime, cleanUrl, formatEventDetails, smartTruncate, isSearchUrl };

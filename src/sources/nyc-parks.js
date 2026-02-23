@@ -65,7 +65,6 @@ async function fetchNYCParksEvents() {
           id,
           source_name: 'nyc_parks',
           source_type: 'government',
-          source_weight: 0.75,
           name: title,
           description_short: description ? description.slice(0, 180) : null,
           short_detail: description ? description.slice(0, 180) : null,

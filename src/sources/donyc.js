@@ -83,7 +83,6 @@ function parseCards($, cards, dateStr, categoryOverride) {
       id: makeEventId(name, venueName, dateLocal, 'donyc'),
       source_name: 'donyc',
       source_type: 'aggregator',
-      source_weight: 0.75,
       name,
       description_short: null,
       short_detail: null,

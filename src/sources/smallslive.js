@@ -92,7 +92,6 @@ async function fetchSmallsLiveEvents() {
           id,
           source_name: 'smallslive',
           source_type: 'venue_calendar',
-          source_weight: 0.8,
           name,
           description_short: `Live jazz at ${venueName}`,
           short_detail: timeText ? `${timeText} at ${venueName}` : `Live jazz at ${venueName}`,

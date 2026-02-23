@@ -101,7 +101,6 @@ async function fetchRAEvents() {
         id: makeEventId(e.title, venueName, dateLocal, 'ra'),
         source_name: 'ra',
         source_type: 'aggregator',
-        source_weight: 0.85,
         name: e.title,
         description_short: desc ? desc.slice(0, 180) : null,
         short_detail: desc ? desc.slice(0, 180) : null,

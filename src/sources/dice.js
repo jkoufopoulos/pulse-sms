@@ -80,7 +80,6 @@ async function fetchDiceEvents() {
         id: makeEventId(e.name, venue.name, dateLocal, 'dice'),
         source_name: 'dice',
         source_type: 'aggregator',
-        source_weight: 0.8,
         name: e.name,
         description_short: desc ? desc.slice(0, 180) : null,
         short_detail: desc ? desc.slice(0, 180) : null,

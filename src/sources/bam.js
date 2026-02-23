@@ -79,7 +79,6 @@ async function fetchBAMEvents() {
         id,
         source_name: 'bam',
         source_type: 'venue_calendar',
-        source_weight: 0.8,
         name,
         description_short: description,
         short_detail: description,

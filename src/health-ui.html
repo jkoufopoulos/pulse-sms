@@ -345,6 +345,99 @@
     50% { opacity: 0.3; }
   }
 
+  /* Alert History */
+  .alert-section {
+    margin-top: 32px;
+    margin-bottom: 24px;
+  }
+
+  .alert-section h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #aaa;
+    margin-bottom: 12px;
+  }
+
+  .alert-table-wrap {
+    background: #141414;
+    border: 1px solid #222;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .alert-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .alert-table th {
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #555;
+    border-bottom: 1px solid #222;
+    background: #0f0f0f;
+  }
+
+  .alert-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #1a1a1a;
+    vertical-align: top;
+  }
+
+  .alert-table tr:last-child td { border-bottom: none; }
+
+  .alert-type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .alert-type-badge.health { background: #3a2a0a; color: #fbbf24; }
+  .alert-type-badge.runtime { background: #0a1a3a; color: #60a5fa; }
+
+  .alert-email-status { font-size: 12px; }
+  .alert-email-status.sent { color: #4ade80; }
+  .alert-email-status.failed { color: #f87171; }
+
+  .alert-details-toggle {
+    background: none;
+    border: 1px solid #333;
+    color: #888;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .alert-details-toggle:hover { border-color: #555; color: #ccc; }
+
+  .alert-details-row td {
+    padding: 0 12px 10px 12px;
+  }
+
+  .alert-details-pre {
+    background: #0a0a0a;
+    border: 1px solid #222;
+    border-radius: 6px;
+    padding: 10px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    color: #aaa;
+    overflow-x: auto;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
   /* Mobile */
   @media (max-width: 600px) {
     body { padding: 12px; }
@@ -392,6 +485,13 @@
 
 <h2 style="font-size:16px;font-weight:600;color:#aaa;margin-bottom:12px;">Sources</h2>
 <div class="source-grid" id="source-grid"></div>
+
+<div class="alert-section">
+  <h2>Alert History</h2>
+  <div id="alert-history">
+    <div class="timing-bar-container"><div class="no-data">Loading alerts...</div></div>
+  </div>
+</div>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -618,10 +718,77 @@ async function refresh() {
   }
 }
 
+function renderAlertHistory(alerts) {
+  const container = $('alert-history');
+  if (!alerts || alerts.length === 0) {
+    container.innerHTML = '<div class="timing-bar-container"><div class="no-data">No alerts recorded</div></div>';
+    return;
+  }
+
+  const rows = alerts.map((a, i) => {
+    const time = new Date(a.timestamp).toLocaleString('en-US', {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+      timeZone: 'America/New_York'
+    });
+    const typeBadge = `<span class="alert-type-badge ${a.type}">${a.type}</span>`;
+    const emailStatus = a.emailSent
+      ? '<span class="alert-email-status sent">sent</span>'
+      : `<span class="alert-email-status failed">${escHtml(a.emailError || 'not sent')}</span>`;
+    const detailsJson = JSON.stringify(a.details, null, 2);
+
+    return `
+      <tr>
+        <td style="color:#888;white-space:nowrap">${time}</td>
+        <td>${typeBadge}${a.alertType ? ` <span style="color:#666;font-size:11px">${escHtml(a.alertType)}</span>` : ''}</td>
+        <td style="color:#ccc">${escHtml(a.subject)}</td>
+        <td>${emailStatus}</td>
+        <td><button class="alert-details-toggle" onclick="toggleAlertDetails(${i})">details</button></td>
+      </tr>
+      <tr id="alert-detail-${i}" style="display:none">
+        <td colspan="5" class="alert-details-row">
+          <pre class="alert-details-pre">${escHtml(detailsJson)}</pre>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="alert-table-wrap">
+      <table class="alert-table">
+        <thead><tr>
+          <th>Time</th><th>Type</th><th>Subject</th><th>Email</th><th></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function toggleAlertDetails(index) {
+  const row = document.getElementById('alert-detail-' + index);
+  if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+
+async function refreshAlerts() {
+  try {
+    const res = await fetch('/api/alerts');
+    if (res.ok) {
+      const data = await res.json();
+      renderAlertHistory(data);
+    } else {
+      renderAlertHistory(null);
+    }
+  } catch {
+    renderAlertHistory(null);
+  }
+}
+
 refresh();
 refreshAudit();
+refreshAlerts();
 setInterval(refresh, 60000);
 setInterval(refreshAudit, 60000);
+setInterval(refreshAlerts, 60000);
 </script>
 </body>
 </html>

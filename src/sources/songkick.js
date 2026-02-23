@@ -57,7 +57,6 @@ async function fetchSongkickEvents() {
             id,
             source_name: 'songkick',
             source_type: 'aggregator',
-            source_weight: 0.75,
             name: e.name,
             description_short: null,
             short_detail: null,

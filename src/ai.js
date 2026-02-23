@@ -3,6 +3,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { getEventDate, getNycDateString } = require('./geo');
 const { EXTRACTION_PROMPT, ROUTE_SYSTEM, COMPOSE_SYSTEM, DETAILS_SYSTEM } = require('./prompts');
 const { buildComposePrompt, buildUnifiedPrompt } = require('./skills/build-compose-prompt');
+const { smartTruncate, isSearchUrl } = require('./formatters');
 
 let client = null;
 function getClient() {
@@ -294,7 +295,7 @@ Compose the SMS now.`;
   }
 
   return {
-    sms_text: require('./formatters').smartTruncate(parsed.sms_text),
+    sms_text: smartTruncate(parsed.sms_text),
     picks: validPicks,
     not_picked_reason: parsed.not_picked_reason || null,
     neighborhood_used: neighborhoodUsed,
@@ -502,26 +503,7 @@ Write the details text. Include this URL: ${bestUrl}`;
     smsText = text.replace(/^["']|["']$/g, '').trim();
   }
 
-  return { sms_text: require('./formatters').smartTruncate(smsText), _raw: text, _usage: response.usage || null };
-}
-
-/**
- * Check if a URL is a search/directory page rather than a direct venue/event link.
- */
-function isSearchUrl(url) {
-  if (!url) return true;
-  try {
-    const u = new URL(url);
-    // Yelp search pages
-    if (u.hostname.includes('yelp.com') && u.pathname.startsWith('/search')) return true;
-    // Google search pages
-    if (u.hostname.includes('google.com') && (u.pathname === '/search' || u.pathname.startsWith('/search'))) return true;
-    // Generic search query indicators
-    if (u.searchParams.has('find_desc') || u.searchParams.has('q') && u.pathname.includes('search')) return true;
-    return false;
-  } catch {
-    return false;
-  }
+  return { sms_text: smartTruncate(smsText), _raw: text, _usage: response.usage || null };
 }
 
 /**
@@ -679,7 +661,7 @@ Respond now.`;
 
   return {
     type: parsed.type || (validPicks.length > 0 ? 'event_picks' : 'conversational'),
-    sms_text: require('./formatters').smartTruncate(parsed.sms_text),
+    sms_text: smartTruncate(parsed.sms_text),
     picks: validPicks,
     clear_filters: parsed.clear_filters === true,
     _raw: text,
@@ -688,4 +670,4 @@ Respond now.`;
   };
 }
 
-module.exports = { routeMessage, composeResponse, composeDetails, extractEvents, unifiedRespond, isSearchUrl, parseJsonFromResponse };
+module.exports = { routeMessage, composeResponse, composeDetails, extractEvents, unifiedRespond, parseJsonFromResponse };

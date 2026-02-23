@@ -7,6 +7,7 @@ const { clearSmsIntervals } = require('./handler');
 const { refreshCache, getCacheStatus, getHealthStatus, getEventById, isCacheFresh, scheduleDailyScrape, clearSchedule } = require('./events');
 const { loadProfiles } = require('./preference-profile');
 const { loadReferrals, clearReferralInterval } = require('./referral');
+const { loadAlerts, getRecentAlerts } = require('./alerts');
 const { renderEventCard, renderStaleCard } = require('./card');
 
 // Validate required env vars — exit if critical ones are missing
@@ -49,6 +50,20 @@ app.get('/health', (req, res) => {
     return res.sendFile(require('path').join(__dirname, 'health-ui.html'));
   }
   res.json(getHealthStatus());
+});
+
+// Alert history API — same auth gating as /health
+app.get('/api/alerts', (req, res) => {
+  const authToken = process.env.HEALTH_AUTH_TOKEN;
+  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
+  const hasValidToken = authToken && req.query.token === authToken;
+
+  if (!isTestMode && !hasValidToken) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+  res.json(getRecentAlerts(limit));
 });
 
 // SMS webhook
@@ -272,6 +287,7 @@ const server = app.listen(PORT, () => {
   console.log(`Pulse listening on port ${PORT}`);
   loadProfiles();
   loadReferrals();
+  loadAlerts();
 
   // Scrape on startup only if no fresh persisted cache — saves time and tokens on restarts
   if (isCacheFresh()) {

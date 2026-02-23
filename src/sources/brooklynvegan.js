@@ -65,7 +65,6 @@ async function fetchBrooklynVeganEvents() {
           id,
           source_name: 'brooklynvegan',
           source_type: 'curated',
-          source_weight: 0.8,
           name: item.title,
           description_short: desc ? desc.slice(0, 180) : null,
           short_detail: desc ? desc.slice(0, 180) : null,

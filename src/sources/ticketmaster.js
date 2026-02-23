@@ -129,7 +129,6 @@ async function fetchTicketmasterEvents() {
           id: makeEventId(e.name, venueName, localDate, 'ticketmaster'),
           source_name: 'ticketmaster',
           source_type: 'aggregator',
-          source_weight: 0.75,
           name: e.name,
           description_short: e.info ? e.info.slice(0, 180) : null,
           short_detail: e.info ? e.info.slice(0, 180) : null,
