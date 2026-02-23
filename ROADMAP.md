@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-02-22
+> Last updated: 2026-02-23
 
 ---
 
@@ -210,6 +210,14 @@ Users saying "forget the comedy" or "show me everything" should clear filters. T
 ---
 
 ## Completed Work
+
+### Alert History Import (2026-02-23)
+
+- `scripts/import-alert-history.js` — One-off script to backfill `data/alerts.jsonl` from historical Gmail alert emails
+- Uses `fetchEmails()` from `src/gmail.js` (same pattern as nonsense.js/yutori.js scrapers)
+- Parses email subject to classify health vs runtime alerts, strips HTML from body
+- Dedup: skips entries with matching subject within 1-minute window (safe to re-run)
+- Imported 29 alerts (9 health, 20 runtime) spanning Feb 19–22 — dashboard now shows full history
 
 ### Code Health: Steps 7, 8, Scraper Cleanup (2026-02-22)
 
