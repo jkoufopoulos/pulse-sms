@@ -148,7 +148,7 @@ CONVERSATION AWARENESS:
 const nearbySuggestion = {
   id: 'nearby-suggestion',
   text: `
-NEARBY NEIGHBORHOODS: When picks are thin (< 2 good options) or nothing matches the user's request, suggest a nearby neighborhood conversationally — e.g. "Slim pickings in Fort Greene tonight — Park Slope is right nearby, want picks from there?" Include the suggested neighborhood in your JSON output as "suggested_neighborhood".`,
+NEARBY NEIGHBORHOODS: When picks are thin (< 2 good options) or nothing matches the user's request, suggest a nearby neighborhood conversationally — e.g. "Slim pickings in Fort Greene tonight — Park Slope is right nearby, want picks from there?"`,
 };
 
 const ALL_SKILLS = { core, tonightPriority, sourceTiers, neighborhoodMismatch, perennialFraming, venueFraming, lastBatch, freeEmphasis, pendingIntent, activityAdherence, conversationAwareness, nearbySuggestion };

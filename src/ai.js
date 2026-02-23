@@ -527,9 +527,9 @@ function isSearchUrl(url) {
  * Replaces routeMessage() + handler dispatch + composeResponse() with a single call
  * that sees the full picture (message, session, events, history) and returns the SMS directly.
  *
- * Returns { type, sms_text, picks, neighborhood_used, filters_used, suggested_neighborhood, pending_filters }
+ * Returns { type, sms_text, picks, clear_filters }
  */
-async function unifiedRespond(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime, validNeighborhoods, activeFilters, isSparse, matchCount, excludeIds }) {
+async function unifiedRespond(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime, validNeighborhoods, activeFilters, isSparse, matchCount, hardCount, softCount, excludeIds, suggestedNeighborhood } = {}) {
   const now = currentTime || new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   const todayNyc = getNycDateString(0);
@@ -546,7 +546,9 @@ async function unifiedRespond(message, { session, events, neighborhood, nearbyHo
     eventListStr = events.map(e => {
       const eventDate = getEventDate(e);
       const dayLabel = eventDate === todayNyc ? 'TODAY' : eventDate === tomorrowNyc ? 'TOMORROW' : eventDate;
-      const tag = e.filter_match ? '[MATCH] ' : '';
+      const tag = e.filter_match === 'hard' ? '[MATCH] '
+                : e.filter_match === 'soft' ? '[SOFT] '
+                : '';
       return tag + JSON.stringify({
         id: e.id,
         name: e.name && e.name.length > 80 ? e.name.slice(0, 77) + '...' : e.name,
@@ -591,7 +593,7 @@ async function unifiedRespond(message, { session, events, neighborhood, nearbyHo
     : '';
 
   const filterContextBlock = hasActiveFilter
-    ? `\nACTIVE_FILTER: ${filterLabel}\nMATCH_COUNT: ${matchCount || 0} of ${events?.length || 0} events match\nSPARSE: ${isSparse ? 'true — few matches, acknowledge honestly' : 'false'}`
+    ? `\nACTIVE_FILTER: ${filterLabel}\nHARD_MATCH: ${hardCount || 0}\nSOFT_MATCH: ${softCount || 0} of ${events?.length || 0} events\nSPARSE: ${isSparse ? 'true — few matches, acknowledge honestly' : 'false'}`
     : '';
 
   const excludeNote = excludeIds && excludeIds.length > 0
@@ -613,6 +615,7 @@ Respond now.`;
     userMessage: message,
     hasConversationHistory: conversationHistory?.length > 0,
     nearbyNeighborhoods: nearbyHoods,
+    suggestedNeighborhood: suggestedNeighborhood || null,
   };
   const systemPrompt = buildUnifiedPrompt(events || [], skillOptions);
 
@@ -634,9 +637,7 @@ Respond now.`;
       type: 'conversational',
       sms_text: "Having a moment — try again in a sec!",
       picks: [],
-      neighborhood_used: neighborhood,
-      filters_used: null,
-      suggested_neighborhood: null,
+      clear_filters: false,
       _raw: text,
       _usage: usage,
       _provider: 'anthropic',
@@ -673,22 +674,10 @@ Respond now.`;
     }
   }
 
-  // Sanitize neighborhood_used
-  let neighborhoodUsed = parsed.neighborhood_used || neighborhood;
-  if (neighborhoodUsed) {
-    const cleaned = neighborhoodUsed.replace(/\s*\(.*\)$/, '').trim();
-    const validNeighborhoods = Object.keys(require('./neighborhoods').NEIGHBORHOODS);
-    neighborhoodUsed = validNeighborhoods.includes(cleaned) ? cleaned : neighborhood;
-  }
-
   return {
     type: parsed.type || (validPicks.length > 0 ? 'event_picks' : 'conversational'),
     sms_text: require('./formatters').smartTruncate(parsed.sms_text),
     picks: validPicks,
-    neighborhood_used: neighborhoodUsed,
-    filters_used: parsed.filters_used || null,
-    suggested_neighborhood: parsed.suggested_neighborhood || null,
-    pending_filters: parsed.pending_filters || null,
     clear_filters: parsed.clear_filters === true,
     _raw: text,
     _usage: usage,

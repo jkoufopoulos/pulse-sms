@@ -13,7 +13,7 @@ These principles govern how Pulse splits work between deterministic code and LLM
 
 The LLM is never the system of record for structured data. Session state, filters, neighborhood resolution, event selection logic — all owned by deterministic code. The LLM reads well-formed tagged inputs and produces natural language output.
 
-**In practice:** `mergeFilters()` compounds filters deterministically. `buildTaggedPool()` tags matching events with `[MATCH]`. The LLM sees the tagged pool and writes copy — it doesn't manage or report filter state.
+**In practice:** `mergeFilters()` compounds filters deterministically. `buildTaggedPool()` tags matching events with `[MATCH]` (hard match) or `[SOFT]` (broad category match where subcategory is set — e.g. jazz within live_music). The LLM sees the tagged pool and writes copy — it doesn't manage or report filter state.
 
 **Anti-pattern:** Reading `filters_used` from LLM output and merging it into session state. This makes the LLM a secondary source of truth. If it hallucinates a filter, we persist it. We tried this (2026-02-22) and reverted it because it violates this principle.
 
@@ -21,7 +21,7 @@ The LLM is never the system of record for structured data. Session state, filter
 
 If the LLM must both understand intent and write compelling copy, those should be separate operations. The reasoning pass returns a small validated struct. The rendering pass takes well-formed data and returns text.
 
-**Current state:** One unified Haiku call does both. Its output contract has 8 structured fields — 6 are state management, 2 are rendering. This is the root cause of contract bloat.
+**Current state:** One unified Haiku call does both. Its output contract has 4 structured fields — `type`, `sms_text`, `picks`, `clear_filters`. Step 3 removed the 4 redundant state-management fields (`filters_used`, `neighborhood_used`, `suggested_neighborhood`, `pending_filters`).
 
 **Target state:** Reasoning call → `{ type, picks[], clear_filters }` (3 fields, validated via tool_use). Rendering call → `sms_text` (pure copy, lightweight parser). Everything else derived by code.
 
@@ -45,11 +45,7 @@ Every code path that sends an SMS must end with the same atomic session save fun
 
 Every structured field in the LLM output is a surface for hallucination and drift. Fields the code already knows before calling the LLM should never be in the LLM's output schema.
 
-**Fields to remove from LLM contract:**
-- `neighborhood_used` — code resolves `hood` before the call
-- `suggested_neighborhood` — code has `nearbyHoods` and can pick deterministically
-- `pending_filters` — code can derive from pre-router detection + intent
-- `filters_used` — code should own filter extraction entirely (see P1)
+**Done (step 3, 2026-02-22):** Removed `filters_used`, `neighborhood_used`, `suggested_neighborhood`, `pending_filters` from `unifiedRespond`. Contract reduced from 8 to 4 fields: `type`, `sms_text`, `picks`, `clear_filters`.
 
 ### P6. Deterministic Extraction Covers Common Cases
 
@@ -98,11 +94,11 @@ Every handler becomes a thin context builder. The pipeline handles everything el
 | 1a | Atomic session frames — `setResponseState()` | P4 | Stale picks, nudge context | **Done** |
 | 1b | Unify all session saves — every SMS path ends with `saveResponseFrame` | P4 | All stale-state bugs; `ask_neighborhood` and filter-clearing paths | **Done** |
 | 1c | Validate event IDs against pool before save | P7 | Hallucinated event IDs | **Done** (with 1b) |
-| 2 | Compound pre-router extraction — "free comedy", "late jazz", "comedy in bushwick" | P1, P6 | Compound filter persistence (P1 regression) | Planned |
-| 3 | Derive state fields deterministically — remove `neighborhood_used`, `suggested_neighborhood`, `pending_filters` from LLM | P5 | Contract bloat (8→5 fields) | Planned |
+| 2 | Compound pre-router extraction — "free comedy", "late jazz", "comedy in bushwick" | P1, P6 | Compound filter persistence (P1 regression) | **Done** |
+| 3 | Derive state fields deterministically — remove `filters_used`, `neighborhood_used`, `suggested_neighborhood`, `pending_filters` from LLM | P1, P5 | Contract bloat (8→4 fields) | **Done** |
 | 4 | Reasoning/rendering split — separate intent+selection from copywriting | P2, P5 | Contract fully minimized; clean separation | Needs A/B eval |
-| 5 | Remove `filters_used` from LLM contract | P1 | Completes code-owns-state | After 2+4 |
-| 6 | Finer category taxonomy — split `live_music` into jazz/rock/indie/folk | — | 3 jazz→live_music eval failures | Planned |
+| 5 | ~~Remove `filters_used` from LLM contract~~ | P1 | ~~Completes code-owns-state~~ | **Done** (merged into step 3) |
+| 6 | Finer category taxonomy — split `live_music` into jazz/rock/indie/folk | — | 3 jazz→live_music eval failures | **Done** (three-tier soft match) |
 | 7 | `executeQuery(context)` pipeline — thin handlers, single filter path | P4 | Prevents split-brain filtering from recurring | Planned |
 | 8 | Scoped event fetching — `neighborhood`/`borough` scope | — | Geographic bleed in MORE | Planned |
 
@@ -156,17 +152,13 @@ All 5 are pre-LLM staging — they set up state that the downstream `saveRespons
 
 ## Open Issues
 
-### P1 — Filter Persistence (regression at 50%)
+### P1 — Filter Persistence (was 50%, expected fixed)
 
-Compound filter messages ("free comedy", "late jazz") bypass the pre-router and go through the unified LLM. The LLM picks correct events but its filter understanding isn't persisted — `activeFilters` only contains pre-router-detected filters, which are empty for these messages.
+**Fixed by step 2** (compound pre-router extraction, 2026-02-22). The pre-router now detects multi-dimension compounds ("free comedy", "late jazz", "comedy in bushwick") via word-boundary matching on free/time/category signals + `extractNeighborhood`. Requires 2+ filter dimensions OR 1 filter + detected neighborhood to trigger. Filters are persisted deterministically — no LLM involvement.
 
-**Root cause:** The pre-router only detects single-dimension filters ("how about comedy", "free", "later tonight"). Multi-dimension compounds fall through.
+**Previous root cause:** The pre-router only detected single-dimension filters. Compounds fell through to the unified LLM, which picked correctly but didn't persist filters.
 
-**Attempted fix (reverted):** Merged `result.filters_used` from LLM into `activeFilters`. Reverted because it violates P1 (code owns state) — the LLM becomes a secondary source of truth for filters, introducing a hallucination surface.
-
-**Principled fix:** Step 2 (compound pre-router extraction). Extend the pre-router to detect "free comedy", "late jazz", "comedy in bushwick" deterministically using composition of existing single-dimension patterns. This keeps filter extraction in code and eliminates the need for `filters_used`.
-
-**Blocked by:** Nothing. Can proceed after step 1b.
+**Needs verification:** Run regression evals (`--principle P1`) against live server to confirm improvement from 50%.
 
 ### P10 — Explicit Filter Removal (regression at 33%)
 
@@ -186,9 +178,9 @@ Events labeled "tonight" that are actually tomorrow, or vice versa. Root cause u
 |---------|----------|--------|----------|
 | "anything tonight?" | Warm prompt for neighborhood | Error | Pre-router: vague-opener pattern |
 | "nah" / "nah im good" | Graceful decline | Error | Pre-router: decline patterns |
-| "free jazz tonight" (no hood) | Ask for neighborhood, preserve filters | Error | Step 2: compound extraction |
-| "underground techno in bushwick" | Closest matches | Error | Step 2: compound extraction |
-| "any more free comedy stuff" | Continue compound session | Error | Step 2: compound extraction |
+| "free jazz tonight" (no hood) | Ask for neighborhood, preserve filters | **Fixed** | Step 2: compound extraction (2026-02-22) |
+| "underground techno in bushwick" | Closest matches | **Fixed** | Step 2: compound extraction (2026-02-22) |
+| "any more free comedy stuff" | Continue compound session | **Fixed** | Step 2: compound extraction (2026-02-22) |
 | "any other trivia options in bk" | Borough-wide search | Error | Step 2 + borough support |
 
 ### Medium Priority — Bugs
@@ -223,6 +215,26 @@ Events labeled "tonight" that are actually tomorrow, or vice versa. Root cause u
 - 4 no-picks transition paths now clear stale picks
 - 13 unit tests for atomic replacement behavior
 
+### Compound Pre-Router Extraction (2026-02-22)
+
+- Word-boundary matching extracts free (`\bfree\b`), time (`\btonight\b`, `\blate\b`, `\bafter midnight\b`), and category (shared `catMap`) signals from any message
+- `extractNeighborhood()` detects neighborhood mentions ("comedy in bushwick")
+- Triggers when 2+ filter dimensions detected, OR 1 filter + detected neighborhood
+- Falls through to unified LLM for single-dimension messages without session/hood context (bare "jazz", "free", "tonight")
+- 60+ test cases covering: category+free, category+time, category+hood, free+time, triple compounds, midnight, complex multi-signal messages
+- Fixes P1 filter persistence regression — compound filters now persisted deterministically
+- Fixes 3 routing gaps: "free jazz tonight", "underground techno in bushwick", "any more free comedy stuff"
+
+### Three-Tier Soft Match for Tagged Pool (2026-02-22)
+
+- `eventMatchesFilters()` now returns `'hard'` / `'soft'` / `false` instead of boolean
+- `buildTaggedPool()` returns `hardCount` + `softCount` alongside `matchCount`
+- `subcategory` field added to filter objects — preserved through `mergeFilters()`, `normalizeFilters()`, and pre-router
+- Pre-router `catMap` broken into objects with optional `subcategory` (e.g. jazz → `{ category: 'live_music', subcategory: 'jazz' }`)
+- `[SOFT]` tag tier in event pool — LLM uses judgment to select sub-genre matches from broad category
+- Prompt updated: `[MATCH]` = verified match (must prefer), `[SOFT]` = broad match (read event details to judge fit)
+- Fixes step 6 (finer category taxonomy) without fragmenting the category system
+
 ### Unified LLM + Tagged Pool (2026-02-21)
 
 - Single `unifiedRespond` Haiku call replaces two-call route+compose flow
@@ -230,6 +242,16 @@ Events labeled "tonight" that are actually tomorrow, or vice versa. Root cause u
 - `mergeFilters()` compounds filters across turns deterministically
 - Pre-router filter detection injects `preDetectedFilters` into unified branch
 - A/B eval: Haiku unified matched Sonnet compose (71% preference, 89% tone) at 73% lower cost
+
+### Derive State Fields Deterministically — Step 3 (2026-02-22)
+
+- Removed 4 redundant fields from `unifiedRespond` LLM output contract: `filters_used`, `neighborhood_used`, `suggested_neighborhood`, `pending_filters`
+- Unified output contract now has 4 fields: `type`, `sms_text`, `picks`, `clear_filters`
+- Handler derives `suggestedHood` deterministically from `isSparse && nearbyHoods[0]`
+- Handler uses resolved `hood` directly instead of reading `neighborhood_used` from LLM
+- `ask_neighborhood` path uses `activeFilters` instead of LLM-reported `pending_filters`
+- `nearbySuggestion` skill updated: dynamic prompt injects specific hood name instead of asking LLM to report it in JSON
+- Also subsumes step 5 (`filters_used` removal) — field was already dead code after Bug 1 revert
 
 ### Conversational + Empty Picks Atomic Save (2026-02-22)
 

@@ -79,8 +79,10 @@ function buildComposePrompt(events, options = {}) {
     parts.push(skills.conversationAwareness.text);
   }
 
-  // Nearby suggestion — when nearby neighborhoods are provided
-  if (options.nearbyNeighborhoods?.length > 0) {
+  // Nearby suggestion — when a specific neighborhood has been determined
+  if (options.suggestedNeighborhood) {
+    parts.push(`\nNEARBY SUGGESTION: Picks are thin — suggest ${options.suggestedNeighborhood} as an alternative (e.g. "Slim pickings tonight — ${options.suggestedNeighborhood} is nearby, want picks from there?").`);
+  } else if (options.nearbyNeighborhoods?.length > 0) {
     parts.push(skills.nearbySuggestion.text);
   }
 
@@ -171,8 +173,10 @@ function buildUnifiedPrompt(events, options = {}) {
     parts.push(skills.conversationAwareness.text);
   }
 
-  // Nearby suggestion
-  if (options.nearbyNeighborhoods?.length > 0) {
+  // Nearby suggestion — when a specific neighborhood has been determined
+  if (options.suggestedNeighborhood) {
+    parts.push(`\nNEARBY SUGGESTION: Picks are thin — suggest ${options.suggestedNeighborhood} as an alternative (e.g. "Slim pickings tonight — ${options.suggestedNeighborhood} is nearby, want picks from there?").`);
+  } else if (options.nearbyNeighborhoods?.length > 0) {
     parts.push(skills.nearbySuggestion.text);
   }
 

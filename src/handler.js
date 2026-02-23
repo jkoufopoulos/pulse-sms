@@ -386,6 +386,8 @@ async function handleMessageAI(phone, message) {
       preDetectedFilters || session?.pendingFilters || null
     );
     let matchCount = 0;
+    let hardCount = 0;
+    let softCount = 0;
     let isSparse = false;
 
     // Fetch events if we have a neighborhood
@@ -400,6 +402,8 @@ async function handleMessageAI(phone, message) {
       const taggedResult = buildTaggedPool(curated, activeFilters);
       events = taggedResult.pool;
       matchCount = taggedResult.matchCount;
+      hardCount = taggedResult.hardCount;
+      softCount = taggedResult.softCount;
       isSparse = taggedResult.isSparse;
       // Merge perennial picks (marked as unmatched)
       const perennialPicks = getPerennialPicks(hood);
@@ -414,6 +418,9 @@ async function handleMessageAI(phone, message) {
 
     trace.events.sent_to_claude = events.length;
     trace.events.sent_ids = events.map(e => e.id);
+
+    // Derive suggested neighborhood deterministically (P5: code owns state)
+    const suggestedHood = isSparse && nearbyHoods.length > 0 ? nearbyHoods[0] : null;
 
     console.log(`Unified flow: hood=${hood}, events=${events.length}, nearby=${nearbyHoods.join(',')}`);
 
@@ -434,7 +441,10 @@ async function handleMessageAI(phone, message) {
       activeFilters,
       isSparse,
       matchCount,
+      hardCount,
+      softCount,
       excludeIds,
+      suggestedNeighborhood: suggestedHood,
     });
     trace.routing.latency_ms = Date.now() - composeStart; // unified call replaces both route + compose
     trace.composition.latency_ms = trace.routing.latency_ms;
@@ -445,7 +455,7 @@ async function handleMessageAI(phone, message) {
       const evt = events.find(e => e.id === p.event_id);
       return { ...p, date_local: evt?.date_local || null };
     });
-    trace.composition.neighborhood_used = result.neighborhood_used || hood;
+    trace.composition.neighborhood_used = hood;
     trackAICost(phone, result._usage, result._provider);
 
     // Filter state management after unified call
@@ -465,7 +475,7 @@ async function handleMessageAI(phone, message) {
         offeredIds: session?.allOfferedIds || [],
         visitedHoods: session?.visitedHoods || [],
         pending: {
-          filters: result.pending_filters || activeFilters,
+          filters: activeFilters,
         },
         pendingMessage: message,
       });
@@ -478,8 +488,6 @@ async function handleMessageAI(phone, message) {
 
     if (result.type === 'conversational' || !result.picks || result.picks.length === 0) {
       // Conversational or empty picks — save atomically, preserving existing picks/events for details/more
-      const suggestedHood = result.suggested_neighborhood && nearbyHoods.includes(result.suggested_neighborhood)
-        ? result.suggested_neighborhood : null;
       saveResponseFrame(phone, {
         picks: session?.lastPicks || [],
         eventMap: Object.keys(eventMap).length > 0 ? eventMap : (session?.lastEvents || {}),
@@ -499,12 +507,10 @@ async function handleMessageAI(phone, message) {
 
     // Send SMS first — ensures user always gets a response even if session save fails
     await sendSMS(phone, result.sms_text);
-    const suggestedHood = result.suggested_neighborhood && nearbyHoods.includes(result.suggested_neighborhood)
-      ? result.suggested_neighborhood : null;
     saveResponseFrame(phone, {
       picks: validPicks,
       eventMap,
-      neighborhood: result.neighborhood_used || hood,
+      neighborhood: hood,
       filters: activeFilters,
       offeredIds: validPicks.map(p => p.event_id),
       pending: suggestedHood ? {

@@ -137,9 +137,122 @@ check('null lastFilters → null', preRoute('show me everything', { ...noFilterS
 // No session → falls through
 check('no session → null', preRoute('forget the comedy', null) === null);
 
-// Compound and complex → still null (unchanged)
-check('free comedy stuff → null', preRoute('any more free comedy stuff', followUpSession) === null);
-check('complex request → null', preRoute('any good jazz shows in williamsburg tonight', null) === null);
+// --- Compound filter extraction ---
+console.log('\npreRoute compound extraction:');
+
+// Category + free
+const freeComedy = preRoute('free comedy', followUpSession);
+check('free comedy → events', freeComedy?.intent === 'events');
+check('free comedy → free_only', freeComedy?.filters?.free_only === true);
+check('free comedy → comedy', freeComedy?.filters?.category === 'comedy');
+check('free comedy → session hood', freeComedy?.neighborhood === 'East Village');
+
+const freeJazz = preRoute('free jazz', followUpSession);
+check('free jazz → events', freeJazz?.intent === 'events');
+check('free jazz → free_only', freeJazz?.filters?.free_only === true);
+check('free jazz → live_music', freeJazz?.filters?.category === 'live_music');
+check('free jazz → subcategory jazz', freeJazz?.filters?.subcategory === 'jazz');
+
+const anyFreeMusic = preRoute('any free music', followUpSession);
+check('any free music → events', anyFreeMusic?.intent === 'events');
+check('any free music → free_only', anyFreeMusic?.filters?.free_only === true);
+check('any free music → live_music', anyFreeMusic?.filters?.category === 'live_music');
+
+// Category + time
+const lateJazz = preRoute('late jazz', followUpSession);
+check('late jazz → events', lateJazz?.intent === 'events');
+check('late jazz → time 22:00', lateJazz?.filters?.time_after === '22:00');
+check('late jazz → live_music', lateJazz?.filters?.category === 'live_music');
+check('late jazz → subcategory jazz', lateJazz?.filters?.subcategory === 'jazz');
+
+const comedyTonight = preRoute('comedy tonight', followUpSession);
+check('comedy tonight → events', comedyTonight?.intent === 'events');
+check('comedy tonight → time 22:00', comedyTonight?.filters?.time_after === '22:00');
+check('comedy tonight → comedy', comedyTonight?.filters?.category === 'comedy');
+
+const lateNightComedy = preRoute('late night comedy', followUpSession);
+check('late night comedy → events', lateNightComedy?.intent === 'events');
+check('late night comedy → time 22:00', lateNightComedy?.filters?.time_after === '22:00');
+check('late night comedy → comedy', lateNightComedy?.filters?.category === 'comedy');
+
+// Category + neighborhood (no session needed)
+const comedyInBushwick = preRoute('comedy in bushwick', null);
+check('comedy in bushwick → events', comedyInBushwick?.intent === 'events');
+check('comedy in bushwick → comedy', comedyInBushwick?.filters?.category === 'comedy');
+check('comedy in bushwick → Bushwick', comedyInBushwick?.neighborhood === 'Bushwick');
+
+const jazzInVillage = preRoute('jazz in east village', null);
+check('jazz in east village → events', jazzInVillage?.intent === 'events');
+check('jazz in east village → live_music', jazzInVillage?.filters?.category === 'live_music');
+check('jazz in east village → subcategory jazz', jazzInVillage?.filters?.subcategory === 'jazz');
+check('jazz in east village → East Village', jazzInVillage?.neighborhood === 'East Village');
+
+// Free + time
+const freeTonight = preRoute('free stuff tonight', null);
+check('free stuff tonight → events', freeTonight?.intent === 'events');
+check('free stuff tonight → free_only', freeTonight?.filters?.free_only === true);
+check('free stuff tonight → time 22:00', freeTonight?.filters?.time_after === '22:00');
+check('free stuff tonight → no hood', freeTonight?.neighborhood === null);
+
+const freeAndLate = preRoute('anything free and late', followUpSession);
+check('anything free and late → events', freeAndLate?.intent === 'events');
+check('anything free and late → free_only', freeAndLate?.filters?.free_only === true);
+check('anything free and late → time 22:00', freeAndLate?.filters?.time_after === '22:00');
+
+// Triple: free + category + time
+const freeComedyTonight = preRoute('free comedy tonight', followUpSession);
+check('free comedy tonight → events', freeComedyTonight?.intent === 'events');
+check('free comedy tonight → free_only', freeComedyTonight?.filters?.free_only === true);
+check('free comedy tonight → comedy', freeComedyTonight?.filters?.category === 'comedy');
+check('free comedy tonight → time 22:00', freeComedyTonight?.filters?.time_after === '22:00');
+
+const freeLateJazz = preRoute('free late jazz', followUpSession);
+check('free late jazz → events', freeLateJazz?.intent === 'events');
+check('free late jazz → free_only', freeLateJazz?.filters?.free_only === true);
+check('free late jazz → live_music', freeLateJazz?.filters?.category === 'live_music');
+check('free late jazz → subcategory jazz', freeLateJazz?.filters?.subcategory === 'jazz');
+check('free late jazz → time 22:00', freeLateJazz?.filters?.time_after === '22:00');
+
+// Compound with conversational filler (from original test, now caught)
+const freeComedyStuff = preRoute('any more free comedy stuff', followUpSession);
+check('free comedy stuff → events (compound)', freeComedyStuff?.intent === 'events');
+check('free comedy stuff → free_only', freeComedyStuff?.filters?.free_only === true);
+check('free comedy stuff → comedy', freeComedyStuff?.filters?.category === 'comedy');
+
+// Complex request with neighborhood + category + time (from original test, now caught)
+const complexReq = preRoute('any good jazz shows in williamsburg tonight', null);
+check('complex jazz+wburg+tonight → events', complexReq?.intent === 'events');
+check('complex jazz+wburg+tonight → live_music', complexReq?.filters?.category === 'live_music');
+check('complex jazz+wburg+tonight → subcategory jazz', complexReq?.filters?.subcategory === 'jazz');
+check('complex jazz+wburg+tonight → Williamsburg', complexReq?.neighborhood === 'Williamsburg');
+check('complex jazz+wburg+tonight → time 22:00', complexReq?.filters?.time_after === '22:00');
+
+// "free tonight" with session — compound catches it (free + time = 2 dims)
+const freeTonightSession = preRoute('free tonight', followUpSession);
+check('free tonight (session) → events', freeTonightSession?.intent === 'events');
+check('free tonight (session) → free_only', freeTonightSession?.filters?.free_only === true);
+check('free tonight (session) → time 22:00', freeTonightSession?.filters?.time_after === '22:00');
+
+// Midnight compounds
+const afterMidnightComedy = preRoute('comedy after midnight', followUpSession);
+check('comedy after midnight → time 00:00', afterMidnightComedy?.filters?.time_after === '00:00');
+check('comedy after midnight → comedy', afterMidnightComedy?.filters?.category === 'comedy');
+
+// Underground techno in bushwick — category + neighborhood
+const undergroundTechno = preRoute('underground techno in bushwick', null);
+check('underground techno in bushwick → events', undergroundTechno?.intent === 'events');
+check('underground techno in bushwick → nightlife', undergroundTechno?.filters?.category === 'nightlife');
+check('underground techno in bushwick → Bushwick', undergroundTechno?.neighborhood === 'Bushwick');
+
+// Single dimension without session or hood → still falls through
+check('bare jazz (no session) → null', preRoute('jazz', null) === null);
+check('bare free (no session) → null', preRoute('free', null) === null);
+check('bare tonight (no session) → null', preRoute('tonight', null) === null);
+check('bare comedy (no session) → null', preRoute('comedy', null) === null);
+
+// Bare neighborhoods still fall through (0 filter dimensions)
+check('east village alone → null', preRoute('east village', null) === null);
+check('bushwick alone → null', preRoute('bushwick', null) === null);
 
 // ---- getAdjacentNeighborhoods ----
 console.log('\ngetAdjacentNeighborhoods:');

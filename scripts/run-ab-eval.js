@@ -89,7 +89,7 @@ function buildTrace(userMessage, neighborhood, events, result) {
     routing: { result: { intent: 'events', neighborhood } },
     composition: {
       picks: result.picks || [],
-      neighborhood_used: result.neighborhood_used || neighborhood,
+      neighborhood_used: neighborhood,
     },
     events: {
       sent_ids: events.map(e => e.id),

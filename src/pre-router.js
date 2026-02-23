@@ -1,4 +1,4 @@
-const { NEIGHBORHOODS, BOROUGHS } = require('./neighborhoods');
+const { NEIGHBORHOODS, BOROUGHS, extractNeighborhood } = require('./neighborhoods');
 
 // Build reverse map: neighborhood → borough
 const HOOD_TO_BOROUGH = {};
@@ -31,7 +31,7 @@ function getAdjacentNeighborhoods(hood, count = 3) {
 function preRoute(message, session) {
   const msg = message.trim();
   const lower = msg.toLowerCase();
-  const base = { filters: { free_only: false, category: null, vibe: null, time_after: null }, event_reference: null, reply: null, confidence: 1.0 };
+  const base = { filters: { free_only: false, category: null, subcategory: null, vibe: null, time_after: null }, event_reference: null, reply: null, confidence: 1.0 };
 
   // Help
   if (/^(help|\?)$/i.test(msg)) {
@@ -94,44 +94,81 @@ function preRoute(message, session) {
     }
   }
 
+  // Category map — shared between session-aware checks and compound extraction
+  const catMap = {
+    'comedy|standup|stand-up|improv': { category: 'comedy' },
+    'theater|theatre': { category: 'theater' },
+    'jazz': { category: 'live_music', subcategory: 'jazz' },
+    'music|live music|rock|punk|metal|folk|indie|hip hop|hip-hop|r&b|soul|funk|rap': { category: 'live_music' },
+    'techno|house|electronic|dj': { category: 'nightlife' },
+    'art': { category: 'art' },
+    'nightlife': { category: 'nightlife' },
+    'dance': { category: 'nightlife' },
+    'trivia|bingo|open mic|poetry|karaoke|drag|burlesque': { category: 'community' },
+    'salsa|bachata|swing': { category: 'nightlife' },
+  };
+
   // --- Session-aware filter follow-ups (deterministic detection → unified LLM composition) ---
   // These return intent='events' with filters; the handler injects filters and uses the unified branch.
   if (session?.lastNeighborhood && session?.lastPicks?.length > 0) {
-    // Free
-    if (/^(free|free stuff|free events|free tonight|anything free)$/i.test(msg)) {
+    // Free (single-dimension)
+    if (/^(free|free stuff|free events|anything free)$/i.test(msg)) {
       return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, free_only: true } };
     }
 
-    // Category follow-ups
-    const catMap = {
-      'comedy|standup|stand-up|improv': 'comedy',
-      'theater|theatre': 'theater',
-      'jazz|music|live music|rock|punk|metal|folk|indie|hip hop|hip-hop|r&b|soul|funk|rap': 'live_music',
-      'techno|house|electronic|dj': 'nightlife',
-      'art': 'art',
-      'nightlife': 'nightlife',
-      'dance': 'nightlife',
-      'trivia|bingo|open mic|poetry|karaoke|drag|burlesque': 'community',
-      'salsa|bachata|swing': 'nightlife',
-    };
-    for (const [pattern, category] of Object.entries(catMap)) {
+    // Category follow-ups (single-dimension, structured prefix required)
+    for (const [pattern, catInfo] of Object.entries(catMap)) {
       const catRegex = new RegExp(`^(?:how about|what about|any|show me|got any|have any|know any)\\s+(?:${pattern})(?:\\s+(?:night|stuff|shows?|events?|tonight|picks?|options?))*$`, 'i');
       if (catRegex.test(msg)) {
-        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, category } };
+        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, ...catInfo } };
       }
     }
 
-    // Time follow-ups
+    // Time follow-ups (single-dimension)
     if (/^(?:how about\s+)?(?:later(?:\s+tonight)?|after\s+midnight|late(?:r)?\s*night|anything?\s+late)$/i.test(msg)) {
       const timeAfter = /midnight/i.test(msg) ? '00:00' : '22:00';
       return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, time_after: timeAfter } };
     }
 
-    // Vibe follow-ups
+    // Vibe follow-ups (single-dimension)
     const vibeMatch = msg.match(/^(?:something|anything|how about something|got anything)\s+(chill|wild|weird|romantic|low-key|fun|crazy|mellow|cozy|rowdy|intimate|energetic|upbeat|laid-back)$/i);
     if (vibeMatch) {
       return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, vibe: vibeMatch[1].toLowerCase() } };
     }
+  }
+
+  // --- Compound filter extraction (multi-dimension: "free comedy", "late jazz", "comedy in bushwick") ---
+  // Catches compound messages that single-dimension checks miss.
+  // Does NOT require session — works for first messages like "free comedy in bushwick".
+  // Additive: if it misses a compound, LLM still works — just won't persist filters.
+  const hasFree = /\bfree\b/i.test(lower);
+
+  let compoundTime = null;
+  if (/\b(?:after\s+midnight|midnight)\b/i.test(lower)) {
+    compoundTime = '00:00';
+  } else if (/\b(?:tonight|later?|late\s*night)\b/i.test(lower)) {
+    compoundTime = '22:00';
+  }
+
+  let detectedCat = null;
+  for (const [pattern, catInfo] of Object.entries(catMap)) {
+    const wordRegex = new RegExp(`\\b(?:${pattern})\\b`, 'i');
+    if (wordRegex.test(lower)) {
+      detectedCat = catInfo;
+      break;
+    }
+  }
+
+  const detectedHood = extractNeighborhood(msg);
+
+  const filterDims = [hasFree, compoundTime, detectedCat].filter(Boolean).length;
+  if (filterDims >= 2 || (filterDims >= 1 && detectedHood)) {
+    const hood = detectedHood || session?.lastNeighborhood || null;
+    const filters = { ...base.filters };
+    if (hasFree) filters.free_only = true;
+    if (compoundTime) filters.time_after = compoundTime;
+    if (detectedCat) Object.assign(filters, detectedCat);
+    return { ...base, intent: 'events', neighborhood: hood, filters, confidence: 0.9 };
   }
 
   return null; // Fall through to unified LLM

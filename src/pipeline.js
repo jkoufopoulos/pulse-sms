@@ -99,6 +99,7 @@ function mergeFilters(existing, incoming) {
   return {
     free_only: next.free_only || base.free_only || false,
     category: next.category || base.category || null,
+    subcategory: next.subcategory || base.subcategory || null,
     vibe: next.vibe || base.vibe || null,
     time_after: next.time_after || base.time_after || null,
   };
@@ -106,7 +107,8 @@ function mergeFilters(existing, incoming) {
 
 /**
  * Check if an event matches ALL active filter dimensions.
- * Events without parseable times pass the time filter (soft behavior).
+ * Returns 'hard' (exact match), 'soft' (broad category match with subcategory),
+ * or false (no match). Events without parseable times pass the time filter.
  */
 function eventMatchesFilters(event, filters) {
   if (filters.free_only && !event.is_free) return false;
@@ -130,7 +132,10 @@ function eventMatchesFilters(event, filters) {
     }
   }
   // vibe has no event field to match — LLM handles vibe selection
-  return true;
+  // Determine hard vs soft: if subcategory is set, the category is a broad match
+  // and the LLM should use judgment to find events matching the sub-genre
+  if (filters.subcategory) return 'soft';
+  return 'hard';
 }
 
 /**
@@ -143,30 +148,39 @@ function buildTaggedPool(events, activeFilters) {
     return {
       pool: events.slice(0, 15).map(e => ({ ...e, filter_match: false })),
       matchCount: 0,
+      hardCount: 0,
+      softCount: 0,
       isSparse: false,
     };
   }
 
-  const matched = [];
+  const hard = [];
+  const soft = [];
   const unmatched = [];
 
   for (const e of events) {
-    if (eventMatchesFilters(e, activeFilters)) {
-      matched.push({ ...e, filter_match: true });
+    const result = eventMatchesFilters(e, activeFilters);
+    if (result === 'hard') {
+      hard.push({ ...e, filter_match: 'hard' });
+    } else if (result === 'soft') {
+      soft.push({ ...e, filter_match: 'soft' });
     } else {
       unmatched.push({ ...e, filter_match: false });
     }
   }
 
-  const pool = [
-    ...matched.slice(0, 10),
-    ...unmatched.slice(0, Math.max(0, 15 - Math.min(matched.length, 10))),
-  ];
+  const hardSlice = hard.slice(0, 10);
+  const softSlice = soft.slice(0, Math.max(0, 10 - hardSlice.length));
+  const unmatchedSlice = unmatched.slice(0, Math.max(0, 15 - hardSlice.length - softSlice.length));
+  const pool = [...hardSlice, ...softSlice, ...unmatchedSlice];
 
+  const totalMatched = hard.length + soft.length;
   return {
     pool,
-    matchCount: matched.length,
-    isSparse: matched.length > 0 && matched.length < 3,
+    matchCount: totalMatched,
+    hardCount: hard.length,
+    softCount: soft.length,
+    isSparse: totalMatched > 0 && totalMatched < 3,
   };
 }
 
@@ -196,7 +210,16 @@ function normalizeFilters(filters) {
   const result = {};
   if (filters.category) {
     const key = String(filters.category).toLowerCase().trim();
-    result.category = CATEGORY_NORMALIZE[key] || key;
+    const canonical = CATEGORY_NORMALIZE[key] || key;
+    result.category = canonical;
+    // If the LLM returned a sub-genre that maps to a broader category,
+    // preserve the original term as subcategory so the tagged pool uses soft matching
+    if (CATEGORY_NORMALIZE[key] && key !== canonical) {
+      result.subcategory = key;
+    }
+  }
+  if (filters.subcategory) {
+    result.subcategory = String(filters.subcategory).toLowerCase().trim();
   }
   if (filters.free_only !== undefined && filters.free_only !== null) {
     result.free_only = Boolean(filters.free_only);
