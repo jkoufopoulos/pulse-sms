@@ -1,5 +1,5 @@
 const { check } = require('../helpers');
-const { mergeFilters, eventMatchesFilters, buildTaggedPool } = require('../../src/pipeline');
+const { mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters } = require('../../src/pipeline');
 
 // ---- mergeFilters ----
 console.log('\nmergeFilters:');
@@ -197,3 +197,58 @@ const origId = original[0].id;
 buildTaggedPool(original, { category: 'comedy' });
 check('original not mutated', original[0].filter_match === undefined);
 check('original id preserved', original[0].id === origId);
+
+
+// ---- normalizeFilters ----
+console.log('\nnormalizeFilters:');
+
+// Null / invalid input
+check('null → null', normalizeFilters(null) === null);
+check('undefined → null', normalizeFilters(undefined) === null);
+check('string → null', normalizeFilters('comedy') === null);
+check('empty obj → null', normalizeFilters({}) === null);
+
+// Standard passthrough (already canonical)
+const standard = normalizeFilters({ category: 'comedy', free_only: true, time_after: '22:00' });
+check('passthrough: category', standard.category === 'comedy');
+check('passthrough: free_only', standard.free_only === true);
+check('passthrough: time_after', standard.time_after === '22:00');
+
+// Subcategory mapping
+check('jazz → live_music', normalizeFilters({ category: 'jazz' }).category === 'live_music');
+check('rock → live_music', normalizeFilters({ category: 'rock' }).category === 'live_music');
+check('indie → live_music', normalizeFilters({ category: 'indie' }).category === 'live_music');
+check('folk → live_music', normalizeFilters({ category: 'folk' }).category === 'live_music');
+check('punk → live_music', normalizeFilters({ category: 'punk' }).category === 'live_music');
+check('techno → nightlife', normalizeFilters({ category: 'techno' }).category === 'nightlife');
+check('house → nightlife', normalizeFilters({ category: 'house' }).category === 'nightlife');
+check('electronic → nightlife', normalizeFilters({ category: 'electronic' }).category === 'nightlife');
+check('dj → nightlife', normalizeFilters({ category: 'dj' }).category === 'nightlife');
+check('standup → comedy', normalizeFilters({ category: 'standup' }).category === 'comedy');
+check('improv → comedy', normalizeFilters({ category: 'improv' }).category === 'comedy');
+check('theatre → theater', normalizeFilters({ category: 'theatre' }).category === 'theater');
+check('trivia → community', normalizeFilters({ category: 'trivia' }).category === 'community');
+check('karaoke → community', normalizeFilters({ category: 'karaoke' }).category === 'community');
+check('drag → community', normalizeFilters({ category: 'drag' }).category === 'community');
+
+// Case insensitivity
+check('Jazz → live_music', normalizeFilters({ category: 'Jazz' }).category === 'live_music');
+check('TECHNO → nightlife', normalizeFilters({ category: 'TECHNO' }).category === 'nightlife');
+
+// Unknown category passes through
+check('unknown → passthrough', normalizeFilters({ category: 'wellness' }).category === 'wellness');
+
+// free_only coercion
+check('free_only 1 → true', normalizeFilters({ free_only: 1 }).free_only === true);
+check('free_only "yes" → true', normalizeFilters({ free_only: 'yes' }).free_only === true);
+check('free_only 0 → false', normalizeFilters({ free_only: 0 }).free_only === false);
+check('free_only "" → false', normalizeFilters({ free_only: '' }).free_only === false);
+
+// time_after validation
+check('valid time_after', normalizeFilters({ time_after: '22:00' }).time_after === '22:00');
+check('valid midnight', normalizeFilters({ time_after: '00:00' }).time_after === '00:00');
+check('invalid time_after → null', normalizeFilters({ time_after: '10pm' }).time_after === null);
+check('invalid format → null', normalizeFilters({ time_after: 'late' }).time_after === null);
+
+// Vibe passthrough
+check('vibe passes through', normalizeFilters({ vibe: 'chill' }).vibe === 'chill');

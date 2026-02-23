@@ -55,7 +55,7 @@ function buildEventMap(events) {
  * Every field is explicitly set to prevent stale state from persisting.
  */
 function saveResponseFrame(phone, { mode = 'fresh', picks = [], prevSession,
-    eventMap = {}, neighborhood, filters, offeredIds = [], visitedHoods, pending } = {}) {
+    eventMap = {}, neighborhood, filters, offeredIds = [], visitedHoods, pending, pendingMessage } = {}) {
   const isMore = mode === 'more';
   setResponseState(phone, {
     picks,
@@ -72,6 +72,7 @@ function saveResponseFrame(phone, { mode = 'fresh', picks = [], prevSession,
     pendingNearby: pending?.neighborhood || null,
     pendingNearbyEvents: pending?.nearbyEvents || null,
     pendingFilters: pending?.filters || null,
+    pendingMessage: pendingMessage || null,
   });
 }
 
@@ -169,4 +170,45 @@ function buildTaggedPool(events, activeFilters) {
   };
 }
 
-module.exports = { applyFilters, resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, mergeFilters, eventMatchesFilters, buildTaggedPool };
+/**
+ * Map LLM subcategory values to canonical categories (matches pre-router.js catMap).
+ */
+const CATEGORY_NORMALIZE = {
+  jazz: 'live_music', rock: 'live_music', indie: 'live_music', folk: 'live_music',
+  punk: 'live_music', metal: 'live_music', 'hip hop': 'live_music', 'hip-hop': 'live_music',
+  'r&b': 'live_music', soul: 'live_music', funk: 'live_music', rap: 'live_music',
+  music: 'live_music', 'live music': 'live_music',
+  techno: 'nightlife', house: 'nightlife', electronic: 'nightlife', dj: 'nightlife',
+  dance: 'nightlife', salsa: 'nightlife', bachata: 'nightlife', swing: 'nightlife',
+  standup: 'comedy', 'stand-up': 'comedy', improv: 'comedy',
+  theatre: 'theater',
+  trivia: 'community', karaoke: 'community', drag: 'community',
+  burlesque: 'community', bingo: 'community', 'open mic': 'community', poetry: 'community',
+};
+
+/**
+ * Normalize LLM-returned filters to canonical form.
+ * Maps subcategories to canonical categories, coerces free_only to boolean,
+ * validates time_after is HH:MM format.
+ */
+function normalizeFilters(filters) {
+  if (!filters || typeof filters !== 'object') return null;
+  const result = {};
+  if (filters.category) {
+    const key = String(filters.category).toLowerCase().trim();
+    result.category = CATEGORY_NORMALIZE[key] || key;
+  }
+  if (filters.free_only !== undefined && filters.free_only !== null) {
+    result.free_only = Boolean(filters.free_only);
+  }
+  if (filters.time_after) {
+    const ta = String(filters.time_after).trim();
+    result.time_after = /^\d{2}:\d{2}$/.test(ta) ? ta : null;
+  }
+  if (filters.vibe) {
+    result.vibe = filters.vibe;
+  }
+  return Object.keys(result).length > 0 ? result : null;
+}
+
+module.exports = { applyFilters, resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters };

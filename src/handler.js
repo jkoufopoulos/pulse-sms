@@ -381,7 +381,7 @@ async function handleMessageAI(phone, message) {
     trace.routing.resolved_neighborhood = hood;
 
     // Resolve active filters: merge persisted filters with newly detected ones
-    const activeFilters = mergeFilters(
+    let activeFilters = mergeFilters(
       session?.lastFilters,
       preDetectedFilters || session?.pendingFilters || null
     );
@@ -449,71 +449,64 @@ async function handleMessageAI(phone, message) {
     trackAICost(phone, result._usage, result._provider);
 
     // Filter state management after unified call
+    // Zero activeFilters so downstream saveResponseFrame persists no filters.
+    // Pending state is cleared by saveResponseFrame (sets pending fields to null unless explicitly provided).
     if (result.clear_filters) {
-      // LLM detected user wants to drop filters (semantic clearing)
-      setSession(phone, { lastFilters: null, pendingFilters: null, pendingMessage: null, pendingNearby: null });
-    } else if (session?.pendingNearby || session?.pendingFilters) {
-      setSession(phone, { pendingNearby: null, pendingFilters: null, pendingMessage: null });
+      activeFilters = {};
     }
 
     // Handle response by type
     if (result.type === 'ask_neighborhood') {
-      if (result.pending_filters) {
-        setSession(phone, { pendingFilters: result.pending_filters, pendingMessage: message });
-      }
+      saveResponseFrame(phone, {
+        picks: session?.lastPicks || [],
+        eventMap: session?.lastEvents || {},
+        neighborhood: hood,
+        filters: Object.values(activeFilters).some(Boolean) ? activeFilters : null,
+        offeredIds: session?.allOfferedIds || [],
+        visitedHoods: session?.visitedHoods || [],
+        pending: {
+          filters: result.pending_filters || activeFilters,
+        },
+        pendingMessage: message,
+      });
       await sendSMS(phone, result.sms_text);
       finalizeTrace(result.sms_text, 'events');
       return;
     }
 
-    if (result.type === 'conversational') {
-      // Persist neighborhood + active filters so follow-ups keep context
-      if (hood) {
-        const sessionUpdate = { lastNeighborhood: hood };
-        if (Object.values(activeFilters).some(Boolean)) {
-          sessionUpdate.lastFilters = activeFilters;
-        }
-        const suggestedHood = result.suggested_neighborhood && nearbyHoods.includes(result.suggested_neighborhood)
-          ? result.suggested_neighborhood : null;
-        if (suggestedHood) sessionUpdate.pendingNearby = suggestedHood;
-        setSession(phone, sessionUpdate);
-      }
+    const eventMap = buildEventMap([...curated, ...taggedPerennials]);
+
+    if (result.type === 'conversational' || !result.picks || result.picks.length === 0) {
+      // Conversational or empty picks — save atomically, preserving existing picks/events for details/more
+      const suggestedHood = result.suggested_neighborhood && nearbyHoods.includes(result.suggested_neighborhood)
+        ? result.suggested_neighborhood : null;
+      saveResponseFrame(phone, {
+        picks: session?.lastPicks || [],
+        eventMap: Object.keys(eventMap).length > 0 ? eventMap : (session?.lastEvents || {}),
+        neighborhood: hood,
+        filters: Object.values(activeFilters).some(Boolean) ? activeFilters : null,
+        offeredIds: session?.allOfferedIds || [],
+        visitedHoods: session?.visitedHoods || [],
+        pending: suggestedHood ? { neighborhood: suggestedHood, filters: activeFilters } : null,
+      });
       await sendSMS(phone, result.sms_text);
       finalizeTrace(result.sms_text, 'conversational');
       return;
     }
 
-    // type === 'event_picks'
-    // If LLM said event_picks but returned 0 valid picks, treat as conversational
-    // to avoid wiping lastPicks (which breaks details references)
-    if (!result.picks || result.picks.length === 0) {
-      if (hood) {
-        const sessionUpdate = { lastNeighborhood: hood };
-        if (Object.values(activeFilters).some(Boolean)) {
-          sessionUpdate.lastFilters = activeFilters;
-        }
-        const suggestedHoodEmpty = result.suggested_neighborhood && nearbyHoods.includes(result.suggested_neighborhood)
-          ? result.suggested_neighborhood : null;
-        if (suggestedHoodEmpty) sessionUpdate.pendingNearby = suggestedHoodEmpty;
-        setSession(phone, sessionUpdate);
-      }
-      await sendSMS(phone, result.sms_text);
-      finalizeTrace(result.sms_text, 'conversational');
-      return;
-    }
+    // Validate event IDs against pool (P7: catch hallucinated IDs before save)
+    const validPicks = (result.picks || []).filter(p => eventMap[p.event_id]);
 
     // Send SMS first — ensures user always gets a response even if session save fails
     await sendSMS(phone, result.sms_text);
-
-    const eventMap = buildEventMap([...curated, ...taggedPerennials]);
     const suggestedHood = result.suggested_neighborhood && nearbyHoods.includes(result.suggested_neighborhood)
       ? result.suggested_neighborhood : null;
     saveResponseFrame(phone, {
-      picks: result.picks,
+      picks: validPicks,
       eventMap,
       neighborhood: result.neighborhood_used || hood,
       filters: activeFilters,
-      offeredIds: (result.picks || []).map(p => p.event_id),
+      offeredIds: validPicks.map(p => p.event_id),
       pending: suggestedHood ? {
         neighborhood: suggestedHood,
         filters: activeFilters,

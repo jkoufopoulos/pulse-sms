@@ -2,6 +2,24 @@
 
 Pulse is an SMS-based AI assistant that recommends NYC nightlife and events. Text a neighborhood and get curated picks via Twilio, powered by Claude.
 
+## Roadmap Maintenance
+
+`ROADMAP.md` is the single source of truth for architecture decisions, open bugs, and planned work. **Update it as part of completing work, not as a separate step.**
+
+When to update:
+- **Bug fix or feature lands** — mark the relevant migration step or open issue as done; add to "Completed Work" with date
+- **Architecture decision made** — log it in "Decisions Made" with rationale; if it changes a principle, update the principle
+- **Bug discovered** — add to "Open Issues" with root cause, regression principle, and fix strategy
+- **Approach attempted and reverted** — document what was tried, why it was reverted, and what the principled fix is
+- **Regression eval results change** — update the relevant principle's pass rate
+
+When NOT to update:
+- Exploratory research that doesn't change the plan
+- Minor code changes that don't affect architecture (typo fixes, log messages)
+- Work in progress — only update when something is actually done or decided
+
+The roadmap has 7 architecture principles (P1-P7). New code changes should be evaluated against these. If a fix violates a principle, flag it rather than shipping it silently.
+
 ## What It Does
 
 Pulse turns a simple text message into a curated night out. A user texts a neighborhood name — "Bushwick", "LES", "prospect park" — and gets back 1-3 opinionated event picks formatted for SMS (under 480 characters). They can reply a number for details, "more" for additional picks, "free" for free events, or refine with follow-ups like "how about comedy" or "later tonight." The entire experience happens in a single SMS thread with no app install, no account, and no links until the user asks for them.
