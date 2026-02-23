@@ -211,6 +211,18 @@ Users saying "forget the comedy" or "show me everything" should clear filters. T
 
 ## Completed Work
 
+### Referral Card & Acquisition Loop (2026-02-22)
+
+- **Referral codes** (`src/referral.js`) — 8-char alphanumeric codes per phone+event pair, 7-day expiry, dedup, first-touch attribution. Persistence: `data/referrals.json` with hashed phone keys, debounced disk writes, 30-min cleanup interval.
+- **Event card pages** (`src/card.js`) — Server-side rendered HTML at `/e/:eventId?ref=CODE` with OG meta tags for iMessage/WhatsApp link previews. Dark theme matching `site/index.html`. Platform-aware `sms:` URI (iOS `&body=` vs Android `?body=`). Stale card fallback when event not in cache.
+- **Details flow wired** — `handleDetails` generates referral code and Pulse URL, passes to both `composeDetails` and fallback `formatEventDetails`. Only single-pick details get referral URLs (not multi-event summaries).
+- **Referral intake** — Pre-router detects `ref:CODE` prefix (tight regex: 6-12 alphanumeric). Handler looks up code, records attribution, seeds preference profile with cold-start signal, sends onboarding SMS. Expired/invalid codes get generic onboarding. Zero AI cost.
+- **P1 compliant** — All state deterministic. No LLM call in referral flow.
+- **P4 compliant** — Referral path saves via `saveResponseFrame`.
+- `getEventById(id)` added to `events.js` — linear scan of cache, sub-millisecond.
+- `formatEventDetails` and `composeDetails` accept `{ pulseUrl }` option — backward-compatible signature change.
+- `PULSE_CARD_DOMAIN` env var — configurable domain for card URLs, defaults to Railway URL.
+
 ### User Preference Profile (2026-02-22)
 
 - `src/preference-profile.js` — silent background signal capture across sessions
@@ -367,6 +379,7 @@ Users saying "forget the comedy" or "show me everything" should clear filters. T
 
 - PostgreSQL — Persistent event storage, user sessions, conversation history
 - Preference learning — Profile capture done; next: inject profile into compose prompt for personalized picks
+- Referral analytics — Dashboard for referral code generation, card views, and conversion rates
 - Paid tier — Stripe billing, $5-10/month unlimited
 - Push notifications — "Free rooftop thing near you starting in 30 min"
 - Multi-city — Same architecture, different sources

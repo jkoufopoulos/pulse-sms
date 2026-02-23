@@ -60,7 +60,7 @@ function cleanUrl(url) {
   } catch { return url; }
 }
 
-function formatEventDetails(event) {
+function formatEventDetails(event, { pulseUrl } = {}) {
   const venue = event.venue_name && event.venue_name !== 'TBA' ? event.venue_name : null;
 
   // Dedupe: skip "at Venue" if event name already contains venue
@@ -95,16 +95,20 @@ function formatEventDetails(event) {
   else if (event.price_display) detail += `\n${event.price_display}`;
 
   if (event.venue_address) detail += `\n${event.venue_address}`;
-  // URL: prefer ticket_url > source_url, but never search pages. Fallback to Google Maps.
-  const directUrl = [event.ticket_url, event.source_url].find(u => u && !isSearchUrl(u));
-  if (directUrl) {
-    detail += `\n${cleanUrl(directUrl)}`;
+  // URL: use pulseUrl override if provided, otherwise ticket_url > source_url > Google Maps
+  if (pulseUrl) {
+    detail += `\n${pulseUrl}`;
   } else {
-    // Google Maps fallback
-    const venueName = event.venue_name || event.name || '';
-    const hood = event.neighborhood || '';
-    if (venueName) {
-      detail += `\nhttps://www.google.com/maps/search/${encodeURIComponent(`${venueName} ${hood} NYC`.trim())}`;
+    const directUrl = [event.ticket_url, event.source_url].find(u => u && !isSearchUrl(u));
+    if (directUrl) {
+      detail += `\n${cleanUrl(directUrl)}`;
+    } else {
+      // Google Maps fallback
+      const venueName = event.venue_name || event.name || '';
+      const hood = event.neighborhood || '';
+      if (venueName) {
+        detail += `\nhttps://www.google.com/maps/search/${encodeURIComponent(`${venueName} ${hood} NYC`.trim())}`;
+      }
     }
   }
 

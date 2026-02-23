@@ -154,6 +154,8 @@ All paths are relative to `src/` unless prefixed with a directory.
 | `geo.js` | `resolveNeighborhood`, proximity ranking, haversine, time filtering |
 | `neighborhoods.js` | 36 NYC neighborhoods with coords, aliases, landmarks, subway stops |
 | `preference-profile.js` | Per-user preference profiles — silent cross-session signal capture (neighborhoods, categories, price/time preferences). Fire-and-forget `updateProfile` after `saveResponseFrame`. Persistence: `data/profiles.json` with hashed phone keys and debounced disk writes. Helpers: `deriveFiltersFromProfile`, `getTopNeighborhood`, `getTopCategories`, `getOptInEligibleUsers` |
+| `referral.js` | Referral code store — generates 8-char codes per phone+event, deduplicates, expires after 7 days. `generateReferralCode`, `lookupReferralCode`, `recordAttribution`. Persistence: `data/referrals.json` with hashed phone keys and debounced disk writes. 30-min cleanup interval |
+| `card.js` | Event card HTML renderer — server-side rendered pages with OG meta tags for link previews in iMessage/WhatsApp. `renderEventCard` (full event card with CTA), `renderStaleCard` (expired event fallback). Platform-aware `sms:` URI for iOS vs Android |
 
 **Output:**
 
@@ -256,6 +258,7 @@ Optional:
 - `RESEND_API_KEY` — Resend API key for email alerts (optional; alerts no-op if unset)
 - `ALERT_EMAIL` — Alert recipient email address
 - `PULSE_NO_RATE_LIMIT=true` — Disable test endpoint rate limiting (30 req/hr/IP default)
+- `PULSE_CARD_DOMAIN` — Base URL for event card pages (default: Railway URL). Used in referral URLs: `$PULSE_CARD_DOMAIN/e/:eventId?ref=CODE`
 
 ## Running Locally
 

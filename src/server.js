@@ -4,8 +4,10 @@ const express = require('express');
 const helmet = require('helmet');
 const smsRoutes = require('./handler');
 const { clearSmsIntervals } = require('./handler');
-const { refreshCache, getCacheStatus, getHealthStatus, isCacheFresh, scheduleDailyScrape, clearSchedule } = require('./events');
+const { refreshCache, getCacheStatus, getHealthStatus, getEventById, isCacheFresh, scheduleDailyScrape, clearSchedule } = require('./events');
 const { loadProfiles } = require('./preference-profile');
+const { loadReferrals, clearReferralInterval } = require('./referral');
+const { renderEventCard, renderStaleCard } = require('./card');
 
 // Validate required env vars — exit if critical ones are missing
 const required = ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER', 'ANTHROPIC_API_KEY', 'TAVILY_API_KEY'];
@@ -66,6 +68,20 @@ app.get('/events', (req, res) => {
 app.get('/api/events', (req, res) => {
   const { getRawCache } = require('./events');
   res.json(getRawCache());
+});
+
+// Event card page — shareable Pulse URLs with OG meta tags
+app.get('/e/:eventId', (req, res) => {
+  const pulsePhone = process.env.TWILIO_PHONE_NUMBER || '+18337857300';
+  const domain = process.env.PULSE_CARD_DOMAIN || `${req.protocol}://${req.get('host')}`;
+  const formattedPhone = pulsePhone.replace(/\D/g, '').replace(/^1(\d{3})(\d{3})(\d{4})$/, '($1) $2-$3');
+  const event = getEventById(req.params.eventId);
+  if (event) {
+    const refCode = req.query.ref || null;
+    res.send(renderEventCard(event, formattedPhone, pulsePhone, domain, refCode));
+  } else {
+    res.send(renderStaleCard(formattedPhone, pulsePhone));
+  }
 });
 
 // SMS simulator UI + Eval dashboard (test mode only)
@@ -255,6 +271,7 @@ if (process.env.PULSE_TEST_MODE === 'true') {
 const server = app.listen(PORT, () => {
   console.log(`Pulse listening on port ${PORT}`);
   loadProfiles();
+  loadReferrals();
 
   // Scrape on startup only if no fresh persisted cache — saves time and tokens on restarts
   if (isCacheFresh()) {
@@ -270,6 +287,7 @@ function shutdown(signal) {
   console.log(`${signal} received, shutting down gracefully...`);
   clearSchedule();
   clearSmsIntervals();
+  clearReferralInterval();
   server.close(() => {
     console.log('Server closed');
     process.exit(0);

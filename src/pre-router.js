@@ -33,6 +33,12 @@ function preRoute(message, session) {
   const lower = msg.toLowerCase();
   const base = { filters: { free_only: false, category: null, subcategory: null, vibe: null, time_after: null }, event_reference: null, reply: null, confidence: 1.0 };
 
+  // Referral code intake
+  const refMatch = msg.match(/^ref:([a-zA-Z0-9_-]{6,12})$/i);
+  if (refMatch) {
+    return { ...base, intent: 'referral', neighborhood: null, referralCode: refMatch[1] };
+  }
+
   // Help
   if (/^(help|\?)$/i.test(msg)) {
     return { ...base, intent: 'help', neighborhood: null };

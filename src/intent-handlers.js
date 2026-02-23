@@ -8,6 +8,7 @@ const { getPerennialPicks, toEventObjects } = require('./perennial');
 const { validatePerennialActivity } = require('./curation');
 const { resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
+const { generateReferralCode } = require('./referral');
 
 // --- Send compose result (picks only, no link messages) ---
 // Links are sent only when the user requests details (texts a number).
@@ -88,9 +89,14 @@ async function handleDetails(ctx) {
     const pick = picks[pickIndex];
     const event = ctx.session.lastEvents[pick.event_id];
     if (event) {
+      // Generate referral code and Pulse URL for shareable details
+      const refCode = generateReferralCode(ctx.phone, event.id);
+      const domain = process.env.PULSE_CARD_DOMAIN || 'https://web-production-c8fdb.up.railway.app';
+      const pulseUrl = `${domain}/e/${event.id}?ref=${refCode}`;
+
       try {
         const composeStart = Date.now();
-        const result = await composeDetails(event, pick.why);
+        const result = await composeDetails(event, pick.why, { pulseUrl });
         ctx.trace.composition.latency_ms = Date.now() - composeStart;
         ctx.trace.composition.raw_response = result._raw || null;
         ctx.trackAICost?.(result._usage);
@@ -101,7 +107,7 @@ async function handleDetails(ctx) {
         return;
       } catch (err) {
         console.error('composeDetails error, falling back:', err.message);
-        const sms = formatEventDetails(event);
+        const sms = formatEventDetails(event, { pulseUrl });
         await sendSMS(ctx.phone, sms);
         ctx.finalizeTrace(sms, 'details');
         return;

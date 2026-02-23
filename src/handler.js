@@ -8,7 +8,8 @@ const { getSession, setSession, clearSession, addToHistory, clearSessionInterval
 const { preRoute, getAdjacentNeighborhoods } = require('./pre-router');
 const { handleHelp, handleConversational, handleDetails, handleMore } = require('./intent-handlers');
 const { sendRuntimeAlert } = require('./alerts');
-const { getEvents } = require('./events');
+const { getEvents, getEventById } = require('./events');
+const { lookupReferralCode, recordAttribution } = require('./referral');
 const { filterKidsEvents, validatePerennialActivity } = require('./curation');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
 const { applyFilters, buildEventMap, saveResponseFrame, mergeFilters, buildTaggedPool } = require('./pipeline');
@@ -328,6 +329,30 @@ async function handleMessageAI(phone, message) {
     // Clear pending state on any pre-routed intent
     if (session?.pendingNearby) {
       setSession(phone, { pendingNearby: null, pendingFilters: null, pendingMessage: null });
+    }
+
+    if (route.intent === 'referral') {
+      const referral = lookupReferralCode(route.referralCode);
+      if (referral) {
+        recordAttribution(phone, route.referralCode);
+        const referredEvent = getEventById(referral.eventId);
+        updateProfile(phone, {
+          neighborhood: referredEvent?.neighborhood || null,
+          filters: referredEvent?.category ? { category: referredEvent.category } : {},
+          responseType: 'referral',
+        }).catch(err => console.error('profile update failed:', err.message));
+        const sms = referredEvent?.neighborhood
+          ? `Hey! Text me a neighborhood and I'll find tonight's best events. Try "${referredEvent.neighborhood}" to get started!`
+          : "Hey! I'm Pulse — text me a NYC neighborhood and I'll find tonight's best events.";
+        saveResponseFrame(phone, { picks: [], eventMap: {}, neighborhood: null, filters: null, offeredIds: [] });
+        await sendSMS(phone, sms);
+        finalizeTrace(sms, 'referral');
+        return;
+      }
+      const sms = "Hey! I'm Pulse — text me a NYC neighborhood and I'll find tonight's best events.";
+      await sendSMS(phone, sms);
+      finalizeTrace(sms, 'referral_expired');
+      return;
     }
 
     if (route.intent === 'help') return handleHelp(ctx);

@@ -606,4 +606,8 @@ function isCacheFresh() {
   return eventCache.length > 0 && cacheTimestamp > 0 && (Date.now() - cacheTimestamp) < STALE_THRESHOLD_MS;
 }
 
-module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, getEvents, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs };
+function getEventById(id) {
+  return eventCache.find(e => e.id === id) || null;
+}
+
+module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, getEvents, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs };
