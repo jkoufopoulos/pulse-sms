@@ -12,6 +12,7 @@
  *   node scripts/run-scenario-evals.js --difficulty must_pass     # Filter by difficulty tier
  *   node scripts/run-scenario-evals.js --name "quiet"             # Name match
  *   node scripts/run-scenario-evals.js --url http://...           # Custom server
+ *   node scripts/run-scenario-evals.js --concurrency 15          # Parallel scenarios (default: 10)
  */
 
 require('dotenv').config();
@@ -30,7 +31,10 @@ const difficultyFilter = args.find(a => a.startsWith('--difficulty='))?.split('=
 const BASE = args.find(a => a.startsWith('--url='))?.split('=')[1]
   || (args.includes('--url') ? args[args.indexOf('--url') + 1] : null)
   || 'http://localhost:3000';
-const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-sonnet-4-5-20250929';
+const CONCURRENCY = parseInt(args.find(a => a.startsWith('--concurrency='))?.split('=')[1]
+  || (args.includes('--concurrency') ? args[args.indexOf('--concurrency') + 1] : null)
+  || '10', 10);
+const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-haiku-4-5-20251001';
 
 const client = new Anthropic();
 
@@ -227,12 +231,13 @@ async function main() {
     process.exit(0);
   }
 
-  console.log(`Running ${scenarios.length} multi-turn scenarios against ${BASE}\n`);
+  console.log(`Running ${scenarios.length} multi-turn scenarios against ${BASE} (concurrency: ${CONCURRENCY})\n`);
 
   const report = {
     timestamp: new Date().toISOString(),
     base_url: BASE,
     judge_model: JUDGE_MODEL,
+    concurrency: CONCURRENCY,
     total: scenarios.length,
     passed: 0,
     failed: 0,
@@ -240,98 +245,105 @@ async function main() {
     scenarios: [],
   };
 
-  for (let i = 0; i < scenarios.length; i++) {
-    const scenario = scenarios[i];
-    // Use hash of scenario name for unique phone — avoids collisions when filtering by --name
+  // Run a single scenario and return result object
+  async function runOne(scenario, index) {
     const nameHash = scenario.name.split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0) >>> 0;
     const phoneNumber = `+1555${String(nameHash % 10000000).padStart(7, '0')}`;
     const userTurnCount = scenario.turns.filter(t => t.sender === 'user').length;
 
-    process.stdout.write(`[${i + 1}/${scenarios.length}] ${scenario.name} (${userTurnCount} user turns)... `);
-
     try {
-      // Step 1: Play through the conversation
       const actualConversation = await runScenario(scenario, phoneNumber);
-
-      // Step 2: Check deterministic assertions
       const assertions = checkAssertions(scenario, actualConversation);
 
-      // If any assertion failed, fail immediately without calling judge
       if (assertions.passed === false) {
-        report.failed++;
-        console.log('\x1b[31mFAIL\x1b[0m (assertion)');
-        for (const r of assertions.results.filter(r => !r.passed)) {
-          const truncExpected = r.expected.length > 60 ? r.expected.slice(0, 60) + '...' : r.expected;
-          const truncActual = r.actual ? (r.actual.length > 60 ? r.actual.slice(0, 60) + '...' : r.actual) : '[missing]';
-          console.log(`  Turn ${r.turn}: expected ${r.assert_type} ${JSON.stringify(truncExpected)} got ${JSON.stringify(truncActual)}`);
-        }
-        report.scenarios.push({
-          name: scenario.name,
-          category: scenario.category,
-          difficulty: scenario.difficulty,
-          pass: false,
-          user_turns: userTurnCount,
-          actual_conversation: actualConversation,
-          assertions: assertions.results,
-          judgment: null,
-        });
-        continue;
+        return {
+          index, name: scenario.name, category: scenario.category,
+          difficulty: scenario.difficulty, pass: false, user_turns: userTurnCount,
+          actual_conversation: actualConversation, assertions: assertions.results, judgment: null,
+        };
       }
 
-      // Step 3: If all pulse turns are asserted and all passed, skip judge
       let judgment = null;
       if (assertions.allAsserted) {
         judgment = { overall_pass: true, overall_note: 'All assertions passed (deterministic)', turns: [], failure_modes_triggered: [] };
       } else {
         judgment = await judgeSenario(scenario, actualConversation);
-        if (!judgment) {
-          throw new Error('Judge returned unparseable response');
-        }
+        if (!judgment) throw new Error('Judge returned unparseable response');
       }
 
-      const passed = judgment.overall_pass;
-      const triggeredFailures = judgment.failure_modes_triggered || [];
-
-      if (passed) {
-        report.passed++;
-        const tag = assertions.allAsserted ? '\x1b[32mPASS\x1b[0m (deterministic)' : '\x1b[32mPASS\x1b[0m';
-        console.log(tag);
-      } else {
-        report.failed++;
-        console.log(`\x1b[31mFAIL\x1b[0m  ${judgment.overall_note}`);
-        if (triggeredFailures.length > 0) {
-          console.log(`       Failure modes: ${triggeredFailures.join(', ')}`);
-        }
-      }
-
-      report.scenarios.push({
-        name: scenario.name,
-        category: scenario.category,
-        difficulty: scenario.difficulty,
-        pass: passed,
-        user_turns: userTurnCount,
-        actual_conversation: actualConversation,
+      return {
+        index, name: scenario.name, category: scenario.category,
+        difficulty: scenario.difficulty, pass: judgment.overall_pass,
+        user_turns: userTurnCount, actual_conversation: actualConversation,
         assertions: assertions.results.length > 0 ? assertions.results : undefined,
         judgment,
-      });
-
+      };
     } catch (err) {
-      report.errors++;
-      console.log(`\x1b[33mERROR\x1b[0m  ${err.message}`);
-      report.scenarios.push({
-        name: scenario.name,
-        category: scenario.category,
-        difficulty: scenario.difficulty,
-        pass: false,
-        error: err.message,
-      });
+      return {
+        index, name: scenario.name, category: scenario.category,
+        difficulty: scenario.difficulty, pass: false, error: err.message,
+      };
     }
   }
 
+  // Concurrency-limited parallel execution
+  let completed = 0;
+  const startTime = Date.now();
+  const results = new Array(scenarios.length);
+
+  async function worker(taskQueue) {
+    while (taskQueue.length > 0) {
+      const { scenario, index } = taskQueue.shift();
+      const result = await runOne(scenario, index);
+      results[index] = result;
+      completed++;
+
+      // Print result as it completes
+      const pct = ((completed / scenarios.length) * 100).toFixed(0);
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
+      const prefix = `[${completed}/${scenarios.length} ${pct}% ${elapsed}s]`;
+
+      if (result.error) {
+        console.log(`${prefix} \x1b[33mERROR\x1b[0m  ${result.name}: ${result.error}`);
+      } else if (!result.pass && !result.judgment) {
+        console.log(`${prefix} \x1b[31mFAIL\x1b[0m  ${result.name} (assertion)`);
+        for (const r of (result.assertions || []).filter(r => !r.passed)) {
+          const truncExpected = r.expected.length > 60 ? r.expected.slice(0, 60) + '...' : r.expected;
+          const truncActual = r.actual ? (r.actual.length > 60 ? r.actual.slice(0, 60) + '...' : r.actual) : '[missing]';
+          console.log(`  Turn ${r.turn}: expected ${r.assert_type} ${JSON.stringify(truncExpected)} got ${JSON.stringify(truncActual)}`);
+        }
+      } else if (result.pass) {
+        const det = result.judgment?.overall_note?.includes('deterministic') ? ' (deterministic)' : '';
+        console.log(`${prefix} \x1b[32mPASS\x1b[0m  ${result.name}${det}`);
+      } else {
+        console.log(`${prefix} \x1b[31mFAIL\x1b[0m  ${result.name}: ${result.judgment?.overall_note || 'no detail'}`);
+        const triggered = result.judgment?.failure_modes_triggered || [];
+        if (triggered.length > 0) {
+          console.log(`       Failure modes: ${triggered.join(', ')}`);
+        }
+      }
+    }
+  }
+
+  // Build task queue and launch workers
+  const taskQueue = scenarios.map((scenario, index) => ({ scenario, index }));
+  const workers = Array.from({ length: Math.min(CONCURRENCY, scenarios.length) }, () => worker(taskQueue));
+  await Promise.all(workers);
+
+  // Collect results into report (in original order)
+  for (const r of results) {
+    if (r.error) report.errors++;
+    else if (r.pass) report.passed++;
+    else report.failed++;
+    report.scenarios.push(r);
+  }
+
   // Summary
+  const totalElapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`\n${'='.repeat(60)}`);
   console.log(`TOTAL: ${report.total}  PASS: ${report.passed}  FAIL: ${report.failed}  ERROR: ${report.errors}`);
   console.log(`Pass rate: ${((report.passed / report.total) * 100).toFixed(1)}%`);
+  console.log(`Time: ${totalElapsed}s (concurrency: ${CONCURRENCY})`);
   console.log(`${'='.repeat(60)}`);
 
   // Difficulty tier breakdown

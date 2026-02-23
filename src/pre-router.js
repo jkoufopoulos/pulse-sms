@@ -29,7 +29,8 @@ function getAdjacentNeighborhoods(hood, count = 3) {
 // All semantic understanding (neighborhoods, categories, time, vibes, free,
 // nudge accepts, boroughs, off-topic) goes through the unified LLM call.
 function preRoute(message, session) {
-  const msg = message.trim().replace(/(?<=\S)[!?.]+$/, '');
+  const trimmed = message.trim();
+  const msg = /^[!?.]+$/.test(trimmed) ? trimmed : trimmed.replace(/(?<=\S)[!?.]+$/, '');
   const lower = msg.toLowerCase();
   const base = { filters: { free_only: false, category: null, subcategory: null, vibe: null, time_after: null }, event_reference: null, reply: null, confidence: 1.0 };
 
@@ -86,7 +87,8 @@ function preRoute(message, session) {
   }
 
   // Casual acknowledgments (session-aware — only when picks are loaded)
-  if (/^(k|ok|cool|bet|word|aight|ight|gotcha|copy)$/i.test(msg)) {
+  // Skip when pendingNearby is set — "bet"/"ok" are nudge accepts, let unified handle them
+  if (/^(k|ok|cool|bet|word|aight|ight|gotcha|copy)$/i.test(msg) && !session?.pendingNearby) {
     if (session?.lastPicks?.length > 0) {
       return { ...base, intent: 'conversational', neighborhood: null, reply: `Your ${session.lastNeighborhood || ''} picks are above — reply a number for details, MORE for extra picks, or try a different neighborhood.` };
     }
