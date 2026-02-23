@@ -7,10 +7,11 @@
  * against expected_behavior and failure_modes.
  *
  * Usage:
- *   node scripts/run-scenario-evals.js                        # Run all
- *   node scripts/run-scenario-evals.js --category happy_path  # Filter
- *   node scripts/run-scenario-evals.js --name "quiet"         # Name match
- *   node scripts/run-scenario-evals.js --url http://...       # Custom server
+ *   node scripts/run-scenario-evals.js                            # Run all
+ *   node scripts/run-scenario-evals.js --category happy_path      # Filter by category
+ *   node scripts/run-scenario-evals.js --difficulty must_pass     # Filter by difficulty tier
+ *   node scripts/run-scenario-evals.js --name "quiet"             # Name match
+ *   node scripts/run-scenario-evals.js --url http://...           # Custom server
  */
 
 require('dotenv').config();
@@ -24,6 +25,8 @@ const categoryFilter = args.find(a => a.startsWith('--category='))?.split('=')[1
   || (args.includes('--category') ? args[args.indexOf('--category') + 1] : null);
 const nameFilter = args.find(a => a.startsWith('--name='))?.split('=')[1]
   || (args.includes('--name') ? args[args.indexOf('--name') + 1] : null);
+const difficultyFilter = args.find(a => a.startsWith('--difficulty='))?.split('=')[1]
+  || (args.includes('--difficulty') ? args[args.indexOf('--difficulty') + 1] : null);
 const BASE = args.find(a => a.startsWith('--url='))?.split('=')[1]
   || (args.includes('--url') ? args[args.indexOf('--url') + 1] : null)
   || 'http://localhost:3000';
@@ -105,6 +108,48 @@ Grade each user turn's response and give an overall verdict.`;
   return null;
 }
 
+/**
+ * Check deterministic assertions on pulse turns.
+ * Returns { passed, allAsserted, results[] }.
+ * - allAsserted: true if every pulse turn has an assertion (can skip judge)
+ * - results: per-turn assertion details for reporting
+ */
+function checkAssertions(scenario, actualConversation) {
+  const expectedPulseTurns = scenario.turns.filter(t => t.sender === 'pulse');
+  const actualPulseTurns = actualConversation.filter(t => t.sender === 'pulse');
+  const results = [];
+  let allPassed = true;
+  let assertedCount = 0;
+
+  for (let i = 0; i < expectedPulseTurns.length; i++) {
+    const expected = expectedPulseTurns[i];
+    if (!expected.assert) continue;
+
+    assertedCount++;
+    const actual = actualPulseTurns[i];
+    if (!actual) {
+      results.push({ turn: i + 1, assert_type: expected.assert, expected: expected.message, actual: null, passed: false });
+      allPassed = false;
+      continue;
+    }
+
+    let passed;
+    if (expected.assert === 'exact') {
+      passed = actual.message === expected.message;
+    } else if (expected.assert === 'contains') {
+      passed = actual.message.includes(expected.message);
+    } else {
+      passed = false;
+    }
+
+    results.push({ turn: i + 1, assert_type: expected.assert, expected: expected.message, actual: actual.message, passed });
+    if (!passed) allPassed = false;
+  }
+
+  const allAsserted = assertedCount > 0 && assertedCount === expectedPulseTurns.length;
+  return { passed: assertedCount === 0 ? null : allPassed, allAsserted, results };
+}
+
 async function runScenario(scenario, phoneNumber) {
   // Clear session
   await fetch(`${BASE}/api/eval/session`, {
@@ -168,6 +213,10 @@ async function main() {
     scenarios = scenarios.filter(s => s.name.toLowerCase().includes(lower));
     console.log(`Filtered to ${scenarios.length} scenarios matching "${nameFilter}"`);
   }
+  if (difficultyFilter) {
+    scenarios = scenarios.filter(s => s.difficulty === difficultyFilter);
+    console.log(`Filtered to ${scenarios.length} scenarios with difficulty "${difficultyFilter}"`);
+  }
 
   if (scenarios.length === 0) {
     console.log('No scenarios to run.');
@@ -200,11 +249,40 @@ async function main() {
       // Step 1: Play through the conversation
       const actualConversation = await runScenario(scenario, phoneNumber);
 
-      // Step 2: Judge the conversation
-      const judgment = await judgeSenario(scenario, actualConversation);
+      // Step 2: Check deterministic assertions
+      const assertions = checkAssertions(scenario, actualConversation);
 
-      if (!judgment) {
-        throw new Error('Judge returned unparseable response');
+      // If any assertion failed, fail immediately without calling judge
+      if (assertions.passed === false) {
+        report.failed++;
+        console.log('\x1b[31mFAIL\x1b[0m (assertion)');
+        for (const r of assertions.results.filter(r => !r.passed)) {
+          const truncExpected = r.expected.length > 60 ? r.expected.slice(0, 60) + '...' : r.expected;
+          const truncActual = r.actual ? (r.actual.length > 60 ? r.actual.slice(0, 60) + '...' : r.actual) : '[missing]';
+          console.log(`  Turn ${r.turn}: expected ${r.assert_type} ${JSON.stringify(truncExpected)} got ${JSON.stringify(truncActual)}`);
+        }
+        report.scenarios.push({
+          name: scenario.name,
+          category: scenario.category,
+          difficulty: scenario.difficulty,
+          pass: false,
+          user_turns: userTurnCount,
+          actual_conversation: actualConversation,
+          assertions: assertions.results,
+          judgment: null,
+        });
+        continue;
+      }
+
+      // Step 3: If all pulse turns are asserted and all passed, skip judge
+      let judgment = null;
+      if (assertions.allAsserted) {
+        judgment = { overall_pass: true, overall_note: 'All assertions passed (deterministic)', turns: [], failure_modes_triggered: [] };
+      } else {
+        judgment = await judgeSenario(scenario, actualConversation);
+        if (!judgment) {
+          throw new Error('Judge returned unparseable response');
+        }
       }
 
       const passed = judgment.overall_pass;
@@ -212,7 +290,8 @@ async function main() {
 
       if (passed) {
         report.passed++;
-        console.log('\x1b[32mPASS\x1b[0m');
+        const tag = assertions.allAsserted ? '\x1b[32mPASS\x1b[0m (deterministic)' : '\x1b[32mPASS\x1b[0m';
+        console.log(tag);
       } else {
         report.failed++;
         console.log(`\x1b[31mFAIL\x1b[0m  ${judgment.overall_note}`);
@@ -224,9 +303,11 @@ async function main() {
       report.scenarios.push({
         name: scenario.name,
         category: scenario.category,
+        difficulty: scenario.difficulty,
         pass: passed,
         user_turns: userTurnCount,
         actual_conversation: actualConversation,
+        assertions: assertions.results.length > 0 ? assertions.results : undefined,
         judgment,
       });
 
@@ -236,6 +317,7 @@ async function main() {
       report.scenarios.push({
         name: scenario.name,
         category: scenario.category,
+        difficulty: scenario.difficulty,
         pass: false,
         error: err.message,
       });
@@ -247,6 +329,27 @@ async function main() {
   console.log(`TOTAL: ${report.total}  PASS: ${report.passed}  FAIL: ${report.failed}  ERROR: ${report.errors}`);
   console.log(`Pass rate: ${((report.passed / report.total) * 100).toFixed(1)}%`);
   console.log(`${'='.repeat(60)}`);
+
+  // Difficulty tier breakdown
+  const byDifficulty = {};
+  for (const s of report.scenarios) {
+    const diff = s.difficulty || 'unknown';
+    if (!byDifficulty[diff]) byDifficulty[diff] = { pass: 0, fail: 0, error: 0 };
+    if (s.error) byDifficulty[diff].error++;
+    else if (s.pass) byDifficulty[diff].pass++;
+    else byDifficulty[diff].fail++;
+  }
+  const tierOrder = ['must_pass', 'should_pass', 'stretch'];
+  console.log('\nBy difficulty:');
+  for (const tier of tierOrder) {
+    const counts = byDifficulty[tier];
+    if (!counts) continue;
+    const total = counts.pass + counts.fail + counts.error;
+    const pct = total > 0 ? ((counts.pass / total) * 100).toFixed(0) : '0';
+    const allPass = counts.pass === total;
+    const icon = allPass ? ' \u2713' : '';
+    console.log(`  ${tier}: ${counts.pass}/${total} passed (${pct}%)${icon}`);
+  }
 
   // Category breakdown
   const byCategory = {};

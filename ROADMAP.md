@@ -401,6 +401,27 @@ Users saying "forget the comedy" or "show me everything" should clear filters. T
 
 ---
 
+## Eval Suite Improvement
+
+5-phase plan to make the eval suite reliable, grounded, and cost-efficient.
+
+| Phase | What | Status |
+|-------|------|--------|
+| 1 | **Pin deterministic paths** — exact/contains assertions for pre-router responses, difficulty tiers (`must_pass`/`should_pass`/`stretch`), assertion-based eval skips LLM judge for fully-asserted scenarios | **Done** (2026-02-23) |
+| 2 | **Generate grounded scenarios** — play user-turn outlines through live server, capture real outputs as expected pulse turns | Planned |
+| 3 | **Rebalance distribution** — target 50% happy path, 20% filter drift, 15% temporal/compound, 15% edge case | Planned |
+| 4 | **Difficulty tiers in practice** — `must_pass` failures block deploys, `should_pass` tracked as regression metric | Planned |
+| 5 | **Stability baseline** — `--repeat N` flag, per-scenario variance measurement, noise floor identification | Planned |
+
+**Phase 1 details (done):**
+- 70 scenarios assigned difficulty tiers: 5 `must_pass`, 33 `should_pass`, 32 `stretch`
+- 8 pulse turns pinned with assertions (5 `exact`, 3 `contains`) across 7 scenarios
+- Eval runner checks assertions before LLM judge — assertion failures reported with expected vs actual
+- `--difficulty` filter flag: `node scripts/run-scenario-evals.js --difficulty must_pass`
+- Difficulty tier breakdown in summary output
+
+---
+
 ## Not Building
 
 - Happy hours / venue busyness / bar discovery — different product
