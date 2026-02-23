@@ -162,8 +162,9 @@ if (process.env.PULSE_TEST_MODE === 'true') {
   });
 
   // API: trace endpoints
-  const { getRecentTraces, getTraceById, annotateTrace, loadTraces } = require('./traces');
+  const { getRecentTraces, getTraceById, annotateTrace, loadTraces, startConversationCapture } = require('./traces');
   loadTraces(); // Load existing traces from disk at startup
+  startConversationCapture(); // Thread traces into conversations for golden dataset
 
   app.get('/api/eval/traces', (req, res) => {
     const limit = parseInt(req.query.limit) || 100;
@@ -304,6 +305,8 @@ function shutdown(signal) {
   clearSchedule();
   clearSmsIntervals();
   clearReferralInterval();
+  // Flush captured conversations before exit
+  try { require('./traces').stopConversationCapture(); } catch {}
   server.close(() => {
     console.log('Server closed');
     process.exit(0);

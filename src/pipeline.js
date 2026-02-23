@@ -137,6 +137,9 @@ function eventMatchesFilters(event, filters) {
   if (filters.free_only && !event.is_free) return false;
   if (filters.category && event.category !== filters.category) return false;
   // vibe has no event field to match — LLM handles vibe selection
+  // If time filter active but event has no parseable time, downgrade to soft —
+  // we don't know if it matches, so [SOFT] lets the LLM deprioritize vs confirmed-late events
+  if (filters.time_after && (!event.start_time_local || !/T\d{2}:/.test(event.start_time_local))) return 'soft';
   // Determine hard vs soft: if subcategory is set, the category is a broad match
   // and the LLM should use judgment to find events matching the sub-genre
   if (filters.subcategory) return 'soft';

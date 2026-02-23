@@ -11,8 +11,11 @@ const path = require('path');
 const crypto = require('crypto');
 
 const TRACES_DIR = path.join(__dirname, '..', 'data', 'traces');
+const CONVERSATIONS_DIR = path.join(__dirname, '..', 'data', 'conversations');
 const RING_BUFFER_SIZE = 200;
 const MAX_TRACE_FILES = 4;
+const CONVERSATION_IDLE_MS = 10 * 60 * 1000; // 10 minutes
+const CONVERSATION_CHECK_MS = 5 * 60 * 1000; // check every 5 minutes
 
 // In-memory ring buffer for fast access
 const traceBuffer = [];
@@ -72,6 +75,9 @@ function saveTrace(trace) {
   } catch (err) {
     console.error('Failed to save trace:', err.message);
   }
+
+  // Thread into conversation (test mode only)
+  recordConversationTurn(trace);
 }
 
 /**
@@ -192,4 +198,119 @@ function getTraceById(traceId) {
   return traceBuffer.find(t => t.id === traceId) || null;
 }
 
-module.exports = { startTrace, saveTrace, loadTraces, annotateTrace, getRecentTraces, getTraceById };
+// --- Conversation capture (test mode only) ---
+
+const conversations = new Map(); // phone_masked → { turns, lastActivity, startedAt }
+let conversationFlushInterval = null;
+
+/**
+ * Record a conversation turn from a completed trace.
+ * Only active in PULSE_TEST_MODE.
+ */
+function recordConversationTurn(trace) {
+  if (process.env.PULSE_TEST_MODE !== 'true') return;
+
+  const key = trace.phone_masked;
+  if (!key) return;
+
+  let conv = conversations.get(key);
+  if (!conv) {
+    conv = { turns: [], lastActivity: 0, startedAt: trace.timestamp };
+    conversations.set(key, conv);
+  }
+
+  conv.turns.push({
+    sender: 'user',
+    message: trace.input_message,
+    timestamp: trace.timestamp
+  });
+
+  if (trace.output_sms) {
+    conv.turns.push({
+      sender: 'pulse',
+      message: trace.output_sms,
+      timestamp: trace.timestamp,
+      _meta: {
+        intent: trace.output_intent,
+        neighborhood: trace.routing?.resolved_neighborhood || trace.routing?.result?.neighborhood,
+        pre_routed: trace.routing?.pre_routed,
+        latency_ms: trace.total_latency_ms
+      }
+    });
+  }
+
+  conv.lastActivity = Date.now();
+}
+
+/**
+ * Flush a single conversation to disk.
+ */
+function flushConversation(key, conv) {
+  try {
+    if (!fs.existsSync(CONVERSATIONS_DIR)) {
+      fs.mkdirSync(CONVERSATIONS_DIR, { recursive: true });
+    }
+    const d = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+    const filepath = path.join(CONVERSATIONS_DIR, `conversations-${d}.jsonl`);
+    const record = {
+      phone_masked: key,
+      started_at: conv.startedAt,
+      ended_at: conv.turns[conv.turns.length - 1]?.timestamp || conv.startedAt,
+      turn_count: conv.turns.length,
+      turns: conv.turns
+    };
+    fs.appendFileSync(filepath, JSON.stringify(record) + '\n');
+  } catch (err) {
+    console.error('Failed to flush conversation:', err.message);
+  }
+}
+
+/**
+ * Flush idle conversations (no activity for CONVERSATION_IDLE_MS).
+ */
+function flushIdleConversations() {
+  const now = Date.now();
+  for (const [key, conv] of conversations) {
+    if (now - conv.lastActivity >= CONVERSATION_IDLE_MS) {
+      flushConversation(key, conv);
+      conversations.delete(key);
+    }
+  }
+}
+
+/**
+ * Flush all active conversations to disk (called on shutdown).
+ */
+function flushAllConversations() {
+  for (const [key, conv] of conversations) {
+    flushConversation(key, conv);
+  }
+  conversations.clear();
+}
+
+/**
+ * Start the idle-flush interval timer. Call once at startup (test mode only).
+ */
+function startConversationCapture() {
+  if (process.env.PULSE_TEST_MODE !== 'true') return;
+  if (conversationFlushInterval) return;
+  conversationFlushInterval = setInterval(flushIdleConversations, CONVERSATION_CHECK_MS);
+  conversationFlushInterval.unref(); // don't prevent process exit
+  console.log('Conversation capture active (test mode)');
+}
+
+/**
+ * Stop the idle-flush interval and flush remaining conversations.
+ */
+function stopConversationCapture() {
+  if (conversationFlushInterval) {
+    clearInterval(conversationFlushInterval);
+    conversationFlushInterval = null;
+  }
+  flushAllConversations();
+}
+
+module.exports = {
+  startTrace, saveTrace, loadTraces, annotateTrace, getRecentTraces, getTraceById,
+  recordConversationTurn, startConversationCapture, stopConversationCapture
+};

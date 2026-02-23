@@ -29,7 +29,7 @@ function getAdjacentNeighborhoods(hood, count = 3) {
 // All semantic understanding (neighborhoods, categories, time, vibes, free,
 // nudge accepts, boroughs, off-topic) goes through the unified LLM call.
 function preRoute(message, session) {
-  const msg = message.trim();
+  const msg = message.trim().replace(/(?<=\S)[!?.]+$/, '');
   const lower = msg.toLowerCase();
   const base = { filters: { free_only: false, category: null, subcategory: null, vibe: null, time_after: null }, event_reference: null, reply: null, confidence: 1.0 };
 
@@ -85,6 +85,14 @@ function preRoute(message, session) {
     return { ...base, intent: 'conversational', neighborhood: null, reply: "Later! Hit me up whenever." };
   }
 
+  // Casual acknowledgments (session-aware — only when picks are loaded)
+  if (/^(k|ok|cool|bet|word|aight|ight|gotcha|copy)$/i.test(msg)) {
+    if (session?.lastPicks?.length > 0) {
+      return { ...base, intent: 'conversational', neighborhood: null, reply: `Your ${session.lastNeighborhood || ''} picks are above — reply a number for details, MORE for extra picks, or try a different neighborhood.` };
+    }
+    return { ...base, intent: 'conversational', neighborhood: null, reply: "Hey! Text me a neighborhood and I'll find you something good tonight." };
+  }
+
   // Impatient follow-up
   if (/^(hello\?+|hey\?+|\?\?+|yo\?+|you there\??|helloooo+|hellooo+)$/i.test(msg)) {
     if (session?.lastPicks?.length > 0) {
@@ -95,7 +103,7 @@ function preRoute(message, session) {
 
   // Explicit filter clearing — requires active filters in session
   if (session?.lastFilters && Object.values(session.lastFilters).some(Boolean)) {
-    if (/^(show me everything|all events|no filter|drop the filter|clear filters?|forget the .+|never mind the .+|just regular stuff|everything|show all)$/i.test(msg)) {
+    if (/^(show me everything|all events|no filter|drop the filter|clear filters?|forget the .+|never mind the .+|just regular stuff|everything|show all|nvm|forget it|nah forget it|drop it)$/i.test(msg)) {
       return { ...base, intent: 'clear_filters', neighborhood: session.lastNeighborhood };
     }
   }
