@@ -95,6 +95,10 @@ Daily scrape (10am ET)              Incoming SMS
                               │
                        twilio.js (send SMS)            ~$0.008
 
+──── background ────
+preference-profile.js — fire-and-forget user signal capture
+  (neighborhoods, categories, price/time prefs → data/profiles.json)
+
 ──── observability ────
 traces.js — per-request JSONL + 200-trace ring buffer
 alerts.js — email alerts via Resend (health + runtime)
@@ -149,6 +153,7 @@ All paths are relative to `src/` unless prefixed with a directory.
 | `venues.js` | Shared venue coord map, auto-learning from sources, Nominatim geocoding fallback, persistence (export/import learned venues) |
 | `geo.js` | `resolveNeighborhood`, proximity ranking, haversine, time filtering |
 | `neighborhoods.js` | 36 NYC neighborhoods with coords, aliases, landmarks, subway stops |
+| `preference-profile.js` | Per-user preference profiles — silent cross-session signal capture (neighborhoods, categories, price/time preferences). Fire-and-forget `updateProfile` after `saveResponseFrame`. Persistence: `data/profiles.json` with hashed phone keys and debounced disk writes. Helpers: `deriveFiltersFromProfile`, `getTopNeighborhood`, `getTopCategories`, `getOptInEligibleUsers` |
 
 **Output:**
 
