@@ -161,7 +161,7 @@ All paths are relative to `src/` unless prefixed with a directory.
 
 | File | Purpose |
 |------|---------|
-| `formatters.js` | SMS formatting — `formatTime`, `cleanUrl`, `formatEventDetails` (480-char cap) |
+| `formatters.js` | SMS formatting — `formatTime`, `cleanUrl`, `formatEventDetails` (480-char cap), `isSearchUrl` (filters search/directory URLs from direct venue links) |
 | `twilio.js` | `sendSMS` with timeout, test capture mode for simulator |
 
 **Observability:**
