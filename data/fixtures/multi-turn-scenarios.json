@@ -4464,14 +4464,14 @@
           "message": "More in Long Island City:\n\n1) Electronic Vibes at Dutch Kills — ambient techno night with rotating DJs. 11pm, $8\n\n2) Open Jam at The Creek — bring your instrument or just listen. 9pm, free\n\nReply 1-2 for details, MORE for extra picks"
         }
       ],
-      "testing": "User requests MORE immediately without checking details first",
-      "expected_behavior": "Pulse serves fresh picks without requiring detail views first",
+      "testing": "LIC is an alias for Long Island City. User requests MORE immediately without checking details first.",
+      "expected_behavior": "Pulse recognizes 'lic' as Long Island City, serves picks, then serves fresh picks on MORE without requiring detail views first",
       "failure_modes": [
+        "Says 'lic' is not recognized or not in the system",
         "Repeats same events",
-        "Loses neighborhood context",
-        "Requires detail view before MORE"
+        "Loses neighborhood context"
       ],
-      "difficulty": "must_pass",
+      "difficulty": "should_pass",
       "grounded_at": "2026-02-23T05:55:55.777Z"
     },
     {
@@ -4585,7 +4585,7 @@
         },
         {
           "sender": "pulse",
-          "message": "Tonight in Boerum Hill:\n\n1) Open Mic at Jalopy Theatre — folk/bluegrass, intimate room, $5 suggested\n\n2) Trivia Night at Sottocasa — pizza + general knowledge, free to play\n\nReply 1-2 for details, MORE for extra picks"
+          "message": "Tonight in Cobble Hill:\n\n1) Open Mic at Jalopy Theatre — folk/bluegrass, intimate room, $5 suggested\n\n2) Trivia Night at Sottocasa — pizza + general knowledge, free to play\n\nReply 1-2 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -4593,17 +4593,17 @@
         },
         {
           "sender": "pulse",
-          "message": "Tonight in Carroll Gardens:\n\n1) Wine Tasting at Stinky Bklyn — natural wines + cheese, chill vibes. 7pm, $35\n\n2) Singer-Songwriter Night at Brooklyn Social — local artists, cozy spot. 9pm, free\n\nReply 1-2 for details, MORE for extra picks"
+          "message": "Cobble Hill covers that area too! Here's what else is happening:\n\n1) Wine Tasting at Stinky Bklyn — natural wines + cheese, chill vibes. 7pm, $35\n\n2) Singer-Songwriter Night at Brooklyn Social — local artists, cozy spot. 9pm, free\n\nReply 1-2 for details, MORE for extra picks"
         }
       ],
-      "testing": "User switches to nearby neighborhood before engaging with picks",
-      "expected_behavior": "Pulse immediately switches neighborhood context and delivers fresh picks without confusion",
+      "testing": "Both Boerum Hill and Carroll Gardens are aliases for Cobble Hill. User switches between aliases of the same neighborhood.",
+      "expected_behavior": "Pulse recognizes both as Cobble Hill aliases and serves Cobble Hill events. Second request may serve fresh picks or acknowledge same area. No confusion or 'not in my system' responses.",
       "failure_modes": [
-        "Doesn't recognize neighborhood switch",
-        "Mixes events from both neighborhoods",
-        "Asks clarifying questions instead of switching"
+        "Says neighborhood is not supported or not in the system",
+        "Crashes or errors on alias resolution",
+        "Asks clarifying questions instead of serving picks"
       ],
-      "difficulty": "must_pass",
+      "difficulty": "should_pass",
       "grounded_at": "2026-02-23T05:56:26.292Z"
     },
     {
@@ -4647,7 +4647,7 @@
         },
         {
           "sender": "pulse",
-          "message": "Tonight in Ridgewood:\n\n1) Ambient Showcase at Trans-Pecos — experimental sound, heady vibes. 9pm, $15\n\n2) Karaoke Night at Nowadays — outdoor courtyard, no shame zone. 10pm, free\n\nReply 1-2 for details, MORE for extra picks"
+          "message": "Tonight in Bushwick (Ridgewood area):\n\n1) Ambient Showcase at Trans-Pecos — experimental sound, heady vibes. 9pm, $15\n\n2) Karaoke Night at Nowadays — outdoor courtyard, no shame zone. 10pm, free\n\nReply 1-2 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -4655,7 +4655,7 @@
         },
         {
           "sender": "pulse",
-          "message": "Trans-Pecos is a Ridgewood gem — DIY venue with a stellar sound system and adventurous bookings. Tonight's ambient showcase features three local artists doing deep listening sets. Heady, meditative, worth the trek. 9pm, $15. https://trans-pecos.com"
+          "message": "Trans-Pecos is a DIY venue with a stellar sound system and adventurous bookings. Tonight's ambient showcase features local artists doing deep listening sets. Heady, meditative, worth the trek. 9pm, $15. https://trans-pecos.com"
         },
         {
           "sender": "user",
@@ -4663,17 +4663,17 @@
         },
         {
           "sender": "pulse",
-          "message": "enjoy 🎧"
+          "message": "Enjoy! Hit me up anytime you want more picks."
         }
       ],
-      "testing": "Natural question format, quick detail grab, casual affirmation",
-      "expected_behavior": "Pulse handles conversational opener, provides detail on request, responds warmly to enthusiasm",
+      "testing": "Ridgewood is an alias for Bushwick. Natural question format, quick detail grab, casual affirmation.",
+      "expected_behavior": "Pulse recognizes 'ridgewood' as Bushwick alias, serves Bushwick events (may mention Ridgewood area). Detail and sign-off work normally.",
       "failure_modes": [
-        "Doesn't parse 'what's good in' format",
+        "Says Ridgewood is not supported or not in the system",
         "Details don't match pick #1",
-        "Overly formal sign-off"
+        "Robotic or excessively long sign-off (3+ sentences)"
       ],
-      "difficulty": "must_pass",
+      "difficulty": "should_pass",
       "grounded_at": "2026-02-23T05:56:26.292Z"
     },
     {

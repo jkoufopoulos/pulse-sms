@@ -305,6 +305,19 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
   }
   trace.routing.resolved_neighborhood = hood;
 
+  // Detect if user used an alias (e.g. "ridgewood" → Bushwick, "lic" → Long Island City)
+  // so the LLM knows the resolution is correct and doesn't say "not in my system"
+  let userHoodAlias = null;
+  if (extracted && hood && !message.toLowerCase().includes(hood.toLowerCase())) {
+    // Find which alias actually matched
+    const hoodData = NEIGHBORHOODS[hood];
+    if (hoodData) {
+      const msgLower = message.toLowerCase();
+      const matched = hoodData.aliases.find(a => a !== hood.toLowerCase() && msgLower.includes(a));
+      userHoodAlias = matched || message.trim();
+    }
+  }
+
   // Resolve active filters: merge persisted filters with newly detected ones
   const activeFilters = mergeFilters(
     session?.lastFilters,
@@ -354,14 +367,14 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
   const prevOfferedIds = session?.allOfferedIds || [];
   const excludeIds = [...new Set([...prevPickIds, ...prevOfferedIds])];
 
-  return { hood, activeFilters, events, curated, taggedPerennials, matchCount, hardCount, softCount, isSparse, nearbyHoods, suggestedHood, excludeIds, now };
+  return { hood, activeFilters, events, curated, taggedPerennials, matchCount, hardCount, softCount, isSparse, nearbyHoods, suggestedHood, excludeIds, now, userHoodAlias };
 }
 
 /**
  * Call unifiedRespond and capture trace/cost data.
  */
 async function callUnified(message, unifiedCtx, session, history, phone, trace) {
-  const { hood, events, nearbyHoods, now, activeFilters, isSparse, matchCount, hardCount, softCount, excludeIds, suggestedHood } = unifiedCtx;
+  const { hood, events, nearbyHoods, now, activeFilters, isSparse, matchCount, hardCount, softCount, excludeIds, suggestedHood, userHoodAlias } = unifiedCtx;
 
   const composeStart = Date.now();
   const result = await unifiedRespond(message, {
@@ -379,6 +392,7 @@ async function callUnified(message, unifiedCtx, session, history, phone, trace) 
     softCount,
     excludeIds,
     suggestedNeighborhood: suggestedHood,
+    userHoodAlias,
   });
   trace.routing.latency_ms = Date.now() - composeStart; // unified call replaces both route + compose
   trace.composition.latency_ms = trace.routing.latency_ms;

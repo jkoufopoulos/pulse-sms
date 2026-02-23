@@ -520,7 +520,7 @@ Write the details text. Include this URL: ${bestUrl}`;
  *
  * Returns { type, sms_text, picks, clear_filters }
  */
-async function unifiedRespond(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime, validNeighborhoods, activeFilters, isSparse, matchCount, hardCount, softCount, excludeIds, suggestedNeighborhood } = {}) {
+async function unifiedRespond(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime, validNeighborhoods, activeFilters, isSparse, matchCount, hardCount, softCount, excludeIds, suggestedNeighborhood, userHoodAlias } = {}) {
   const now = currentTime || new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   const todayNyc = getNycDateString(0);
@@ -592,10 +592,11 @@ async function unifiedRespond(message, { session, events, neighborhood, nearbyHo
     ? `\nEXCLUDED (already shown to user — do NOT pick these): ${excludeIds.join(', ')}`
     : '';
 
+  const aliasNote = userHoodAlias ? ` (user said "${userHoodAlias}" — this is a known alias for ${neighborhood}, serve events normally)` : '';
   const userPrompt = `Current time (NYC): ${now}
 <user_message>${message}</user_message>
 Session context: ${sessionContext}
-Neighborhood: ${neighborhood || 'not specified'}
+Neighborhood: ${neighborhood || 'not specified'}${aliasNote}
 ${historyBlock}${nearbyBlock}${validNeighborhoodsBlock}${filterContextBlock}${excludeNote}
 ${eventListStr ? `EVENT_LIST (${events.length} events):\n${eventListStr}` : 'No events available for this area.'}
 
