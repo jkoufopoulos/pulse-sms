@@ -517,7 +517,11 @@ When you have events to recommend:
 PICK PRIORITY ORDER:
 1. Tonight first: "TODAY" events beat tomorrow events. A decent tonight event beats a great tomorrow event.
 2. Source tier: prefer unstructured/primary over secondary.
-3. Neighborhood match: strongly prefer events in the user's requested neighborhood. If NONE match, acknowledge this upfront.
+3. Neighborhood match: strongly prefer events in the user's requested neighborhood.
+   Events tagged [NEARBY] are from an adjacent neighborhood — still good, but label them.
+   If you pick a [NEARBY] event, mention its actual neighborhood — e.g. "Over in NoHo:" or "(nearby in NoHo)".
+   NEVER present a [NEARBY] event as if it's in the requested neighborhood.
+   If ALL events are [NEARBY], lead with "Not much in [hood] tonight, but nearby:" before listing.
 4. Curation taste: prefer gallery openings, DJ nights at small venues, indie concerts, comedy shows, themed pop-ups, unique one-offs. Avoid corporate events, hotel bars, tourist traps, chain venues.
 5. Only include a tomorrow event if there are genuinely fewer than 2 good tonight options.
 

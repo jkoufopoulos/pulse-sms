@@ -179,7 +179,8 @@ async function composeResponse(message, events, neighborhood, filters, { exclude
   const eventListStr = events.map(e => {
     const eventDate = getEventDate(e);
     const dayLabel = eventDate === todayNyc ? 'TODAY' : eventDate === tomorrowNyc ? 'TOMORROW' : eventDate;
-    return JSON.stringify({
+    const nearbyTag = (neighborhood && e.neighborhood && e.neighborhood !== neighborhood) ? '[NEARBY] ' : '';
+    return nearbyTag + JSON.stringify({
       id: e.id,
       name: e.name && e.name.length > 80 ? e.name.slice(0, 77) + '...' : e.name,
       venue_name: e.venue_name,
@@ -549,7 +550,8 @@ async function unifiedRespond(message, { session, events, neighborhood, nearbyHo
       const tag = e.filter_match === 'hard' ? '[MATCH] '
                 : e.filter_match === 'soft' ? '[SOFT] '
                 : '';
-      return tag + JSON.stringify({
+      const nearbyTag = (neighborhood && e.neighborhood && e.neighborhood !== neighborhood) ? '[NEARBY] ' : '';
+      return tag + nearbyTag + JSON.stringify({
         id: e.id,
         name: e.name && e.name.length > 80 ? e.name.slice(0, 77) + '...' : e.name,
         venue_name: e.venue_name,
