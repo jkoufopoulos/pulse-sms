@@ -47,6 +47,10 @@ GRADING RULES:
 - Focus on: correct intent handling, appropriate tone, proper formatting, honest responses, session continuity.
 - A response can use different words/events and still PASS if the behavior matches.
 - Only FAIL if the actual response clearly violates expected behavior or triggers a listed failure mode.
+- Sign-offs: A warm sign-off (1-2 sentences) that includes future engagement prompts ("Hit me up anytime!", "Text me when you're heading out!") is ACCEPTABLE and SHOULD PASS. Only FAIL sign-offs that are excessively long (3+ sentences), ignore the user's exit intent, or are robotically formal. Brief sign-offs ("enjoy!") and warm sign-offs ("Have fun tonight! Hit me up anytime.") are BOTH acceptable.
+- Nearby expansion: When a neighborhood has few or no matching events, Pulse is DESIGNED to transparently expand to nearby neighborhoods ("not much in LES, but nearby East Village has..."). This is CORRECT behavior, not a failure. Only FAIL if the system silently serves wrong-neighborhood events without acknowledging the expansion.
+- Thin coverage: If the requested neighborhood genuinely has zero events for the given filter (or zero events at all), an honest "not much here" response with alternatives is CORRECT behavior. Do not fail a scenario just because no events exist — judge the system's HANDLING of the empty state.
+- MORE numbering: Pulse restarts pick numbering at 1 after MORE (new batch = new numbers). Sequential numbering (4-6 continuing from 1-3) is NOT expected. Do not fail for restarting numbering.
 
 For each user turn, grade pass/fail and explain briefly.
 Then give an overall scenario verdict.

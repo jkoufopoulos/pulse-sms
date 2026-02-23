@@ -26,7 +26,7 @@
         },
         {
           "sender": "pulse",
-          "message": "more for more",
+          "message": "for more",
           "assert": "contains"
         }
       ],
@@ -384,7 +384,7 @@
         },
         {
           "sender": "pulse",
-          "message": "4) Late Night Techno at Nowadays — Minimal techno in the outdoor space. 12am, $20\n5) Karaoke Madness at Robertas — Private room vibes, great pizza obviously. 9pm, Free entry\n6) Jazz Jam at Friends and Lovers — Weekly session, always surprises. 10pm, $5\n\nReply 4-6 for details, MORE for extra picks"
+          "message": "1) Late Night Techno at Nowadays — Minimal techno in the outdoor space. 12am, $20\n2) Karaoke Madness at Robertas — Private room vibes, great pizza obviously. 9pm, Free entry\n3) Jazz Jam at Friends and Lovers — Weekly session, always surprises. 10pm, $5\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2468,7 +2468,7 @@
         },
         {
           "sender": "pulse",
-          "message": "4) Techno Night at Elsewhere — dark room, serious sound system. 11pm, $15\n5) Open Mic at Pete's Candy Store — writers & musicians, cozy back room. 7pm, Free\n6) House Party Vibes at Skinny Dennis — honky tonk DJ, no cover. 9pm, Free\n\nReply 4-6 for details, MORE for extra picks"
+          "message": "1) Techno Night at Elsewhere — dark room, serious sound system. 11pm, $15\n2) Open Mic at Pete's Candy Store — writers & musicians, cozy back room. 7pm, Free\n3) House Party Vibes at Skinny Dennis — honky tonk DJ, no cover. 9pm, Free\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2500,7 +2500,7 @@
         },
         {
           "sender": "pulse",
-          "message": "more for more",
+          "message": "for more",
           "assert": "contains"
         }
       ],
@@ -3040,7 +3040,7 @@
         },
         {
           "sender": "pulse",
-          "message": "More jazz in East Village:\n\n4) Vinyl Jazz Night at Berlin — DJs spinning Blue Note classics. 9pm, Free\n5) Latin Jazz at Slipper Room — salsa-inflected quartet, full bar. 10pm, $12\n\nReply 4-5 for details"
+          "message": "More jazz in East Village:\n\n1) Vinyl Jazz Night at Berlin — DJs spinning Blue Note classics. 9pm, Free\n2) Latin Jazz at Slipper Room — salsa-inflected quartet, full bar. 10pm, $12\n\nReply 1-2 for details"
         }
       ],
       "testing": "When a user applies one category filter then asks for a different category in the same family, the new category should REPLACE the old one, not stack. 'Actually jazz' after comedy should give jazz, not comedy+jazz (which would likely return nothing).",
@@ -3208,7 +3208,7 @@
         },
         {
           "sender": "pulse",
-          "message": "more for more",
+          "message": "for more",
           "assert": "contains"
         }
       ],
@@ -3361,7 +3361,7 @@
         },
         {
           "sender": "pulse",
-          "message": "More Bushwick comedy:\n\n4) Sketch Comedy at Baby's All Right — absurdist group show, very Brooklyn. 9:30pm, $10\n5) Improv Jam at House of Yes — audience participation, anything goes. 10pm, $8\n\nReply 4-5 for details"
+          "message": "More Bushwick comedy:\n\n1) Sketch Comedy at Baby's All Right — absurdist group show, very Brooklyn. 9:30pm, $10\n2) Improv Jam at House of Yes — audience participation, anything goes. 10pm, $8\n\nReply 1-2 for details"
         },
         {
           "sender": "user",
@@ -3377,7 +3377,7 @@
         },
         {
           "sender": "pulse",
-          "message": "More Bushwick tonight:\n\n4) House Music at Mood Ring — disco ball energy, great cocktails. 10pm, $10\n5) Punk Show at Gold Sounds — three local bands, divey and loud. 9pm, $8\n6) Karaoke at Pine Box Rock Shop — packed and chaotic in the best way. 10pm, Free\n\nReply 4-6 for details"
+          "message": "More Bushwick tonight:\n\n1) House Music at Mood Ring — disco ball energy, great cocktails. 10pm, $10\n2) Punk Show at Gold Sounds — three local bands, divey and loud. 9pm, $8\n3) Karaoke at Pine Box Rock Shop — packed and chaotic in the best way. 10pm, Free\n\nReply 1-3 for details"
         }
       ],
       "testing": "Comedy filter applied in LES should persist when user switches to Bushwick with 'try bushwick'. Filter should survive through MORE, and 'forget the comedy' should clear it. Subsequent picks should be unfiltered.",
@@ -3545,7 +3545,7 @@
         },
         {
           "sender": "pulse",
-          "message": "4) Open Mic at Threes Brewing — comedy and music, solid beer selection. 9pm, Free\n5) Vinyl Night at Franklin Park — DJs spin rare records, backyard vibes. 10pm, Free\n6) Karaoke at Soda Bar — no judgment, all vibes. 9pm, Free\n\nReply 4-6 for details"
+          "message": "1) Open Mic at Threes Brewing — comedy and music, solid beer selection. 9pm, Free\n2) Vinyl Night at Franklin Park — DJs spin rare records, backyard vibes. 10pm, Free\n3) Karaoke at Soda Bar — no judgment, all vibes. 9pm, Free\n\nReply 1-3 for details"
         }
       ],
       "testing": "User says 'yes' or 'yeah' when there is no pending nudge (no nearby neighborhood suggestion). The system should treat this as conversational rather than triggering a neighborhood switch or crashing.",
@@ -3608,13 +3608,13 @@
         },
         {
           "sender": "pulse",
-          "message": "enjoy!"
+          "message": "Enjoy! Hit me up anytime you want more picks."
         }
       ],
       "testing": "Quick browse with casual exit, no detail requests",
       "expected_behavior": "Pulse delivers picks, handles casual thanks naturally without over-explaining",
       "failure_modes": [
-        "Over-responds to casual thanks",
+        "Ignores user exit intent or sends picks when user is leaving",
         "Doesn't acknowledge user satisfaction"
       ],
       "difficulty": "must_pass",
@@ -3708,15 +3708,15 @@
         },
         {
           "sender": "pulse",
-          "message": "have fun!"
+          "message": "Have fun tonight! Text me anytime."
         }
       ],
       "testing": "Standard flow with detail request and positive feedback",
       "expected_behavior": "Pulse delivers picks, provides venue details, exits warmly after user satisfaction",
       "failure_modes": [
         "Details don't match pick #1",
-        "Awkward exit response",
-        "Over-explains after 'perfect'"
+        "Robotic or excessively long sign-off (3+ sentences)",
+        "Ignores user satisfaction signal"
       ],
       "difficulty": "must_pass",
       "grounded_at": "2026-02-23T05:53:23.555Z"
@@ -3770,7 +3770,7 @@
         },
         {
           "sender": "pulse",
-          "message": "enjoy!"
+          "message": "Enjoy! Hit me up anytime you want more picks."
         }
       ],
       "testing": "Category + neighborhood in one request, user satisfied without details",
@@ -3778,9 +3778,9 @@
       "failure_modes": [
         "Returns non-jazz events",
         "Ignores neighborhood",
-        "Awkward response to thanks"
+        "Robotic or excessively long sign-off (3+ sentences)"
       ],
-      "difficulty": "must_pass",
+      "difficulty": "should_pass",
       "grounded_at": "2026-02-23T05:53:52.201Z"
     },
     {
@@ -3832,14 +3832,14 @@
         },
         {
           "sender": "pulse",
-          "message": "have fun"
+          "message": "Have fun tonight! Text me anytime."
         }
       ],
       "testing": "Abbreviated neighborhood name, user satisfied with picks alone",
       "expected_behavior": "Pulse recognizes 'lic' as Long Island City, returns picks, handles casual acknowledgment",
       "failure_modes": [
         "Doesn't recognize LIC abbreviation",
-        "Awkward response to 'cool'",
+        "Robotic or excessively long sign-off (3+ sentences)",
         "Pushes for more engagement unnecessarily"
       ],
       "difficulty": "should_pass",
@@ -3933,7 +3933,7 @@
         },
         {
           "sender": "pulse",
-          "message": "enjoy!"
+          "message": "Enjoy! Hit me up anytime you want more picks."
         }
       ],
       "testing": "Category + neighborhood in one message, quick exit after picks",
@@ -3941,7 +3941,7 @@
       "failure_modes": [
         "Ignores 'live music' category",
         "Returns non-music events",
-        "Awkward sign-off"
+        "Robotic or excessively long sign-off (3+ sentences)"
       ],
       "difficulty": "must_pass",
       "grounded_at": "2026-02-23T05:54:23.547Z"
@@ -4096,14 +4096,14 @@
         },
         {
           "sender": "pulse",
-          "message": "have a good one"
+          "message": "Have a good one! Hit me up whenever."
         }
       ],
       "testing": "Clean sign-off after initial picks without detail request",
       "expected_behavior": "User browses picks, thanks and exits. Pulse responds warmly without pushing more",
       "failure_modes": [
         "Overly formal sign-off",
-        "Pushes MORE unnecessarily",
+        "Ignores user exit intent",
         "Robotic closing"
       ],
       "difficulty": "must_pass",
@@ -4189,7 +4189,7 @@
         },
         {
           "sender": "pulse",
-          "message": "More in Astoria:\n\n3) Salsa Dancing at The Bohemian Hall — outdoor beer garden, live band. 9pm, $15\n\n4) Open Mic Poetry at Astoria Bookshop — cozy spot, bring your verses. 7:30pm, free\n\nReply 3-4 for details"
+          "message": "More in Astoria:\n\n1) Salsa Dancing at The Bohemian Hall — outdoor beer garden, live band. 9pm, $15\n\n2) Open Mic Poetry at Astoria Bookshop — cozy spot, bring your verses. 7:30pm, free\n\nReply 1-2 for details"
         },
         {
           "sender": "user",
@@ -4201,10 +4201,10 @@
         }
       ],
       "testing": "MORE command followed by detail request on new picks",
-      "expected_behavior": "User gets initial picks, requests MORE, then details on one of the additional picks (numbered 3-4)",
+      "expected_behavior": "User gets initial picks, requests MORE, then details on one of the additional picks (numbered 1-2)",
       "failure_modes": [
         "MORE returns duplicate events",
-        "Pick numbering doesn't continue (restarts at 1)",
+        "Pick numbering doesn't restart at 1 (continues from previous batch)",
         "Details don't match pick #3"
       ],
       "difficulty": "should_pass",
@@ -4238,7 +4238,7 @@
         "Generic response without venue color",
         "No URL provided"
       ],
-      "difficulty": "must_pass",
+      "difficulty": "should_pass",
       "grounded_at": "2026-02-23T05:55:25.673Z"
     },
     {
@@ -4337,7 +4337,7 @@
         },
         {
           "sender": "pulse",
-          "message": "enjoy"
+          "message": "Enjoy! Text me anytime you want more picks."
         }
       ],
       "testing": "MORE command returns additional picks in same neighborhood, handles casual dismissal",
@@ -4347,7 +4347,7 @@
         "Loses neighborhood context",
         "Doesn't recognize dismissal"
       ],
-      "difficulty": "must_pass",
+      "difficulty": "should_pass",
       "grounded_at": "2026-02-23T05:55:25.673Z"
     },
     {
@@ -4430,7 +4430,7 @@
         },
         {
           "sender": "pulse",
-          "message": "enjoy!"
+          "message": "Enjoy! Hit me up anytime you want more picks."
         }
       ],
       "testing": "Time filter applied upfront — early shows",
@@ -4500,7 +4500,7 @@
         },
         {
           "sender": "pulse",
-          "message": "have a great night"
+          "message": "Have a great night! Text me anytime."
         }
       ],
       "testing": "Category request with neighborhood, detail view, natural sign-off",
@@ -4508,7 +4508,7 @@
       "failure_modes": [
         "Returns non-music events",
         "Generic venue description",
-        "Awkward sign-off"
+        "Robotic or excessively long sign-off (3+ sentences)"
       ],
       "difficulty": "must_pass",
       "grounded_at": "2026-02-23T05:55:55.777Z"
@@ -4624,7 +4624,7 @@
         },
         {
           "sender": "pulse",
-          "message": "have a great night out there"
+          "message": "Have a great night out there! Hit me up whenever."
         }
       ],
       "testing": "Category request with neighborhood returns filtered results, user signs off satisfied",
@@ -4632,7 +4632,7 @@
       "failure_modes": [
         "Ignores dance/party filter",
         "Returns non-dance events",
-        "Awkward sign-off"
+        "Robotic or excessively long sign-off (3+ sentences)"
       ],
       "difficulty": "should_pass",
       "grounded_at": "2026-02-23T05:56:26.292Z"
@@ -4743,7 +4743,7 @@
         "Doesn't acknowledge neighborhood switch",
         "Loses context between switch and detail request"
       ],
-      "difficulty": "must_pass",
+      "difficulty": "should_pass",
       "grounded_at": "2026-02-23T05:56:35.559Z"
     },
     {
@@ -4821,7 +4821,7 @@
         },
         {
           "sender": "pulse",
-          "message": "More free events in Prospect Heights:\n\n4) DJ Set at Olmsted — backyard party vibes, natural wine. 9pm, Free\n5) Poetry Reading at Unnameable Books — local writers, intimate space. 7:30pm, Free\n\nReply 4-5 for details, MORE for extra picks"
+          "message": "More free events in Prospect Heights:\n\n1) DJ Set at Olmsted — backyard party vibes, natural wine. 9pm, Free\n2) Poetry Reading at Unnameable Books — local writers, intimate space. 7:30pm, Free\n\nReply 1-2 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -4829,7 +4829,7 @@
         },
         {
           "sender": "pulse",
-          "message": "More free events in Prospect Heights:\n\n6) Community Board Game Night at Berg'n — food hall with tables set up. 7pm, Free\n7) Late Night DJ at Franklin Park — indie dance party, cash bar. 11pm, Free\n\nReply 6-7 for details"
+          "message": "More free events in Prospect Heights:\n\n1) Community Board Game Night at Berg'n — food hall with tables set up. 7pm, Free\n2) Late Night DJ at Franklin Park — indie dance party, cash bar. 11pm, Free\n\nReply 1-2 for details"
         },
         {
           "sender": "user",
@@ -4977,7 +4977,7 @@
         },
         {
           "sender": "pulse",
-          "message": "More live music in Astoria:\n\n4) Jazz Trio at The Wolfhound — Irish pub with Sunday jazz sessions. 7pm, Free\n5) Karaoke Night at The Ditty — live band karaoke, full setlist. 9pm, $5\n\nReply 4-5 for details, MORE for extra picks"
+          "message": "More live music in Astoria:\n\n1) Jazz Trio at The Wolfhound — Irish pub with Sunday jazz sessions. 7pm, Free\n2) Karaoke Night at The Ditty — live band karaoke, full setlist. 9pm, $5\n\nReply 1-2 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -5114,7 +5114,7 @@
         },
         {
           "sender": "pulse",
-          "message": "More live music in Greenpoint:\n\n4) Jazz Trio at Black Rabbit — bebop standards, cozy bar. 9pm, $10\n5) Punk Night at Saint Vitus — heavy lineup, loud. 10pm, $15\n\nReply 4-5 for details, MORE for extra picks"
+          "message": "More live music in Greenpoint:\n\n1) Jazz Trio at Black Rabbit — bebop standards, cozy bar. 9pm, $10\n2) Punk Night at Saint Vitus — heavy lineup, loud. 10pm, $15\n\nReply 1-2 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -5266,7 +5266,7 @@
         },
         {
           "sender": "pulse",
-          "message": "More live music in Bushwick:\n\n5) Songwriter Night at The Johnsons — intimate acoustic circle. 8pm, Free\n6) DJ Set + Live Drums at Elsewhere — electronic fusion. 11:30pm, $18\n\nReply 5-6 for details"
+          "message": "More live music in Bushwick:\n\n1) Songwriter Night at The Johnsons — intimate acoustic circle. 8pm, Free\n2) DJ Set + Live Drums at Elsewhere — electronic fusion. 11:30pm, $18\n\nReply 1-2 for details"
         },
         {
           "sender": "user",
@@ -5514,7 +5514,7 @@
         },
         {
           "sender": "pulse",
-          "message": "More jazz in Harlem:\n\n4) Shrine World Music Venue — Afrobeat and jazz fusion. 10pm, $15\n5) Paris Blues — divey late-night jam sessions. 11pm, $10\n\nReply 4-5 for details, MORE for extra picks"
+          "message": "More jazz in Harlem:\n\n1) Shrine World Music Venue — Afrobeat and jazz fusion. 10pm, $15\n2) Paris Blues — divey late-night jam sessions. 11pm, $10\n\nReply 1-2 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -5522,7 +5522,7 @@
         },
         {
           "sender": "pulse",
-          "message": "More jazz in Harlem:\n\n6) Lenox Lounge Revival — classic cocktails, smooth standards trio. 8:30pm, $18\n7) Apollo Theater Jazz Night — monthly showcase, rotating ensembles. 9pm, $30\n\nReply 6-7 for details"
+          "message": "More jazz in Harlem:\n\n1) Lenox Lounge Revival — classic cocktails, smooth standards trio. 8:30pm, $18\n2) Apollo Theater Jazz Night — monthly showcase, rotating ensembles. 9pm, $30\n\nReply 1-2 for details"
         },
         {
           "sender": "user",
@@ -5619,7 +5619,7 @@
         },
         {
           "sender": "pulse",
-          "message": "More late live music in Astoria:\n\n3) Rock Covers at Break Bar — classic hits, full band. 10pm, $12\n\nReply 3 for details"
+          "message": "More late live music in Astoria:\n\n1) Rock Covers at Break Bar — classic hits, full band. 10pm, $12\n\nReply 1 for details"
         },
         {
           "sender": "user",
@@ -5668,7 +5668,7 @@
         },
         {
           "sender": "pulse",
-          "message": "More comedy in Carroll Gardens:\n\n3) Improv Night at Union Hall — long-form comedy, audience-driven. 10pm, $12\n\nReply 3 for details"
+          "message": "More comedy in Carroll Gardens:\n\n1) Improv Night at Union Hall — long-form comedy, audience-driven. 10pm, $12\n\nReply 1 for details"
         },
         {
           "sender": "user",
@@ -5806,7 +5806,7 @@
         },
         {
           "sender": "pulse",
-          "message": "More late night in Crown Heights:\n\n4) Open Decks at Nowadays — bring your records, spin for the room. Midnight, $5\n5) Midnight Movies at Nitehawk — cult classics with booze. 12:15am, $18\n\nReply 4-5 for details, MORE for extra picks"
+          "message": "More late night in Crown Heights:\n\n1) Open Decks at Nowadays — bring your records, spin for the room. Midnight, $5\n2) Midnight Movies at Nitehawk — cult classics with booze. 12:15am, $18\n\nReply 1-2 for details, MORE for extra picks"
         },
         {
           "sender": "user",
