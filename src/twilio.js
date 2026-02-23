@@ -28,8 +28,14 @@ async function sendSMS(to, body, { maxRetries = 2 } = {}) {
     return { sid: 'TEST_' + Date.now() };
   }
 
+  // Safety: never call Twilio in test mode — capture race conditions can leak real API calls
+  if (process.env.PULSE_TEST_MODE === 'true') {
+    console.warn(`[TEST] sendSMS called outside capture for ${maskPhone(to)} — skipping Twilio call`);
+    return { sid: 'SKIPPED_TEST_' + Date.now() };
+  }
+
   // Safety: if phone looks like a test phone but capture is disabled, log warning and short-circuit
-  if (/^\+1555\d{7}$/.test(to)) {
+  if (/^\+1(555\d{7}|0{9,})$/.test(to)) {
     console.warn(`[BUG] sendSMS called for test phone ${maskPhone(to)} without active capture — skipping Twilio call`);
     return { sid: 'SKIPPED_' + Date.now() };
   }
