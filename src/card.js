@@ -53,6 +53,35 @@ function buildDescription(event) {
 }
 
 /**
+ * Map source_name to a friendly display name for "View on ..." CTA.
+ */
+const SOURCE_DISPLAY = {
+  ra: 'RA',
+  dice: 'Dice',
+  eventbrite: 'Eventbrite',
+  songkick: 'Songkick',
+  brooklynvegan: 'BrooklynVegan',
+  ohmyrockness: 'Oh My Rockness',
+  donyc: 'DoNYC',
+  bam: 'BAM',
+  smallslive: 'SmallsLIVE',
+  nyc_parks: 'NYC Parks',
+  nypl: 'NYPL',
+  ticketmaster: 'Ticketmaster',
+  nonsensenyc: 'Nonsense NYC',
+  skint: 'The Skint',
+  yutori: 'Yutori',
+  tavily: 'the event page',
+};
+
+function getSourceLabel(event) {
+  if (event.source_name && SOURCE_DISPLAY[event.source_name]) {
+    return SOURCE_DISPLAY[event.source_name];
+  }
+  return 'the event page';
+}
+
+/**
  * Build platform-aware SMS URI.
  * iOS uses sms:number&body=text, Android uses sms:number?body=text.
  * We use a JS redirect to detect platform at render time.
@@ -70,6 +99,7 @@ function renderEventCard(event, formattedPhone, pulsePhone, domain, refCode) {
   const price = event.is_free ? 'Free' : (event.price_display || '');
   const detail = escapeHtml(event.description_short || event.short_detail || '');
   const ticketUrl = event.ticket_url || event.source_url || '';
+  const sourceLabel = escapeHtml(getSourceLabel(event));
   const sms = smsUri(pulsePhone, `ref:${refCode}`);
   const phoneFmt = formattedPhone;
 
@@ -175,29 +205,35 @@ function renderEventCard(event, formattedPhone, pulsePhone, domain, refCode) {
       cursor: pointer;
       transition: opacity 0.2s, transform 0.2s;
       box-shadow: 0 4px 20px rgba(255,107,66,0.2);
-      margin-bottom: 12px;
+      margin-bottom: 16px;
     }
     .cta-btn:hover { opacity: 0.92; transform: translateY(-1px); }
-    .cta-sub {
-      text-align: center;
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      margin-bottom: 28px;
-    }
     .divider {
       height: 1px;
       background: rgba(255,255,255,0.05);
-      margin-bottom: 20px;
+      margin: 28px 0 20px;
     }
-    .original-link {
-      display: block;
+    .pulse-promo {
       text-align: center;
+      padding: 0 8px;
+    }
+    .pulse-promo p {
       font-size: 0.82rem;
       color: var(--text-dim);
-      text-decoration: none;
-      padding: 8px;
+      margin-bottom: 12px;
+      line-height: 1.5;
     }
-    .original-link:hover { color: var(--text); }
+    .pulse-promo a {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--coral);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: opacity 0.2s;
+    }
+    .pulse-promo a:hover { opacity: 0.8; }
   </style>
 </head>
 <body>
@@ -211,20 +247,23 @@ function renderEventCard(event, formattedPhone, pulsePhone, domain, refCode) {
       ${hood ? `<span class="meta-tag">${hood}</span>` : ''}
     </div>
     ${detail ? `<p class="event-detail">${detail}</p>` : ''}
-    <a id="cta" class="cta-btn" href="sms:${escapeHtml(sms.phone)}?body=${sms.body}">Text Pulse for more picks</a>
-    <p class="cta-sub">Text ${escapeHtml(phoneFmt)} to discover NYC events</p>
-    ${ticketUrl ? `<div class="divider"></div><a class="original-link" href="${escapeHtml(ticketUrl)}">View original event page</a>` : ''}
+    ${ticketUrl ? `<a class="cta-btn" href="${escapeHtml(ticketUrl)}">View on ${sourceLabel}</a>` : ''}
+    <div class="divider"></div>
+    <div class="pulse-promo">
+      <p>Discover more events like this via text</p>
+      <a id="sms-link" href="sms:${escapeHtml(sms.phone)}?body=${sms.body}">Text Pulse &rarr;</a>
+    </div>
   </div>
   <script>
     // Platform-aware SMS URI: iOS needs &body=, Android needs ?body=
     (function() {
-      var cta = document.getElementById('cta');
-      if (!cta) return;
+      var link = document.getElementById('sms-link');
+      if (!link) return;
       var isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
       var phone = ${JSON.stringify(sms.phone)};
       var body = ${JSON.stringify(decodeURIComponent(sms.body))};
       var encoded = encodeURIComponent(body);
-      cta.href = isIOS
+      link.href = isIOS
         ? 'sms:' + phone + '&body=' + encoded
         : 'sms:' + phone + '?body=' + encoded;
     })();
