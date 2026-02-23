@@ -408,8 +408,7 @@ Users saying "forget the comedy" or "show me everything" should clear filters. T
 | Phase | What | Status |
 |-------|------|--------|
 | 1 | **Pin deterministic paths** — exact/contains assertions for pre-router responses, difficulty tiers (`must_pass`/`should_pass`/`stretch`), assertion-based eval skips LLM judge for fully-asserted scenarios | **Done** (2026-02-23) |
-| 2 | **Generate grounded scenarios** — play user-turn outlines through live server, capture real outputs as expected pulse turns | Planned |
-| 3 | **Rebalance distribution** — target 50% happy path, 20% filter drift, 15% temporal/compound, 15% edge case | Planned |
+| 2+3 | **Golden data + rebalance** — expand parenthetical placeholders into golden examples via Claude, generate new scenarios to rebalance distribution toward 50/20/15/15 target | **Done** (2026-02-23) |
 | 4 | **Difficulty tiers in practice** — `must_pass` failures block deploys, `should_pass` tracked as regression metric | Planned |
 | 5 | **Stability baseline** — `--repeat N` flag, per-scenario variance measurement, noise floor identification | Planned |
 
@@ -419,6 +418,13 @@ Users saying "forget the comedy" or "show me everything" should clear filters. T
 - Eval runner checks assertions before LLM judge — assertion failures reported with expected vs actual
 - `--difficulty` filter flag: `node scripts/run-scenario-evals.js --difficulty must_pass`
 - Difficulty tier breakdown in summary output
+
+**Phase 2+3 details (done):**
+- `scripts/ground-scenarios.js` — two modes: expand parentheticals, generate new scenarios
+- **Expand mode**: Uses Claude to write golden SMS responses for 106 parenthetical placeholder turns across 20 scenarios. Golden examples show ideal tone/structure/behavior for the LLM judge to compare against (events differ daily, judge grades behavior not content).
+- **Generate mode** (`--generate N`): Creates new scenarios for under-represented categories. Computes generation plan against target distribution (50% happy_path, 20% filter_drift, 15% edge_case, 15% poor_experience). Prior distribution was 17% happy / 44% edge / 26% poor / 6% filter_drift.
+- Flags: `--dry-run`, `--reground`, `--category`, `--name`, `--generate N`
+- Validates generated scenarios (480-char limit, no parentheticals, required fields)
 
 ---
 

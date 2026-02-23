@@ -376,7 +376,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(Bushwick picks)"
+          "message": "1) Noise Night at Mood Ring — Experimental electronic showcase with local DJs. 10pm, $10\n2) Open Mic Comedy at The Footlight — Solid local lineup, good crowd energy. 9pm, Free\n3) House Party Vibes at Lot 45 — Disco and funk night with DJ Rahaan. 11pm, $15\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -384,7 +384,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(more Bushwick picks — NOW more works)"
+          "message": "4) Late Night Techno at Nowadays — Minimal techno in the outdoor space. 12am, $20\n5) Karaoke Madness at Robertas — Private room vibes, great pizza obviously. 9pm, Free entry\n6) Jazz Jam at Friends and Lovers — Weekly session, always surprises. 10pm, $5\n\nReply 4-6 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -392,7 +392,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details on pick 1)"
+          "message": "💚 Mood Ring — Noise Night: Experimental electronic showcase featuring Bent Pyramid, M. Geddes Gengras, and surprise guests. Known for adventurous bookings and a welcoming crowd. 10pm, $10. https://moodring.nyc"
         },
         {
           "sender": "user",
@@ -400,7 +400,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(even more picks or exhaustion)"
+          "message": "You've seen most of what's happening in Bushwick tonight! Want to check nearby Ridgewood or East Williamsburg? Just text the neighborhood."
         }
       ],
       "testing": "User sends 'more' without a session, then establishes one and uses MORE normally",
@@ -411,7 +411,8 @@
         "Details request resets the MORE offset",
         "System confused by multiple MORE commands in one session"
       ],
-      "difficulty": "must_pass"
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:38:55.670Z"
     },
     {
       "name": "Edge case: unsupported — coney island",
@@ -641,7 +642,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(acknowledges wait, delivers EV picks)"
+          "message": "Sorry for the delay! Here's what's happening in East Village tonight:\n\n1) Synth Wave Party at Berlin — underground dance floor spinning 80s new wave and synth-pop. 10pm, $15\n2) Jazz Jam Session at Rue B — intimate spot, talented locals sit in all night. 9pm, $10\n3) Indie Rock Showcase at Mercury Lounge — three Brooklyn bands, headliner just got blog buzz. 8pm, $20\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -649,7 +650,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details on pick 2)"
+          "message": "Rue B — cozy bar with a legit jazz vibe, brick walls and dim lighting. Tonight's jam session starts at 9pm, house band backs visiting musicians until late. $10 cover, cash only. rueblowereastside.com"
         },
         {
           "sender": "user",
@@ -661,7 +662,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(comedy picks or acknowledgment of impatience)"
+          "message": "Got it — filtering for comedy now:\n\n1) Stand-Up Open Mic at The Creek — mix of new faces and local favorites testing material. 8pm, $5\n2) Sketch Comedy Troupe at Caveat — absurdist sketches from a group that's been selling out lately. 9:30pm, $18\n\nReply 1-2 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -669,7 +670,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details on comedy pick)"
+          "message": "Caveat — smart venue for comedy and storytelling on Clinton St. Tonight's sketch troupe does weird, clever stuff that actually lands. Show starts 9:30pm, bar opens at 8pm. $18 advance, $20 door. caveat.nyc"
         }
       ],
       "testing": "User double-texts impatiently twice in one session — system handles gracefully both times",
@@ -681,7 +682,8 @@
         "Details fail after double-text because session is confused",
         "Impatient follow-up treated as a new neighborhood query"
       ],
-      "difficulty": "should_pass"
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:39:06.450Z"
     },
     {
       "name": "Poor experience: very specific unmatched request",
@@ -2458,7 +2460,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(picks for Williamsburg)"
+          "message": "1) Vinyl Karaoke at Our Wicked Lady — indie rock singalongs on the roof. 9pm, $10\n2) Late Night Art Show at Baby's All Right — multimedia exhibit + DJ set. 10pm, Free\n3) Punk Bingo at Union Pool — exactly what it sounds like. 8pm, $5\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2466,7 +2468,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(more Williamsburg picks)"
+          "message": "4) Techno Night at Elsewhere — dark room, serious sound system. 11pm, $15\n5) Open Mic at Pete's Candy Store — writers & musicians, cozy back room. 7pm, Free\n6) House Party Vibes at Skinny Dennis — honky tonk DJ, no cover. 9pm, Free\n\nReply 4-6 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2474,7 +2476,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(comedy picks)"
+          "message": "1) Stand-Up Showcase at Union Hall — rotating comics, bocce in back. 8pm, $12\n2) Improv Jam at The Brick — audience suggestions get weird. 9pm, $8\n3) Comedy Open Mic at Muchmore's — hit or miss but always entertaining. 7:30pm, Free\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2482,7 +2484,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details on pick 1)"
+          "message": "🎤 Union Hall — 702 Union St, Park Slope\n\nStand-Up Showcase tonight at 8pm — rotating lineup of NYC comics, some you've seen on late night. Bocce courts in back if you want to play between sets.\n\n$12 at door\nhttps://unionhallny.com"
         },
         {
           "sender": "user",
@@ -2490,7 +2492,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(jazz picks)"
+          "message": "1) Jazz Jam Session at Smalls — real deal basement club, late night. 11pm, $20\n2) Latin Jazz at Zinc Bar — intimate West Village spot. 9pm, $15\n3) Free Jazz Monday at The Stone — experimental, not for everyone. 8pm, $25\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2510,7 +2512,8 @@
         "thanks!! not caught as sign-off",
         "System treats punctuation as part of the message content"
       ],
-      "difficulty": "must_pass"
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:39:19.657Z"
     },
     {
       "name": "Edge case: zero-event neighborhood — DUMBO nudge chain",
@@ -2522,7 +2525,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(no events or nudge to nearby neighborhood)"
+          "message": "Nothing happening in DUMBO tonight — pretty quiet over there. Want picks from Downtown Brooklyn instead? It's right next door and has some good stuff going on."
         },
         {
           "sender": "user",
@@ -2530,7 +2533,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(picks from nearby neighborhood)"
+          "message": "Here's what's happening in Downtown Brooklyn tonight:\n\n1) Vinyl Night at Barbès — DJs spinning rare soul and funk records. 9pm, $10\n2) Late Night Jazz at Brooklyn Music School — intimate showcase with local talent. 10pm, Free\n3) Karaoke Therapy at Slope Bar — private rooms, full bar, no judgment. 8pm, $15/person\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2538,7 +2541,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(more picks or exhaustion)"
+          "message": "That's everything I've got for Downtown Brooklyn tonight — it's a Tuesday so pickings are slim. Want to try Williamsburg or Park Slope? Both have more happening."
         },
         {
           "sender": "user",
@@ -2546,7 +2549,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(comedy filter applied)"
+          "message": "Comedy in Downtown Brooklyn:\n\n1) Stand-Up Open Mic at Friends & Lovers — sign up at 7:30, show starts 8pm. Always a mix of new faces and vets testing material. Free, 2-drink min\n\nReply 1 for details"
         },
         {
           "sender": "user",
@@ -2554,7 +2557,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(filter cleared)"
+          "message": "Okay, showing you everything again:\n\n1) Vinyl Night at Barbès — DJs spinning rare soul and funk records. 9pm, $10\n2) Late Night Jazz at Brooklyn Music School — intimate showcase with local talent. 10pm, Free\n3) Karaoke Therapy at Slope Bar — private rooms, full bar, no judgment. 8pm, $15/person\n\nReply 1-3 for details"
         },
         {
           "sender": "user",
@@ -2562,7 +2565,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details)"
+          "message": "🎤 Late Night Jazz at Brooklyn Music School — intimate performance space hosting a rotating showcase of Brooklyn-based jazz musicians. Tonight's lineup features a quartet doing Coltrane and Mingus interpretations. Very chill vibe, BYOB welcome. 10pm, Free. bqmusic.org"
         },
         {
           "sender": "user",
@@ -2570,7 +2573,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(sign-off)"
+          "message": "Anytime! Enjoy the show."
         }
       ],
       "testing": "Neighborhoods with zero events should gracefully nudge to nearby areas, and session should work normally after redirect",
@@ -2581,7 +2584,8 @@
         "Session breaks after redirect — MORE or filters fail",
         "Nudge suggests a neighborhood that also has zero events"
       ],
-      "difficulty": "stretch"
+      "difficulty": "stretch",
+      "grounded_at": "2026-02-23T05:39:31.607Z"
     },
     {
       "name": "Edge case: food and drink deflection with graceful recovery",
@@ -2593,7 +2597,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(deflection — Pulse does events, not food/drink recs)"
+          "message": "I'm all about events — shows, parties, performances. Not really a food/drink guide! But I've got tons happening in Bushwick if you want event recs."
         },
         {
           "sender": "user",
@@ -2601,7 +2605,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(Bushwick event picks)"
+          "message": "Here's what's going on in Bushwick tonight:\n\n1) Techno night at Basement — dark room, heavy bass, resident DJs. 11pm, $15\n2) Comedy showcase at The Meadows — up-and-coming comics, full bar. 8pm, $10\n3) Art opening at Monroe Studios — new multimedia exhibit + DJ set. 7pm, Free\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2609,7 +2613,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(free filter applied)"
+          "message": "Free Bushwick picks:\n\n1) Art opening at Monroe Studios — new multimedia exhibit + DJ set. 7pm, Free\n2) Open jam at Mood Ring — bring your instrument or just vibe. 9pm, Free\n3) Rooftop film screening at The Well — classic 90s movie under the stars. 8:30pm, Free\n\nReply 1-3 for details, MORE for extra"
         },
         {
           "sender": "user",
@@ -2617,7 +2621,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details on pick 2)"
+          "message": "🎨 Art opening at Monroe Studios — new multimedia exhibit exploring urban identity, plus a live DJ set spinning house and disco. Full bar, very chill crowd. 7pm, Free. https://monroestudios.com/opening"
         },
         {
           "sender": "user",
@@ -2625,7 +2629,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(deflection again — stays on events)"
+          "message": "Still just doing events! But if you're looking for something to do near Monroe Studios after the opening, I can find you shows or parties in the area."
         },
         {
           "sender": "user",
@@ -2633,7 +2637,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(more Bushwick picks)"
+          "message": "More Bushwick tonight:\n\n1) Indie rock at Our Wicked Lady — Brooklyn bands, rooftop vibes. 9pm, $12\n2) House party at Bossa Nova Civic Club — sweaty dance floor, local selectors. 10pm, $10\n3) Poetry slam at The Footlight — open mic + featured readers. 7:30pm, $8\n\nReply 1-3 for details"
         }
       ],
       "testing": "Food/drink/restaurant requests should be deflected gracefully, and user should be able to recover into normal event flow",
@@ -2644,7 +2648,8 @@
         "Robotic or preachy deflection tone",
         "Session state corrupted by off-topic messages"
       ],
-      "difficulty": "stretch"
+      "difficulty": "stretch",
+      "grounded_at": "2026-02-23T05:39:44.104Z"
     },
     {
       "name": "Edge case: implicit negation — drop a filter by exclusion",
@@ -2656,7 +2661,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(jazz picks in Greenwich Village)"
+          "message": "Here's jazz in Greenwich Village tonight:\n\n1) Vanguard Sessions at Village Vanguard — classic jazz trio, intimate basement vibes. 9pm, $35\n2) Latin Jazz Night at Blue Note — energetic Afro-Cuban ensemble. 8pm & 10:30pm, $45\n3) Saxophone Showcase at Smalls — rotating saxophonists, serious players only. 7:30pm, $20\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2664,7 +2669,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(clears jazz filter, shows other events)"
+          "message": "Got it, no jazz. Here's what else is happening in Greenwich Village:\n\n1) Drag Bingo at Pieces — hilarious host, cheap drinks. 9pm, $10\n2) Open Mic Night at Cafe Wha? — rock bands, singer-songwriters, eclectic mix. 8pm, free\n3) DJ Set at Le Bain — rooftop dance party, house music. 10pm, $20\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2672,7 +2677,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(comedy picks)"
+          "message": "Comedy picks for tonight:\n\n1) The Cellar Crowd at Comedy Cellar — drop-ins likely, always solid lineup. 7pm & 9pm, $20-30\n2) Late Night Weird at Caveat — experimental comedy, wonderfully strange. 11pm, $15\n3) Stand-Up Showcase at The Stand — up-and-comers testing new material. 8pm, $10\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2680,7 +2685,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(clears comedy, shows variety)"
+          "message": "Cool, switching it up. Here's a mix:\n\n1) Vinyl DJ Night at Nowadays — rare soul and funk records. 10pm, $10\n2) Poetry Slam at Nuyorican — passionate spoken word competition. 9pm, $15\n3) Indie Rock at Mercury Lounge — Brooklyn band on tour. 8:30pm, $18\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2688,7 +2693,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details)"
+          "message": "🎵 Vinyl DJ Night at Nowadays in Ridgewood. Serious crate-diggers spinning rare soul, funk, and disco on vinyl all night. Dance floor gets packed by midnight. 10pm, $10. https://ra.co/events/vinyldj"
         },
         {
           "sender": "user",
@@ -2696,7 +2701,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(more picks, no comedy or jazz filter)"
+          "message": "More picks across the board:\n\n1) Karaoke Night at Winnie's — dive bar energy, no judgment zone. 9pm, free\n2) Techno at Basement — dark warehouse vibes, serious sound system. 11pm, $15\n3) Trivia at The Way Station — themed rounds, cocktail specials. 8pm, free\n\nReply 1-3 for details"
         }
       ],
       "testing": "Negation phrases like 'not jazz' and 'anything but comedy' should clear the active category filter",
@@ -2707,7 +2712,8 @@
         "All filters cleared instead of just the negated one",
         "LLM confused by negation and returns random intent"
       ],
-      "difficulty": "stretch"
+      "difficulty": "stretch",
+      "grounded_at": "2026-02-23T05:39:59.190Z"
     },
     {
       "name": "Edge case: casual single-word texting — k, lol, bet, nah",
@@ -2719,7 +2725,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(LES picks)"
+          "message": "1) Techno Night at Nowadays — Deep house and techno till sunrise. 10pm, $15\n2) Jazz Jam at Nublu — Experimental jazz in an intimate setting. 9pm, $10\n3) Rooftop Party at Mr. Purple — Drinks with skyline views. 8pm, Free before 10pm\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2736,7 +2742,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details on pick 1)"
+          "message": "🟣 Nowadays\n\nTechno Night — Brooklyn's best underground spot for serious dance music. Killer sound system, no phones on the floor. Tonight 10pm-late, $15 at the door.\n\nwww.nowadays.com"
         },
         {
           "sender": "user",
@@ -2753,7 +2759,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(comedy filter applied)"
+          "message": "1) Stand-Up Showcase at The Creek — Rising comics testing new material. 8pm, $10\n2) Comedy Open Mic at Union Hall — Mix of pros and newbies. 9pm, $5\n\nReply 1-2 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2761,7 +2767,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(acknowledgment or clears)"
+          "message": "No worries! Want picks for a different vibe or neighborhood?"
         },
         {
           "sender": "user",
@@ -2769,7 +2775,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(acknowledgment)"
+          "message": "Cool! Text me anytime you need plans."
         }
       ],
       "testing": "Casual Gen-Z single-word responses should not confuse the system or trigger neighborhood lookups",
@@ -2780,7 +2786,8 @@
         "Falls through to LLM which generates confused response",
         "Session state corrupted"
       ],
-      "difficulty": "must_pass"
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:40:07.156Z"
     },
     {
       "name": "Poor experience: thin neighborhood rapid exhaustion chain",
@@ -2792,7 +2799,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(few picks or nudge)"
+          "message": "Cobble Hill's pretty quiet tonight — just 1 pick:\n\n1) Wine Tasting at Brooklyn Winery — natural wine flight with small bites. 7pm, $35\n\nReply 1 for details, or I can check nearby neighborhoods like Boerum Hill or Carroll Gardens?"
         },
         {
           "sender": "user",
@@ -2800,7 +2807,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(exhaustion — suggests nearby)"
+          "message": "That's all I've got for Cobble Hill tonight. Want me to check Boerum Hill? It's right next door and usually has more going on."
         },
         {
           "sender": "user",
@@ -2808,7 +2815,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(picks from nearby — Boerum Hill or similar)"
+          "message": "Boerum Hill picks:\n\n1) DJ Night at Weather Up — vinyl-only soul and funk sets. 9pm, Free\n2) Trivia at Berg'n — pop culture team trivia in the beer hall. 8pm, Free\n3) Live Jazz at Clover Club — intimate quartet, craft cocktails. 8:30pm, $10 cover\n\nReply 1-3 for details or MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2816,7 +2823,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(exhaustion again — suggests another nearby)"
+          "message": "That's everything for Boerum Hill tonight. Carroll Gardens is close by and has a few more options — want me to check there?"
         },
         {
           "sender": "user",
@@ -2824,7 +2831,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(picks from third neighborhood)"
+          "message": "Carroll Gardens picks:\n\n1) Karaoke at Jakewalk — private rooms, full bar. 7pm onwards, $25/hour per room\n2) Paint Night at Whiskey Brooklyn — guided session with drinks. 7pm, $40\n3) Open Mic at Brooklyn Inn — poetry and acoustic sets. 8pm, Free\n\nReply 1-3 for details or MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2832,7 +2839,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(comedy filter on third neighborhood)"
+          "message": "Comedy in Carroll Gardens:\n\n1) Stand-Up Showcase at Jalopy Theatre — local comics, intimate room. 9pm, $15\n\nReply 1 for details, or I can check other neighborhoods for more comedy options?"
         },
         {
           "sender": "user",
@@ -2840,7 +2847,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(more or exhaustion)"
+          "message": "That's all the comedy in Carroll Gardens tonight. Red Hook and Park Slope are nearby if you want to keep looking, but honestly it's slim pickings in this corner of Brooklyn for comedy on a weeknight."
         }
       ],
       "testing": "Chain of thin neighborhoods where user keeps accepting nudges — system should handle gracefully without loops",
@@ -2851,7 +2858,8 @@
         "System suggests the original thin neighborhood again",
         "Picks from neighborhood A delivered but labeled as neighborhood B"
       ],
-      "difficulty": "should_pass"
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:40:19.107Z"
     },
     {
       "name": "Edge case: time filter on sparse time data — later tonight",
@@ -2863,7 +2871,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(Bushwick picks)"
+          "message": "1) Basement Sessions at Mood Ring — deep house & techno in their disco room. 9pm, $10\n2) Queer Indie Night at The Meadows — live bands + DJ sets. 8pm, $15\n3) Late Night Comedy at Bizarre — uncensored stand-up showcase. 10pm, $12\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2871,7 +2879,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(late-night picks — time filter applied)"
+          "message": "1) Late Night Comedy at Bizarre — uncensored stand-up showcase. 10pm, $12\n2) Warehouse Rave at Secret Loft — details on confirmation. 11pm, $20\n3) Open Decks at The Footlight — bring your vinyl, play a set. Time TBD, Free\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2879,7 +2887,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details)"
+          "message": "🎭 Late Night Comedy at Bizarre — Uncensored stand-up showcase with rotating comics, gets wild after midnight. Very Bushwick energy.\n\n10pm, $12\nhttps://dice.fm/bizarre-comedy"
         },
         {
           "sender": "user",
@@ -2887,7 +2895,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(more late picks or exhaustion)"
+          "message": "That's most of what's confirmed late tonight in Bushwick — some events don't list times yet. Want me to show you everything again (reply FORGET TIME), or try nearby Williamsburg or East Williamsburg?"
         },
         {
           "sender": "user",
@@ -2895,7 +2903,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(filter cleared)"
+          "message": "Time filter cleared! Here's the full Bushwick lineup again."
         },
         {
           "sender": "user",
@@ -2903,7 +2911,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(unfiltered picks)"
+          "message": "1) Basement Sessions at Mood Ring — deep house & techno in their disco room. 9pm, $10\n2) Art Show Opening at Roberta's — new mixed media exhibit + pizza. 7pm, Free\n3) Karaoke Chaos at Goldilocks — private rooms available. 8pm, $8/person\n\nReply 1-3 for details, MORE for extra picks"
         }
       ],
       "testing": "Time filter when most events lack start_time_local — system should not drop events with unknown times entirely",
@@ -2914,7 +2922,8 @@
         "Time filter not clearable",
         "Unknown-time events treated same as confirmed-late events"
       ],
-      "difficulty": "stretch"
+      "difficulty": "stretch",
+      "grounded_at": "2026-02-23T05:40:30.185Z"
     },
     {
       "name": "Filter drift: double-redirect with compound filter persistence",
@@ -2926,7 +2935,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(few or no results — nudge to nearby with filters)"
+          "message": "Not much free comedy in Red Hook tonight. Want me to check nearby Carroll Gardens? Still keeping it free + comedy."
         },
         {
           "sender": "user",
@@ -2934,7 +2943,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(picks from nearby — free comedy filter persists)"
+          "message": "1) Open Mic Night at The Bell House — new comics testing material, always unpredictable. 8pm, Free\n2) Backyard Comedy at Brooklyn Social — outdoor setup, BYOB welcome. 9pm, Free\n3) Late Night Laughs at Union Hall — established names dropping in. 10:30pm, Free\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2942,7 +2951,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(exhaustion — nudge to another nearby)"
+          "message": "That's all the free comedy I've got for Carroll Gardens. Gowanus has some good spots though — want me to check there?"
         },
         {
           "sender": "user",
@@ -2950,7 +2959,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(picks from second redirect — free comedy still active)"
+          "message": "1) Warehouse Comedy at The Gutter — intimate room, strong lineup. 8pm, Free\n2) Monday Madness at Littlefield — locals + drop-ins, hit or miss. 9pm, Free\nReply 1-2 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -2958,7 +2967,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details on pick 2)"
+          "message": "Monday Madness at Littlefield — divey space in Gowanus, usually packed with comedy nerds. Mondays are their free open mic night with occasional surprise guests. 9pm, Free. https://littlefieldnyc.com"
         },
         {
           "sender": "user",
@@ -2966,7 +2975,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(filters cleared)"
+          "message": "Filter dropped — back to all events."
         },
         {
           "sender": "user",
@@ -2974,7 +2983,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(unfiltered picks from current neighborhood)"
+          "message": "1) Vinyl Night at The Gutter — DJs spinning rare soul records. 8pm, $10\n2) Trivia Night at Union Hall — bocce court + drinks. 7:30pm, Free\n3) Karaoke at Branded Saloon — dive bar classics, no judgement. 10pm, Free\nReply 1-3 for details, MORE for extra picks"
         }
       ],
       "testing": "Compound filters (free + comedy) should survive two neighborhood redirects and be clearable",
@@ -2986,7 +2995,8 @@
         "drop the filter only clears one of the two filters",
         "Picks labeled as free comedy but include paid/non-comedy events"
       ],
-      "difficulty": "should_pass"
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:40:40.623Z"
     },
     {
       "name": "Filter drift: category replacement not stacking — comedy then jazz",
@@ -2998,7 +3008,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(EV picks — mix of genres)"
+          "message": "East Village tonight:\n\n1) The Velvet Underground Experience at Bowery Electric — psychedelic tribute show. 9pm, $15\n2) Late Night Jazz at Rue B — intimate bebop trio. 10pm, $10\n3) Stand-Up Showcase at The Creek — rotating comics. 8pm, Free\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3006,7 +3016,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(comedy filter applied — comedy events in EV)"
+          "message": "Comedy in East Village:\n\n1) Stand-Up Showcase at The Creek — rotating comics from the Comedy Cellar circuit. 8pm, Free\n2) Improv Night at Caveat — long-form comedy, audience suggestions. 9pm, $12\n3) Open Mic at Otto's Shrunken Head — divey, anything goes. 10pm, $5\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3014,7 +3024,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(comedy replaced by jazz — jazz events in EV)"
+          "message": "Jazz in East Village:\n\n1) Late Night Jazz at Rue B — intimate bebop trio, classic standards. 10pm, $10\n2) Experimental Jazz at Nublu — avant-garde quartet pushing boundaries. 11pm, $15\n3) Sunday Jazz Brunch at B Bar — smooth trio, boozy vibes. 12pm, $20\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3022,7 +3032,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details on jazz pick 1)"
+          "message": "🎷 Late Night Jazz at Rue B — Intimate basement spot with a bebop trio running through Parker and Monk standards. Candlelit tables, cash bar. 10pm, $10\n\nhttps://rueb.nyc/jazz-tonight"
         },
         {
           "sender": "user",
@@ -3030,7 +3040,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(more jazz events — jazz filter still active, comedy gone)"
+          "message": "More jazz in East Village:\n\n4) Vinyl Jazz Night at Berlin — DJs spinning Blue Note classics. 9pm, Free\n5) Latin Jazz at Slipper Room — salsa-inflected quartet, full bar. 10pm, $12\n\nReply 4-5 for details"
         }
       ],
       "testing": "When a user applies one category filter then asks for a different category in the same family, the new category should REPLACE the old one, not stack. 'Actually jazz' after comedy should give jazz, not comedy+jazz (which would likely return nothing).",
@@ -3041,7 +3051,8 @@
         "'Actually' ignored — treats as compound filter",
         "Both filters dropped — returns unfiltered picks"
       ],
-      "difficulty": "should_pass"
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:40:51.174Z"
     },
     {
       "name": "Edge case: rapid neighborhood switching without MORE",
@@ -3053,7 +3064,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(Bushwick picks)"
+          "message": "Tonight in Bushwick:\n\n1) Cosmic Disco at Bossa Nova Civic Club — groovy house and disco edits, vinyl-only DJ set. 10pm, $10\n2) Punk Karaoke at The Meadows — scream your heart out with a live band backing you. 9pm, Free\n3) Late Night Jazz at Nowadays — intimate courtyard session with Brooklyn's best. 11pm, $15\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3061,7 +3072,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(Williamsburg picks — different events)"
+          "message": "Tonight in Williamsburg:\n\n1) Warehouse Techno at Superior Ingredients — dark, sweaty, proper Berlin vibes. 11pm, $20\n2) Indie Rock Showcase at Baby's All Right — three bands, all worth catching. 8pm, $18\n3) Rooftop Dance Party at Westlight — panoramic views + house music. 9pm, $25\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3069,7 +3080,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(LES picks — different events)"
+          "message": "Tonight on the LES:\n\n1) Underground Hip-Hop at Arlene's Grocery — raw talent, intimate basement show. 10pm, $12\n2) Alt Comedy at The Slipper Room — weird, experimental, definitely not for everyone. 9pm, $15\n3) Electronic Showcase at Public Records — ambient to breakbeat progression. 10pm, $20\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3077,7 +3088,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details on LES pick 1 — not Bushwick or Williamsburg)"
+          "message": "Underground Hip-Hop at Arlene's Grocery — Raw basement show featuring emerging NYC MCs and producers. Intimate, sweaty, real. Known for discovering talent before they blow up. 10pm, $12\n\nhttps://pulse.events/arlenes-hiphop"
         },
         {
           "sender": "user",
@@ -3085,7 +3096,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(Bushwick picks — may include previously shown or fresh)"
+          "message": "Back to Bushwick:\n\n1) Cosmic Disco at Bossa Nova Civic Club — groovy house and disco edits, vinyl-only DJ set. 10pm, $10\n2) Punk Karaoke at The Meadows — scream your heart out with a live band backing you. 9pm, Free\n3) Late Night Jazz at Nowadays — intimate courtyard session with Brooklyn's best. 11pm, $15\n\nReply 1-3 for details, MORE for extra picks"
         }
       ],
       "testing": "User rapidly switches between three neighborhoods without using MORE. Each switch should produce picks for the correct neighborhood. Number replies should reference the MOST RECENT pick list. Returning to a previously visited neighborhood should still work.",
@@ -3096,7 +3107,8 @@
         "Session confused by multiple neighborhoods — returns stale picks",
         "'Go back to bushwick' fails to re-resolve as neighborhood request"
       ],
-      "difficulty": "stretch"
+      "difficulty": "stretch",
+      "grounded_at": "2026-02-23T05:41:03.727Z"
     },
     {
       "name": "Filter drift: filter stacking across turns — free then comedy then late",
@@ -3108,7 +3120,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(Williamsburg picks)"
+          "message": "Williamsburg tonight:\n\n1) Indie Rock Showcase at Knitting Factory — local bands, packed crowd. 8pm, $15\n2) Open Mic Night at Union Pool — comedy/music hybrid, always unpredictable. 9pm, Free\n3) DJ Set at Elsewhere — house and techno in the zone. 10pm, $20\n4) Late Night Comedy at The Meadow — stand-up in a cozy bar. 10:30pm, $10\n\nReply 1-4 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3116,7 +3128,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(free filter applied — free events in Williamsburg)"
+          "message": "Free events in Williamsburg:\n\n1) Open Mic Night at Union Pool — comedy/music hybrid, always unpredictable. 9pm, Free\n2) Warehouse Dance Party at Secret Loft — experimental electronic. 11pm, Free\n3) Trivia Night at Spuyten Duyvil — beer-focused bar with tough questions. 8pm, Free\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3124,7 +3136,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(free + comedy stacked — free comedy events)"
+          "message": "Free comedy in Williamsburg:\n\n1) Open Mic Night at Union Pool — comedy/music hybrid, always unpredictable. 9pm, Free\n2) Stand-Up Showcase at The Footlight — rotating comics testing new material. 8pm, Free\n\nReply 1-2 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3132,7 +3144,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(free + comedy + late stacked — free comedy events starting late)"
+          "message": "Free comedy starting late in Williamsburg:\n\n1) Open Mic Night at Union Pool — comedy/music hybrid, always unpredictable. 9pm, Free\n2) Midnight Comedy Jam at The Meadow — loose late-night set, anything goes. 11:45pm, Free\n\nReply 1-2 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3140,7 +3152,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details on pick matching all three filters)"
+          "message": "🟤 Midnight Comedy Jam at The Meadow — Late-night open mic where comics test their weirdest material. Intimate bar setting, drinks flowing, crowd gets looser as the night goes on. Very Williamsburg energy.\n\n11:45pm, Free\n\nhttps://pulse.events/meadow-midnight-comedy"
         }
       ],
       "testing": "Progressive filter stacking: free, then comedy on top, then time on top. Each filter addition should compound, not replace. All three should be active simultaneously by the final picks.",
@@ -3151,7 +3163,8 @@
         "Only most recent filter active at any point",
         "Stacking produces empty results but system shows unfiltered instead of saying so"
       ],
-      "difficulty": "should_pass"
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:41:14.266Z"
     },
     {
       "name": "Edge case: number out of range — pick 6 when only 3 shown",
@@ -3163,7 +3176,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(Greenpoint picks — 2-3 events)"
+          "message": "1) Joke's On You at The Meadow — standup showcase with rotating comics. 8pm, $15\n2) Warehouse Grooves at Elsewhere — house & techno all night. 10pm, $20\n3) Jazz Vibes at Manhattan Inn — intimate late-night session. 11pm, Free\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3171,7 +3184,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(graceful error — points to valid range)"
+          "message": "I only have 1-3 — which one?"
         },
         {
           "sender": "user",
@@ -3179,7 +3192,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(graceful error — points to valid range)"
+          "message": "I only have 1-3 — which one?"
         },
         {
           "sender": "user",
@@ -3187,7 +3200,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details on valid pick 2)"
+          "message": "🟢 Warehouse Grooves at Elsewhere\nHouse & techno all night with Brooklyn's best selectors. Gets packed after midnight.\n10pm, $20\nhttps://ra.co/events/warehouse-grooves"
         },
         {
           "sender": "user",
@@ -3207,7 +3220,8 @@
         "Session corrupted — valid '2' after errors returns wrong event",
         "System interprets '0' or '6' as a neighborhood or search query"
       ],
-      "difficulty": "stretch"
+      "difficulty": "stretch",
+      "grounded_at": "2026-02-23T05:41:19.143Z"
     },
     {
       "name": "Edge case: emoji-only messages",
@@ -3219,7 +3233,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(SoHo picks)"
+          "message": "1) Jazz Loft Sessions at The Django — intimate jazz in a Renzo Piano tower. 8pm, $25\n2) Midnight Vinyl Party at Fanelli Cafe — DJs spinning rare records in SoHo's oldest bar. 10pm, free\n3) Poetry Slam at Housing Works — raw performances, cheap drinks. 7pm, $10\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3227,7 +3241,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(interprets as music interest or asks for clarification)"
+          "message": "Got it — filtering for live music! 1) Jazz Loft Sessions at The Django — intimate jazz in a Renzo Piano tower. 8pm, $25\n2) Midnight Vinyl Party at Fanelli Cafe — DJs spinning rare records. 10pm, free\n\nReply 1-2 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3235,7 +3249,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(interprets as theater/performing arts or asks for clarification)"
+          "message": "Theater mode activated! 1) Improv Throwdown at The PIT — comedians battle for laughs, anything goes. 9pm, $15\n2) Experimental Cabaret at Joe's Pub — wild performances, full bar. 8pm, $20\n\nReply 1-2 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3243,7 +3257,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details on most recent pick 1)"
+          "message": "🎭 Improv Throwdown at The PIT — comedians compete in wild improv battles, audience picks the winner. Super interactive, packed house, anything-can-happen energy. 9pm, $15. thepit-nyc.com"
         },
         {
           "sender": "user",
@@ -3251,7 +3265,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(acknowledgment — treats as positive response)"
+          "message": "Awesome! Have a great time tonight."
         }
       ],
       "testing": "Emoji-only messages should not crash the system. Musical note and theater mask emojis may reasonably be interpreted as category hints, or the system may ask for clarification. Thumbs up should be treated as conversational acknowledgment.",
@@ -3262,7 +3276,8 @@
         "Session state corrupted by emoji message",
         "Thumbs up triggers a neighborhood search or confuses routing"
       ],
-      "difficulty": "stretch"
+      "difficulty": "stretch",
+      "grounded_at": "2026-02-23T05:41:27.320Z"
     },
     {
       "name": "Edge case: long rambling message with buried intent",
@@ -3274,7 +3289,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(Bushwick picks — ideally prioritizing live music and art)"
+          "message": "Bushwick tonight:\n\n1) Live Jazz at The Keep — experimental jazz trio, cool gallery space. 9pm, $15\n2) Open Mic Art Night at Lot 45 — rotating art + live performances. 8pm, Free\n3) Indie Rock at The Meadows — Brooklyn bands, outdoor vibes. 10pm, $10\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3282,7 +3297,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(Williamsburg picks — late night filter applied)"
+          "message": "Williamsburg late night:\n\n1) DJ Set at Elsewhere — dance party starts at midnight. 12am, $20\n2) Comedy & Karaoke at Union Pool — weird late night energy. 11pm, Free\n3) Electronic Night at Good Room — deep house til 4am. 1am, $25\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3290,7 +3305,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details on Williamsburg pick 2)"
+          "message": "🎵 Electronic Night at Good Room — one of Brooklyn's best sound systems, deep house and techno til 4am. Serious dance crowd, cash bar. 1am, $25\n\ngoodroombklyn.com"
         },
         {
           "sender": "user",
@@ -3298,7 +3313,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(sign-off)"
+          "message": "Enjoy! Text me anytime."
         }
       ],
       "testing": "Long, rambling messages with embedded neighborhood names and filter preferences. The system should extract the core intent (neighborhood + optional filters) from verbose, conversational input without getting confused.",
@@ -3309,7 +3324,8 @@
         "Matches on 'weekend' and gives wrong-day events",
         "Response mirrors the verbose style instead of staying concise SMS"
       ],
-      "difficulty": "stretch"
+      "difficulty": "stretch",
+      "grounded_at": "2026-02-23T05:41:34.298Z"
     },
     {
       "name": "Filter drift: filter persists across neighborhood switch",
@@ -3321,7 +3337,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(LES picks)"
+          "message": "Lower East Side tonight:\n\n1) Jazz Night at The DeLancey — intimate set with Brooklyn trio. 9pm, $15\n2) Late Night Comedy at The Stand — packed lineup, good energy. 10pm, $20\n3) Techno Underground at Nowadays — dark, sweaty, perfect. 11pm, $10\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3329,7 +3345,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(comedy filter applied — comedy events in LES)"
+          "message": "Comedy in LES:\n\n1) Late Night Comedy at The Stand — packed lineup, solid headliners. 10pm, $20\n2) Open Mic at Pianos — hit or miss but always fun chaos. 9pm, Free\n3) Storytelling Show at Arlene's Grocery — funny personal stories, intimate vibe. 8pm, $10\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3337,7 +3353,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(Bushwick picks — comedy filter persists)"
+          "message": "Bushwick comedy tonight:\n\n1) Warehouse Comedy at The Meadows — experimental standup in a brewery. 9pm, $12\n2) Queer Comedy Night at Our Wicked Lady — inclusive lineup, rooftop vibes. 10pm, $15\n3) Late Show at Friends and Lovers — touring headliner plus locals. 11pm, $18\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3345,7 +3361,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(more Bushwick comedy — filter still active)"
+          "message": "More Bushwick comedy:\n\n4) Sketch Comedy at Baby's All Right — absurdist group show, very Brooklyn. 9:30pm, $10\n5) Improv Jam at House of Yes — audience participation, anything goes. 10pm, $8\n\nReply 4-5 for details"
         },
         {
           "sender": "user",
@@ -3353,7 +3369,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(comedy filter cleared — unfiltered Bushwick picks or acknowledgment)"
+          "message": "Cool, showing you everything in Bushwick now:\n\n1) Techno Loft at Bossa Nova Civic Club — proper sound system, late crowd. 11pm, $15\n2) Live Cumbia at Nowadays — outdoor dance party vibes. 9pm, $12\n3) Art Opening at The Johnson's — free drinks, DJ after. 8pm, Free\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3361,7 +3377,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(more unfiltered Bushwick picks)"
+          "message": "More Bushwick tonight:\n\n4) House Music at Mood Ring — disco ball energy, great cocktails. 10pm, $10\n5) Punk Show at Gold Sounds — three local bands, divey and loud. 9pm, $8\n6) Karaoke at Pine Box Rock Shop — packed and chaotic in the best way. 10pm, Free\n\nReply 4-6 for details"
         }
       ],
       "testing": "Comedy filter applied in LES should persist when user switches to Bushwick with 'try bushwick'. Filter should survive through MORE, and 'forget the comedy' should clear it. Subsequent picks should be unfiltered.",
@@ -3372,7 +3388,8 @@
         "'Forget the comedy' fails to clear filter",
         "Filter cleared but new unfiltered picks not shown until another MORE"
       ],
-      "difficulty": "should_pass"
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:41:48.620Z"
     },
     {
       "name": "Edge case: back-to-back detail requests",
@@ -3384,7 +3401,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(West Village picks — 3 events)"
+          "message": "1) Jazz Night at Smalls — intimate basement jazz club, classic sets. 9pm, $25\n2) Comedy Showcase at The Comedy Cellar — headline comics, packed room. 8pm & 10pm, $20-30\n3) Wine & Vinyl at Buvette — cozy French spot spinning records. 7pm-late, free entry\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3392,7 +3409,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details on pick 1)"
+          "message": "🎷 Jazz Night at Smalls — legendary basement jazz club on W 10th, brick walls and intimate tables. Tonight's set features a rotating trio starting at 9pm. $25 cover, cash only. https://smallslive.com"
         },
         {
           "sender": "user",
@@ -3400,7 +3417,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details on pick 2 — different event from pick 1)"
+          "message": "🎤 Comedy Showcase at The Comedy Cellar — the spot where everyone drops in unannounced. MacDougal St location. Two shows tonight at 8pm & 10pm, arrive early. $20-30 depending on lineup. https://comedycellar.com"
         },
         {
           "sender": "user",
@@ -3408,7 +3425,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details on pick 3 — different event from picks 1 and 2)"
+          "message": "🍷 Wine & Vinyl at Buvette — tiny French bistro on Grove St with a turntable behind the bar. Natural wines, small plates, whatever records they're feeling. Starts 7pm, no cover. https://buvette.com"
         },
         {
           "sender": "user",
@@ -3416,7 +3433,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(more West Village picks — fresh batch)"
+          "message": "1) Late Night Poetry at Café Wha? — open mic & featured readers, divey vibes. 10pm, $10\n2) DJ Set at Dante — Negronis & house music in the back garden. 9pm-late, free\n3) Acoustic Session at Cornelia Street Café — folk & indie songwriters. 8pm, $15\n\nReply 1-3 for details, MORE for extra picks"
         }
       ],
       "testing": "User requests details on every pick in sequence. Each detail response should be for the correct event. The pick list should remain stable across detail requests — asking for '2' after seeing details for '1' should still reference the original list, not shift.",
@@ -3427,7 +3444,8 @@
         "Session loses pick list after multiple detail views",
         "'More' after detail requests returns the same picks again"
       ],
-      "difficulty": "stretch"
+      "difficulty": "stretch",
+      "grounded_at": "2026-02-23T05:41:59.036Z"
     },
     {
       "name": "Poor experience: unsolicited negative feedback",
@@ -3439,7 +3457,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(Midtown picks)"
+          "message": "1) Sake Bar Hagi at Bryant Park — intimate izakaya hidden on 2nd floor, late-night Japanese whisky scene. 9pm, $$\n2) The Campbell at Grand Central — gilded cocktail bar in a former tycoon's office, ornate 1920s vibes. 8pm, $$$\n3) Bar Goto at Kips Bay — minimalist Japanese cocktails by Pegu Club alum. 9pm, $$\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3447,7 +3465,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(acknowledges feedback, offers alternatives or different approach)"
+          "message": "Fair — midtown can be hit or miss. Want me to try a different neighborhood? LES, West Village, and Williamsburg are solid tonight."
         },
         {
           "sender": "user",
@@ -3455,7 +3473,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(adjusts — may suggest different neighborhood or offer different picks)"
+          "message": "Got it — let's skip the midtown stuff. LES has some good underground spots, or Williamsburg if you want Brooklyn. Which sounds better?"
         },
         {
           "sender": "user",
@@ -3463,7 +3481,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(Brooklyn picks or asks which Brooklyn neighborhood)"
+          "message": "Brooklyn's huge — which neighborhood? Williamsburg, Bushwick, Park Slope, or somewhere else?"
         },
         {
           "sender": "user",
@@ -3471,7 +3489,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(Williamsburg picks)"
+          "message": "1) Our Wicked Lady at Bushwick border — rooftop bar meets DIY venue, indie bands and good beer. 10pm, $\n2) The Turk's Inn on Montrose — dim lit cocktail bar, feels like a secret. 9pm, $$\n3) Loosie Rouge on S 4th — natural wine bar with rotating art, laid-back crowd. 8pm, $$\n\nReply 1-3 for details, MORE for extra picks"
         }
       ],
       "testing": "User gives negative feedback about picks. System should handle criticism gracefully without breaking, getting defensive, or repeating the same picks. Should pivot constructively.",
@@ -3482,7 +3500,8 @@
         "Negative feedback crashes or confuses the router",
         "System ignores the feedback and continues as if nothing happened"
       ],
-      "difficulty": "should_pass"
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:42:09.508Z"
     },
     {
       "name": "Edge case: ambiguous yes without pending nudge",
@@ -3494,7 +3513,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(Prospect Heights picks)"
+          "message": "1) Late Night Jazz at Barboncino — intimate set with rotating local musicians. 10pm, Free\n2) Trivia Night at Weather Up — craft cocktails + surprisingly tough questions. 8pm, Free\n3) DJ Night at The Islands — Caribbean vibes meets Brooklyn soul. 11pm, $10\n\nReply 1-3 for details, MORE for extra picks"
         },
         {
           "sender": "user",
@@ -3502,7 +3521,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(details on pick 1)"
+          "message": "🎵 Late Night Jazz at Barboncino — Cozy pizza spot turns into an intimate jazz den on Fridays. Local musicians rotate through, great natural wine list. 10pm-1am, Free. 781 Franklin Ave. https://barboncino.com"
         },
         {
           "sender": "user",
@@ -3510,7 +3529,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(handles gracefully — no pending nudge to accept)"
+          "message": "Sounds good! Let me know if you want more picks or details on the other spots."
         },
         {
           "sender": "user",
@@ -3518,7 +3537,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(conversational acknowledgment)"
+          "message": "Great! Text me if you need anything else tonight."
         },
         {
           "sender": "user",
@@ -3526,7 +3545,7 @@
         },
         {
           "sender": "pulse",
-          "message": "(more Prospect Heights picks)"
+          "message": "4) Open Mic at Threes Brewing — comedy and music, solid beer selection. 9pm, Free\n5) Vinyl Night at Franklin Park — DJs spin rare records, backyard vibes. 10pm, Free\n6) Karaoke at Soda Bar — no judgment, all vibes. 9pm, Free\n\nReply 4-6 for details"
         }
       ],
       "testing": "User says 'yes' or 'yeah' when there is no pending nudge (no nearby neighborhood suggestion). The system should treat this as conversational rather than triggering a neighborhood switch or crashing.",
@@ -3537,7 +3556,2373 @@
         "'Yes' triggers an error or unhandled path",
         "'More' after orphaned yes returns wrong neighborhood picks"
       ],
-      "difficulty": "stretch"
+      "difficulty": "stretch",
+      "grounded_at": "2026-02-23T05:42:18.023Z"
+    },
+    {
+      "name": "Happy path: Bushwick late-night request",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "bushwick later tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "Later in Bushwick:\n\n1) Tygapaw at Mood Ring — techno set starting midnight, $10\n\n2) Late Night Jazz at Our Wicked Lady — rooftop vibes, 11pm til late. Free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "Our Wicked Lady has one of the best rooftop setups in Brooklyn — heaters when it's cold, great sound system. Late night jazz session kicks off at 11pm, rotating musicians, no cover. Gets packed after midnight. https://ourwickedlady.com"
+        }
+      ],
+      "testing": "Time filter combined with neighborhood request, detail retrieval",
+      "expected_behavior": "Pulse interprets 'later tonight' as a time filter, returns late-starting events only, provides details on request",
+      "failure_modes": [
+        "Returns early events",
+        "Ignores time filter",
+        "Details don't match pick #2"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:53:23.552Z"
+    },
+    {
+      "name": "Happy path: Chelsea quick browse",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "chelsea"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Chelsea:\n\n1) Drag Bingo at Industry Bar — hilarious hosts, cheap drinks. 8pm, Free\n\n2) Live Music at The Half King — indie folk showcase. 9pm, $15\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "cool thx"
+        },
+        {
+          "sender": "pulse",
+          "message": "enjoy!"
+        }
+      ],
+      "testing": "Quick browse with casual exit, no detail requests",
+      "expected_behavior": "Pulse delivers picks, handles casual thanks naturally without over-explaining",
+      "failure_modes": [
+        "Over-responds to casual thanks",
+        "Doesn't acknowledge user satisfaction"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:53:23.554Z"
+    },
+    {
+      "name": "Happy path: Park Slope to Gowanus switch",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "park slope"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Park Slope:\n\n1) Trivia Night at The Gate — packed weekly event, great beer list. 8pm, Free\n\n2) Singer-Songwriter Round at Union Hall — acoustic showcase in the basement venue. 9pm, $12\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "actually gowanus"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Gowanus:\n\n1) Techno Night at Nowadays — outdoor dance floor, fire pits. 10pm, $15\n\n2) Comedy Open Mic at Freddy's Bar — dive bar legends, supportive crowd. 8pm, Free\n\nReply 1-2 for details, MORE for extra picks"
+        }
+      ],
+      "testing": "Neighborhood switch before viewing details or MORE",
+      "expected_behavior": "Pulse immediately switches context to new neighborhood, drops previous picks",
+      "failure_modes": [
+        "Mixes picks from both neighborhoods",
+        "Doesn't recognize switch",
+        "Acknowledges switch awkwardly"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:53:23.554Z"
+    },
+    {
+      "name": "Happy path: Astoria music request",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "live music astoria"
+        },
+        {
+          "sender": "pulse",
+          "message": "Live music in Astoria tonight:\n\n1) Greek Folk Night at Kyclades — bouzouki players, dancing. 9pm, Free\n\n2) Rock Covers at The Quays — solid bar band doing 90s hits. 10pm, Free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "MORE"
+        },
+        {
+          "sender": "pulse",
+          "message": "More live music in Astoria:\n\n1) Jazz Trio at The Bonnie — intimate corner spot, excellent musicians. 8:30pm, $10\n\nReply 1 for details"
+        }
+      ],
+      "testing": "Category request with MORE follow-up, Queens neighborhood",
+      "expected_behavior": "Pulse filters to live music category, returns additional music events on MORE request",
+      "failure_modes": [
+        "MORE returns non-music events",
+        "Loses category filter on MORE",
+        "No additional events available"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:53:23.555Z"
+    },
+    {
+      "name": "Happy path: Fort Greene brief session",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "fort greene tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Fort Greene:\n\n1) DJ Night at Ode to Babel — afrobeats and dancehall, rooftop vibes. 10pm, $10\n\n2) Poetry Open Mic at Greenlight Bookstore — supportive crowd, great readers. 7:30pm, Free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "Ode to Babel is a gorgeous spot on Dekalb — rooftop bar with good energy. Tonight's DJ night leans afrobeats and dancehall, starts at 10pm, $10 cover. Gets packed after 11 so show up early if you want space to dance. https://odetobabel.com"
+        },
+        {
+          "sender": "user",
+          "message": "perfect"
+        },
+        {
+          "sender": "pulse",
+          "message": "have fun!"
+        }
+      ],
+      "testing": "Standard flow with detail request and positive feedback",
+      "expected_behavior": "Pulse delivers picks, provides venue details, exits warmly after user satisfaction",
+      "failure_modes": [
+        "Details don't match pick #1",
+        "Awkward exit response",
+        "Over-explains after 'perfect'"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:53:23.555Z"
+    },
+    {
+      "name": "Happy path: Bed-Stuy single pick detail request",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "bed stuy tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Bed-Stuy:\n\n1) Neo Soul Session at Sista's Place — intimate basement jazz club, incredible talent. 8pm, $15\n\n2) Open Mic at Therapy Wine Bar — cozy spot, poets and acoustic sets. 9pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "Therapy Wine Bar is this warm little spot on Fulton — low-key vibe, good wine list. Their open mic pulls poets, singers, acoustic guitarists. Starts at 9pm, no cover. Perfect if you want something mellow. https://therapywinebar.com"
+        }
+      ],
+      "testing": "Simple flow: neighborhood request → picks → single detail request on second option",
+      "expected_behavior": "Pulse returns picks for Bed-Stuy, then provides detailed info specifically about pick #2 when requested",
+      "failure_modes": [
+        "Details don't match pick #2",
+        "Returns info for pick #1 instead",
+        "Loses neighborhood context"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:53:52.201Z"
+    },
+    {
+      "name": "Happy path: Harlem jazz direct request",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "jazz in harlem"
+        },
+        {
+          "sender": "pulse",
+          "message": "Jazz in Harlem tonight:\n\n1) Monday Night Jam at Minton's Playhouse — birthplace of bebop, legendary jam session. 7pm, $20\n\n2) Late Night Set at Ginny's Supper Club — swanky vibes, killer musicians. 11pm, $15\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "perfect thanks"
+        },
+        {
+          "sender": "pulse",
+          "message": "enjoy!"
+        }
+      ],
+      "testing": "Category + neighborhood in one request, user satisfied without details",
+      "expected_behavior": "Pulse recognizes compound request, returns only jazz events in Harlem, handles satisfaction gracefully",
+      "failure_modes": [
+        "Returns non-jazz events",
+        "Ignores neighborhood",
+        "Awkward response to thanks"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:53:52.201Z"
+    },
+    {
+      "name": "Happy path: Crown Heights to Prospect Heights switch",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "crown heights"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Crown Heights:\n\n1) Afrobeat Night at Franklin Park — packed dance floor, DJ Underdog spinning. 10pm, free\n\n2) Poetry & Pints at Burly — open mic with a bar vibe. 8pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "what about prospect heights"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Prospect Heights:\n\n1) Trivia Night at weather up — craft cocktails and competitive energy. 8pm, free\n\n2) Soul Revue at Bar LunÀtico — tiny room, powerful voices. 9pm, $15\n\nReply 1-2 for details, MORE for extra picks"
+        }
+      ],
+      "testing": "Quick neighborhood switch without exhausting first neighborhood",
+      "expected_behavior": "Pulse smoothly switches neighborhoods, returns fresh picks for new location",
+      "failure_modes": [
+        "Confused by switch request",
+        "Returns Crown Heights events again",
+        "Loses session context"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:53:52.201Z"
+    },
+    {
+      "name": "Happy path: Long Island City brief browse",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "lic"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Long Island City:\n\n1) Warehouse Rave at Knockdown Center — techno all night, massive space. 11pm, $25\n\n2) Art Opening at MoMA PS1 — installations and cocktails. 7pm, $10\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "cool"
+        },
+        {
+          "sender": "pulse",
+          "message": "have fun"
+        }
+      ],
+      "testing": "Abbreviated neighborhood name, user satisfied with picks alone",
+      "expected_behavior": "Pulse recognizes 'lic' as Long Island City, returns picks, handles casual acknowledgment",
+      "failure_modes": [
+        "Doesn't recognize LIC abbreviation",
+        "Awkward response to 'cool'",
+        "Pushes for more engagement unnecessarily"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:53:52.201Z"
+    },
+    {
+      "name": "Happy path: Cobble Hill late night request",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "cobble hill later tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "Later tonight in Cobble Hill:\n\n1) Vinyl Night at Clover Club — classic cocktail bar, DJ spinning deep cuts. 11pm, free\n\nReply 1 for details"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "Clover Club is this gorgeous old-school cocktail bar on Smith Street — dark wood, perfect lighting, serious bartenders. Their vinyl night brings in a DJ who knows how to dig through crates. Starts at 11pm, no cover. https://cloverclubny.com"
+        },
+        {
+          "sender": "user",
+          "message": "sick"
+        },
+        {
+          "sender": "pulse",
+          "message": "🍸"
+        }
+      ],
+      "testing": "Time filter + neighborhood, thin results handled naturally, emoji sign-off",
+      "expected_behavior": "Pulse filters for late events in Cobble Hill, handles single pick gracefully, matches casual energy",
+      "failure_modes": [
+        "Returns early evening events",
+        "Ignores 'later tonight' filter",
+        "Overly formal response to casual chat"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:53:52.201Z"
+    },
+    {
+      "name": "Happy path: Red Hook quick detail grab",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "red hook"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Red Hook:\n\n1) Funk Night at Pioneer Works — live band covering classics, great sound system. 10pm, $15\n\n2) Open Mic at Sunny's Bar — legendary dive, anything goes vibe. 8pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "Sunny's is a Red Hook institution — been around since 1890, feels like stepping into another era. Tonight's open mic starts at 8pm, totally free, and you never know who'll show up. Bluegrass regulars but open to everything. https://sunnysredhook.com"
+        }
+      ],
+      "testing": "Quick neighborhood request → immediate detail grab without browsing",
+      "expected_behavior": "Pulse delivers picks, user skips browsing and goes straight for details on one event",
+      "failure_modes": [
+        "Details don't match pick #2",
+        "Response too formal",
+        "Missing URL or key venue info"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:54:23.547Z"
+    },
+    {
+      "name": "Happy path: Sunset Park live music request",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "live music sunset park"
+        },
+        {
+          "sender": "pulse",
+          "message": "Live music in Sunset Park tonight:\n\n1) Salsa Night at Club Bonita — full band, dance floor gets packed. 9pm, $10\n\n2) Acoustic Showcase at Greenwood Park — chill outdoor vibe, rotating singer-songwriters. 7pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "sounds good thx"
+        },
+        {
+          "sender": "pulse",
+          "message": "enjoy!"
+        }
+      ],
+      "testing": "Category + neighborhood in one message, quick exit after picks",
+      "expected_behavior": "Pulse parses compound request correctly, user exits satisfied without needing details",
+      "failure_modes": [
+        "Ignores 'live music' category",
+        "Returns non-music events",
+        "Awkward sign-off"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:54:23.547Z"
+    },
+    {
+      "name": "Happy path: Greenpoint to DUMBO neighborhood jump",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "greenpoint"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Greenpoint:\n\n1) Techno night at Nowadays — outdoor dance floor, killer sound. 11pm, $20\n\n2) Poetry Reading at Word Bookstore — local writers, intimate vibe. 7:30pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "actually dumbo"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in DUMBO:\n\n1) Jazz Under the Bridge at Archway — outdoor series, Manhattan skyline views. 8pm, $15\n\n2) Gallery Opening at DUMBO Arts Center — new contemporary exhibit, wine and mingling. 6pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        }
+      ],
+      "testing": "User switches neighborhoods before engaging with initial picks",
+      "expected_behavior": "Pulse smoothly switches context, no leftover state from Greenpoint",
+      "failure_modes": [
+        "Mixes events from both neighborhoods",
+        "Doesn't acknowledge the switch",
+        "Keeps Greenpoint filters active"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:54:23.547Z"
+    },
+    {
+      "name": "Happy path: Hell's Kitchen theater search",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "theater hells kitchen"
+        },
+        {
+          "sender": "pulse",
+          "message": "Theater in Hell's Kitchen tonight:\n\n1) One-Act Festival at The Tank — experimental shorts, always surprising. 8pm, $18\n\n2) Improv Comedy at The PIT — house team showcase, fast and funny. 9:30pm, $12\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "MORE"
+        },
+        {
+          "sender": "pulse",
+          "message": "More theater in Hell's Kitchen:\n\n1) Late Night Cabaret at Don't Tell Mama — Broadway performers doing their thing off-duty. 10:30pm, $15 + 2 drink min\n\nReply 1 for details"
+        }
+      ],
+      "testing": "Category request followed by MORE for additional category-specific picks",
+      "expected_behavior": "MORE returns fresh theater events, maintains category filter across turns",
+      "failure_modes": [
+        "MORE returns non-theater events",
+        "Repeats initial picks",
+        "Loses neighborhood context"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:54:23.547Z"
+    },
+    {
+      "name": "Happy path: NoHo two-pick detail browse",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "noho"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in NoHo:\n\n1) Bluegrass Jam at The Bitter End — open session, bring your instrument or just listen. 9pm, $10\n\n2) DJ Night at Public Arts — underground house, intimate space. 11pm, $15\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "The Bitter End is a Bleecker Street classic — tiny room, huge history. Dylan played here back in the day. Tonight's bluegrass jam is open to players and listeners, super welcoming vibe. Starts at 9, $10 cover. https://bitterend.com/events"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "Public Arts is one of those spots you have to know about — small basement space on Bleecker, serious sound system. Tonight's DJ is spinning deep house til late. Gets going around 11, $15 at the door. https://publicarts.nyc"
+        }
+      ],
+      "testing": "User browses details on multiple picks sequentially",
+      "expected_behavior": "Pulse maintains session state, delivers correct details for each numbered request in order",
+      "failure_modes": [
+        "Second detail request fails or repeats first",
+        "Details don't match their pick numbers",
+        "Session state lost between turns"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:54:23.547Z"
+    },
+    {
+      "name": "Happy path: SoHo single pick quick detail",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "soho tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in SoHo:\n\n1) DJ Seinfeld at The Panther — underground techno in a basement, always packed. 11pm, $15\n\n2) Jazz Jam at Fanelli's — weekly session, bring your horn if you got one. 8pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "Fanelli's is the oldest bar in SoHo — been there since 1847. Their Monday jazz jam is low-key legendary, locals bring instruments and just vibe. Starts at 8, no cover. https://fanelliscafe.com"
+        }
+      ],
+      "testing": "Quick single-pick detail request flow",
+      "expected_behavior": "User gets picks, requests details on second option, receives detailed venue info with character",
+      "failure_modes": [
+        "Details don't match pick #2",
+        "Generic venue description",
+        "Missing URL"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:54:54.647Z"
+    },
+    {
+      "name": "Happy path: Downtown BK direct sign-off",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "downtown brooklyn"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Downtown Brooklyn:\n\n1) Open Mic at Freddy's Bar — legendary spot, poets and musicians mix it up. 8pm, free\n\n2) The National Reserve at Roulette — experimental jazz, serious listening room. 9pm, $25\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "cool thanks"
+        },
+        {
+          "sender": "pulse",
+          "message": "have a good one"
+        }
+      ],
+      "testing": "Clean sign-off after initial picks without detail request",
+      "expected_behavior": "User browses picks, thanks and exits. Pulse responds warmly without pushing more",
+      "failure_modes": [
+        "Overly formal sign-off",
+        "Pushes MORE unnecessarily",
+        "Robotic closing"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:54:54.647Z"
+    },
+    {
+      "name": "Happy path: live music in Gowanus",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "live music gowanus"
+        },
+        {
+          "sender": "pulse",
+          "message": "Live music in Gowanus tonight:\n\n1) Palberta at Trans-Pecos — noise rock trio, super energetic. 9pm, $12\n\n2) Jazz Brunch Residency at Threes Brewing — chill Sunday vibes, rotating players. 1pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "Trans-Pecos is a warehouse venue right by the canal — raw space, great sound. Palberta brings chaotic energy, drums-bass-guitar noise rock that's actually fun. 9pm, $12 at the door. https://trans-pecos.com/events"
+        }
+      ],
+      "testing": "Category filter with neighborhood in single request",
+      "expected_behavior": "Pulse interprets 'live music' as a category filter, returns only live music in Gowanus",
+      "failure_modes": [
+        "Returns non-music events",
+        "Ignores neighborhood",
+        "Generic event descriptions"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:54:54.647Z"
+    },
+    {
+      "name": "Happy path: Midtown to West Village switch",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "midtown"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Midtown:\n\n1) Trivia Night at The Waylon — country bar with surprisingly hard questions. 8pm, free\n\n2) Jazz Standards at Birdland — the classic spot, tourist-friendly but legit. 9pm, $40\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "actually west village"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in West Village:\n\n1) Comedy Cellar Late Show — always stacked lineup, tiny room. 11:30pm, $25\n\n2) DJ Night at The Monster — classic gay bar, dance floor that never disappoints. 10pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        }
+      ],
+      "testing": "Neighborhood switch without requesting MORE first",
+      "expected_behavior": "User switches neighborhoods mid-session, Pulse immediately provides new picks for West Village",
+      "failure_modes": [
+        "Confused by 'actually', asks for clarification",
+        "Mixes picks from both neighborhoods",
+        "Loses session context"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:54:54.647Z"
+    },
+    {
+      "name": "Happy path: Astoria MORE then detail",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "astoria"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Astoria:\n\n1) Karaoke Night at Terraza 7 — Latin vibes, full backyard. 9pm, free\n\n2) Indie Rock Showcase at Queensboro — three bands, all local. 8pm, $10\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More in Astoria:\n\n3) Salsa Dancing at The Bohemian Hall — outdoor beer garden, live band. 9pm, $15\n\n4) Open Mic Poetry at Astoria Bookshop — cozy spot, bring your verses. 7:30pm, free\n\nReply 3-4 for details"
+        },
+        {
+          "sender": "user",
+          "message": "3"
+        },
+        {
+          "sender": "pulse",
+          "message": "The Bohemian Hall has the best beer garden in Queens — massive outdoor space, Czech heritage vibes. Tonight's salsa night with a live band under the trees. Starts at 9, $15 cover. https://bohemianhall.com"
+        }
+      ],
+      "testing": "MORE command followed by detail request on new picks",
+      "expected_behavior": "User gets initial picks, requests MORE, then details on one of the additional picks (numbered 3-4)",
+      "failure_modes": [
+        "MORE returns duplicate events",
+        "Pick numbering doesn't continue (restarts at 1)",
+        "Details don't match pick #3"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:54:54.647Z"
+    },
+    {
+      "name": "Happy path: Greenpoint quick pick and detail",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "greenpoint"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Greenpoint:\n\n1) Karaoke Night at Skinny Dennis — honky-tonk bar with killer song list. 9pm, free\n\n2) DJ Nita at Black Flamingo — house and disco til late. 10pm, $10\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "Black Flamingo is a cozy spot on Manhattan Ave — velvet booths, intimate vibes. DJ Nita spins house and disco, great energy without being too packed. 10pm start, $10 cover. https://blackflamingobk.com"
+        }
+      ],
+      "testing": "Simple neighborhood request followed by single detail request",
+      "expected_behavior": "Pulse returns picks for Greenpoint, then provides rich details for pick #2 when requested",
+      "failure_modes": [
+        "Details don't match pick #2",
+        "Generic response without venue color",
+        "No URL provided"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:55:25.673Z"
+    },
+    {
+      "name": "Happy path: Crown Heights live music to details",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "live music crown heights"
+        },
+        {
+          "sender": "pulse",
+          "message": "Live music in Crown Heights tonight:\n\n1) Afrobeat Jam at Franklin Park — live band, dance party after. 9pm, $15\n\n2) Open Mic at Butter & Scotch — acoustic vibes at a dessert bar. 8pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "Franklin Park on Franklin Ave is a Crown Heights staple — big backyard, great sound system. Tonight's Afrobeat Jam features a rotating live band, then turns into a full dance party. 9pm, $15. https://franklinparkbrooklyn.com"
+        },
+        {
+          "sender": "user",
+          "message": "perfect thanks"
+        },
+        {
+          "sender": "pulse",
+          "message": "have fun out there"
+        }
+      ],
+      "testing": "Category filter with neighborhood, detail request, polite sign-off",
+      "expected_behavior": "Pulse combines 'live music' category with 'crown heights' neighborhood, provides detailed venue info, handles gratitude warmly",
+      "failure_modes": [
+        "Ignores 'live music' filter",
+        "Details don't match event #1",
+        "Awkward or robotic sign-off"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:55:25.673Z"
+    },
+    {
+      "name": "Happy path: LIC to Astoria switch",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "long island city"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Long Island City:\n\n1) Rooftop Film Club at LIC Landing — outdoor movie screening. 8pm, $18\n\n2) Trivia Night at Dutch Kills — craft cocktails and questions. 7:30pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "actually astoria"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Astoria:\n\n1) Latin Night at The Bonnie — salsa and bachata, live DJ. 10pm, $8\n\n2) Comedy Showcase at QED — rotating comedians, intimate room. 8pm, $12\n\nReply 1-2 for details, MORE for extra picks"
+        }
+      ],
+      "testing": "User switches neighborhoods immediately after initial picks",
+      "expected_behavior": "Pulse recognizes neighborhood change request and returns fresh picks for Astoria without needing 'neighborhood switch' phrasing",
+      "failure_modes": [
+        "Doesn't recognize 'actually astoria' as a switch",
+        "Returns LIC events instead",
+        "Loses context"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:55:25.673Z"
+    },
+    {
+      "name": "Happy path: Prospect Heights MORE command",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "prospect heights"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Prospect Heights:\n\n1) Jazz Quartet at Barbès — intimate basement venue, killer players. 9pm, $15\n\n2) Vinyl Night at Weather Up — DJ spins rare records. 8pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More in Prospect Heights:\n\n1) Poetry Reading at Unnameable Books — local authors, cozy vibes. 7pm, free\n\n2) Rock Show at Schnitzel Haus — garage rock triple bill. 10pm, $10\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "cool that's all"
+        },
+        {
+          "sender": "pulse",
+          "message": "enjoy"
+        }
+      ],
+      "testing": "MORE command returns additional picks in same neighborhood, handles casual dismissal",
+      "expected_behavior": "Pulse returns new events (not repeats) in Prospect Heights, recognizes 'that's all' as session end",
+      "failure_modes": [
+        "Repeats same events",
+        "Loses neighborhood context",
+        "Doesn't recognize dismissal"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:55:25.673Z"
+    },
+    {
+      "name": "Happy path: West Village late request",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "west village later tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "Later tonight in West Village:\n\n1) DJ Spinna at The Jungle — house music til 3am. 11pm, $15\n\n2) Late Night Jazz at Blue Note — final set starts midnight. 12am, $25\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1 please"
+        },
+        {
+          "sender": "pulse",
+          "message": "The Jungle on Gansevoort is a West Village dance haven — dark, sweaty, great sound. DJ Spinna's a legend, spinning house and funk til 3am. Gets going around 11pm, $15 cover. https://thejunglenyc.com"
+        }
+      ],
+      "testing": "Time filter ('later tonight') combined with neighborhood request",
+      "expected_behavior": "Pulse interprets 'later tonight' as a time constraint and returns events with later start times in West Village",
+      "failure_modes": [
+        "Ignores time filter, shows early events",
+        "No late-night events returned",
+        "Details don't match pick #1"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:55:25.673Z"
+    },
+    {
+      "name": "Happy path: Tribeca quick pick",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "tribeca"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Tribeca:\n\n1) Quantum at The Screening Room — experimental jazz trio, intimate setting. 8pm, $15\n\n2) Open Mic Poetry at Poet's Den — spoken word showcase, always surprises. 9pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "Poet's Den on Franklin is a cozy spot — exposed brick, dim lights, the whole vibe. Tonight's open mic brings out some real talent mixed with brave first-timers. Free entry, 9pm start. https://poetsdentribeca.com"
+        }
+      ],
+      "testing": "Simple neighborhood query with single detail request in underused neighborhood",
+      "expected_behavior": "Pulse returns curated picks for Tribeca, provides rich venue details on request",
+      "failure_modes": [
+        "No Tribeca events returned",
+        "Generic venue description",
+        "Wrong pick details"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:55:55.777Z"
+    },
+    {
+      "name": "Happy path: time filter — early show request",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "soho tonight early"
+        },
+        {
+          "sender": "pulse",
+          "message": "Early tonight in SoHo:\n\n1) Jazz Standards at Zinc Bar — classic sets from the old guard. 7pm, $15\n\n2) Acoustic Showcase at The Bitter End — singer-songwriter night, intimate vibes. 6:30pm, $10\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "perfect thanks"
+        },
+        {
+          "sender": "pulse",
+          "message": "enjoy!"
+        }
+      ],
+      "testing": "Time filter applied upfront — early shows",
+      "expected_behavior": "Pulse recognizes 'early' as time constraint, returns only early-evening events",
+      "failure_modes": [
+        "Returns late-night shows",
+        "Ignores time filter",
+        "No early events found"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:55:55.777Z"
+    },
+    {
+      "name": "Happy path: direct MORE without details",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "lic"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Long Island City:\n\n1) Disco Fever at LIC Bar — retro dance party, vinyl only. 10pm, free\n\n2) Indie Rock Showcase at The Gantries — three local bands. 8:30pm, $12\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More in Long Island City:\n\n1) Electronic Vibes at Dutch Kills — ambient techno night with rotating DJs. 11pm, $8\n\n2) Open Jam at The Creek — bring your instrument or just listen. 9pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        }
+      ],
+      "testing": "User requests MORE immediately without checking details first",
+      "expected_behavior": "Pulse serves fresh picks without requiring detail views first",
+      "failure_modes": [
+        "Repeats same events",
+        "Loses neighborhood context",
+        "Requires detail view before MORE"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:55:55.777Z"
+    },
+    {
+      "name": "Happy path: live music Bed-Stuy to details",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "bed stuy live music"
+        },
+        {
+          "sender": "pulse",
+          "message": "Live music in Bed-Stuy tonight:\n\n1) Soul Night at Sista's Place — legendary jazz spot, incredible vocals. 8pm, $20\n\n2) Afrobeat Party at Therapy Wine Bar — live band plus DJ, dancing guaranteed. 9:30pm, $15\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "Sista's Place is a Bed-Stuy institution — intimate jazz venue run by Patience Higgins for decades. Tonight's soul night features rotating vocalists backed by a killer house band. Real deal. 8pm, $20. https://sistasplace.org"
+        },
+        {
+          "sender": "user",
+          "message": "perfect"
+        },
+        {
+          "sender": "pulse",
+          "message": "have a great night"
+        }
+      ],
+      "testing": "Category request with neighborhood, detail view, natural sign-off",
+      "expected_behavior": "Pulse filters by both category and neighborhood, provides venue history in details, handles casual sign-off",
+      "failure_modes": [
+        "Returns non-music events",
+        "Generic venue description",
+        "Awkward sign-off"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:55:55.777Z"
+    },
+    {
+      "name": "Happy path: Upper West Side to Lower East Side switch",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "upper west side"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight on the Upper West Side:\n\n1) Chamber Music at Merkin Hall — string quartet playing contemporary classics. 7:30pm, $25\n\n2) Jazz Standards at Dizzy's — Lincoln Center's jazz club, world-class musicians. 9pm, $35\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "actually lower east side"
+        },
+        {
+          "sender": "pulse",
+          "message": "Switching to Lower East Side:\n\n1) Punk Karaoke at Arlene's Grocery — sing punk classics with a live band. 10pm, free\n\n2) DJ Spinna at Public Records — vinyl-only soul and funk session. 11pm, $15\n\nReply 1-2 for details, MORE for extra picks"
+        }
+      ],
+      "testing": "User changes mind and switches neighborhoods before viewing details",
+      "expected_behavior": "Pulse smoothly switches neighborhoods, drops previous picks, returns new curated list",
+      "failure_modes": [
+        "Mixes UWS and LES events",
+        "Doesn't acknowledge switch",
+        "Keeps previous neighborhood context"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:55:55.777Z"
+    },
+    {
+      "name": "Happy path: Tribeca single pick quick grab",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "tribeca"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Tribeca:\n\n1) The Silkworm at Roxy Cinema — rare 35mm noir screening, film nerds unite. 8pm, $15\n\n2) Late Night Jazz at The Django — Reinhardt vibes in a stunning space. 11pm, $25\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "The Django is tucked inside the Roxy Hotel — art deco glam, intimate tables, Django Reinhardt tribute vibe. Tonight's late set at 11pm features some of the city's best gypsy jazz players. $25 cover. https://thedjangonyc.com"
+        }
+      ],
+      "testing": "User requests one specific pick detail and is satisfied",
+      "expected_behavior": "Pulse delivers picks for Tribeca, then provides detailed info on pick #2 when requested",
+      "failure_modes": [
+        "Details don't match pick #2",
+        "Continues prompting after user is done",
+        "Wrong venue info"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:56:26.292Z"
+    },
+    {
+      "name": "Happy path: Boerum Hill to Carroll Gardens switch",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "boerum hill"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Boerum Hill:\n\n1) Open Mic at Jalopy Theatre — folk/bluegrass, intimate room, $5 suggested\n\n2) Trivia Night at Sottocasa — pizza + general knowledge, free to play\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "carroll gardens instead"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Carroll Gardens:\n\n1) Wine Tasting at Stinky Bklyn — natural wines + cheese, chill vibes. 7pm, $35\n\n2) Singer-Songwriter Night at Brooklyn Social — local artists, cozy spot. 9pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        }
+      ],
+      "testing": "User switches to nearby neighborhood before engaging with picks",
+      "expected_behavior": "Pulse immediately switches neighborhood context and delivers fresh picks without confusion",
+      "failure_modes": [
+        "Doesn't recognize neighborhood switch",
+        "Mixes events from both neighborhoods",
+        "Asks clarifying questions instead of switching"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:56:26.292Z"
+    },
+    {
+      "name": "Happy path: Upper East Side dance request",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "dance party upper east side"
+        },
+        {
+          "sender": "pulse",
+          "message": "Dance tonight on the Upper East Side:\n\n1) 80s Night at The Penrose — throwback dance party, generous pours. 10pm, free\n\n2) Latin Night at Barrio — salsa & bachata, all levels welcome. 9pm, $10\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "perfect thanks"
+        },
+        {
+          "sender": "pulse",
+          "message": "have a great night out there"
+        }
+      ],
+      "testing": "Category request with neighborhood returns filtered results, user signs off satisfied",
+      "expected_behavior": "Pulse recognizes 'dance party' as activity filter, applies to UES, gracefully handles thanks",
+      "failure_modes": [
+        "Ignores dance/party filter",
+        "Returns non-dance events",
+        "Awkward sign-off"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:56:26.292Z"
+    },
+    {
+      "name": "Happy path: quick Ridgewood browse to detail",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "what's good in ridgewood"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Ridgewood:\n\n1) Ambient Showcase at Trans-Pecos — experimental sound, heady vibes. 9pm, $15\n\n2) Karaoke Night at Nowadays — outdoor courtyard, no shame zone. 10pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "Trans-Pecos is a Ridgewood gem — DIY venue with a stellar sound system and adventurous bookings. Tonight's ambient showcase features three local artists doing deep listening sets. Heady, meditative, worth the trek. 9pm, $15. https://trans-pecos.com"
+        },
+        {
+          "sender": "user",
+          "message": "sold"
+        },
+        {
+          "sender": "pulse",
+          "message": "enjoy 🎧"
+        }
+      ],
+      "testing": "Natural question format, quick detail grab, casual affirmation",
+      "expected_behavior": "Pulse handles conversational opener, provides detail on request, responds warmly to enthusiasm",
+      "failure_modes": [
+        "Doesn't parse 'what's good in' format",
+        "Details don't match pick #1",
+        "Overly formal sign-off"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:56:26.292Z"
+    },
+    {
+      "name": "Happy path: Washington Heights music to MORE",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "live music washington heights"
+        },
+        {
+          "sender": "pulse",
+          "message": "Live music tonight in Washington Heights:\n\n1) Salsa Night at La Marina — waterfront spot, live band, dancing til late. 9pm, $15\n\n2) Open Mic at Coogan's — neighborhood staple, all genres welcome. 8pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More live music in Washington Heights:\n\n1) Bachata Night at The Uptown Lounge — romantic vibes, great dancers. 10pm, $10\n\nReply 1 for details"
+        }
+      ],
+      "testing": "Category + neighborhood request, user wants more options before committing",
+      "expected_behavior": "Pulse applies music filter to Washington Heights, serves MORE with fresh options maintaining filter",
+      "failure_modes": [
+        "MORE returns duplicate events",
+        "Loses music filter on MORE",
+        "Switches neighborhoods unexpectedly"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:56:26.292Z"
+    },
+    {
+      "name": "Happy path: Financial District to Brooklyn Heights switch",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "financial district"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Financial District:\n\n1) Jazz at Django — classic club in the Roxy Hotel, world-class players. 8pm, $30\n\n2) Tribeca Talks at BMCC — free speaker series, filmmaker tonight. 7pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "actually brooklyn heights"
+        },
+        {
+          "sender": "pulse",
+          "message": "Switching to Brooklyn Heights:\n\n1) Poetry Reading at St. Ann's Warehouse — intimate evening with local poets. 7:30pm, $15\n\n2) Classical Guitar at One Brooklyn Bridge Park — outdoor concert series. 8pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "One Brooklyn Bridge Park does free outdoor concerts all summer — tonight's classical guitarist is part of their weekly series. Beautiful spot right on the water, bring a blanket. 8pm start. https://brooklynbridgepark.org/events"
+        }
+      ],
+      "testing": "Neighborhood switch then detail request on new location's picks",
+      "expected_behavior": "Pulse smoothly switches neighborhoods, returns fresh picks for the new location, provides detail for pick #2 from the new set",
+      "failure_modes": [
+        "Details reference wrong pick or old neighborhood",
+        "Doesn't acknowledge neighborhood switch",
+        "Loses context between switch and detail request"
+      ],
+      "difficulty": "must_pass",
+      "grounded_at": "2026-02-23T05:56:35.559Z"
+    },
+    {
+      "name": "Filter drift: category persists through MORE exhaustion and neighborhood switch",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "jazz in cobble hill"
+        },
+        {
+          "sender": "pulse",
+          "message": "Jazz in Cobble Hill:\n\n1) Vinyl Jazz Night at Clover Club — classic cocktails and Blue Note records. 8pm, Free\n2) Sunday Jazz Brunch at Battersby — intimate trio, reservations recommended. 11am, $25\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "That's all the jazz I've got for Cobble Hill tonight. Want me to check nearby Carroll Gardens?"
+        },
+        {
+          "sender": "user",
+          "message": "yeah"
+        },
+        {
+          "sender": "pulse",
+          "message": "Jazz in Carroll Gardens:\n\n1) Latin Jazz Trio at Leyenda — salsa-inflected standards, mezcal cocktails. 9pm, $15\n2) Experimental Jazz at The Pines — avant-garde quartet, dim lighting. 10pm, $12\n3) Late Night Jazz at Frankies 457 — classic Italian spot with live music. 10:30pm, $10\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "actually try park slope"
+        },
+        {
+          "sender": "pulse",
+          "message": "Jazz in Park Slope:\n\n1) Sunday Jazz Brunch at Union Hall — bocce + bebop combo. 12pm, $20\n2) Jazz Standards at Barbes — intimate Brooklyn institution, classic trio. 9pm, $15\n3) Late Night Jazz at Lowlands — Belgian beer + smooth piano. 10pm, Free\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "3"
+        },
+        {
+          "sender": "pulse",
+          "message": "🎹 Late Night Jazz at Lowlands — Cozy Belgian bar in Park Slope with a smooth piano trio running standards. Great beer list, low-key crowd. Perfect late-night vibe.\n\n10pm, Free\n\nhttps://lowlandsbar.com/jazz"
+        }
+      ],
+      "testing": "Jazz category filter should persist through MORE exhaustion, travel nudge acceptance, user-initiated neighborhood switch, and into final detail request",
+      "expected_behavior": "Jazz filter detected initially. MORE exhaustion triggers nudge but keeps jazz active. Travel nudge acceptance shows jazz in new neighborhood. User switches to third neighborhood ('actually try park slope') — jazz should still be active. Detail request shows jazz event.",
+      "failure_modes": [
+        "Jazz filter lost after MORE exhaustion",
+        "Jazz filter lost after travel nudge",
+        "Jazz filter lost after user-initiated neighborhood switch",
+        "System shows all events instead of jazz-filtered after switch",
+        "Detail shows non-jazz event"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:57:34.913Z"
+    },
+    {
+      "name": "Filter drift: free filter persists through multiple MORE commands",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "free stuff in prospect heights"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free events in Prospect Heights:\n\n1) Open Mic at Barboncino — pizza place with a stage, music/comedy mix. 8pm, Free\n2) Art Opening at Field Projects — experimental gallery, wine reception. 7pm, Free\n3) Trivia Night at Weather Up — craft cocktails and tough questions. 8:30pm, Free\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More free events in Prospect Heights:\n\n4) DJ Set at Olmsted — backyard party vibes, natural wine. 9pm, Free\n5) Poetry Reading at Unnameable Books — local writers, intimate space. 7:30pm, Free\n\nReply 4-5 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More free events in Prospect Heights:\n\n6) Community Board Game Night at Berg'n — food hall with tables set up. 7pm, Free\n7) Late Night DJ at Franklin Park — indie dance party, cash bar. 11pm, Free\n\nReply 6-7 for details"
+        },
+        {
+          "sender": "user",
+          "message": "6"
+        },
+        {
+          "sender": "pulse",
+          "message": "🎲 Community Board Game Night at Berg'n — Food hall in Prospect Heights hosts a weekly game night with loaner games. Grab food from the vendors, pull up a table, meet some locals. Chill Tuesday vibe.\n\n7pm, Free\n\nhttps://bergn.com/events"
+        }
+      ],
+      "testing": "Free filter should persist through multiple consecutive MORE commands without degrading",
+      "expected_behavior": "Free filter detected from 'free stuff' query. All picks across three sets should be free events. Each MORE command should return additional free events. Detail request shows a free event from the third batch.",
+      "failure_modes": [
+        "Free filter lost after first MORE",
+        "Free filter lost after second MORE",
+        "Paid events leak into second or third batch",
+        "System drops filter silently and shows all events",
+        "Detail shows paid event"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:57:34.913Z"
+    },
+    {
+      "name": "Filter drift: time filter cleared by 'anytime' then re-applied",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "later tonight in bed stuy"
+        },
+        {
+          "sender": "pulse",
+          "message": "Late events in Bed-Stuy:\n\n1) DJ Set at Saraghina — Italian spot turns into dance party. 10pm, Free\n2) Late Night Jazz at Chez Oscar — intimate trio, wine bar setting. 11pm, $15\n3) Midnight Screening at Syndicated — cult classic film + food menu. 12am, $12\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "show me everything"
+        },
+        {
+          "sender": "pulse",
+          "message": "All events in Bed-Stuy:\n\n1) Open Mic at Sistas' Place — jazz and spoken word. 7pm, $10\n2) Trivia Night at Do or Dive — neighborhood bar, relaxed crowd. 8pm, Free\n3) DJ Set at Saraghina — Italian spot turns into dance party. 10pm, Free\n4) Late Night Jazz at Chez Oscar — intimate trio, wine bar setting. 11pm, $15\n\nReply 1-4 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "actually just later"
+        },
+        {
+          "sender": "pulse",
+          "message": "Late events in Bed-Stuy:\n\n1) DJ Set at Saraghina — Italian spot turns into dance party. 10pm, Free\n2) Late Night Jazz at Chez Oscar — intimate trio, wine bar setting. 11pm, $15\n3) Midnight Screening at Syndicated — cult classic film + food menu. 12am, $12\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "🎷 Late Night Jazz at Chez Oscar — Cozy wine bar in Bed-Stuy with a bebop trio playing standards. Candlelit tables, French wine list, late-night crowd settling in for the vibe.\n\n11pm, $15\n\nhttps://chezoscarnyc.com"
+        }
+      ],
+      "testing": "Time filter should clear when user says 'show me everything', then be re-applicable when user says 'actually just later'",
+      "expected_behavior": "Initial query has 'later tonight' time filter — picks start at 10pm+. 'Show me everything' clears time filter — picks include earlier events. 'Actually just later' re-applies time filter — picks return to 10pm+ only. Detail shows late event.",
+      "failure_modes": [
+        "Time filter persists after 'show me everything'",
+        "Time filter doesn't re-apply after 'actually just later'",
+        "Early events leak into final filtered picks",
+        "'Show me everything' doesn't actually show early events",
+        "Detail shows early event instead of late event"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:57:34.913Z"
+    },
+    {
+      "name": "Filter drift: compound filter cleared partially then rebuilt differently",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "free jazz in bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free jazz in Bushwick:\n\n1) Experimental Jazz at Trans-Pecos — avant-garde quartet, DIY space. 9pm, Free\n2) Sunday Jazz Jam at Footlight — open session, all welcome. 8pm, Free\n3) Vinyl Jazz Night at The Johnson's — DJs spinning classic albums. 10pm, Free\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "forget the free part"
+        },
+        {
+          "sender": "pulse",
+          "message": "Jazz in Bushwick:\n\n1) Experimental Jazz at Trans-Pecos — avant-garde quartet, DIY space. 9pm, Free\n2) Sunday Jazz Jam at Footlight — open session, all welcome. 8pm, Free\n3) Latin Jazz Trio at Nowadays — outdoor stage, tropical drinks. 9pm, $12\n4) Late Night Jazz at The Johnsons — intimate trio, craft cocktails. 10:30pm, $15\n\nReply 1-4 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "make it free but drop the jazz"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free events in Bushwick:\n\n1) Experimental Jazz at Trans-Pecos — avant-garde quartet, DIY space. 9pm, Free\n2) Sunday Jazz Jam at Footlight — open session, all welcome. 8pm, Free\n3) Open Mic at Mood Ring — queer bar, comedy/music mix. 8pm, Free\n4) Art Opening at 99 Scott — gallery show with wine. 7pm, Free\n5) DJ Set at House of Yes — theme night with costumes. 11pm, Free\n\nReply 1-5 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "3"
+        },
+        {
+          "sender": "pulse",
+          "message": "🌈 Open Mic at Mood Ring — Queer bar in Bushwick hosting a weekly open mic with comedy, music, spoken word — anything goes. Welcoming crowd, strong drinks, always a good time.\n\n8pm, Free\n\nhttps://moodringbk.com"
+        }
+      ],
+      "testing": "Compound filters (free+jazz) should be independently removable and re-combinable in different configurations",
+      "expected_behavior": "Initial compound: free+jazz. 'Forget the free part' removes free, keeps jazz — shows all jazz (free and paid). 'Make it free but drop the jazz' removes jazz, adds back free — shows all free events including non-jazz. Detail shows free non-jazz event.",
+      "failure_modes": [
+        "Both filters cleared instead of just free",
+        "Free filter persists after 'forget the free part'",
+        "Jazz filter persists after 'drop the jazz'",
+        "Both filters cleared after second instruction",
+        "Final picks show jazz events or paid events",
+        "Detail shows jazz or paid event"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:57:34.913Z"
+    },
+    {
+      "name": "Filter drift: category filter survives gibberish interruption",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "live music in astoria"
+        },
+        {
+          "sender": "pulse",
+          "message": "Live music in Astoria:\n\n1) Rock Showcase at The Shillelagh Tavern — local bands, dive bar energy. 9pm, $10\n2) Acoustic Night at Katch — rooftop bar with singer-songwriters. 8pm, Free\n3) DJ Set at The Bonnie — electronic music, outdoor patio. 10pm, $12\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "jfjdjdksksk"
+        },
+        {
+          "sender": "pulse",
+          "message": "Sorry, didn't catch that. Still showing live music in Astoria — reply 1-3 for details or MORE for extra picks."
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More live music in Astoria:\n\n4) Jazz Trio at The Wolfhound — Irish pub with Sunday jazz sessions. 7pm, Free\n5) Karaoke Night at The Ditty — live band karaoke, full setlist. 9pm, $5\n\nReply 4-5 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "4"
+        },
+        {
+          "sender": "pulse",
+          "message": "🍀 Jazz Trio at The Wolfhound — Irish pub in Astoria with Sunday jazz sessions. Classic standards, Guinness on tap, neighborhood regulars. Chill vibe, no pretension.\n\n7pm, Free\n\nhttps://wolfhoundastoria.com/jazz"
+        }
+      ],
+      "testing": "Live music category filter should survive gibberish input and remain active for subsequent MORE and detail commands",
+      "expected_behavior": "Live music filter applied initially. Gibberish message acknowledged but doesn't clear filter or session. MORE command returns additional live music picks. Detail shows live music event.",
+      "failure_modes": [
+        "Gibberish clears the filter",
+        "Gibberish ends the session",
+        "MORE returns unfiltered events",
+        "System forgets which picks were shown before gibberish",
+        "Detail shows non-music event"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:57:34.913Z"
+    },
+    {
+      "name": "Filter drift: price filter clears gracefully with 'anything' then reapplies",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "free stuff in bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free events in Bushwick:\n\n1) Art Opening at The Living Gallery — installations + wine. 7pm, Free\n2) Dance Party at Mood Ring — queer dance night, sliding scale. 10pm, Free\n3) Open Mic at The Johnsons — comedy and music mashup. 9pm, Free\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "show me anything"
+        },
+        {
+          "sender": "pulse",
+          "message": "All events in Bushwick:\n\n1) Art Opening at The Living Gallery — installations + wine. 7pm, Free\n2) Live Band Karaoke at Berlin — sing with a real band. 9pm, $15\n3) Techno Night at Elsewhere — basement zone, heavy bass. 11pm, $20\n4) Comedy Showcase at The Meadow — local comics. 8pm, $10\n\nReply 1-4 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "actually keep it free"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free events in Bushwick:\n\n1) Art Opening at The Living Gallery — installations + wine. 7pm, Free\n2) Dance Party at Mood Ring — queer dance night, sliding scale. 10pm, Free\n3) Open Mic at The Johnsons — comedy and music mashup. 9pm, Free\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "3"
+        },
+        {
+          "sender": "pulse",
+          "message": "🎤 Open Mic at The Johnsons — Neighborhood bar with a stage and no pretension. Comics and musicians take turns, quality varies wildly but the energy's always fun. Cash bar, good crowd.\n\n9pm, Free\n\nhttps://thejohnsonsbk.com"
+        }
+      ],
+      "testing": "Free filter should clear when user says 'anything' or 'show me anything', then cleanly reapply when user says 'actually keep it free' or similar. Filter state should toggle cleanly without confusion.",
+      "expected_behavior": "Free filter active initially. 'Show me anything' clears the filter — results include paid events. 'Actually keep it free' reapplies free filter. Final detail request should work against the re-filtered list.",
+      "failure_modes": [
+        "'Show me anything' doesn't clear the free filter",
+        "'Actually keep it free' stacks a second free filter instead of reapplying",
+        "Filter reapplication returns different events than initial free results without explanation",
+        "Paid events leak through after free filter reapplied"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:58:31.939Z"
+    },
+    {
+      "name": "Filter drift: category survives MORE exhaustion into neighborhood switch",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "jazz in prospect heights"
+        },
+        {
+          "sender": "pulse",
+          "message": "Jazz in Prospect Heights:\n\n1) Sunday Jazz Brunch at Barboncino — laid-back trio, great pizza. 12pm, $15\n2) Evening Standards at Freddy's — piano bar classics. 8pm, $10\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "That's all the jazz in Prospect Heights tonight. Crown Heights has some solid spots though — want me to check there?"
+        },
+        {
+          "sender": "user",
+          "message": "nah, try park slope"
+        },
+        {
+          "sender": "pulse",
+          "message": "Jazz in Park Slope:\n\n1) Latin Jazz Night at Barbès — intimate basement venue, great vibe. 9pm, $15\n2) Swing Standards at Union Hall — classic trio, bocce in back. 8pm, $12\n3) Experimental Jazz at Tea Lounge — avant-garde quartet. 10pm, $10\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "🎺 Latin Jazz Night at Barbès — Tiny basement bar in Park Slope with some of the best Latin jazz in Brooklyn. Salsa-inflected quartet, intimate seating, BYOB-friendly. Gets packed early.\n\n9pm, $15\n\nhttps://barbesbrooklyn.com"
+        }
+      ],
+      "testing": "Jazz category filter should persist through MORE exhaustion AND through user-initiated neighborhood switch (declining the nudge and choosing their own neighborhood).",
+      "expected_behavior": "Jazz filter active from start. MORE exhausts Prospect Heights jazz. System offers Crown Heights nudge. User declines and requests Park Slope instead. Jazz filter should still be active — Park Slope picks are jazz only. Detail request works against filtered list.",
+      "failure_modes": [
+        "Jazz filter lost when user declines nudge",
+        "Jazz filter lost when user switches to Park Slope",
+        "Park Slope results include non-jazz events",
+        "System forgets filter state during exhaustion + switch flow"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:58:31.939Z"
+    },
+    {
+      "name": "Filter drift: implicit category switch via new request",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "live music in greenpoint"
+        },
+        {
+          "sender": "pulse",
+          "message": "Live music in Greenpoint:\n\n1) Indie Rock at TV Eye — local bands, packed bar. 9pm, $12\n2) Acoustic Night at Troost — singer-songwriters, intimate. 8pm, $8\n3) Electronic Showcase at Good Room — modular synths, experimental. 10pm, $15\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More live music in Greenpoint:\n\n4) Jazz Trio at Black Rabbit — bebop standards, cozy bar. 9pm, $10\n5) Punk Night at Saint Vitus — heavy lineup, loud. 10pm, $15\n\nReply 4-5 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "what about comedy"
+        },
+        {
+          "sender": "pulse",
+          "message": "Comedy in Greenpoint:\n\n1) Stand-Up Showcase at The Diamond — rotating comics, craft cocktails. 8pm, $10\n2) Improv Night at The Footlight — long-form scenes, audience prompts. 9pm, $12\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "🎭 Improv Night at The Footlight — Long-form improv troupe takes audience suggestions and builds entire narratives. Greenpoint theater space with a full bar. Hit or miss but always entertaining.\n\n9pm, $12\n\nhttps://thefootlightbar.com"
+        }
+      ],
+      "testing": "'What about comedy' after live music filter should REPLACE the category, not stack. User is implicitly asking to switch focus, not find live music comedy hybrids.",
+      "expected_behavior": "Live music filter active initially. MORE shows more live music. 'What about comedy' replaces live music with comedy filter. Comedy picks shown, no music events. Detail request works against comedy list.",
+      "failure_modes": [
+        "Comedy stacks with live music — returns empty or nonsense results",
+        "Both filters dropped — shows all events",
+        "Live music filter persists — only shows musical comedy",
+        "'What about' treated as compound instead of replacement"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:58:31.939Z"
+    },
+    {
+      "name": "Filter drift: time filter persists through category addition",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "later tonight in astoria"
+        },
+        {
+          "sender": "pulse",
+          "message": "Events starting late in Astoria:\n\n1) DJ Set at The Quays — house music, waterfront bar. 11pm, $15\n2) Karaoke Night at Wolfhound — Irish bar, loose crowd. 10pm, Free\n3) Comedy Showcase at QED — stand-up in a bookstore. 10:30pm, $10\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "keep it to live music"
+        },
+        {
+          "sender": "pulse",
+          "message": "Live music starting late in Astoria:\n\n1) Jazz Night at The Bonnie — bebop trio, intimate bar. 10pm, $12\n2) Rock Showcase at Katch — local bands, rooftop stage. 11pm, $15\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "🎷 Jazz Night at The Bonnie — Cozy Astoria bar with a bebop trio running standards. Dimly lit, great cocktails, intimate seating. Solid neighborhood spot.\n\n10pm, $12\n\nhttps://thebonnienyc.com"
+        }
+      ],
+      "testing": "Time filter ('later tonight') should persist when user adds a category filter ('keep it to live music'). Both filters should compound correctly.",
+      "expected_behavior": "Time filter active initially — events starting after ~9:30pm. 'Keep it to live music' adds category filter on top. Results are late-starting live music events only. Detail request works against compound-filtered list.",
+      "failure_modes": [
+        "Time filter dropped when category added",
+        "Category replaces time instead of stacking",
+        "Results include early live music events",
+        "Results include late non-music events"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:58:31.939Z"
+    },
+    {
+      "name": "Filter drift: explicit filter clear mid-compound then single filter reapply",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "free jazz in fort greene"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free jazz in Fort Greene:\n\n1) Sunday Jazz Session at Frank's Cocktail Lounge — open jam, byob. 3pm, Free\n2) Experimental Jazz at Roulette — avant-garde, donor-supported. 8pm, Free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "That's all the free jazz in Fort Greene tonight. Bed-Stuy has some good spots though — want me to check there?"
+        },
+        {
+          "sender": "user",
+          "message": "forget the free part"
+        },
+        {
+          "sender": "pulse",
+          "message": "Jazz in Fort Greene (all prices):\n\n1) Sunday Jazz Session at Frank's Cocktail Lounge — open jam, byob. 3pm, Free\n2) Latin Jazz at Sputnik — salsa-inflected quartet. 9pm, $15\n3) Bebop Night at Putnam Public House — classic trio. 8pm, $12\n4) Experimental Jazz at Roulette — avant-garde, donor-supported. 8pm, Free\n\nReply 1-4 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "now drop jazz too"
+        },
+        {
+          "sender": "pulse",
+          "message": "All events in Fort Greene:\n\n1) Sunday Jazz Session at Frank's Cocktail Lounge — open jam, byob. 3pm, Free\n2) Comedy Showcase at Irondale — local comics in a theater. 8pm, $10\n3) DJ Set at Putnam Public House — soul and funk vinyl. 10pm, Free\n4) Trivia Night at Ample Hills — ice cream + hard questions. 7pm, Free\n\nReply 1-4 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "actually just free"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free events in Fort Greene:\n\n1) Sunday Jazz Session at Frank's Cocktail Lounge — open jam, byob. 3pm, Free\n2) DJ Set at Putnam Public House — soul and funk vinyl. 10pm, Free\n3) Trivia Night at Ample Hills — ice cream + hard questions. 7pm, Free\n\nReply 1-3 for details, MORE for extra picks"
+        }
+      ],
+      "testing": "System should handle partial filter clearing (drop free, keep jazz), then full clearing (drop jazz too), then single filter reapplication (just free). Filter state should update correctly at each step.",
+      "expected_behavior": "Free + jazz compound initially. 'Forget the free part' drops price filter, keeps jazz. 'Drop jazz too' clears both — all events. 'Actually just free' reapplies only free filter. Each step shows correct filtered results.",
+      "failure_modes": [
+        "'Forget the free part' drops both filters",
+        "'Drop jazz too' doesn't work because jazz already gone",
+        "'Actually just free' stacks with existing state instead of replacing",
+        "Filter clearing doesn't expand results as expected"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:58:31.939Z"
+    },
+    {
+      "name": "Filter drift: category persists through explicit time filter removal",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "live music in bushwick later tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "Live music starting late in Bushwick:\n\n1) Indie Rock at Baby's All Right — three-band bill, packed room. 10pm, $15\n2) Jazz Trio at C'mon Everybody — intimate late set. 11pm, $12\n3) DJ Set + Live Drums at Elsewhere — electronic fusion. 11:30pm, $18\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "actually show me earlier stuff too"
+        },
+        {
+          "sender": "pulse",
+          "message": "Live music in Bushwick (all times):\n\n1) Folk Duo at The Bushwick Public House — acoustic storytelling. 7pm, $10\n2) Punk Show at Shea Stadium — three local bands. 8pm, $12\n3) Indie Rock at Baby's All Right — three-band bill, packed room. 10pm, $15\n4) Jazz Trio at C'mon Everybody — intimate late set. 11pm, $12\n\nReply 1-4 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More live music in Bushwick:\n\n5) Songwriter Night at The Johnsons — intimate acoustic circle. 8pm, Free\n6) DJ Set + Live Drums at Elsewhere — electronic fusion. 11:30pm, $18\n\nReply 5-6 for details"
+        },
+        {
+          "sender": "user",
+          "message": "5"
+        },
+        {
+          "sender": "pulse",
+          "message": "🎸 Songwriter Night at The Johnsons — Cozy bar with rotating local songwriters doing acoustic sets. Low-key vibe, good for discovering new artists. Cash bar.\n\n8pm, Free\n\nhttps://pulse.events/johnsons-songwriter-night"
+        }
+      ],
+      "testing": "Time filter should be removable via explicit user request ('show me earlier stuff too') while category filter (live music) persists through the change and subsequent MORE",
+      "expected_behavior": "Initial compound filter: live music + later tonight. User explicitly asks to remove time constraint. System drops time filter but keeps live music. Subsequent picks and MORE show live music at all times. Details reflect live music category still active.",
+      "failure_modes": [
+        "Both filters dropped when time filter removed",
+        "Time filter persists despite explicit removal request",
+        "Live music category lost when time constraint lifted",
+        "System treats request as filter clear instead of partial removal"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:59:29.598Z"
+    },
+    {
+      "name": "Filter drift: free filter survives category pivot via MORE exhaustion",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "free jazz in soho"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free jazz in SoHo:\n\n1) Afternoon Jazz at City Winery — Sunday matinee series. 2pm, Free\n2) Jazz Jam Session at The Django — open to sit-ins. 9pm, Free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "That's all the free jazz in SoHo tonight. I've got plenty of other free events though — want to see those?"
+        },
+        {
+          "sender": "user",
+          "message": "yeah"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free events in SoHo:\n\n1) Art Gallery Opening at Peter Freeman — wine and cheese, new exhibition. 6pm, Free\n2) Poetry Reading at Housing Works — local writers, bookstore vibe. 7pm, Free\n3) Trivia Night at The Wren — general knowledge, teams welcome. 8pm, Free\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "🎨 Art Gallery Opening at Peter Freeman — Contemporary art opening in a sleek SoHo gallery. Free wine, light bites, and a chance to see new work before the critics weigh in. Dresscode: effortlessly cool.\n\n6pm, Free\n\nhttps://peterfreemaninc.com"
+        }
+      ],
+      "testing": "When MORE exhausts a compound filter's results and user accepts pivot to broader results, the price filter (free) should persist while category (jazz) is dropped",
+      "expected_behavior": "free + jazz compound initially. MORE exhausts free jazz. System offers 'other free events' — implicit category drop, explicit free retention. User accepts. New picks are free but not jazz. Detail reflects free filter still active.",
+      "failure_modes": [
+        "Both filters dropped — shows paid events after pivot",
+        "Jazz filter persists — returns empty or repeated results",
+        "System doesn't offer logical pivot — just says no more events",
+        "Pivot offer unclear about which filter persists"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:59:29.598Z"
+    },
+    {
+      "name": "Filter drift: compound filter persists through detail request and neighborhood switch",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "free comedy in harlem"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free comedy in Harlem:\n\n1) Open Mic at Silvana — basement comedy room, rotating hosts. 8pm, Free\n2) Stand-Up Showcase at Harlem Public — established comics testing material. 9pm, Free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "🎤 Stand-Up Showcase at Harlem Public — Uptown comedy spot where established names test new hours before recording specials. Intimate room, strong local crowd. Cash bar.\n\n9pm, Free\n\nhttps://pulse.events/harlem-public-comedy"
+        },
+        {
+          "sender": "user",
+          "message": "what about upper west side"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free comedy in Upper West Side:\n\n1) Comedy Night at Stand Up NY — open mic with drop-ins. 7:30pm, Free\n2) Late Show at Gotham Comedy Club — industry night, free entry. 11pm, Free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "🎤 Comedy Night at Stand Up NY — Classic comedy club running free open mic on Mondays. Mix of rookies and occasional TV names working out new bits. Two-drink minimum still applies.\n\n7:30pm, Free\n\nhttps://www.standupny.com"
+        }
+      ],
+      "testing": "Compound filter (free + comedy) should persist across detail request and neighborhood switch. User never explicitly reapplies filters after switching neighborhoods.",
+      "expected_behavior": "free + comedy applied initially. Detail request doesn't affect filter state. Neighborhood switch to UWS should automatically carry forward free + comedy. Subsequent picks and details reflect compound filter still active.",
+      "failure_modes": [
+        "Detail request clears filters",
+        "Neighborhood switch drops one or both filters",
+        "System treats neighborhood switch as fresh session",
+        "Picks after switch show all UWS events instead of free comedy"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:59:29.598Z"
+    },
+    {
+      "name": "Filter drift: implicit category removal via neighborhood switch preserves price",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "free dance music in greenpoint"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free dance music in Greenpoint:\n\n1) Warehouse Party at Secret Loft — techno and house DJs. 11pm, Free\n2) DJ Night at Achilles Heel — disco and funk vinyl. 9pm, Free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "That's all the free dance music in Greenpoint. Want me to check Williamsburg?"
+        },
+        {
+          "sender": "user",
+          "message": "yes"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free dance music in Williamsburg:\n\n1) Late Night Dance Party at Elsewhere — house and techno in the zone. 11pm, Free\n2) Vinyl Dance Night at Union Pool — DJs spinning disco classics. 10pm, Free\n3) Electronic Showcase at Baby's All Right — local producers, heavy bass. 9pm, Free\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "actually just show me everything free"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free events in Williamsburg:\n\n1) Late Night Dance Party at Elsewhere — house and techno in the zone. 11pm, Free\n2) Vinyl Dance Night at Union Pool — DJs spinning disco classics. 10pm, Free\n3) Comedy Open Mic at The Footlight — testing new material. 8pm, Free\n4) Trivia Night at Spuyten Duyvil — beer nerd questions. 8pm, Free\n\nReply 1-4 for details, MORE for extra picks"
+        }
+      ],
+      "testing": "When user explicitly asks to drop category filter ('show me everything free') while compound filter is active, category should clear but price filter should persist",
+      "expected_behavior": "free + dance music compound initially. Persists through MORE exhaustion and neighborhood redirect. 'Show me everything free' explicitly drops dance music but keeps free. Final picks are free but not dance-specific.",
+      "failure_modes": [
+        "Both filters dropped — shows paid events",
+        "Dance music persists — returns only free dance events",
+        "System interprets as total filter clear",
+        "'Everything' misread as removing all constraints including free"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:59:29.598Z"
+    },
+    {
+      "name": "Filter drift: category filter survives ambiguous user response after nudge",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "jazz in cobble hill"
+        },
+        {
+          "sender": "pulse",
+          "message": "Not much jazz in Cobble Hill tonight. Want me to check nearby Carroll Gardens? Still keeping it jazz."
+        },
+        {
+          "sender": "user",
+          "message": "ok"
+        },
+        {
+          "sender": "pulse",
+          "message": "Jazz in Carroll Gardens:\n\n1) Latin Jazz at Bar Tabac — intimate trio, mojitos flowing. 9pm, $15\n2) Bebop Night at Clover Club — cocktail bar with live quartet. 8pm, $20\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "That's all the jazz I've got for Carroll Gardens tonight. Brooklyn Heights has some solid spots though — want me to check there?"
+        },
+        {
+          "sender": "user",
+          "message": "sure"
+        },
+        {
+          "sender": "pulse",
+          "message": "Jazz in Brooklyn Heights:\n\n1) Sunday Jazz Brunch at River Café — waterfront views, smooth trio. 12pm, $45\n2) Evening Jazz at Noodle Pudding — cozy Italian spot with live piano. 7pm, $25\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "🎹 Evening Jazz at Noodle Pudding — Cozy Italian spot on a quiet Brooklyn Heights corner. Live pianist playing standards while you eat. Very old-school New York, reservations recommended.\n\n7pm, $25 (cover, separate from dinner)\n\nhttps://noodlepudding.com"
+        }
+      ],
+      "testing": "Category filter (jazz) should persist through multiple nudges/redirects even when user responses are minimal and ambiguous ('ok', 'sure'). System should maintain filter confidence.",
+      "expected_behavior": "Jazz filter applied initially. First nudge explicit about filter persistence. Ambiguous 'ok' accepts. Picks are jazz. MORE exhausts, second nudge. Ambiguous 'sure' accepts. Picks still jazz. Detail reflects jazz category throughout.",
+      "failure_modes": [
+        "Jazz filter lost after first ambiguous response",
+        "Jazz filter lost after second redirect",
+        "System drops filter confidence due to minimal user engagement",
+        "Nudge claims to keep filter but delivers unfiltered results"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T05:59:29.598Z"
+    },
+    {
+      "name": "Filter drift: category persists through detail request and multiple MORE commands",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "jazz in harlem"
+        },
+        {
+          "sender": "pulse",
+          "message": "Jazz in Harlem:\n\n1) Bill's Place — speakeasy vibes, intimate bebop trio. 8pm, $20\n2) Minton's Playhouse — historic room, modern quartet. 9pm, $25\n3) Jazz at Lincoln Center's Dizzy's Club — panoramic views, established names. 7:30pm, $40\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "🎺 Bill's Place — Legendary Harlem speakeasy where bebop was born. Tiny room, no amplification, BYOB policy. Bebop trio running through classics. Reservation required.\n\n8pm, $20\n\nhttps://billsplaceharlem.com"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More jazz in Harlem:\n\n4) Shrine World Music Venue — Afrobeat and jazz fusion. 10pm, $15\n5) Paris Blues — divey late-night jam sessions. 11pm, $10\n\nReply 4-5 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More jazz in Harlem:\n\n6) Lenox Lounge Revival — classic cocktails, smooth standards trio. 8:30pm, $18\n7) Apollo Theater Jazz Night — monthly showcase, rotating ensembles. 9pm, $30\n\nReply 6-7 for details"
+        },
+        {
+          "sender": "user",
+          "message": "6"
+        },
+        {
+          "sender": "pulse",
+          "message": "🎷 Lenox Lounge Revival — Recreating the golden era vibe with craft cocktails and a smooth standards trio. Malcolm X used to drink here. Dress nicely.\n\n8:30pm, $18\n\nhttps://lenoxlounge.com/jazz"
+        }
+      ],
+      "testing": "Category filter should persist through detail requests and multiple MORE commands without being re-stated by the user. Jazz filter should remain active throughout the entire conversation.",
+      "expected_behavior": "Jazz filter applied in initial request. Detail request for pick 1 doesn't clear filter. First MORE returns more jazz. Second MORE returns even more jazz. Second detail request still shows jazz event. No non-jazz events appear at any point.",
+      "failure_modes": [
+        "Filter cleared by detail request",
+        "Filter cleared by first MORE command",
+        "Filter cleared by second MORE command",
+        "Non-jazz events leak into MORE results",
+        "System forgets filter between turns"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T06:00:28.173Z"
+    },
+    {
+      "name": "Filter drift: explicit 'everything' clears stacked filters then reapply single filter",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "free live music in bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free live music in Bushwick:\n\n1) Punk Matinee at Trans-Pecos — local bands, outdoor stage. 4pm, Free\n2) Jazz Jam at C'mon Everybody — open session, BYOB. 8pm, Free\n3) Electronic Showcase at Mood Ring — experimental synth collective. 9pm, Free\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "show me everything"
+        },
+        {
+          "sender": "pulse",
+          "message": "All events in Bushwick:\n\n1) DJ Night at Bossa Nova Civic Club — house and techno. 10pm, $15\n2) Comedy Open Mic at The Brewery — hit or miss lineup. 8pm, $8\n3) Punk Matinee at Trans-Pecos — local bands, outdoor stage. 4pm, Free\n4) Karaoke at Heaven or Las Vegas — dive bar vibes. 9pm, Free\n\nReply 1-4 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "free"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free events in Bushwick:\n\n1) Punk Matinee at Trans-Pecos — local bands, outdoor stage. 4pm, Free\n2) Jazz Jam at C'mon Everybody — open session, BYOB. 8pm, Free\n3) Karaoke at Heaven or Las Vegas — dive bar vibes. 9pm, Free\n4) Trivia Night at Wreck Room — themed rounds, prizes. 7:30pm, Free\n\nReply 1-4 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "4"
+        },
+        {
+          "sender": "pulse",
+          "message": "🟤 Trivia Night at Wreck Room — Weekly themed trivia with rotating categories and solid prizes. Gets competitive but stays fun. Good beer selection.\n\n7:30pm, Free\n\nhttps://wreckroombar.com/trivia"
+        }
+      ],
+      "testing": "'Show me everything' should explicitly clear compound filters (free + live music). User can then reapply a single filter (free) which should work cleanly without the original compound.",
+      "expected_behavior": "Initial request applies free + live music compound. Picks match both filters. 'Show me everything' clears both filters — picks are unfiltered. 'Free' reapplies only the free filter — picks are free events of any type, not just live music. Detail request works on free-filtered list.",
+      "failure_modes": [
+        "'Show me everything' doesn't clear filters",
+        "Live music filter persists after 'everything'",
+        "Reapplied 'free' filter revives the old 'live music' compound",
+        "Detail numbering breaks after filter changes"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T06:00:28.173Z"
+    },
+    {
+      "name": "Filter drift: time filter survives category addition mid-session",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "what's happening late in astoria"
+        },
+        {
+          "sender": "pulse",
+          "message": "Late tonight in Astoria:\n\n1) DJ Set at The Bonnie — house music, drinks till 4am. 11pm, $10\n2) Karaoke at Pomeroy's — dive bar classics. 10pm, Free\n3) Live Jazz at The Wolfhound — cozy Irish pub, small ensemble. 10:30pm, $8\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "live music"
+        },
+        {
+          "sender": "pulse",
+          "message": "Late live music in Astoria:\n\n1) Live Jazz at The Wolfhound — cozy Irish pub, small ensemble. 10:30pm, $8\n2) Acoustic Night at The Quays — singer-songwriter showcase. 11pm, Free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More late live music in Astoria:\n\n3) Rock Covers at Break Bar — classic hits, full band. 10pm, $12\n\nReply 3 for details"
+        },
+        {
+          "sender": "user",
+          "message": "3"
+        },
+        {
+          "sender": "pulse",
+          "message": "🎸 Rock Covers at Break Bar — Full band running through '70s and '80s rock classics. Gets loud and fun. Pool tables in back.\n\n10pm, $12\n\nhttps://breakbar.com/live"
+        }
+      ],
+      "testing": "Time filter ('late') should persist when user adds a category filter ('live music') mid-session. Compound filter (late + live music) should be active through MORE and detail requests.",
+      "expected_behavior": "Initial 'late in astoria' applies time filter — events starting after ~10pm. 'Live music' adds category filter — now late + live music compound is active. Picks after category addition match both filters. MORE continues with both filters. Detail request reflects the compound-filtered list.",
+      "failure_modes": [
+        "Time filter dropped when category added",
+        "Category replaces time filter instead of stacking",
+        "Non-late events appear after category addition",
+        "Non-live-music events appear after category addition",
+        "MORE breaks the compound filter"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T06:00:28.173Z"
+    },
+    {
+      "name": "Filter drift: category survives ambiguous response after nudge with filter intact",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "comedy in cobble hill"
+        },
+        {
+          "sender": "pulse",
+          "message": "Not much comedy in Cobble Hill tonight. Want me to check nearby Carroll Gardens? Keeping the comedy filter."
+        },
+        {
+          "sender": "user",
+          "message": "ok"
+        },
+        {
+          "sender": "pulse",
+          "message": "Comedy in Carroll Gardens:\n\n1) Open Mic at The Bell House — new comics testing material. 8pm, Free\n2) Stand-Up Showcase at Brooklyn Social — rotating lineup. 9pm, $10\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More comedy in Carroll Gardens:\n\n3) Improv Night at Union Hall — long-form comedy, audience-driven. 10pm, $12\n\nReply 3 for details"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "🎤 Open Mic at The Bell House — Legendary Brooklyn comedy room where tons of now-famous comics got their start. Mondays are open mic night with a mix of newbies and established names testing new material.\n\n8pm, Free\n\nhttps://thebellhouseny.com/comedy"
+        }
+      ],
+      "testing": "Category filter should survive a thin-neighborhood nudge and affirmative response. Ambiguous 'ok' should accept the nudge while preserving the comedy filter through picks, MORE, and detail requests.",
+      "expected_behavior": "Comedy filter applied in initial request. Nudge explicitly states filter is preserved. 'ok' accepts nudge. Picks in new neighborhood are comedy events. MORE continues with comedy filter. Detail request shows comedy event. No non-comedy events appear.",
+      "failure_modes": [
+        "Comedy filter dropped after nudge acceptance",
+        "Comedy filter dropped by MORE command",
+        "Non-comedy events appear in picks",
+        "Nudge acceptance interpreted as filter clear",
+        "Detail request breaks filter context"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T06:00:28.173Z"
+    },
+    {
+      "name": "Filter drift: price filter persists through category pivot and neighborhood switch",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "free stuff in greenpoint"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free events in Greenpoint:\n\n1) Trivia Night at Black Rabbit — themed rounds, solid prizes. 7:30pm, Free\n2) Open Mic at Alphabet City — music and comedy mix. 9pm, Free\n3) Warehouse Dance Party at Secret Loft — experimental electronic. 11pm, Free\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "live music"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free live music in Greenpoint:\n\n1) Open Mic at Alphabet City — music and comedy mix. 9pm, Free\n2) Jazz Jam at The Diamond — open session, BYOB welcome. 8pm, Free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free live music in Williamsburg:\n\n1) Punk Showcase at Trans-Pecos — local bands, outdoor stage. 9pm, Free\n2) Singer-Songwriter Night at Union Pool — acoustic vibes. 8pm, Free\n3) Jazz Session at Bembe — Afro-Cuban rhythms, packed room. 10pm, Free\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "🎸 Singer-Songwriter Night at Union Pool — Weekly acoustic showcase featuring Brooklyn-based artists testing new material. Backyard setting, good beer selection, chill crowd.\n\n8pm, Free\n\nhttps://union-pool.com/music"
+        }
+      ],
+      "testing": "Price filter (free) should persist when user adds category filter (live music) and then switches neighborhoods. Compound filter (free + live music) should remain active across neighborhood change.",
+      "expected_behavior": "Free filter applied initially. Live music category stacks — now free + live music compound. Neighborhood switch to Williamsburg preserves both filters. Picks in Williamsburg are free live music events. Detail request reflects the compound-filtered list in new neighborhood.",
+      "failure_modes": [
+        "Free filter dropped when category added",
+        "Free filter dropped on neighborhood switch",
+        "Category filter dropped on neighborhood switch",
+        "Paid events appear after neighborhood switch",
+        "Non-live-music events appear after neighborhood switch"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T06:00:28.173Z"
+    },
+    {
+      "name": "Filter drift: category survives explicit price filter removal then neighborhood switch",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "free jazz in soho"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free jazz in SoHo:\n\n1) Afternoon Jazz at The Django — Sunday matinee standards trio. 3pm, Free\n2) Late Night Jam at Subculture — open session, bring your horn. 11pm, Free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "show me paid ones too"
+        },
+        {
+          "sender": "pulse",
+          "message": "All jazz in SoHo:\n\n1) Afternoon Jazz at The Django — Sunday matinee standards trio. 3pm, Free\n2) Quartet Night at Blue Note — modern jazz heavyweights. 8pm, $35\n3) Late Night Jam at Subculture — open session, bring your horn. 11pm, Free\n4) Brazilian Jazz at SOB's — samba-inflected quartet. 9pm, $25\n\nReply 1-4 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "tribeca"
+        },
+        {
+          "sender": "pulse",
+          "message": "Jazz in Tribeca:\n\n1) Bebop Brunch at Roxy Hotel — classic trio with eggs benedict. 12pm, $40\n2) Experimental Jazz at The Ear Inn — avant-garde duo. 9pm, $15\n3) Vinyl Jazz Night at The Black Ant — DJs spinning Blue Note classics. 10pm, Free\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "3"
+        },
+        {
+          "sender": "pulse",
+          "message": "🎶 Vinyl Jazz Night at The Black Ant — Cozy Tribeca bar where DJs spin classic Blue Note and Prestige recordings on vinyl. Candlelit booths, craft cocktails, chill crowd. Pure listening vibe.\n\n10pm, Free\n\nhttps://pulse.events/black-ant-vinyl"
+        }
+      ],
+      "testing": "Category filter (jazz) should survive explicit price filter removal ('show me paid ones too') AND persist through neighborhood switch",
+      "expected_behavior": "Initial compound: free + jazz. User removes price constraint explicitly — jazz persists, price opens up to all. Neighborhood switch to Tribeca should maintain jazz category. All picks after removal show both free and paid jazz. Tribeca picks are jazz across price points.",
+      "failure_modes": [
+        "Jazz category cleared when price filter removed",
+        "Jazz category lost during neighborhood switch",
+        "Price filter not actually removed — still shows only free",
+        "Both filters cleared by 'show me paid ones too'"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T06:00:54.991Z"
+    },
+    {
+      "name": "Filter drift: time filter survives MORE exhaustion then category addition",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "late night crown heights"
+        },
+        {
+          "sender": "pulse",
+          "message": "Late night in Crown Heights:\n\n1) DJ Set at Franklin Park — house and disco until 2am. 11pm, $10\n2) Karaoke Night at Piña's — dive bar classics, BYOB energy. 10pm, Free\n3) Warehouse Party at Secret Loft — experimental electronic. 11:30pm, $15\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More late night in Crown Heights:\n\n4) Open Decks at Nowadays — bring your records, spin for the room. Midnight, $5\n5) Midnight Movies at Nitehawk — cult classics with booze. 12:15am, $18\n\nReply 4-5 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "That's all the late night events I've got for Crown Heights tonight."
+        },
+        {
+          "sender": "user",
+          "message": "live music"
+        },
+        {
+          "sender": "pulse",
+          "message": "Late night live music in Crown Heights:\n\n1) Jazz Jam at Sista's Place — open session with veteran players. 10:30pm, $15\n2) Reggae Night at The Flatbush Caton Market — sound system and live band. 11pm, $12\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "🎺 Jazz Jam at Sista's Place — Legendary Crown Heights jazz spot where serious players come to trade solos. Intimate room, veteran musicians, real deal bebop energy. Starts late, runs later.\n\n10:30pm, $15\n\nhttps://pulse.events/sistas-place-jam"
+        }
+      ],
+      "testing": "Time filter ('late night') should survive MORE exhaustion and persist when category (live music) is added",
+      "expected_behavior": "Late night filter detected from initial request. All picks across both MORE commands start late (10pm+). Exhaustion message acknowledges no more late events. Adding 'live music' stacks onto existing time filter — results are late night live music. Detail confirms compound filtering worked.",
+      "failure_modes": [
+        "Time filter lost after exhaustion",
+        "Live music replaces time filter instead of stacking",
+        "System treats 'live music' as new search, drops time context",
+        "Exhaustion message drops time filter implicitly"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T06:00:54.991Z"
+    },
+    {
+      "name": "Poor experience: user admits broke — free filter pivot",
+      "category": "poor_experience",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "fort greene"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Fort Greene:\n\n1) Jazz night at Sistas' Place — intimate spot, solid players. 9pm, $15\n2) Open mic at Thalassa Social — cafe vibes. 8pm, $8\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "damn i'm broke rn"
+        },
+        {
+          "sender": "pulse",
+          "message": "Got you — here's what's free tonight in Fort Greene:\n\n1) Community art opening at BRIC — work by local artists. 7pm, Free\n\nReply 1 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "BRIC — community art space in a converted theater, always interesting curation.\n\nCommunity art opening — local artists showing new work, free wine usually. 7pm tonight, Free.\n\nbricartsmedia.org/exhibitions"
+        }
+      ],
+      "testing": "User shares financial constraint mid-session — Pulse pivots to free events gracefully",
+      "expected_behavior": "Turn 1: Normal picks with prices. Turn 2: User mentions being broke — Pulse interprets this as implicit free filter request, reframes with empathy, serves free events. Turn 3: Detail request works as expected. The empathy + filter pivot is core test.",
+      "failure_modes": [
+        "Ignores 'broke' comment and continues paid picks",
+        "Awkward or judgmental framing around money",
+        "Doesn't apply free filter",
+        "Loses context after filter pivot"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T06:01:14.425Z"
+    },
+    {
+      "name": "Poor experience: immediate dissatisfaction — first picks rejected",
+      "category": "poor_experience",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "clinton hill"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Clinton Hill:\n\n1) DJ night at Friends and Lovers — dance party vibes. 10pm, $10\n2) Trivia at Kin Dee — thai spot does weekly trivia. 8pm, Free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "nah not feeling those"
+        },
+        {
+          "sender": "pulse",
+          "message": "Fair enough — here's more from Clinton Hill:\n\n1) Live band at C'mon Everybody — indie rock tonight. 9pm, $12\n2) Poetry reading at Cafe Rue Dix — cozy spot. 7:30pm, Free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "thanks"
+        },
+        {
+          "sender": "pulse",
+          "message": "You got it! Have a good night."
+        }
+      ],
+      "testing": "User rejects initial picks without explanation — Pulse recovers gracefully with more options",
+      "expected_behavior": "Turn 1: Normal picks. Turn 2: User says 'nah not feeling those' — Pulse treats this like MORE command, doesn't take offense, serves different picks from same neighborhood. Turn 3: User thanks and exits — Pulse wraps warmly. The rejection handling without defensiveness is core test.",
+      "failure_modes": [
+        "Asks what user wants instead of just serving more picks",
+        "Defensive or apologetic tone",
+        "Suggests leaving neighborhood when more picks exist",
+        "Treats rejection as error state"
+      ],
+      "difficulty": "should_pass",
+      "grounded_at": "2026-02-23T06:01:14.425Z"
     }
   ]
 }
