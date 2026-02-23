@@ -11,6 +11,13 @@ function getClient() {
   return client;
 }
 
+function withTimeout(promise, ms, label) {
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+  );
+  return Promise.race([promise, timeout]);
+}
+
 let geminiClient = null;
 function getGeminiClient() {
   if (!geminiClient) {
@@ -229,12 +236,12 @@ Compose the SMS now.`;
     const result = await composeWithGemini(systemPrompt, userPrompt, resolvedModel);
     text = result.text; usage = result.usage; provider = 'gemini';
   } else {
-    const response = await getClient().messages.create({
+    const response = await withTimeout(getClient().messages.create({
       model: resolvedModel,
       max_tokens: 512,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
-    }, { timeout: 12000 });
+    }, { timeout: 12000 }), 15000, 'composeResponse');
     text = response.content?.[0]?.text || '';
     usage = response.usage || null;
     provider = 'anthropic';
@@ -483,12 +490,12 @@ Why you recommended it: ${pickReason || 'solid pick for the neighborhood'}
 
 Write the details text. Include this URL: ${bestUrl}`;
 
-  const response = await getClient().messages.create({
+  const response = await withTimeout(getClient().messages.create({
     model: MODELS.compose,
     max_tokens: 256,
     system: DETAILS_SYSTEM,
     messages: [{ role: 'user', content: userPrompt }],
-  }, { timeout: 8000 });
+  }, { timeout: 8000 }), 10000, 'composeDetails');
 
   const text = response.content?.[0]?.text || '';
 
@@ -604,12 +611,12 @@ Respond now.`;
   };
   const systemPrompt = buildUnifiedPrompt(events || [], skillOptions);
 
-  const response = await getClient().messages.create({
+  const response = await withTimeout(getClient().messages.create({
     model: MODELS.compose,
     max_tokens: 512,
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
-  }, { timeout: 12000 });
+  }, { timeout: 12000 }), 15000, 'unifiedRespond');
 
   const text = response.content?.[0]?.text || '';
   const usage = response.usage || null;

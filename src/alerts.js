@@ -52,7 +52,18 @@ function loadAlerts() {
       alertBuffer.length = 0;
       alertBuffer.push(...entries.slice(-ALERT_BUFFER_SIZE));
     }
-    console.log(`[ALERT] Loaded ${alertBuffer.length} alerts from disk`);
+    // Restore cooldown timestamps from persisted alerts
+    const lastHealth = entries.filter(e => e.type === 'health').pop();
+    if (lastHealth) lastAlertSent = new Date(lastHealth.timestamp).getTime();
+
+    const runtimeEntries = entries.filter(e => e.type === 'runtime' && e.alertType);
+    for (const e of runtimeEntries.slice(-20)) {
+      const ts = new Date(e.timestamp).getTime();
+      const existing = _runtimeCooldowns.get(e.alertType) || 0;
+      if (ts > existing) _runtimeCooldowns.set(e.alertType, ts);
+    }
+
+    console.log(`[ALERT] Loaded ${alertBuffer.length} alerts from disk (health cooldown: ${lastAlertSent ? new Date(lastAlertSent).toISOString() : 'none'}, runtime cooldowns: ${_runtimeCooldowns.size})`);
   } catch (err) {
     console.error('[ALERT] Failed to load alert log:', err.message);
   }
