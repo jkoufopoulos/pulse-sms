@@ -6,6 +6,7 @@ const {
   getTopNeighborhood,
   getTopCategories,
   exportProfiles,
+  hashPhone,
   _resetForTest,
 } = require('../../src/preference-profile');
 
@@ -17,7 +18,7 @@ console.log('\npreference-profile:');
 // ---- getProfile ----
 console.log('\ngetProfile:');
 
-const blank = getProfile('+10000000001');
+const blank = getProfile('+12125550001');
 check('unknown user returns blank profile', blank.sessionCount === 0);
 check('blank has empty neighborhoods', Object.keys(blank.neighborhoods).length === 0);
 check('blank has empty categories', Object.keys(blank.categories).length === 0);
@@ -31,7 +32,7 @@ console.log('\nupdateProfile (event_picks):');
 async function runAsyncTests() {
   _resetForTest();
 
-  const phone = '+10000000010';
+  const phone = '+12125550010';
   await updateProfile(phone, {
     neighborhood: 'williamsburg',
     filters: { category: 'live_music', subcategory: 'jazz' },
@@ -50,7 +51,7 @@ async function runAsyncTests() {
   // ---- updateProfile with conversational ----
   console.log('\nupdateProfile (conversational):');
 
-  const convPhone = '+10000000011';
+  const convPhone = '+12125550011';
   await updateProfile(convPhone, {
     neighborhood: 'bushwick',
     filters: { category: 'comedy' },
@@ -66,7 +67,7 @@ async function runAsyncTests() {
   // ---- updateProfile with ask_neighborhood ----
   console.log('\nupdateProfile (ask_neighborhood):');
 
-  const askPhone = '+10000000012';
+  const askPhone = '+12125550012';
   await updateProfile(askPhone, {
     neighborhood: null,
     filters: {},
@@ -80,7 +81,7 @@ async function runAsyncTests() {
   // ---- Multiple updates compound correctly ----
   console.log('\ncompounding updates:');
 
-  const multiPhone = '+10000000013';
+  const multiPhone = '+12125550013';
   await updateProfile(multiPhone, { neighborhood: 'east_village', filters: { subcategory: 'jazz' }, responseType: 'event_picks' });
   await updateProfile(multiPhone, { neighborhood: 'east_village', filters: { subcategory: 'jazz' }, responseType: 'event_picks' });
   await updateProfile(multiPhone, { neighborhood: 'west_village', filters: { subcategory: 'jazz' }, responseType: 'event_picks' });
@@ -95,7 +96,7 @@ async function runAsyncTests() {
   // ---- pricePreference derives to 'free' ----
   console.log('\npricePreference derivation:');
 
-  const freePhone = '+10000000014';
+  const freePhone = '+12125550014';
   await updateProfile(freePhone, { neighborhood: 'les', filters: { free_only: true }, responseType: 'event_picks' });
   await updateProfile(freePhone, { neighborhood: 'les', filters: { free_only: true }, responseType: 'event_picks' });
   await updateProfile(freePhone, { neighborhood: 'les', filters: {}, responseType: 'event_picks' });
@@ -103,7 +104,7 @@ async function runAsyncTests() {
   const p5 = getProfile(freePhone);
   check('free 2/3 sessions → free preference', p5.pricePreference === 'free');
 
-  const paidPhone = '+10000000015';
+  const paidPhone = '+12125550015';
   await updateProfile(paidPhone, { neighborhood: 'les', filters: { free_only: true }, responseType: 'event_picks' });
   await updateProfile(paidPhone, { neighborhood: 'les', filters: {}, responseType: 'event_picks' });
   await updateProfile(paidPhone, { neighborhood: 'les', filters: {}, responseType: 'event_picks' });
@@ -114,7 +115,7 @@ async function runAsyncTests() {
   // ---- timePreference derivation ----
   console.log('\ntimePreference derivation:');
 
-  const latePhone = '+10000000016';
+  const latePhone = '+12125550016';
   await updateProfile(latePhone, { neighborhood: 'bushwick', filters: { time_after: '22:00' }, responseType: 'event_picks' });
   await updateProfile(latePhone, { neighborhood: 'bushwick', filters: { time_after: '23:00' }, responseType: 'event_picks' });
   await updateProfile(latePhone, { neighborhood: 'bushwick', filters: { time_after: '18:00' }, responseType: 'event_picks' });
@@ -122,7 +123,7 @@ async function runAsyncTests() {
   const p7 = getProfile(latePhone);
   check('late 2/3 timed sessions → late preference', p7.timePreference === 'late');
 
-  const earlyPhone = '+10000000017';
+  const earlyPhone = '+12125550017';
   await updateProfile(earlyPhone, { neighborhood: 'bushwick', filters: { time_after: '18:00' }, responseType: 'event_picks' });
   await updateProfile(earlyPhone, { neighborhood: 'bushwick', filters: { time_after: '19:00' }, responseType: 'event_picks' });
   await updateProfile(earlyPhone, { neighborhood: 'bushwick', filters: { time_after: '23:00' }, responseType: 'event_picks' });
@@ -130,14 +131,14 @@ async function runAsyncTests() {
   const p8 = getProfile(earlyPhone);
   check('early 2/3 timed sessions → early preference', p8.timePreference === 'early');
 
-  const noTimePhone = '+10000000018';
+  const noTimePhone = '+12125550018';
   await updateProfile(noTimePhone, { neighborhood: 'bushwick', filters: {}, responseType: 'event_picks' });
 
   const p9 = getProfile(noTimePhone);
   check('no time filters → any preference', p9.timePreference === 'any');
 
   // Invalid time_after format should not count
-  const badTimePhone = '+10000000019';
+  const badTimePhone = '+12125550019';
   await updateProfile(badTimePhone, { neighborhood: 'bushwick', filters: { time_after: 'late' }, responseType: 'event_picks' });
   const p9b = getProfile(badTimePhone);
   check('invalid time_after format → timedSessionCount stays 0', p9b.timedSessionCount === 0);
@@ -152,7 +153,7 @@ async function runAsyncTests() {
   check('null profile → empty filters', Object.keys(nullDerived).length === 0);
 
   // Build a profile with known signals
-  const derivedPhone = '+10000000020';
+  const derivedPhone = '+12125550020';
   await updateProfile(derivedPhone, { neighborhood: 'bushwick', filters: { category: 'comedy' }, responseType: 'event_picks' });
   await updateProfile(derivedPhone, { neighborhood: 'bushwick', filters: { category: 'comedy' }, responseType: 'event_picks' });
   await updateProfile(derivedPhone, { neighborhood: 'bushwick', filters: { category: 'live_music' }, responseType: 'event_picks' });
@@ -162,21 +163,21 @@ async function runAsyncTests() {
   check('derives top category as filter', derived.category === 'comedy');
 
   // Free preference derivation
-  const derivedFreePhone = '+10000000021';
+  const derivedFreePhone = '+12125550021';
   await updateProfile(derivedFreePhone, { neighborhood: 'les', filters: { free_only: true }, responseType: 'event_picks' });
   await updateProfile(derivedFreePhone, { neighborhood: 'les', filters: { free_only: true }, responseType: 'event_picks' });
   const derivedFree = deriveFiltersFromProfile(getProfile(derivedFreePhone));
   check('free preference → free_only in derived', derivedFree.free_only === true);
 
   // Late time derivation
-  const derivedLatePhone = '+10000000022';
+  const derivedLatePhone = '+12125550022';
   await updateProfile(derivedLatePhone, { neighborhood: 'bushwick', filters: { time_after: '22:00' }, responseType: 'event_picks' });
   await updateProfile(derivedLatePhone, { neighborhood: 'bushwick', filters: { time_after: '23:00' }, responseType: 'event_picks' });
   const derivedLate = deriveFiltersFromProfile(getProfile(derivedLatePhone));
   check('late preference → time_after in derived', derivedLate.time_after === '21:00');
 
   // No signal → null dimensions
-  const minimalPhone = '+10000000023';
+  const minimalPhone = '+12125550023';
   await updateProfile(minimalPhone, { neighborhood: 'bushwick', filters: {}, responseType: 'event_picks' });
   const minimalDerived = deriveFiltersFromProfile(getProfile(minimalPhone));
   check('no category signal → no category filter', minimalDerived.category === undefined);
@@ -195,7 +196,7 @@ async function runAsyncTests() {
 
   check('null profile → empty', getTopCategories(null).length === 0);
 
-  const catPhone = '+10000000024';
+  const catPhone = '+12125550024';
   await updateProfile(catPhone, { neighborhood: 'les', filters: { category: 'comedy' }, responseType: 'event_picks' });
   await updateProfile(catPhone, { neighborhood: 'les', filters: { category: 'comedy' }, responseType: 'event_picks' });
   await updateProfile(catPhone, { neighborhood: 'les', filters: { category: 'live_music', subcategory: 'jazz' }, responseType: 'event_picks' });
@@ -205,14 +206,13 @@ async function runAsyncTests() {
   const topCats = getTopCategories(getProfile(catPhone), 3);
   check('top categories returns array', Array.isArray(topCats));
   check('top categories length capped at n', topCats.length <= 3);
-  // comedy: 2, live_music: 2, jazz: 2, nightlife: 1 — merged, top 3 should include comedy, live_music, jazz
   check('top categories includes comedy', topCats.includes('comedy'));
   check('top categories includes jazz (from subcategories)', topCats.includes('jazz'));
 
   // ---- updateProfile with 'more' responseType ----
   console.log('\nupdateProfile (more):');
 
-  const morePhone = '+10000000025';
+  const morePhone = '+12125550025';
   await updateProfile(morePhone, { neighborhood: 'williamsburg', filters: { category: 'comedy' }, responseType: 'more' });
 
   const pm = getProfile(morePhone);
@@ -221,17 +221,49 @@ async function runAsyncTests() {
   check('more: category tracked', pm.categories.comedy === 1);
   check('more: totalPicksSessionCount incremented', pm.totalPicksSessionCount === 1);
 
-  // ---- Error handling ----
-  console.log('\nerror handling:');
+  // ---- Phone validation ----
+  console.log('\nphone validation:');
 
-  // updateProfile should not throw even with bad input
   let threw = false;
   try {
     await updateProfile(null, { responseType: 'event_picks' });
   } catch {
     threw = true;
   }
-  check('updateProfile with null phone does not throw', !threw);
+  check('null phone does not throw', !threw);
+
+  await updateProfile('', { neighborhood: 'bushwick', filters: {}, responseType: 'event_picks' });
+  check('empty string phone rejected (no profile created)', getProfile('').sessionCount === 0);
+
+  await updateProfile('not-a-phone', { neighborhood: 'bushwick', filters: {}, responseType: 'event_picks' });
+  check('invalid format rejected', getProfile('not-a-phone').sessionCount === 0);
+
+  await updateProfile('12125550099', { neighborhood: 'bushwick', filters: {}, responseType: 'event_picks' });
+  check('missing + prefix rejected', getProfile('12125550099').sessionCount === 0);
+
+  // Valid E.164 should work
+  const validPhone = '+12125550099';
+  await updateProfile(validPhone, { neighborhood: 'bushwick', filters: {}, responseType: 'event_picks' });
+  check('valid E.164 accepted', getProfile(validPhone).sessionCount === 1);
+
+  // ---- Test phone exclusion ----
+  console.log('\ntest phone exclusion:');
+
+  const testPhone = '+10000000000';
+  await updateProfile(testPhone, { neighborhood: 'bushwick', filters: { category: 'comedy' }, responseType: 'event_picks' });
+  check('default test phone rejected', getProfile(testPhone).sessionCount === 0);
+
+  const testPhone2 = '+10000001234';
+  await updateProfile(testPhone2, { neighborhood: 'les', filters: {}, responseType: 'event_picks' });
+  check('test prefix phone rejected', getProfile(testPhone2).sessionCount === 0);
+
+  // ---- Phone hashing ----
+  console.log('\nphone hashing:');
+
+  check('hashPhone returns string', typeof hashPhone('+12125550001') === 'string');
+  check('hashPhone is 16 chars', hashPhone('+12125550001').length === 16);
+  check('hashPhone is deterministic', hashPhone('+12125550001') === hashPhone('+12125550001'));
+  check('different phones → different hashes', hashPhone('+12125550001') !== hashPhone('+12125550002'));
 
   // ---- Persistence round-trip ----
   console.log('\npersistence:');
@@ -240,6 +272,10 @@ async function runAsyncTests() {
   check('export returns object', typeof exported === 'object');
   check('export contains test profiles', Object.keys(exported).length > 0);
   check('exported profile has correct sessionCount', exported[phone]?.sessionCount === 1);
+
+  // Verify test phones are not in exported data
+  const hasTestPhone = Object.keys(exported).some(k => k.startsWith('+1000000'));
+  check('no test phones in exported data', !hasTestPhone);
 
   // Clean up
   _resetForTest();

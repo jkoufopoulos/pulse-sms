@@ -6,10 +6,25 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const PROFILES_PATH = path.join(__dirname, '../data/profiles.json');
 const profiles = new Map();
 let writeTimer = null;
+
+// E.164 format: + followed by 7-15 digits
+const E164_RE = /^\+\d{7,15}$/;
+
+// Test phone numbers excluded from persistence
+const TEST_PHONE_PREFIX = '+1000000';
+
+function isTestPhone(phone) {
+  return phone.startsWith(TEST_PHONE_PREFIX);
+}
+
+function hashPhone(phone) {
+  return crypto.createHash('sha256').update(phone).digest('hex').slice(0, 16);
+}
 
 function blankProfile() {
   return {
@@ -33,12 +48,27 @@ function blankProfile() {
 }
 
 function getProfile(phone) {
-  return profiles.get(phone) || blankProfile();
+  return profiles.get(phone) || profiles.get(hashPhone(phone)) || blankProfile();
 }
 
 async function updateProfile(phone, { neighborhood, filters, responseType }) {
   try {
-    const profile = profiles.has(phone) ? profiles.get(phone) : blankProfile();
+    if (!phone || !E164_RE.test(phone)) return;
+    if (isTestPhone(phone)) return;
+
+    // Check raw phone key first, then hashed key (from disk load), then create new
+    let profile;
+    if (profiles.has(phone)) {
+      profile = profiles.get(phone);
+    } else {
+      const hashed = hashPhone(phone);
+      if (profiles.has(hashed)) {
+        profile = profiles.get(hashed);
+        profiles.delete(hashed); // migrate to raw-phone key
+      } else {
+        profile = blankProfile();
+      }
+    }
     const now = new Date().toISOString().slice(0, 10);
 
     // Always: increment sessionCount, update dates
@@ -100,7 +130,7 @@ function scheduleDiskWrite() {
     try {
       const data = {};
       for (const [phone, profile] of profiles) {
-        data[phone] = profile;
+        data[hashPhone(phone)] = profile;
       }
       fs.writeFileSync(PROFILES_PATH, JSON.stringify(data, null, 2));
     } catch (err) {
@@ -200,5 +230,6 @@ module.exports = {
   getOptInEligibleUsers,
   loadProfiles,
   exportProfiles,
+  hashPhone,
   _resetForTest,
 };
