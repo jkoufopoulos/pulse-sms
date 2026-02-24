@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse Eval Report</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+    background: #0a0a0a;
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 24px;
+    padding-bottom: 80px;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .header h1 { font-size: 24px; font-weight: 700; color: #fff; }
+  .header h1 span { color: #FF6B35; }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 13px;
+    color: #888;
+  }
+
+  /* ── Report picker bar ── */
+  .picker-bar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #0a0a0a;
+    border-bottom: 1px solid #222;
+    padding: 12px 0;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .picker-bar label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+  .picker-bar select {
+    background: #141414;
+    border: 1px solid #333;
+    color: #e0e0e0;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    max-width: 400px;
+    cursor: pointer;
+  }
+  .picker-bar select:focus { outline: none; border-color: #FF6B35; }
+  .compare-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #888;
+    cursor: pointer;
+    user-select: none;
+  }
+  .compare-toggle input { accent-color: #FF6B35; cursor: pointer; }
+  .compare-select { display: none; }
+  .compare-select.visible { display: inline-block; }
+
+  /* ── Summary cards ── */
+  .summary-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .summary-card {
+    background: #141414;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .summary-card .label {
+    font-size: 11px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .summary-card .value {
+    font-size: 28px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .summary-card .value.green { color: #4ade80; }
+  .summary-card .value.yellow { color: #fbbf24; }
+  .summary-card .value.red { color: #f87171; }
+  .summary-card .delta {
+    font-size: 12px;
+    margin-left: 6px;
+    font-weight: 500;
+  }
+  .summary-card .delta.up { color: #4ade80; }
+  .summary-card .delta.down { color: #f87171; }
+  .summary-card .delta.neutral { color: #666; }
+  .summary-card .sub {
+    font-size: 11px;
+    color: #555;
+    margin-top: 2px;
+  }
+
+  /* ── Status pills ── */
+  .status-pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .status-pill.ok, .status-pill.pass { background: #1a3a1a; color: #4ade80; }
+  .status-pill.degraded, .status-pill.warn { background: #3a2a0a; color: #fbbf24; }
+  .status-pill.critical, .status-pill.fail { background: #3a1a1a; color: #f87171; }
+  .status-pill.error { background: #2a1a2a; color: #c084fc; }
+
+  /* ── Must-pass failures alert ── */
+  .must-pass-alert {
+    background: #2a0a0a;
+    border: 1px solid #5a1a1a;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+  .must-pass-alert.hidden { display: none; }
+  .must-pass-alert h3 {
+    color: #f87171;
+    font-size: 14px;
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+  .must-pass-alert ul { list-style: none; }
+  .must-pass-alert li {
+    padding: 6px 0;
+    border-bottom: 1px solid #3a1a1a;
+    font-size: 13px;
+    cursor: pointer;
+    color: #e0a0a0;
+    transition: color 0.15s;
+  }
+  .must-pass-alert li:hover { color: #fff; }
+  .must-pass-alert li:last-child { border-bottom: none; }
+
+  /* ── Section headers ── */
+  .section-header {
+    font-size: 14px;
+    font-weight: 600;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    margin-top: 8px;
+  }
+
+  /* ── Bar charts ── */
+  .bar-chart { margin-bottom: 24px; }
+  .bar-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .bar-row:hover { opacity: 0.85; }
+  .bar-label {
+    width: 140px;
+    font-size: 12px;
+    color: #aaa;
+    text-align: right;
+    padding-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bar-track {
+    flex: 1;
+    height: 22px;
+    background: #1a1a1a;
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    position: relative;
+  }
+  .bar-fill-pass {
+    background: #1a5a1a;
+    height: 100%;
+    transition: width 0.4s ease;
+  }
+  .bar-fill-fail {
+    background: #5a1a1a;
+    height: 100%;
+    transition: width 0.4s ease;
+  }
+  .bar-fill-error {
+    background: #3a1a3a;
+    height: 100%;
+    transition: width 0.4s ease;
+  }
+  .bar-stats {
+    width: 100px;
+    font-size: 11px;
+    color: #888;
+    padding-left: 10px;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  /* ── Trend sparkline ── */
+  .sparkline-section { margin-bottom: 24px; }
+  .sparkline {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 40px;
+  }
+  .spark-bar {
+    flex: 1;
+    max-width: 28px;
+    border-radius: 2px 2px 0 0;
+    min-height: 2px;
+    position: relative;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .spark-bar:hover { opacity: 0.8; }
+  .spark-bar .spark-tip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #222;
+    color: #e0e0e0;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    white-space: nowrap;
+    z-index: 10;
+  }
+  .spark-bar:hover .spark-tip { display: block; }
+
+  /* ── Charts row ── */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 768px) {
+    .charts-row { grid-template-columns: 1fr; }
+  }
+
+  /* ── Filter bar ── */
+  .filter-bar {
+    position: sticky;
+    top: 50px;
+    z-index: 90;
+    background: #0a0a0a;
+    border-bottom: 1px solid #1a1a1a;
+    padding: 12px 0;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .filter-group {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .filter-group-label {
+    font-size: 10px;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    align-self: center;
+    margin-right: 2px;
+  }
+  .filter-sep {
+    width: 1px;
+    height: 24px;
+    background: #333;
+    margin: 0 6px;
+    align-self: center;
+  }
+  .filter-btn {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #999;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .filter-btn:hover { border-color: #555; color: #ccc; }
+  .filter-btn.active { background: #FF6B35; border-color: #FF6B35; color: #fff; }
+  .search-input {
+    background: #141414;
+    border: 1px solid #333;
+    color: #e0e0e0;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: inherit;
+    width: 180px;
+    transition: border-color 0.15s;
+  }
+  .search-input:focus { outline: none; border-color: #FF6B35; }
+  .search-input::placeholder { color: #555; }
+  .filter-count {
+    font-size: 12px;
+    color: #666;
+    margin-left: auto;
+    white-space: nowrap;
+  }
+
+  /* ── Scenario cards ── */
+  .scenario-list { display: flex; flex-direction: column; gap: 8px; }
+  .scenario-card {
+    background: #141414;
+    border: 1px solid #222;
+    border-radius: 10px;
+    overflow: hidden;
+    border-left: 4px solid #333;
+    transition: border-color 0.15s;
+  }
+  .scenario-card.pass { border-left-color: #4ade80; }
+  .scenario-card.fail { border-left-color: #f87171; }
+  .scenario-card.error { border-left-color: #c084fc; }
+  .scenario-card.focused { box-shadow: 0 0 0 2px #FF6B35; }
+  .scenario-card.changed { position: relative; }
+  .scenario-card.changed::after {
+    content: 'CHANGED';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #3a2a0a;
+    color: #fbbf24;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+    pointer-events: none;
+  }
+
+  .scenario-header {
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    flex-wrap: wrap;
+  }
+  .scenario-header:hover { background: #1a1a1a; }
+  .scenario-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #ddd;
+    flex: 1;
+    min-width: 200px;
+  }
+  .scenario-badges { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .badge.category { background: #1a1a2a; color: #60a5fa; }
+  .badge.difficulty { background: #1a2a1a; color: #86efac; }
+  .badge.difficulty.must_pass { background: #2a1a1a; color: #fca5a5; }
+  .badge.difficulty.stretch { background: #2a2a1a; color: #fde68a; }
+  .badge.turns { background: #1a1a1a; color: #777; }
+
+  .scenario-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease;
+  }
+  .scenario-card.expanded .scenario-body {
+    max-height: 5000px;
+    transition: max-height 0.5s ease;
+  }
+  .scenario-body-inner {
+    padding: 0 16px 16px 16px;
+    border-top: 1px solid #222;
+  }
+
+  /* ── SMS bubbles ── */
+  .chat-transcript {
+    margin: 12px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .chat-bubble {
+    max-width: 80%;
+    padding: 10px 14px;
+    border-radius: 16px;
+    font-size: 13px;
+    line-height: 1.5;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+  .chat-bubble.user {
+    align-self: flex-end;
+    background: #0b5cff;
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+  .chat-bubble.pulse {
+    align-self: flex-start;
+    background: #2a2a2a;
+    color: #e0e0e0;
+    border-bottom-left-radius: 4px;
+    font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Monaco, 'Cascadia Mono', monospace;
+    font-size: 12px;
+  }
+
+  /* ── Judgment section ── */
+  .judgment-section {
+    margin-top: 16px;
+    padding: 12px;
+    background: #0f0f0f;
+    border-radius: 8px;
+    border: 1px solid #1a1a1a;
+  }
+  .judgment-section h4 {
+    font-size: 12px;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  .judgment-note {
+    font-size: 13px;
+    color: #ccc;
+    line-height: 1.6;
+    margin-bottom: 12px;
+  }
+
+  .turn-grades { display: flex; flex-direction: column; gap: 6px; }
+  .turn-grade {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12px;
+    padding: 6px 8px;
+    background: #111;
+    border-radius: 6px;
+  }
+  .turn-grade .turn-label {
+    color: #666;
+    font-weight: 600;
+    flex-shrink: 0;
+    min-width: 50px;
+  }
+  .turn-grade .turn-result {
+    font-weight: 600;
+    flex-shrink: 0;
+    min-width: 30px;
+  }
+  .turn-grade .turn-result.pass { color: #4ade80; }
+  .turn-grade .turn-result.fail { color: #f87171; }
+  .turn-grade .turn-note { color: #aaa; flex: 1; line-height: 1.5; }
+
+  /* ── Failure modes ── */
+  .failure-modes { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .failure-badge {
+    background: #3a1a1a;
+    color: #f87171;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  /* ── Assertion results ── */
+  .assertions { margin-top: 12px; }
+  .assertion-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12px;
+    padding: 4px 0;
+    color: #aaa;
+  }
+  .assertion-icon { font-weight: 700; flex-shrink: 0; }
+  .assertion-icon.pass { color: #4ade80; }
+  .assertion-icon.fail { color: #f87171; }
+  .assertion-detail { line-height: 1.5; }
+  .assertion-detail code {
+    background: #1a1a1a;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Monaco, monospace;
+    color: #ccc;
+  }
+
+  /* ── Error scenario ── */
+  .error-message {
+    padding: 12px;
+    background: #1a0a2a;
+    border: 1px solid #3a1a4a;
+    border-radius: 8px;
+    color: #c084fc;
+    font-size: 13px;
+    margin-top: 8px;
+  }
+
+  /* ── Loading / empty ── */
+  .loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    gap: 16px;
+  }
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #333;
+    border-top-color: #FF6B35;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { color: #666; font-size: 13px; }
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #555;
+    font-size: 14px;
+  }
+
+  /* ── Back to top ── */
+  .back-to-top {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 40px;
+    height: 40px;
+    background: #FF6B35;
+    border: none;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    z-index: 200;
+    transition: opacity 0.2s;
+  }
+  .back-to-top.visible { display: flex; }
+  .back-to-top:hover { opacity: 0.85; }
+
+  /* ── Keyboard hint ── */
+  .keyboard-hint {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 10px;
+    color: #555;
+    z-index: 200;
+    display: none;
+  }
+  .keyboard-hint kbd {
+    background: #222;
+    border: 1px solid #444;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: inherit;
+    color: #888;
+  }
+  @media (min-width: 1024px) {
+    .keyboard-hint { display: block; }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 600px) {
+    body { padding: 12px; }
+    .header h1 { font-size: 20px; }
+    .summary-card .value { font-size: 22px; }
+    .bar-label { width: 100px; font-size: 11px; }
+    .scenario-name { font-size: 12px; min-width: 150px; }
+    .chat-bubble { max-width: 90%; }
+    .filter-bar { top: 44px; }
+    .search-input { width: 140px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Pulse <span>Eval Report</span></h1>
+  <div class="header-right" id="header-meta"></div>
+</div>
+
+<div class="picker-bar" id="picker-bar">
+  <label for="report-select">Report:</label>
+  <select id="report-select"></select>
+  <label class="compare-toggle">
+    <input type="checkbox" id="compare-toggle"> Compare
+  </label>
+  <select id="compare-select" class="compare-select"></select>
+</div>
+
+<div id="content">
+  <div class="loading-container" id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">Loading eval reports...</div>
+  </div>
+</div>
+
+<button class="back-to-top" id="back-to-top" title="Back to top">&#8593;</button>
+
+<div class="keyboard-hint">
+  <kbd>j</kbd>/<kbd>k</kbd> navigate &middot;
+  <kbd>Enter</kbd> expand &middot;
+  <kbd>f</kbd> search &middot;
+  <kbd>1</kbd>-<kbd>6</kbd> category &middot;
+  <kbd>Esc</kbd> clear
+</div>
+
+<script>
+// ── State ──
+let allReports = [];
+let currentReport = null;
+let compareReport = null;
+let activeCategory = 'all';
+let activeDifficulty = 'all';
+let activeResult = 'all';
+let searchQuery = '';
+let focusedIndex = -1;
+
+const CATEGORIES = ['all', 'happy_path', 'filter_drift', 'edge_case', 'poor_experience', 'abuse_off_topic'];
+const DIFFICULTIES = ['all', 'must_pass', 'should_pass', 'stretch'];
+const RESULTS = ['all', 'pass', 'fail', 'error'];
+
+// ── Init ──
+async function init() {
+  await loadReportList();
+  if (allReports.length === 0) {
+    showEmpty();
+    return;
+  }
+  populateSelects();
+  await loadReport(allReports[0].filename);
+  setupEventListeners();
+}
+
+async function loadReportList() {
+  try {
+    const res = await fetch('/api/eval-reports');
+    allReports = await res.json();
+  } catch (e) {
+    console.error('Failed to load report list:', e);
+    allReports = [];
+  }
+}
+
+async function loadReport(filename) {
+  showLoading();
+  try {
+    const res = await fetch('/api/eval-reports/' + encodeURIComponent(filename));
+    currentReport = await res.json();
+    render();
+  } catch (e) {
+    console.error('Failed to load report:', e);
+    showEmpty('Failed to load report.');
+  }
+}
+
+async function loadCompareReport(filename) {
+  try {
+    const res = await fetch('/api/eval-reports/' + encodeURIComponent(filename));
+    compareReport = await res.json();
+    render();
+  } catch (e) {
+    console.error('Failed to load compare report:', e);
+    compareReport = null;
+  }
+}
+
+// ── Selects ──
+function populateSelects() {
+  const sel = document.getElementById('report-select');
+  const cmp = document.getElementById('compare-select');
+  sel.innerHTML = '';
+  cmp.innerHTML = '<option value="">-- select --</option>';
+  allReports.forEach((r, i) => {
+    const rate = r.total > 0 ? Math.round(100 * r.passed / r.total) : 0;
+    const ts = formatTimestamp(r.timestamp);
+    const label = ts + ' \u2014 ' + rate + '% (' + r.passed + '/' + r.total + ')';
+    sel.innerHTML += '<option value="' + escAttr(r.filename) + '"' + (i === 0 ? ' selected' : '') + '>' + escHtml(label) + '</option>';
+    cmp.innerHTML += '<option value="' + escAttr(r.filename) + '">' + escHtml(label) + '</option>';
+  });
+}
+
+// ── Render ──
+function render() {
+  if (!currentReport) return;
+  const c = document.getElementById('content');
+  const scenarios = currentReport.scenarios || [];
+  const passRate = currentReport.total > 0 ? (100 * currentReport.passed / currentReport.total) : 0;
+
+  let html = '';
+
+  // Summary cards
+  html += renderSummary(passRate);
+
+  // Must-pass failures
+  html += renderMustPassAlert(scenarios);
+
+  // Charts row: category + difficulty
+  html += '<div class="charts-row">';
+  html += '<div>' + renderBarChart('Category Breakdown', groupBy(scenarios, 'category'), CATEGORIES.slice(1)) + '</div>';
+  html += '<div>' + renderBarChart('Difficulty Breakdown', groupBy(scenarios, 'difficulty'), DIFFICULTIES.slice(1)) + '</div>';
+  html += '</div>';
+
+  // Trend sparkline
+  if (allReports.length > 1) {
+    html += renderSparkline();
+  }
+
+  // Filter bar
+  html += renderFilterBar(scenarios);
+
+  // Scenario cards
+  html += '<div class="scenario-list" id="scenario-list">';
+  scenarios.forEach(function(s, i) {
+    html += renderScenarioCard(s, i);
+  });
+  html += '</div>';
+
+  c.innerHTML = html;
+
+  // Update header meta
+  document.getElementById('header-meta').innerHTML =
+    '<span>' + escHtml(formatTimestamp(currentReport.timestamp)) + '</span>' +
+    '<span class="status-pill ' + passRateClass(passRate) + '">' + Math.round(passRate) + '% pass</span>';
+
+  applyFilters();
+}
+
+function renderSummary(passRate) {
+  var r = currentReport;
+  var cmp = compareReport;
+  var html = '<div class="summary-row">';
+
+  // Pass rate
+  html += summaryCard('Pass Rate', Math.round(passRate) + '%', passRateColorClass(passRate),
+    cmp ? deltaStr(passRate, cmp.total > 0 ? 100 * cmp.passed / cmp.total : 0, '%') : '',
+    r.judge_model ? 'Judge: ' + r.judge_model : '');
+
+  // Passed
+  html += summaryCard('Passed', r.passed, 'green',
+    cmp ? deltaStr(r.passed, cmp.passed) : '');
+
+  // Failed
+  html += summaryCard('Failed', r.failed, r.failed > 0 ? 'red' : '',
+    cmp ? deltaStr(r.failed, cmp.failed, '', true) : '');
+
+  // Errors
+  html += summaryCard('Errors', r.errors, r.errors > 0 ? 'yellow' : '',
+    cmp ? deltaStr(r.errors, cmp.errors, '', true) : '');
+
+  // Judge cost
+  html += summaryCard('Judge Cost', r.judge_cost != null ? '$' + r.judge_cost.toFixed(2) : 'N/A', '',
+    cmp && cmp.judge_cost != null ? deltaStr(r.judge_cost, cmp.judge_cost, '$', true) : '');
+
+  // Duration
+  var dur = r.elapsed_seconds != null ? Math.round(r.elapsed_seconds) + 's' : 'N/A';
+  html += summaryCard('Duration', dur, '',
+    cmp && cmp.elapsed_seconds != null ? deltaStr(r.elapsed_seconds, cmp.elapsed_seconds, 's', true) : '');
+
+  html += '</div>';
+  return html;
+}
+
+function summaryCard(label, value, colorClass, delta, sub) {
+  return '<div class="summary-card">' +
+    '<div class="label">' + escHtml(label) + '</div>' +
+    '<div class="value ' + (colorClass || '') + '">' + escHtml(String(value)) +
+    (delta || '') +
+    '</div>' +
+    (sub ? '<div class="sub">' + escHtml(sub) + '</div>' : '') +
+    '</div>';
+}
+
+function deltaStr(current, prev, unit, inverted) {
+  if (current == null || prev == null) return '';
+  var diff = current - prev;
+  if (Math.abs(diff) < 0.01) return '<span class="delta neutral">=</span>';
+  var up = diff > 0;
+  var good = inverted ? !up : up;
+  var arrow = up ? '\u2191' : '\u2193';
+  var cls = good ? 'up' : 'down';
+  var display = Math.abs(Math.round(diff * 100) / 100);
+  return '<span class="delta ' + cls + '">' + arrow + display + (unit || '') + '</span>';
+}
+
+function renderMustPassAlert(scenarios) {
+  var failures = scenarios.filter(function(s) { return s.difficulty === 'must_pass' && !s.pass; });
+  if (failures.length === 0) return '<div class="must-pass-alert hidden"></div>';
+  var html = '<div class="must-pass-alert">';
+  html += '<h3>Must-Pass Failures (' + failures.length + ')</h3>';
+  html += '<ul>';
+  failures.forEach(function(f) {
+    html += '<li data-jump="' + f.index + '">' + escHtml(f.name) + '</li>';
+  });
+  html += '</ul></div>';
+  return html;
+}
+
+function renderBarChart(title, groups, keys) {
+  var html = '<div class="section-header">' + escHtml(title) + '</div>';
+  html += '<div class="bar-chart">';
+  keys.forEach(function(key) {
+    var g = groups[key] || { pass: 0, fail: 0, error: 0, total: 0 };
+    var total = g.total || 1;
+    var pPct = (g.pass / total * 100).toFixed(1);
+    var fPct = (g.fail / total * 100).toFixed(1);
+    var ePct = (g.error / total * 100).toFixed(1);
+    html += '<div class="bar-row" data-bar-category="' + escAttr(key) + '">' +
+      '<div class="bar-label">' + formatLabel(key) + '</div>' +
+      '<div class="bar-track">' +
+        '<div class="bar-fill-pass" style="width:' + pPct + '%"></div>' +
+        '<div class="bar-fill-fail" style="width:' + fPct + '%"></div>' +
+        '<div class="bar-fill-error" style="width:' + ePct + '%"></div>' +
+      '</div>' +
+      '<div class="bar-stats">' + g.pass + '/' + g.total + ' (' + Math.round(g.pass / total * 100) + '%)</div>' +
+      '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderSparkline() {
+  var recent = allReports.slice(0, 10).reverse();
+  var html = '<div class="sparkline-section">';
+  html += '<div class="section-header">Pass Rate Trend (last ' + recent.length + ' runs)</div>';
+  html += '<div class="sparkline">';
+  recent.forEach(function(r) {
+    var rate = r.total > 0 ? Math.round(100 * r.passed / r.total) : 0;
+    var h = Math.max(2, Math.round(rate * 0.38));
+    var color = rate >= 70 ? '#1a5a1a' : (rate >= 40 ? '#5a4a1a' : '#5a1a1a');
+    var ts = formatTimestamp(r.timestamp);
+    html += '<div class="spark-bar" style="height:' + h + 'px; background:' + color + '">' +
+      '<span class="spark-tip">' + escHtml(ts) + ' \u2014 ' + rate + '%</span>' +
+      '</div>';
+  });
+  html += '</div></div>';
+  return html;
+}
+
+function renderFilterBar(scenarios) {
+  var html = '<div class="filter-bar" id="filter-bar">';
+
+  // Category
+  html += '<div class="filter-group">';
+  html += '<span class="filter-group-label">Cat:</span>';
+  CATEGORIES.forEach(function(cat, i) {
+    html += '<button class="filter-btn' + (activeCategory === cat ? ' active' : '') +
+      '" data-filter="category" data-value="' + escAttr(cat) + '"' +
+      ' title="Shortcut: ' + (i + 1) + '">' + formatLabel(cat) + '</button>';
+  });
+  html += '</div>';
+
+  html += '<div class="filter-sep"></div>';
+
+  // Difficulty
+  html += '<div class="filter-group">';
+  html += '<span class="filter-group-label">Diff:</span>';
+  DIFFICULTIES.forEach(function(d) {
+    html += '<button class="filter-btn' + (activeDifficulty === d ? ' active' : '') +
+      '" data-filter="difficulty" data-value="' + escAttr(d) + '">' + formatLabel(d) + '</button>';
+  });
+  html += '</div>';
+
+  html += '<div class="filter-sep"></div>';
+
+  // Result
+  html += '<div class="filter-group">';
+  html += '<span class="filter-group-label">Result:</span>';
+  RESULTS.forEach(function(r) {
+    html += '<button class="filter-btn' + (activeResult === r ? ' active' : '') +
+      '" data-filter="result" data-value="' + escAttr(r) + '">' + formatLabel(r) + '</button>';
+  });
+  html += '</div>';
+
+  html += '<div class="filter-sep"></div>';
+
+  // Search
+  html += '<input type="text" class="search-input" id="search-input" placeholder="Search scenarios..." value="' + escAttr(searchQuery) + '">';
+
+  // Count
+  html += '<div class="filter-count" id="filter-count"></div>';
+
+  html += '</div>';
+  return html;
+}
+
+function renderScenarioCard(s, idx) {
+  var resultClass = s.error ? 'error' : (s.pass ? 'pass' : 'fail');
+  var resultLabel = s.error ? 'ERROR' : (s.pass ? 'PASS' : 'FAIL');
+
+  // Check for comparison changes
+  var changedClass = '';
+  if (compareReport) {
+    var cmpScenarios = compareReport.scenarios || [];
+    var cmpScenario = null;
+    for (var ci = 0; ci < cmpScenarios.length; ci++) {
+      if (cmpScenarios[ci].name === s.name) { cmpScenario = cmpScenarios[ci]; break; }
+    }
+    if (cmpScenario && cmpScenario.pass !== s.pass) {
+      changedClass = ' changed';
+    }
+  }
+
+  var html = '<div class="scenario-card ' + resultClass + changedClass + '" ' +
+    'data-idx="' + idx + '" ' +
+    'data-category="' + escAttr(s.category || '') + '" ' +
+    'data-difficulty="' + escAttr(s.difficulty || '') + '" ' +
+    'data-result="' + (s.error ? 'error' : (s.pass ? 'pass' : 'fail')) + '" ' +
+    'data-name="' + escAttr((s.name || '').toLowerCase()) + '">';
+
+  // Header
+  html += '<div class="scenario-header">';
+  html += '<div class="scenario-name">' + escHtml(s.name || 'Scenario ' + s.index) + '</div>';
+  html += '<div class="scenario-badges">';
+  if (s.category) html += '<span class="badge category">' + formatLabel(s.category) + '</span>';
+  if (s.difficulty) html += '<span class="badge difficulty ' + escAttr(s.difficulty) + '">' + formatLabel(s.difficulty) + '</span>';
+  html += '<span class="status-pill ' + resultClass + '">' + resultLabel + '</span>';
+  if (s.user_turns) html += '<span class="badge turns">' + s.user_turns + ' turns</span>';
+  html += '</div></div>';
+
+  // Body
+  html += '<div class="scenario-body"><div class="scenario-body-inner">';
+
+  if (s.error) {
+    html += '<div class="error-message">' + escHtml(s.error) + '</div>';
+  } else {
+    // Chat transcript
+    if (s.actual_conversation && s.actual_conversation.length > 0) {
+      html += '<div class="section-header" style="margin-top:8px">Conversation</div>';
+      html += '<div class="chat-transcript">';
+      s.actual_conversation.forEach(function(msg) {
+        var bubbleClass = msg.sender === 'user' ? 'user' : 'pulse';
+        html += '<div class="chat-bubble ' + bubbleClass + '">' + escHtml(msg.message) + '</div>';
+      });
+      html += '</div>';
+    }
+
+    // Judgment
+    if (s.judgment) {
+      html += '<div class="judgment-section">';
+      html += '<h4>Judge Verdict</h4>';
+      if (s.judgment.overall_note) {
+        html += '<div class="judgment-note">' + escHtml(s.judgment.overall_note) + '</div>';
+      }
+
+      // Per-turn grades
+      if (s.judgment.turns && s.judgment.turns.length > 0) {
+        html += '<h4>Per-Turn Grades</h4>';
+        html += '<div class="turn-grades">';
+        s.judgment.turns.forEach(function(t) {
+          var tResult = t.pass ? 'pass' : 'fail';
+          html += '<div class="turn-grade">' +
+            '<span class="turn-label">Turn ' + t.turn + '</span>' +
+            '<span class="turn-result ' + tResult + '">' + (t.pass ? 'PASS' : 'FAIL') + '</span>' +
+            '<span class="turn-note">' + escHtml(t.note || '') + '</span>' +
+            '</div>';
+        });
+        html += '</div>';
+      }
+
+      // Failure modes
+      if (s.judgment.failure_modes_triggered && s.judgment.failure_modes_triggered.length > 0) {
+        html += '<div class="failure-modes">';
+        s.judgment.failure_modes_triggered.forEach(function(fm) {
+          html += '<span class="failure-badge">' + escHtml(fm) + '</span>';
+        });
+        html += '</div>';
+      }
+
+      html += '</div>'; // .judgment-section
+    }
+
+    // Assertions
+    if (s.assertions && s.assertions.length > 0) {
+      html += '<div class="assertions">';
+      html += '<div class="section-header">Assertions</div>';
+      s.assertions.forEach(function(a) {
+        var icon = a.passed ? 'PASS' : 'FAIL';
+        var cls = a.passed ? 'pass' : 'fail';
+        html += '<div class="assertion-row">' +
+          '<span class="assertion-icon ' + cls + '">' + icon + '</span>' +
+          '<span class="assertion-detail">Turn ' + a.turn + ' ' + escHtml(a.assert_type) +
+          ': expected <code>' + escHtml(String(a.expected)) + '</code>' +
+          (a.passed ? '' : ', got <code>' + escHtml(String(a.actual || '').substring(0, 120)) + '</code>') +
+          '</span></div>';
+      });
+      html += '</div>';
+    }
+  }
+
+  html += '</div></div>'; // .scenario-body-inner, .scenario-body
+  html += '</div>'; // .scenario-card
+  return html;
+}
+
+// ── Filters ──
+function applyFilters() {
+  var cards = document.querySelectorAll('.scenario-card');
+  var shown = 0;
+  var q = searchQuery.toLowerCase().trim();
+
+  cards.forEach(function(card) {
+    var cat = card.dataset.category;
+    var diff = card.dataset.difficulty;
+    var res = card.dataset.result;
+    var name = card.dataset.name || '';
+
+    var visible = true;
+    if (activeCategory !== 'all' && cat !== activeCategory) visible = false;
+    if (activeDifficulty !== 'all' && diff !== activeDifficulty) visible = false;
+    if (activeResult !== 'all' && res !== activeResult) visible = false;
+    if (q && name.indexOf(q) === -1) visible = false;
+
+    card.style.display = visible ? '' : 'none';
+    if (visible) shown++;
+  });
+
+  var total = cards.length;
+  var countEl = document.getElementById('filter-count');
+  if (countEl) countEl.textContent = 'Showing ' + shown + ' of ' + total;
+}
+
+// ── Grouping ──
+function groupBy(scenarios, field) {
+  var groups = {};
+  scenarios.forEach(function(s) {
+    var key = s[field] || 'unknown';
+    if (!groups[key]) groups[key] = { pass: 0, fail: 0, error: 0, total: 0 };
+    groups[key].total++;
+    if (s.error) groups[key].error++;
+    else if (s.pass) groups[key].pass++;
+    else groups[key].fail++;
+  });
+  return groups;
+}
+
+// ── Helpers ──
+function passRateClass(rate) {
+  if (rate >= 70) return 'ok';
+  if (rate >= 40) return 'degraded';
+  return 'critical';
+}
+
+function passRateColorClass(rate) {
+  if (rate >= 70) return 'green';
+  if (rate >= 40) return 'yellow';
+  return 'red';
+}
+
+function formatTimestamp(ts) {
+  if (!ts) return '';
+  try {
+    var d = new Date(ts);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
+      d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  } catch (e) { return ts; }
+}
+
+function formatLabel(s) {
+  if (s === 'all') return 'All';
+  return s.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+}
+
+function escHtml(s) {
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function escAttr(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function showLoading() {
+  document.getElementById('content').innerHTML =
+    '<div class="loading-container"><div class="spinner"></div><div class="loading-text">Loading report data...</div></div>';
+}
+
+function showEmpty(msg) {
+  document.getElementById('content').innerHTML =
+    '<div class="empty-state">' + escHtml(msg || 'No eval reports found. Run scenario evals to generate reports.') + '</div>';
+  var loadEl = document.getElementById('loading');
+  if (loadEl) loadEl.remove();
+}
+
+// ── Event listeners ──
+function setupEventListeners() {
+  // Report select
+  document.getElementById('report-select').addEventListener('change', function(e) {
+    loadReport(e.target.value);
+  });
+
+  // Compare toggle
+  document.getElementById('compare-toggle').addEventListener('change', function(e) {
+    var sel = document.getElementById('compare-select');
+    if (e.target.checked) {
+      sel.classList.add('visible');
+    } else {
+      sel.classList.remove('visible');
+      compareReport = null;
+      render();
+    }
+  });
+
+  // Compare select
+  document.getElementById('compare-select').addEventListener('change', function(e) {
+    if (e.target.value) {
+      loadCompareReport(e.target.value);
+    } else {
+      compareReport = null;
+      render();
+    }
+  });
+
+  // Delegated click handlers
+  document.addEventListener('click', function(e) {
+    // Expand/collapse scenario cards
+    var header = e.target.closest('.scenario-header');
+    if (header) {
+      var card = header.closest('.scenario-card');
+      card.classList.toggle('expanded');
+      return;
+    }
+
+    // Filter buttons
+    var filterBtn = e.target.closest('.filter-btn');
+    if (filterBtn) {
+      var type = filterBtn.dataset.filter;
+      var value = filterBtn.dataset.value;
+      if (type === 'category') activeCategory = value;
+      if (type === 'difficulty') activeDifficulty = value;
+      if (type === 'result') activeResult = value;
+      // Update active states
+      filterBtn.closest('.filter-group').querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+      filterBtn.classList.add('active');
+      applyFilters();
+      return;
+    }
+
+    // Bar chart clicks (category/difficulty filter toggle)
+    var barRow = e.target.closest('.bar-row');
+    if (barRow && barRow.dataset.barCategory) {
+      var val = barRow.dataset.barCategory;
+      if (CATEGORIES.indexOf(val) !== -1) {
+        activeCategory = activeCategory === val ? 'all' : val;
+      } else if (DIFFICULTIES.indexOf(val) !== -1) {
+        activeDifficulty = activeDifficulty === val ? 'all' : val;
+      }
+      render();
+      return;
+    }
+
+    // Must-pass jump
+    var jumpItem = e.target.closest('[data-jump]');
+    if (jumpItem) {
+      var jumpIdx = parseInt(jumpItem.dataset.jump);
+      // Clear filters first so target is visible
+      activeCategory = 'all';
+      activeDifficulty = 'all';
+      activeResult = 'all';
+      searchQuery = '';
+      render();
+      // After render, scroll and expand
+      setTimeout(function() {
+        var targetCard = document.querySelector('.scenario-card[data-idx="' + jumpIdx + '"]');
+        if (targetCard) {
+          targetCard.classList.add('expanded');
+          targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 50);
+      return;
+    }
+  });
+
+  // Search input (delegated)
+  document.addEventListener('input', function(e) {
+    if (e.target.id === 'search-input') {
+      searchQuery = e.target.value;
+      applyFilters();
+    }
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', function(e) {
+    // Skip if typing in input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+      if (e.key === 'Escape') {
+        e.target.blur();
+      }
+      return;
+    }
+
+    var visibleCards = [];
+    document.querySelectorAll('.scenario-card').forEach(function(c) {
+      if (c.style.display !== 'none') visibleCards.push(c);
+    });
+
+    switch (e.key) {
+      case 'j': // Next
+        e.preventDefault();
+        focusedIndex = Math.min(focusedIndex + 1, visibleCards.length - 1);
+        focusCard(visibleCards);
+        break;
+      case 'k': // Previous
+        e.preventDefault();
+        focusedIndex = Math.max(focusedIndex - 1, 0);
+        focusCard(visibleCards);
+        break;
+      case 'Enter': // Toggle expand
+        e.preventDefault();
+        if (focusedIndex >= 0 && focusedIndex < visibleCards.length) {
+          visibleCards[focusedIndex].classList.toggle('expanded');
+        }
+        break;
+      case 'f': // Focus search
+        e.preventDefault();
+        var searchInput = document.getElementById('search-input');
+        if (searchInput) searchInput.focus();
+        break;
+      case '1': case '2': case '3': case '4': case '5': case '6':
+        var catIdx = parseInt(e.key) - 1;
+        if (catIdx < CATEGORIES.length) {
+          activeCategory = CATEGORIES[catIdx];
+          render();
+        }
+        break;
+      case 'Escape':
+        activeCategory = 'all';
+        activeDifficulty = 'all';
+        activeResult = 'all';
+        searchQuery = '';
+        focusedIndex = -1;
+        document.querySelectorAll('.scenario-card').forEach(function(c) { c.classList.remove('focused'); });
+        render();
+        break;
+    }
+  });
+
+  // Back to top
+  var topBtn = document.getElementById('back-to-top');
+  window.addEventListener('scroll', function() {
+    topBtn.classList.toggle('visible', window.scrollY > 400);
+  });
+  topBtn.addEventListener('click', function() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+}
+
+function focusCard(visibleCards) {
+  document.querySelectorAll('.scenario-card').forEach(function(c) { c.classList.remove('focused'); });
+  if (focusedIndex >= 0 && focusedIndex < visibleCards.length) {
+    visibleCards[focusedIndex].classList.add('focused');
+    visibleCards[focusedIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+// ── Boot ──
+init();
+</script>
+</body>
+</html>

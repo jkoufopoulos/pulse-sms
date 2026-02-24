@@ -75,6 +75,52 @@ app.get('/architecture', (req, res) => {
   res.sendFile(require('path').join(__dirname, 'architecture.html'));
 });
 
+// Eval report viewer (read-only, always available)
+app.get('/eval-report', (req, res) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
+  res.sendFile(require('path').join(__dirname, 'eval-report.html'));
+});
+
+// Eval report API — list available reports and serve report data
+app.get('/api/eval-reports', (req, res) => {
+  const reportsDir = require('path').join(__dirname, '..', 'data', 'reports');
+  const fs = require('fs');
+  if (!fs.existsSync(reportsDir)) return res.json([]);
+  const files = fs.readdirSync(reportsDir)
+    .filter(f => f.startsWith('scenario-eval-') && f.endsWith('.json'))
+    .sort()
+    .reverse();
+  const summaries = files.map(f => {
+    try {
+      const data = JSON.parse(fs.readFileSync(require('path').join(reportsDir, f), 'utf8'));
+      return {
+        filename: f,
+        timestamp: data.timestamp,
+        total: data.total,
+        passed: data.passed,
+        failed: data.failed,
+        errors: data.errors,
+        judge_model: data.judge_model,
+        judge_cost: data.judge_cost,
+        elapsed_seconds: data.elapsed_seconds,
+        concurrency: data.concurrency,
+        base_url: data.base_url,
+      };
+    } catch { return null; }
+  }).filter(Boolean);
+  res.json(summaries);
+});
+
+app.get('/api/eval-reports/:filename', (req, res) => {
+  const fs = require('fs');
+  const filePath = require('path').join(__dirname, '..', 'data', 'reports', req.params.filename);
+  if (!req.params.filename.startsWith('scenario-eval-') || !req.params.filename.endsWith('.json')) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
+  res.sendFile(filePath);
+});
+
 // Events browser (read-only, always available)
 app.get('/events', (req, res) => {
   res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");

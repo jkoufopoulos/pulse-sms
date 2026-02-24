@@ -35,8 +35,19 @@ const CONCURRENCY = parseInt(args.find(a => a.startsWith('--concurrency='))?.spl
   || (args.includes('--concurrency') ? args[args.indexOf('--concurrency') + 1] : null)
   || '10', 10);
 const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-haiku-4-5-20251001';
+const BUDGET_LIMIT = parseFloat(args.find(a => a.startsWith('--budget='))?.split('=')[1]
+  || (args.includes('--budget') ? args[args.indexOf('--budget') + 1] : null)
+  || '2.00');
 
 const client = new Anthropic();
+
+// Cost tracking for judge calls (Haiku pricing: $0.80/M input, $4/M output)
+const PRICING = {
+  'claude-haiku-4-5-20251001': { input: 0.80 / 1_000_000, output: 4.0 / 1_000_000 },
+  'claude-sonnet-4-5-20250929': { input: 3.0 / 1_000_000, output: 15.0 / 1_000_000 },
+};
+let judgeCostTotal = 0;
+let budgetExceeded = false;
 
 const JUDGE_SYSTEM = `You are a QA judge for Pulse, an SMS bot that recommends NYC events.
 
@@ -93,12 +104,21 @@ ${actualConversation.map(t => `${t.sender.toUpperCase()}: ${t.message}`).join('\
 
 Grade each user turn's response and give an overall verdict.`;
 
+  if (budgetExceeded) throw new Error(`Budget exceeded ($${judgeCostTotal.toFixed(2)}/$${BUDGET_LIMIT.toFixed(2)})`);
+
   const response = await client.messages.create({
     model: JUDGE_MODEL,
     max_tokens: 1024,
     system: JUDGE_SYSTEM,
     messages: [{ role: 'user', content: prompt }],
   }, { timeout: 15000 });
+
+  // Track judge cost
+  const pricing = PRICING[JUDGE_MODEL] || PRICING['claude-haiku-4-5-20251001'];
+  const cost = (response.usage?.input_tokens || 0) * pricing.input
+    + (response.usage?.output_tokens || 0) * pricing.output;
+  judgeCostTotal += cost;
+  if (judgeCostTotal >= BUDGET_LIMIT) budgetExceeded = true;
 
   const text = response.content?.[0]?.text || '';
 
@@ -238,6 +258,7 @@ async function main() {
     base_url: BASE,
     judge_model: JUDGE_MODEL,
     concurrency: CONCURRENCY,
+    budget_limit: BUDGET_LIMIT,
     total: scenarios.length,
     passed: 0,
     failed: 0,
@@ -344,6 +365,7 @@ async function main() {
   console.log(`TOTAL: ${report.total}  PASS: ${report.passed}  FAIL: ${report.failed}  ERROR: ${report.errors}`);
   console.log(`Pass rate: ${((report.passed / report.total) * 100).toFixed(1)}%`);
   console.log(`Time: ${totalElapsed}s (concurrency: ${CONCURRENCY})`);
+  console.log(`Judge cost: $${judgeCostTotal.toFixed(2)} (budget: $${BUDGET_LIMIT.toFixed(2)})`);
   console.log(`${'='.repeat(60)}`);
 
   // Difficulty tier breakdown
@@ -399,6 +421,8 @@ async function main() {
   if (!fs.existsSync(reportsDir)) fs.mkdirSync(reportsDir, { recursive: true });
   const now = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const reportPath = path.join(reportsDir, `scenario-eval-${now}.json`);
+  report.judge_cost = parseFloat(judgeCostTotal.toFixed(4));
+  report.elapsed_seconds = parseFloat(totalElapsed);
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
   console.log(`\nReport saved: ${reportPath}`);
 
