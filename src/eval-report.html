@@ -21,227 +21,321 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
     flex-wrap: wrap;
     gap: 12px;
   }
   .header h1 { font-size: 24px; font-weight: 700; color: #fff; }
   .header h1 span { color: #FF6B35; }
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    font-size: 13px;
-    color: #888;
-  }
 
-  /* ── Report picker bar ── */
-  .picker-bar {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background: #0a0a0a;
-    border-bottom: 1px solid #222;
-    padding: 12px 0;
-    margin-bottom: 24px;
+  /* ── Toolbar ── */
+  .toolbar {
+    background: #141414;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
     display: flex;
     align-items: center;
     gap: 12px;
     flex-wrap: wrap;
   }
-  .picker-bar label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
-  .picker-bar select {
-    background: #141414;
+  .toolbar select {
+    background: #0a0a0a;
     border: 1px solid #333;
     color: #e0e0e0;
     padding: 6px 10px;
     border-radius: 6px;
     font-size: 13px;
     font-family: inherit;
-    max-width: 400px;
+    max-width: 360px;
     cursor: pointer;
   }
-  .picker-bar select:focus { outline: none; border-color: #FF6B35; }
-  .compare-toggle {
+  .toolbar select:focus { outline: none; border-color: #FF6B35; }
+  .toolbar-sep {
+    width: 1px;
+    height: 24px;
+    background: #333;
+    flex-shrink: 0;
+  }
+  .toolbar-vs {
+    font-size: 11px;
+    color: #666;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid #333;
+    background: none;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .toolbar-vs:hover { border-color: #555; color: #aaa; }
+  .toolbar-vs.active { border-color: #FF6B35; color: #FF6B35; }
+  .compare-wrap { display: none; align-items: center; gap: 6px; }
+  .compare-wrap.visible { display: flex; }
+  .search-input {
+    background: #0a0a0a;
+    border: 1px solid #333;
+    color: #e0e0e0;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: inherit;
+    width: 180px;
+    transition: border-color 0.15s;
+  }
+  .search-input:focus { outline: none; border-color: #FF6B35; }
+  .search-input::placeholder { color: #555; }
+  .toolbar-count {
+    font-size: 12px;
+    color: #666;
+    margin-left: auto;
+    white-space: nowrap;
+  }
+
+  /* ── Filter rows ── */
+  .filter-rows {
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .filter-row {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 12px;
-    color: #888;
+    flex-wrap: wrap;
+  }
+  .filter-row-label {
+    font-size: 10px;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    width: 64px;
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .filter-btn {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #999;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-family: inherit;
     cursor: pointer;
-    user-select: none;
+    transition: all 0.15s;
+    white-space: nowrap;
   }
-  .compare-toggle input { accent-color: #FF6B35; cursor: pointer; }
-  .compare-select { display: none; }
-  .compare-select.visible { display: inline-block; }
+  .filter-btn:hover { border-color: #555; color: #ccc; }
+  .filter-btn.active { background: #FF6B35; border-color: #FF6B35; color: #fff; }
 
-  /* ── Summary cards ── */
-  .summary-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 12px;
-    margin-bottom: 24px;
+  /* ── Active filter chips ── */
+  .active-chips {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-height: 0;
+    margin-bottom: 0;
+    transition: margin 0.15s;
   }
-  .summary-card {
+  .active-chips.has-chips { margin-bottom: 16px; }
+  .active-chips-label {
+    font-size: 10px;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .chip:hover { opacity: 0.8; }
+  .chip .chip-x {
+    font-size: 13px;
+    font-weight: 400;
+    opacity: 0.7;
+    margin-left: 2px;
+  }
+  .chip.category { background: #1a1a2a; color: #60a5fa; }
+  .chip.difficulty { background: #1a2a1a; color: #86efac; }
+  .chip.difficulty.must_pass { background: #2a1a1a; color: #fca5a5; }
+  .chip.difficulty.stretch { background: #2a2a1a; color: #fde68a; }
+  .chip.result-pass { background: #1a3a1a; color: #4ade80; }
+  .chip.result-fail { background: #3a1a1a; color: #f87171; }
+  .chip.result-error { background: #2a1a2a; color: #c084fc; }
+  .clear-all {
+    font-size: 11px;
+    color: #666;
+    cursor: pointer;
+    padding: 3px 8px;
+    border: 1px solid #333;
+    border-radius: 12px;
+    background: none;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .clear-all:hover { border-color: #555; color: #aaa; }
+
+  /* ── Expand/Collapse all ── */
+  .bulk-actions {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .bulk-btn {
+    background: none;
+    border: 1px solid #333;
+    color: #666;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .bulk-btn:hover { border-color: #555; color: #aaa; }
+
+  /* ── Summary ── */
+  .summary-section {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .summary-big {
     background: #141414;
     border: 1px solid #222;
     border-radius: 10px;
-    padding: 16px;
+    padding: 20px 28px;
+    text-align: center;
+    min-width: 140px;
   }
-  .summary-card .label {
+  .summary-big .label {
     font-size: 11px;
     color: #666;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 4px;
   }
-  .summary-card .value {
-    font-size: 28px;
+  .summary-big .value {
+    font-size: 42px;
     font-weight: 700;
     color: #fff;
+    line-height: 1.1;
   }
-  .summary-card .value.green { color: #4ade80; }
-  .summary-card .value.yellow { color: #fbbf24; }
-  .summary-card .value.red { color: #f87171; }
-  .summary-card .delta {
-    font-size: 12px;
-    margin-left: 6px;
-    font-weight: 500;
-  }
-  .summary-card .delta.up { color: #4ade80; }
-  .summary-card .delta.down { color: #f87171; }
-  .summary-card .delta.neutral { color: #666; }
-  .summary-card .sub {
+  .summary-big .value.green { color: #4ade80; }
+  .summary-big .value.yellow { color: #fbbf24; }
+  .summary-big .value.red { color: #f87171; }
+  .summary-big .sub {
     font-size: 11px;
     color: #555;
-    margin-top: 2px;
+    margin-top: 4px;
   }
-
-  /* ── Status pills ── */
-  .status-pill {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  .status-pill.ok, .status-pill.pass { background: #1a3a1a; color: #4ade80; }
-  .status-pill.degraded, .status-pill.warn { background: #3a2a0a; color: #fbbf24; }
-  .status-pill.critical, .status-pill.fail { background: #3a1a1a; color: #f87171; }
-  .status-pill.error { background: #2a1a2a; color: #c084fc; }
-
-  /* ── Must-pass failures alert ── */
-  .must-pass-alert {
-    background: #2a0a0a;
-    border: 1px solid #5a1a1a;
-    border-radius: 10px;
-    padding: 16px;
-    margin-bottom: 24px;
-  }
-  .must-pass-alert.hidden { display: none; }
-  .must-pass-alert h3 {
-    color: #f87171;
-    font-size: 14px;
-    margin-bottom: 10px;
-    font-weight: 600;
-  }
-  .must-pass-alert ul { list-style: none; }
-  .must-pass-alert li {
-    padding: 6px 0;
-    border-bottom: 1px solid #3a1a1a;
+  .summary-big .delta {
     font-size: 13px;
-    cursor: pointer;
-    color: #e0a0a0;
-    transition: color 0.15s;
+    font-weight: 500;
+    margin-left: 4px;
   }
-  .must-pass-alert li:hover { color: #fff; }
-  .must-pass-alert li:last-child { border-bottom: none; }
+  .delta.up { color: #4ade80; }
+  .delta.down { color: #f87171; }
+  .delta.neutral { color: #666; }
 
-  /* ── Section headers ── */
-  .section-header {
-    font-size: 14px;
-    font-weight: 600;
-    color: #999;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 12px;
-    margin-top: 8px;
+  .summary-stats {
+    flex: 1;
+    min-width: 200px;
   }
-
-  /* ── Bar charts ── */
-  .bar-chart { margin-bottom: 24px; }
-  .bar-row {
+  .stat-row {
     display: flex;
     align-items: center;
-    margin-bottom: 8px;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid #1a1a1a;
+  }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-label {
+    font-size: 12px;
+    color: #888;
+    width: 90px;
+    flex-shrink: 0;
+  }
+  .stat-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #ccc;
+  }
+  .stat-value.green { color: #4ade80; }
+  .stat-value.red { color: #f87171; }
+  .stat-value.yellow { color: #fbbf24; }
+  .stat-value.purple { color: #c084fc; }
+
+  /* ── Category breakdown inline ── */
+  .category-breakdown {
+    background: #141414;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .cat-stat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
     cursor: pointer;
     transition: opacity 0.15s;
   }
-  .bar-row:hover { opacity: 0.85; }
-  .bar-label {
-    width: 140px;
-    font-size: 12px;
-    color: #aaa;
-    text-align: right;
-    padding-right: 12px;
-    flex-shrink: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .bar-track {
-    flex: 1;
-    height: 22px;
-    background: #1a1a1a;
-    border-radius: 4px;
-    overflow: hidden;
-    display: flex;
-    position: relative;
-  }
-  .bar-fill-pass {
-    background: #1a5a1a;
-    height: 100%;
-    transition: width 0.4s ease;
-  }
-  .bar-fill-fail {
-    background: #5a1a1a;
-    height: 100%;
-    transition: width 0.4s ease;
-  }
-  .bar-fill-error {
-    background: #3a1a3a;
-    height: 100%;
-    transition: width 0.4s ease;
-  }
-  .bar-stats {
-    width: 100px;
-    font-size: 11px;
-    color: #888;
-    padding-left: 10px;
-    flex-shrink: 0;
-    white-space: nowrap;
-  }
+  .cat-stat:hover { opacity: 0.8; }
+  .cat-stat-name { color: #888; }
+  .cat-stat-rate { font-weight: 700; }
+  .cat-stat-rate.green { color: #4ade80; }
+  .cat-stat-rate.yellow { color: #fbbf24; }
+  .cat-stat-rate.red { color: #f87171; }
+  .cat-stat-detail { color: #555; font-size: 11px; }
 
-  /* ── Trend sparkline ── */
-  .sparkline-section { margin-bottom: 24px; }
+  /* ── Sparkline trend ── */
+  .trend-section {
+    background: #141414;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+  }
+  .trend-label {
+    font-size: 10px;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
   .sparkline {
     display: flex;
     align-items: flex-end;
     gap: 3px;
-    height: 40px;
+    height: 36px;
   }
   .spark-bar {
     flex: 1;
-    max-width: 28px;
+    max-width: 32px;
     border-radius: 2px 2px 0 0;
     min-height: 2px;
     position: relative;
     cursor: pointer;
     transition: opacity 0.15s;
   }
-  .spark-bar:hover { opacity: 0.8; }
+  .spark-bar:hover { opacity: 0.75; }
   .spark-bar .spark-tip {
     display: none;
     position: absolute;
@@ -258,87 +352,49 @@
   }
   .spark-bar:hover .spark-tip { display: block; }
 
-  /* ── Charts row ── */
-  .charts-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    margin-bottom: 24px;
-  }
-  @media (max-width: 768px) {
-    .charts-row { grid-template-columns: 1fr; }
-  }
-
-  /* ── Filter bar ── */
-  .filter-bar {
-    position: sticky;
-    top: 50px;
-    z-index: 90;
-    background: #0a0a0a;
-    border-bottom: 1px solid #1a1a1a;
-    padding: 12px 0;
+  /* ── Must-pass alert ── */
+  .must-pass-alert {
+    background: #2a0a0a;
+    border: 1px solid #5a1a1a;
+    border-radius: 10px;
+    padding: 14px 16px;
     margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
   }
-  .filter-group {
-    display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
+  .must-pass-alert.hidden { display: none; }
+  .must-pass-alert h3 {
+    color: #f87171;
+    font-size: 13px;
+    margin-bottom: 8px;
+    font-weight: 600;
   }
-  .filter-group-label {
-    font-size: 10px;
-    color: #555;
+  .must-pass-alert ul { list-style: none; }
+  .must-pass-alert li {
+    padding: 4px 0;
+    border-bottom: 1px solid #3a1a1a;
+    font-size: 12px;
+    cursor: pointer;
+    color: #e0a0a0;
+    transition: color 0.15s;
+  }
+  .must-pass-alert li:hover { color: #fff; }
+  .must-pass-alert li:last-child { border-bottom: none; }
+
+  /* ── Status pills ── */
+  .status-pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    align-self: center;
-    margin-right: 2px;
   }
-  .filter-sep {
-    width: 1px;
-    height: 24px;
-    background: #333;
-    margin: 0 6px;
-    align-self: center;
-  }
-  .filter-btn {
-    background: #1a1a1a;
-    border: 1px solid #333;
-    color: #999;
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 11px;
-    font-family: inherit;
-    cursor: pointer;
-    transition: all 0.15s;
-    white-space: nowrap;
-  }
-  .filter-btn:hover { border-color: #555; color: #ccc; }
-  .filter-btn.active { background: #FF6B35; border-color: #FF6B35; color: #fff; }
-  .search-input {
-    background: #141414;
-    border: 1px solid #333;
-    color: #e0e0e0;
-    padding: 5px 10px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-family: inherit;
-    width: 180px;
-    transition: border-color 0.15s;
-  }
-  .search-input:focus { outline: none; border-color: #FF6B35; }
-  .search-input::placeholder { color: #555; }
-  .filter-count {
-    font-size: 12px;
-    color: #666;
-    margin-left: auto;
-    white-space: nowrap;
-  }
+  .status-pill.pass { background: #1a3a1a; color: #4ade80; }
+  .status-pill.fail { background: #3a1a1a; color: #f87171; }
+  .status-pill.error { background: #2a1a2a; color: #c084fc; }
 
   /* ── Scenario cards ── */
-  .scenario-list { display: flex; flex-direction: column; gap: 8px; }
+  .scenario-list { display: flex; flex-direction: column; gap: 6px; }
   .scenario-card {
     background: #141414;
     border: 1px solid #222;
@@ -368,21 +424,24 @@
   }
 
   .scenario-header {
-    padding: 12px 16px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    padding: 10px 16px;
     cursor: pointer;
     user-select: none;
-    flex-wrap: wrap;
+    transition: background 0.1s;
   }
   .scenario-header:hover { background: #1a1a1a; }
+  .scenario-header-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
   .scenario-name {
     font-size: 13px;
     font-weight: 600;
     color: #ddd;
     flex: 1;
-    min-width: 200px;
+    min-width: 180px;
   }
   .scenario-badges { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
   .badge {
@@ -400,13 +459,25 @@
   .badge.difficulty.stretch { background: #2a2a1a; color: #fde68a; }
   .badge.turns { background: #1a1a1a; color: #777; }
 
+  .scenario-preview {
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+    line-height: 1.4;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  .scenario-preview .preview-label { color: #555; }
+
   .scenario-body {
     max-height: 0;
     overflow: hidden;
     transition: max-height 0.35s ease;
   }
   .scenario-card.expanded .scenario-body {
-    max-height: 5000px;
+    max-height: 8000px;
     transition: max-height 0.5s ease;
   }
   .scenario-body-inner {
@@ -444,6 +515,12 @@
     font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Monaco, 'Cascadia Mono', monospace;
     font-size: 12px;
   }
+  .chat-turn-marker {
+    font-size: 10px;
+    color: #444;
+    text-align: center;
+    padding: 2px 0;
+  }
 
   /* ── Judgment section ── */
   .judgment-section {
@@ -467,6 +544,18 @@
     margin-bottom: 12px;
   }
 
+  /* ── Failure modes ── */
+  .failure-modes { margin-top: 10px; margin-bottom: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .failure-badge {
+    background: #3a1a1a;
+    color: #f87171;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  /* ── Turn grades ── */
   .turn-grades { display: flex; flex-direction: column; gap: 6px; }
   .turn-grade {
     display: flex;
@@ -492,18 +581,7 @@
   .turn-grade .turn-result.fail { color: #f87171; }
   .turn-grade .turn-note { color: #aaa; flex: 1; line-height: 1.5; }
 
-  /* ── Failure modes ── */
-  .failure-modes { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
-  .failure-badge {
-    background: #3a1a1a;
-    color: #f87171;
-    padding: 3px 10px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 500;
-  }
-
-  /* ── Assertion results ── */
+  /* ── Assertions ── */
   .assertions { margin-top: 12px; }
   .assertion-row {
     display: flex;
@@ -534,6 +612,17 @@
     border-radius: 8px;
     color: #c084fc;
     font-size: 13px;
+    margin-top: 8px;
+  }
+
+  /* ── Section headers ── */
+  .section-header {
+    font-size: 12px;
+    font-weight: 600;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
     margin-top: 8px;
   }
 
@@ -616,12 +705,13 @@
   @media (max-width: 600px) {
     body { padding: 12px; }
     .header h1 { font-size: 20px; }
-    .summary-card .value { font-size: 22px; }
-    .bar-label { width: 100px; font-size: 11px; }
-    .scenario-name { font-size: 12px; min-width: 150px; }
+    .summary-big .value { font-size: 32px; }
+    .scenario-name { font-size: 12px; min-width: 140px; }
     .chat-bubble { max-width: 90%; }
-    .filter-bar { top: 44px; }
     .search-input { width: 140px; }
+    .filter-row-label { width: 48px; font-size: 9px; }
+    .summary-section { flex-direction: column; }
+    .category-breakdown { flex-direction: column; gap: 8px; }
   }
 </style>
 </head>
@@ -629,16 +719,6 @@
 
 <div class="header">
   <h1>Pulse <span>Eval Report</span></h1>
-  <div class="header-right" id="header-meta"></div>
-</div>
-
-<div class="picker-bar" id="picker-bar">
-  <label for="report-select">Report:</label>
-  <select id="report-select"></select>
-  <label class="compare-toggle">
-    <input type="checkbox" id="compare-toggle"> Compare
-  </label>
-  <select id="compare-select" class="compare-select"></select>
 </div>
 
 <div id="content">
@@ -654,27 +734,28 @@
   <kbd>j</kbd>/<kbd>k</kbd> navigate &middot;
   <kbd>Enter</kbd> expand &middot;
   <kbd>f</kbd> search &middot;
-  <kbd>1</kbd>-<kbd>6</kbd> category &middot;
-  <kbd>Esc</kbd> clear
+  <kbd>x</kbd> expand all &middot;
+  <kbd>c</kbd> collapse all &middot;
+  <kbd>Esc</kbd> clear filters
 </div>
 
 <script>
 // ── State ──
-let allReports = [];
-let currentReport = null;
-let compareReport = null;
-let activeCategory = 'all';
-let activeDifficulty = 'all';
-let activeResult = 'all';
-let searchQuery = '';
-let focusedIndex = -1;
+var allReports = [];
+var currentReport = null;
+var compareReport = null;
+var filters = { category: 'all', difficulty: 'all', result: 'all' };
+var searchQuery = '';
+var focusedIndex = -1;
+var compareVisible = false;
 
-const CATEGORIES = ['all', 'happy_path', 'filter_drift', 'edge_case', 'poor_experience', 'abuse_off_topic'];
-const DIFFICULTIES = ['all', 'must_pass', 'should_pass', 'stretch'];
-const RESULTS = ['all', 'pass', 'fail', 'error'];
+var CATEGORIES = ['all', 'happy_path', 'filter_drift', 'edge_case', 'poor_experience', 'abuse_off_topic'];
+var DIFFICULTIES = ['all', 'must_pass', 'should_pass', 'stretch'];
+var RESULTS = ['all', 'pass', 'fail', 'error'];
 
 // ── Init ──
 async function init() {
+  readHashState();
   await loadReportList();
   if (allReports.length === 0) {
     showEmpty();
@@ -685,9 +766,37 @@ async function init() {
   setupEventListeners();
 }
 
+function readHashState() {
+  var hash = window.location.hash.substring(1);
+  if (!hash) return;
+  hash.split('&').forEach(function(pair) {
+    var parts = pair.split('=');
+    if (parts.length === 2) {
+      var key = decodeURIComponent(parts[0]);
+      var val = decodeURIComponent(parts[1]);
+      if (key === 'category' && CATEGORIES.indexOf(val) !== -1) filters.category = val;
+      if (key === 'difficulty' && DIFFICULTIES.indexOf(val) !== -1) filters.difficulty = val;
+      if (key === 'result' && RESULTS.indexOf(val) !== -1) filters.result = val;
+      if (key === 'search') searchQuery = val;
+    }
+  });
+}
+
+function writeHashState() {
+  var parts = [];
+  if (filters.category !== 'all') parts.push('category=' + encodeURIComponent(filters.category));
+  if (filters.difficulty !== 'all') parts.push('difficulty=' + encodeURIComponent(filters.difficulty));
+  if (filters.result !== 'all') parts.push('result=' + encodeURIComponent(filters.result));
+  if (searchQuery) parts.push('search=' + encodeURIComponent(searchQuery));
+  var hash = parts.length > 0 ? '#' + parts.join('&') : '';
+  if (window.location.hash !== hash) {
+    history.replaceState(null, '', window.location.pathname + hash);
+  }
+}
+
 async function loadReportList() {
   try {
-    const res = await fetch('/api/eval-reports');
+    var res = await fetch('/api/eval-reports');
     allReports = await res.json();
   } catch (e) {
     console.error('Failed to load report list:', e);
@@ -698,7 +807,7 @@ async function loadReportList() {
 async function loadReport(filename) {
   showLoading();
   try {
-    const res = await fetch('/api/eval-reports/' + encodeURIComponent(filename));
+    var res = await fetch('/api/eval-reports/' + encodeURIComponent(filename));
     currentReport = await res.json();
     render();
   } catch (e) {
@@ -709,7 +818,7 @@ async function loadReport(filename) {
 
 async function loadCompareReport(filename) {
   try {
-    const res = await fetch('/api/eval-reports/' + encodeURIComponent(filename));
+    var res = await fetch('/api/eval-reports/' + encodeURIComponent(filename));
     compareReport = await res.json();
     render();
   } catch (e) {
@@ -718,168 +827,176 @@ async function loadCompareReport(filename) {
   }
 }
 
-// ── Selects ──
-function populateSelects() {
-  const sel = document.getElementById('report-select');
-  const cmp = document.getElementById('compare-select');
-  sel.innerHTML = '';
-  cmp.innerHTML = '<option value="">-- select --</option>';
-  allReports.forEach((r, i) => {
-    const rate = r.total > 0 ? Math.round(100 * r.passed / r.total) : 0;
-    const ts = formatTimestamp(r.timestamp);
-    const label = ts + ' \u2014 ' + rate + '% (' + r.passed + '/' + r.total + ')';
-    sel.innerHTML += '<option value="' + escAttr(r.filename) + '"' + (i === 0 ? ' selected' : '') + '>' + escHtml(label) + '</option>';
-    cmp.innerHTML += '<option value="' + escAttr(r.filename) + '">' + escHtml(label) + '</option>';
+function populateSelects() {}
+
+// ── Sorting ──
+function sortScenarios(scenarios) {
+  var order = { error: 0, fail: 1, pass: 2 };
+  var tierOrder = { must_pass: 0, should_pass: 1, stretch: 2 };
+  return scenarios.slice().sort(function(a, b) {
+    var aResult = a.error ? 'error' : (a.pass ? 'pass' : 'fail');
+    var bResult = b.error ? 'error' : (b.pass ? 'pass' : 'fail');
+    var rDiff = (order[aResult] || 2) - (order[bResult] || 2);
+    if (rDiff !== 0) return rDiff;
+    var aTier = tierOrder[a.difficulty] != null ? tierOrder[a.difficulty] : 9;
+    var bTier = tierOrder[b.difficulty] != null ? tierOrder[b.difficulty] : 9;
+    return aTier - bTier;
   });
 }
 
 // ── Render ──
 function render() {
   if (!currentReport) return;
-  const c = document.getElementById('content');
-  const scenarios = currentReport.scenarios || [];
-  const passRate = currentReport.total > 0 ? (100 * currentReport.passed / currentReport.total) : 0;
+  var c = document.getElementById('content');
+  var scenarios = currentReport.scenarios || [];
+  var sorted = sortScenarios(scenarios);
+  var passRate = currentReport.total > 0 ? (100 * currentReport.passed / currentReport.total) : 0;
 
-  let html = '';
+  var html = '';
 
-  // Summary cards
-  html += renderSummary(passRate);
+  // Toolbar
+  html += renderToolbar();
 
-  // Must-pass failures
-  html += renderMustPassAlert(scenarios);
+  // Summary section
+  html += renderSummary(passRate, scenarios);
 
-  // Charts row: category + difficulty
-  html += '<div class="charts-row">';
-  html += '<div>' + renderBarChart('Category Breakdown', groupBy(scenarios, 'category'), CATEGORIES.slice(1)) + '</div>';
-  html += '<div>' + renderBarChart('Difficulty Breakdown', groupBy(scenarios, 'difficulty'), DIFFICULTIES.slice(1)) + '</div>';
-  html += '</div>';
+  // Category breakdown
+  html += renderCategoryBreakdown(scenarios);
 
-  // Trend sparkline
-  if (allReports.length > 1) {
+  // Trend sparkline (only if >3 reports)
+  if (allReports.length > 3) {
     html += renderSparkline();
   }
 
-  // Filter bar
-  html += renderFilterBar(scenarios);
+  // Must-pass alert
+  html += renderMustPassAlert(scenarios);
+
+  // Filter rows
+  html += renderFilterRows();
+
+  // Active chips
+  html += '<div class="active-chips" id="active-chips"></div>';
+
+  // Bulk actions
+  html += '<div class="bulk-actions">';
+  html += '<button class="bulk-btn" id="expand-all-btn">Expand all</button>';
+  html += '<button class="bulk-btn" id="collapse-all-btn">Collapse all</button>';
+  html += '</div>';
 
   // Scenario cards
   html += '<div class="scenario-list" id="scenario-list">';
-  scenarios.forEach(function(s, i) {
+  sorted.forEach(function(s, i) {
     html += renderScenarioCard(s, i);
   });
   html += '</div>';
 
   c.innerHTML = html;
 
-  // Update header meta
-  document.getElementById('header-meta').innerHTML =
-    '<span>' + escHtml(formatTimestamp(currentReport.timestamp)) + '</span>' +
-    '<span class="status-pill ' + passRateClass(passRate) + '">' + Math.round(passRate) + '% pass</span>';
-
   applyFilters();
+  renderChips();
+  writeHashState();
 }
 
-function renderSummary(passRate) {
-  var r = currentReport;
-  var cmp = compareReport;
-  var html = '<div class="summary-row">';
+function renderToolbar() {
+  var html = '<div class="toolbar">';
 
-  // Pass rate
-  html += summaryCard('Pass Rate', Math.round(passRate) + '%', passRateColorClass(passRate),
-    cmp ? deltaStr(passRate, cmp.total > 0 ? 100 * cmp.passed / cmp.total : 0, '%') : '',
-    r.judge_model ? 'Judge: ' + r.judge_model : '');
+  // Report selector
+  html += '<select id="report-select">';
+  allReports.forEach(function(r, i) {
+    var rate = r.total > 0 ? Math.round(100 * r.passed / r.total) : 0;
+    var ts = formatTimestamp(r.timestamp);
+    var label = ts + ' \u2014 ' + rate + '% (' + r.passed + '/' + r.total + ')';
+    html += '<option value="' + escAttr(r.filename) + '"' + (i === 0 ? ' selected' : '') + '>' + escHtml(label) + '</option>';
+  });
+  html += '</select>';
 
-  // Passed
-  html += summaryCard('Passed', r.passed, 'green',
-    cmp ? deltaStr(r.passed, cmp.passed) : '');
+  // Compare toggle
+  html += '<button class="toolbar-vs' + (compareVisible ? ' active' : '') + '" id="compare-btn">vs</button>';
+  html += '<div class="compare-wrap' + (compareVisible ? ' visible' : '') + '" id="compare-wrap">';
+  html += '<select id="compare-select"><option value="">-- compare to --</option>';
+  allReports.forEach(function(r) {
+    var rate = r.total > 0 ? Math.round(100 * r.passed / r.total) : 0;
+    var ts = formatTimestamp(r.timestamp);
+    var label = ts + ' \u2014 ' + rate + '% (' + r.passed + '/' + r.total + ')';
+    html += '<option value="' + escAttr(r.filename) + '">' + escHtml(label) + '</option>';
+  });
+  html += '</select></div>';
 
-  // Failed
-  html += summaryCard('Failed', r.failed, r.failed > 0 ? 'red' : '',
-    cmp ? deltaStr(r.failed, cmp.failed, '', true) : '');
+  html += '<div class="toolbar-sep"></div>';
 
-  // Errors
-  html += summaryCard('Errors', r.errors, r.errors > 0 ? 'yellow' : '',
-    cmp ? deltaStr(r.errors, cmp.errors, '', true) : '');
+  // Search
+  html += '<input type="text" class="search-input" id="search-input" placeholder="Search scenarios..." value="' + escAttr(searchQuery) + '">';
 
-  // Judge cost
-  html += summaryCard('Judge Cost', r.judge_cost != null ? '$' + r.judge_cost.toFixed(2) : 'N/A', '',
-    cmp && cmp.judge_cost != null ? deltaStr(r.judge_cost, cmp.judge_cost, '$', true) : '');
-
-  // Duration
-  var dur = r.elapsed_seconds != null ? Math.round(r.elapsed_seconds) + 's' : 'N/A';
-  html += summaryCard('Duration', dur, '',
-    cmp && cmp.elapsed_seconds != null ? deltaStr(r.elapsed_seconds, cmp.elapsed_seconds, 's', true) : '');
+  // Count
+  html += '<span class="toolbar-count" id="toolbar-count"></span>';
 
   html += '</div>';
   return html;
 }
 
-function summaryCard(label, value, colorClass, delta, sub) {
-  return '<div class="summary-card">' +
-    '<div class="label">' + escHtml(label) + '</div>' +
-    '<div class="value ' + (colorClass || '') + '">' + escHtml(String(value)) +
-    (delta || '') +
-    '</div>' +
-    (sub ? '<div class="sub">' + escHtml(sub) + '</div>' : '') +
-    '</div>';
-}
+function renderSummary(passRate, scenarios) {
+  var r = currentReport;
+  var cmp = compareReport;
+  var cmpRate = cmp && cmp.total > 0 ? (100 * cmp.passed / cmp.total) : null;
 
-function deltaStr(current, prev, unit, inverted) {
-  if (current == null || prev == null) return '';
-  var diff = current - prev;
-  if (Math.abs(diff) < 0.01) return '<span class="delta neutral">=</span>';
-  var up = diff > 0;
-  var good = inverted ? !up : up;
-  var arrow = up ? '\u2191' : '\u2193';
-  var cls = good ? 'up' : 'down';
-  var display = Math.abs(Math.round(diff * 100) / 100);
-  return '<span class="delta ' + cls + '">' + arrow + display + (unit || '') + '</span>';
-}
+  var html = '<div class="summary-section">';
 
-function renderMustPassAlert(scenarios) {
-  var failures = scenarios.filter(function(s) { return s.difficulty === 'must_pass' && !s.pass; });
-  if (failures.length === 0) return '<div class="must-pass-alert hidden"></div>';
-  var html = '<div class="must-pass-alert">';
-  html += '<h3>Must-Pass Failures (' + failures.length + ')</h3>';
-  html += '<ul>';
-  failures.forEach(function(f) {
-    html += '<li data-jump="' + f.index + '">' + escHtml(f.name) + '</li>';
-  });
-  html += '</ul></div>';
+  // Big pass rate
+  html += '<div class="summary-big">';
+  html += '<div class="label">Pass Rate</div>';
+  html += '<div class="value ' + passRateColor(passRate) + '">' + Math.round(passRate) + '%';
+  if (cmpRate != null) html += deltaHtml(passRate, cmpRate, '%');
+  html += '</div>';
+  html += '<div class="sub">' + r.passed + ' of ' + r.total + ' scenarios</div>';
+  html += '</div>';
+
+  // Stats column
+  html += '<div class="summary-stats">';
+  html += statRow('Passed', r.passed, 'green', cmp ? deltaHtml(r.passed, cmp.passed) : '');
+  html += statRow('Failed', r.failed, r.failed > 0 ? 'red' : '', cmp ? deltaHtml(r.failed, cmp.failed, '', true) : '');
+  html += statRow('Errors', r.errors || 0, (r.errors || 0) > 0 ? 'purple' : '', cmp ? deltaHtml(r.errors || 0, cmp.errors || 0, '', true) : '');
+  html += statRow('Duration', r.elapsed_seconds != null ? Math.round(r.elapsed_seconds) + 's' : 'N/A', '');
+  html += statRow('Judge Cost', r.judge_cost != null ? '$' + r.judge_cost.toFixed(2) : 'N/A', '');
+  if (r.judge_model) html += statRow('Judge', r.judge_model, '');
+  html += '</div>';
+
+  html += '</div>';
   return html;
 }
 
-function renderBarChart(title, groups, keys) {
-  var html = '<div class="section-header">' + escHtml(title) + '</div>';
-  html += '<div class="bar-chart">';
-  keys.forEach(function(key) {
-    var g = groups[key] || { pass: 0, fail: 0, error: 0, total: 0 };
-    var total = g.total || 1;
-    var pPct = (g.pass / total * 100).toFixed(1);
-    var fPct = (g.fail / total * 100).toFixed(1);
-    var ePct = (g.error / total * 100).toFixed(1);
-    html += '<div class="bar-row" data-bar-category="' + escAttr(key) + '">' +
-      '<div class="bar-label">' + formatLabel(key) + '</div>' +
-      '<div class="bar-track">' +
-        '<div class="bar-fill-pass" style="width:' + pPct + '%"></div>' +
-        '<div class="bar-fill-fail" style="width:' + fPct + '%"></div>' +
-        '<div class="bar-fill-error" style="width:' + ePct + '%"></div>' +
-      '</div>' +
-      '<div class="bar-stats">' + g.pass + '/' + g.total + ' (' + Math.round(g.pass / total * 100) + '%)</div>' +
-      '</div>';
+function statRow(label, value, colorClass, delta) {
+  return '<div class="stat-row">' +
+    '<span class="stat-label">' + escHtml(label) + '</span>' +
+    '<span class="stat-value ' + (colorClass || '') + '">' + escHtml(String(value)) + (delta || '') + '</span>' +
+    '</div>';
+}
+
+function renderCategoryBreakdown(scenarios) {
+  var groups = groupBy(scenarios, 'category');
+  var cats = CATEGORIES.slice(1);
+  var html = '<div class="category-breakdown">';
+  cats.forEach(function(cat) {
+    var g = groups[cat] || { pass: 0, fail: 0, error: 0, total: 0 };
+    if (g.total === 0) return;
+    var rate = Math.round(g.pass / g.total * 100);
+    html += '<div class="cat-stat" data-cat-click="' + escAttr(cat) + '">';
+    html += '<span class="cat-stat-name">' + formatLabel(cat) + '</span>';
+    html += '<span class="cat-stat-rate ' + passRateColor(rate) + '">' + rate + '%</span>';
+    html += '<span class="cat-stat-detail">' + g.pass + '/' + g.total + '</span>';
+    html += '</div>';
   });
   html += '</div>';
   return html;
 }
 
 function renderSparkline() {
-  var recent = allReports.slice(0, 10).reverse();
-  var html = '<div class="sparkline-section">';
-  html += '<div class="section-header">Pass Rate Trend (last ' + recent.length + ' runs)</div>';
+  var recent = allReports.slice(0, 12).reverse();
+  var html = '<div class="trend-section">';
+  html += '<div class="trend-label">Pass Rate Trend (last ' + recent.length + ' runs)</div>';
   html += '<div class="sparkline">';
   recent.forEach(function(r) {
     var rate = r.total > 0 ? Math.round(100 * r.passed / r.total) : 0;
-    var h = Math.max(2, Math.round(rate * 0.38));
+    var h = Math.max(2, Math.round(rate * 0.34));
     var color = rate >= 70 ? '#1a5a1a' : (rate >= 40 ? '#5a4a1a' : '#5a1a1a');
     var ts = formatTimestamp(r.timestamp);
     html += '<div class="spark-bar" style="height:' + h + 'px; background:' + color + '">' +
@@ -890,58 +1007,87 @@ function renderSparkline() {
   return html;
 }
 
-function renderFilterBar(scenarios) {
-  var html = '<div class="filter-bar" id="filter-bar">';
+function renderMustPassAlert(scenarios) {
+  var failures = scenarios.filter(function(s) { return s.difficulty === 'must_pass' && !s.pass; });
+  if (failures.length === 0) return '<div class="must-pass-alert hidden"></div>';
+  var html = '<div class="must-pass-alert">';
+  html += '<h3>Must-Pass Failures (' + failures.length + ')</h3>';
+  html += '<ul>';
+  failures.forEach(function(f) {
+    html += '<li data-jump="' + escAttr(f.name) + '">' + escHtml(f.name);
+    if (f.error) {
+      html += ' <span style="color:#c084fc;font-size:11px">(error)</span>';
+    }
+    html += '</li>';
+  });
+  html += '</ul></div>';
+  return html;
+}
 
-  // Category
-  html += '<div class="filter-group">';
-  html += '<span class="filter-group-label">Cat:</span>';
-  CATEGORIES.forEach(function(cat, i) {
-    html += '<button class="filter-btn' + (activeCategory === cat ? ' active' : '') +
-      '" data-filter="category" data-value="' + escAttr(cat) + '"' +
-      ' title="Shortcut: ' + (i + 1) + '">' + formatLabel(cat) + '</button>';
+function renderFilterRows() {
+  var html = '<div class="filter-rows">';
+
+  // Category row
+  html += '<div class="filter-row">';
+  html += '<span class="filter-row-label">Category</span>';
+  CATEGORIES.forEach(function(cat) {
+    html += '<button class="filter-btn' + (filters.category === cat ? ' active' : '') +
+      '" data-filter="category" data-value="' + escAttr(cat) + '">' + formatLabel(cat) + '</button>';
   });
   html += '</div>';
 
-  html += '<div class="filter-sep"></div>';
-
-  // Difficulty
-  html += '<div class="filter-group">';
-  html += '<span class="filter-group-label">Diff:</span>';
+  // Difficulty row
+  html += '<div class="filter-row">';
+  html += '<span class="filter-row-label">Tier</span>';
   DIFFICULTIES.forEach(function(d) {
-    html += '<button class="filter-btn' + (activeDifficulty === d ? ' active' : '') +
+    html += '<button class="filter-btn' + (filters.difficulty === d ? ' active' : '') +
       '" data-filter="difficulty" data-value="' + escAttr(d) + '">' + formatLabel(d) + '</button>';
   });
   html += '</div>';
 
-  html += '<div class="filter-sep"></div>';
-
-  // Result
-  html += '<div class="filter-group">';
-  html += '<span class="filter-group-label">Result:</span>';
+  // Result row
+  html += '<div class="filter-row">';
+  html += '<span class="filter-row-label">Result</span>';
   RESULTS.forEach(function(r) {
-    html += '<button class="filter-btn' + (activeResult === r ? ' active' : '') +
+    html += '<button class="filter-btn' + (filters.result === r ? ' active' : '') +
       '" data-filter="result" data-value="' + escAttr(r) + '">' + formatLabel(r) + '</button>';
   });
   html += '</div>';
-
-  html += '<div class="filter-sep"></div>';
-
-  // Search
-  html += '<input type="text" class="search-input" id="search-input" placeholder="Search scenarios..." value="' + escAttr(searchQuery) + '">';
-
-  // Count
-  html += '<div class="filter-count" id="filter-count"></div>';
 
   html += '</div>';
   return html;
 }
 
-function renderScenarioCard(s, idx) {
+function renderChips() {
+  var el = document.getElementById('active-chips');
+  if (!el) return;
+  var chips = [];
+  if (filters.category !== 'all') {
+    chips.push('<span class="chip category" data-chip-clear="category">' + formatLabel(filters.category) + '<span class="chip-x">&times;</span></span>');
+  }
+  if (filters.difficulty !== 'all') {
+    var dClass = 'difficulty' + (filters.difficulty === 'must_pass' ? ' must_pass' : '') + (filters.difficulty === 'stretch' ? ' stretch' : '');
+    chips.push('<span class="chip ' + dClass + '" data-chip-clear="difficulty">' + formatLabel(filters.difficulty) + '<span class="chip-x">&times;</span></span>');
+  }
+  if (filters.result !== 'all') {
+    var rClass = 'result-' + filters.result;
+    chips.push('<span class="chip ' + rClass + '" data-chip-clear="result">' + formatLabel(filters.result) + '<span class="chip-x">&times;</span></span>');
+  }
+  if (chips.length > 0) {
+    el.innerHTML = '<span class="active-chips-label">Active:</span>' + chips.join('') +
+      '<button class="clear-all" id="clear-all-btn">Clear all</button>';
+    el.classList.add('has-chips');
+  } else {
+    el.innerHTML = '';
+    el.classList.remove('has-chips');
+  }
+}
+
+function renderScenarioCard(s, sortIdx) {
   var resultClass = s.error ? 'error' : (s.pass ? 'pass' : 'fail');
   var resultLabel = s.error ? 'ERROR' : (s.pass ? 'PASS' : 'FAIL');
 
-  // Check for comparison changes
+  // Compare changes
   var changedClass = '';
   if (compareReport) {
     var cmpScenarios = compareReport.scenarios || [];
@@ -949,27 +1095,47 @@ function renderScenarioCard(s, idx) {
     for (var ci = 0; ci < cmpScenarios.length; ci++) {
       if (cmpScenarios[ci].name === s.name) { cmpScenario = cmpScenarios[ci]; break; }
     }
-    if (cmpScenario && cmpScenario.pass !== s.pass) {
-      changedClass = ' changed';
-    }
+    if (cmpScenario && cmpScenario.pass !== s.pass) changedClass = ' changed';
   }
 
+  // Get preview text: first ~120 chars of judge note or error
+  var preview = '';
+  if (s.error) {
+    preview = s.error;
+  } else if (s.judgment && s.judgment.overall_note) {
+    preview = s.judgment.overall_note;
+  }
+  if (preview.length > 120) preview = preview.substring(0, 120) + '...';
+
   var html = '<div class="scenario-card ' + resultClass + changedClass + '" ' +
-    'data-idx="' + idx + '" ' +
+    'data-sort-idx="' + sortIdx + '" ' +
     'data-category="' + escAttr(s.category || '') + '" ' +
     'data-difficulty="' + escAttr(s.difficulty || '') + '" ' +
     'data-result="' + (s.error ? 'error' : (s.pass ? 'pass' : 'fail')) + '" ' +
-    'data-name="' + escAttr((s.name || '').toLowerCase()) + '">';
+    'data-name="' + escAttr((s.name || '').toLowerCase()) + '" ' +
+    'data-name-exact="' + escAttr(s.name || '') + '">';
 
   // Header
   html += '<div class="scenario-header">';
-  html += '<div class="scenario-name">' + escHtml(s.name || 'Scenario ' + s.index) + '</div>';
+  html += '<div class="scenario-header-top">';
+  html += '<span class="status-pill ' + resultClass + '">' + resultLabel + '</span>';
+  html += '<span class="scenario-name">' + escHtml(s.name || 'Scenario ' + s.index) + '</span>';
   html += '<div class="scenario-badges">';
   if (s.category) html += '<span class="badge category">' + formatLabel(s.category) + '</span>';
   if (s.difficulty) html += '<span class="badge difficulty ' + escAttr(s.difficulty) + '">' + formatLabel(s.difficulty) + '</span>';
-  html += '<span class="status-pill ' + resultClass + '">' + resultLabel + '</span>';
   if (s.user_turns) html += '<span class="badge turns">' + s.user_turns + ' turns</span>';
   html += '</div></div>';
+
+  // Preview line for failures/errors
+  if (!s.pass && preview) {
+    var previewColor = s.error ? '#c084fc' : '#888';
+    html += '<div class="scenario-preview" style="color:' + previewColor + '">';
+    html += '<span class="preview-label">' + (s.error ? 'Error: ' : 'Judge: ') + '</span>';
+    html += escHtml(preview);
+    html += '</div>';
+  }
+
+  html += '</div>'; // .scenario-header
 
   // Body
   html += '<div class="scenario-body"><div class="scenario-body-inner">';
@@ -977,11 +1143,16 @@ function renderScenarioCard(s, idx) {
   if (s.error) {
     html += '<div class="error-message">' + escHtml(s.error) + '</div>';
   } else {
-    // Chat transcript
+    // Conversation first
     if (s.actual_conversation && s.actual_conversation.length > 0) {
       html += '<div class="section-header" style="margin-top:8px">Conversation</div>';
       html += '<div class="chat-transcript">';
+      var turnNum = 0;
       s.actual_conversation.forEach(function(msg) {
+        if (msg.sender === 'user') {
+          turnNum++;
+          html += '<div class="chat-turn-marker">Turn ' + turnNum + '</div>';
+        }
         var bubbleClass = msg.sender === 'user' ? 'user' : 'pulse';
         html += '<div class="chat-bubble ' + bubbleClass + '">' + escHtml(msg.message) + '</div>';
       });
@@ -991,7 +1162,18 @@ function renderScenarioCard(s, idx) {
     // Judgment
     if (s.judgment) {
       html += '<div class="judgment-section">';
-      html += '<h4>Judge Verdict</h4>';
+      html += '<h4>Judge Verdict <span class="status-pill ' + (s.judgment.overall_pass ? 'pass' : 'fail') + '" style="margin-left:8px">' +
+        (s.judgment.overall_pass ? 'PASS' : 'FAIL') + '</span></h4>';
+
+      // Failure modes right after verdict header
+      if (s.judgment.failure_modes_triggered && s.judgment.failure_modes_triggered.length > 0) {
+        html += '<div class="failure-modes">';
+        s.judgment.failure_modes_triggered.forEach(function(fm) {
+          html += '<span class="failure-badge">' + escHtml(fm) + '</span>';
+        });
+        html += '</div>';
+      }
+
       if (s.judgment.overall_note) {
         html += '<div class="judgment-note">' + escHtml(s.judgment.overall_note) + '</div>';
       }
@@ -1007,15 +1189,6 @@ function renderScenarioCard(s, idx) {
             '<span class="turn-result ' + tResult + '">' + (t.pass ? 'PASS' : 'FAIL') + '</span>' +
             '<span class="turn-note">' + escHtml(t.note || '') + '</span>' +
             '</div>';
-        });
-        html += '</div>';
-      }
-
-      // Failure modes
-      if (s.judgment.failure_modes_triggered && s.judgment.failure_modes_triggered.length > 0) {
-        html += '<div class="failure-modes">';
-        s.judgment.failure_modes_triggered.forEach(function(fm) {
-          html += '<span class="failure-badge">' + escHtml(fm) + '</span>';
         });
         html += '</div>';
       }
@@ -1050,6 +1223,7 @@ function renderScenarioCard(s, idx) {
 function applyFilters() {
   var cards = document.querySelectorAll('.scenario-card');
   var shown = 0;
+  var total = cards.length;
   var q = searchQuery.toLowerCase().trim();
 
   cards.forEach(function(card) {
@@ -1059,18 +1233,27 @@ function applyFilters() {
     var name = card.dataset.name || '';
 
     var visible = true;
-    if (activeCategory !== 'all' && cat !== activeCategory) visible = false;
-    if (activeDifficulty !== 'all' && diff !== activeDifficulty) visible = false;
-    if (activeResult !== 'all' && res !== activeResult) visible = false;
+    if (filters.category !== 'all' && cat !== filters.category) visible = false;
+    if (filters.difficulty !== 'all' && diff !== filters.difficulty) visible = false;
+    if (filters.result !== 'all' && res !== filters.result) visible = false;
     if (q && name.indexOf(q) === -1) visible = false;
 
     card.style.display = visible ? '' : 'none';
     if (visible) shown++;
   });
 
-  var total = cards.length;
-  var countEl = document.getElementById('filter-count');
+  var countEl = document.getElementById('toolbar-count');
   if (countEl) countEl.textContent = 'Showing ' + shown + ' of ' + total;
+}
+
+function clearAllFilters() {
+  filters.category = 'all';
+  filters.difficulty = 'all';
+  filters.result = 'all';
+  searchQuery = '';
+  focusedIndex = -1;
+  document.querySelectorAll('.scenario-card').forEach(function(c) { c.classList.remove('focused'); });
+  render();
 }
 
 // ── Grouping ──
@@ -1088,16 +1271,22 @@ function groupBy(scenarios, field) {
 }
 
 // ── Helpers ──
-function passRateClass(rate) {
-  if (rate >= 70) return 'ok';
-  if (rate >= 40) return 'degraded';
-  return 'critical';
-}
-
-function passRateColorClass(rate) {
+function passRateColor(rate) {
   if (rate >= 70) return 'green';
   if (rate >= 40) return 'yellow';
   return 'red';
+}
+
+function deltaHtml(current, prev, unit, inverted) {
+  if (current == null || prev == null) return '';
+  var diff = current - prev;
+  if (Math.abs(diff) < 0.01) return '<span class="delta neutral">=</span>';
+  var up = diff > 0;
+  var good = inverted ? !up : up;
+  var arrow = up ? '\u2191' : '\u2193';
+  var cls = good ? 'up' : 'down';
+  var display = Math.abs(Math.round(diff * 100) / 100);
+  return '<span class="delta ' + cls + '">' + arrow + display + (unit || '') + '</span>';
 }
 
 function formatTimestamp(ts) {
@@ -1138,36 +1327,9 @@ function showEmpty(msg) {
 
 // ── Event listeners ──
 function setupEventListeners() {
-  // Report select
-  document.getElementById('report-select').addEventListener('change', function(e) {
-    loadReport(e.target.value);
-  });
-
-  // Compare toggle
-  document.getElementById('compare-toggle').addEventListener('change', function(e) {
-    var sel = document.getElementById('compare-select');
-    if (e.target.checked) {
-      sel.classList.add('visible');
-    } else {
-      sel.classList.remove('visible');
-      compareReport = null;
-      render();
-    }
-  });
-
-  // Compare select
-  document.getElementById('compare-select').addEventListener('change', function(e) {
-    if (e.target.value) {
-      loadCompareReport(e.target.value);
-    } else {
-      compareReport = null;
-      render();
-    }
-  });
-
   // Delegated click handlers
   document.addEventListener('click', function(e) {
-    // Expand/collapse scenario cards
+    // Expand/collapse scenario card
     var header = e.target.closest('.scenario-header');
     if (header) {
       var card = header.closest('.scenario-card');
@@ -1180,25 +1342,44 @@ function setupEventListeners() {
     if (filterBtn) {
       var type = filterBtn.dataset.filter;
       var value = filterBtn.dataset.value;
-      if (type === 'category') activeCategory = value;
-      if (type === 'difficulty') activeDifficulty = value;
-      if (type === 'result') activeResult = value;
-      // Update active states
-      filterBtn.closest('.filter-group').querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+      filters[type] = value;
+      // Update active states in the row
+      filterBtn.closest('.filter-row').querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
       filterBtn.classList.add('active');
       applyFilters();
+      renderChips();
+      writeHashState();
       return;
     }
 
-    // Bar chart clicks (category/difficulty filter toggle)
-    var barRow = e.target.closest('.bar-row');
-    if (barRow && barRow.dataset.barCategory) {
-      var val = barRow.dataset.barCategory;
-      if (CATEGORIES.indexOf(val) !== -1) {
-        activeCategory = activeCategory === val ? 'all' : val;
-      } else if (DIFFICULTIES.indexOf(val) !== -1) {
-        activeDifficulty = activeDifficulty === val ? 'all' : val;
+    // Chip clear
+    var chip = e.target.closest('[data-chip-clear]');
+    if (chip) {
+      var filterType = chip.dataset.chipClear;
+      filters[filterType] = 'all';
+      // Update filter button state
+      var filterRow = document.querySelector('.filter-btn[data-filter="' + filterType + '"][data-value="all"]');
+      if (filterRow) {
+        filterRow.closest('.filter-row').querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+        filterRow.classList.add('active');
       }
+      applyFilters();
+      renderChips();
+      writeHashState();
+      return;
+    }
+
+    // Clear all button
+    if (e.target.id === 'clear-all-btn' || e.target.closest('#clear-all-btn')) {
+      clearAllFilters();
+      return;
+    }
+
+    // Category breakdown click
+    var catStat = e.target.closest('[data-cat-click]');
+    if (catStat) {
+      var cat = catStat.dataset.catClick;
+      filters.category = filters.category === cat ? 'all' : cat;
       render();
       return;
     }
@@ -1206,16 +1387,15 @@ function setupEventListeners() {
     // Must-pass jump
     var jumpItem = e.target.closest('[data-jump]');
     if (jumpItem) {
-      var jumpIdx = parseInt(jumpItem.dataset.jump);
-      // Clear filters first so target is visible
-      activeCategory = 'all';
-      activeDifficulty = 'all';
-      activeResult = 'all';
+      var jumpName = jumpItem.dataset.jump;
+      // Clear filters so target is visible
+      filters.category = 'all';
+      filters.difficulty = 'all';
+      filters.result = 'all';
       searchQuery = '';
       render();
-      // After render, scroll and expand
       setTimeout(function() {
-        var targetCard = document.querySelector('.scenario-card[data-idx="' + jumpIdx + '"]');
+        var targetCard = document.querySelector('.scenario-card[data-name-exact="' + CSS.escape(jumpName) + '"]');
         if (targetCard) {
           targetCard.classList.add('expanded');
           targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1223,19 +1403,64 @@ function setupEventListeners() {
       }, 50);
       return;
     }
+
+    // Compare button
+    if (e.target.id === 'compare-btn' || e.target.closest('#compare-btn')) {
+      compareVisible = !compareVisible;
+      var wrap = document.getElementById('compare-wrap');
+      var btn = document.getElementById('compare-btn');
+      if (wrap) wrap.classList.toggle('visible', compareVisible);
+      if (btn) btn.classList.toggle('active', compareVisible);
+      if (!compareVisible) {
+        compareReport = null;
+        render();
+      }
+      return;
+    }
+
+    // Expand all
+    if (e.target.id === 'expand-all-btn' || e.target.closest('#expand-all-btn')) {
+      document.querySelectorAll('.scenario-card').forEach(function(c) {
+        if (c.style.display !== 'none') c.classList.add('expanded');
+      });
+      return;
+    }
+
+    // Collapse all
+    if (e.target.id === 'collapse-all-btn' || e.target.closest('#collapse-all-btn')) {
+      document.querySelectorAll('.scenario-card').forEach(function(c) {
+        c.classList.remove('expanded');
+      });
+      return;
+    }
   });
 
-  // Search input (delegated)
+  // Report select change
+  document.addEventListener('change', function(e) {
+    if (e.target.id === 'report-select') {
+      loadReport(e.target.value);
+    }
+    if (e.target.id === 'compare-select') {
+      if (e.target.value) {
+        loadCompareReport(e.target.value);
+      } else {
+        compareReport = null;
+        render();
+      }
+    }
+  });
+
+  // Search input
   document.addEventListener('input', function(e) {
     if (e.target.id === 'search-input') {
       searchQuery = e.target.value;
       applyFilters();
+      writeHashState();
     }
   });
 
   // Keyboard shortcuts
   document.addEventListener('keydown', function(e) {
-    // Skip if typing in input
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
       if (e.key === 'Escape') {
         e.target.blur();
@@ -1249,42 +1474,41 @@ function setupEventListeners() {
     });
 
     switch (e.key) {
-      case 'j': // Next
+      case 'j':
         e.preventDefault();
         focusedIndex = Math.min(focusedIndex + 1, visibleCards.length - 1);
         focusCard(visibleCards);
         break;
-      case 'k': // Previous
+      case 'k':
         e.preventDefault();
         focusedIndex = Math.max(focusedIndex - 1, 0);
         focusCard(visibleCards);
         break;
-      case 'Enter': // Toggle expand
+      case 'Enter':
         e.preventDefault();
         if (focusedIndex >= 0 && focusedIndex < visibleCards.length) {
           visibleCards[focusedIndex].classList.toggle('expanded');
         }
         break;
-      case 'f': // Focus search
+      case 'f':
         e.preventDefault();
         var searchInput = document.getElementById('search-input');
         if (searchInput) searchInput.focus();
         break;
-      case '1': case '2': case '3': case '4': case '5': case '6':
-        var catIdx = parseInt(e.key) - 1;
-        if (catIdx < CATEGORIES.length) {
-          activeCategory = CATEGORIES[catIdx];
-          render();
-        }
+      case 'x':
+        e.preventDefault();
+        document.querySelectorAll('.scenario-card').forEach(function(c) {
+          if (c.style.display !== 'none') c.classList.add('expanded');
+        });
+        break;
+      case 'c':
+        e.preventDefault();
+        document.querySelectorAll('.scenario-card').forEach(function(c) {
+          c.classList.remove('expanded');
+        });
         break;
       case 'Escape':
-        activeCategory = 'all';
-        activeDifficulty = 'all';
-        activeResult = 'all';
-        searchQuery = '';
-        focusedIndex = -1;
-        document.querySelectorAll('.scenario-card').forEach(function(c) { c.classList.remove('focused'); });
-        render();
+        clearAllFilters();
         break;
     }
   });
@@ -1296,6 +1520,12 @@ function setupEventListeners() {
   });
   topBtn.addEventListener('click', function() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  // Hash change
+  window.addEventListener('hashchange', function() {
+    readHashState();
+    render();
   });
 }
 
