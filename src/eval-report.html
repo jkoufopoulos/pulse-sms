@@ -701,6 +701,139 @@
     .keyboard-hint { display: block; }
   }
 
+  /* ── Override badges ── */
+  .override-pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: #1a2a3a;
+    color: #60a5fa;
+  }
+  .override-pill.pass { background: #1a2a3a; color: #60a5fa; }
+  .override-pill.fail { background: #3a1a2a; color: #f472b6; }
+  .stale-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    background: #3a2a0a;
+    color: #fbbf24;
+    margin-left: 4px;
+  }
+  .override-excluded {
+    text-decoration: line-through;
+    opacity: 0.5;
+  }
+
+  /* ── Override panel ── */
+  .override-panel {
+    margin-top: 16px;
+    padding: 12px;
+    background: #0f0f1a;
+    border-radius: 8px;
+    border: 1px solid #1a2a3a;
+  }
+  .override-panel h4 {
+    font-size: 12px;
+    color: #60a5fa;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+  }
+  .override-btns {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .ovr-btn {
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.15s;
+    font-family: inherit;
+    background: #1a1a1a;
+    color: #888;
+  }
+  .ovr-btn:hover { border-color: #555; color: #ccc; }
+  .ovr-btn.ovr-pass { background: #1a3a1a; color: #4ade80; border-color: #2d5a2d; }
+  .ovr-btn.ovr-pass:hover, .ovr-btn.ovr-pass.active { background: #2d5a2d; border-color: #4ade80; }
+  .ovr-btn.ovr-fail { background: #3a1a1a; color: #f87171; border-color: #5a2d2d; }
+  .ovr-btn.ovr-fail:hover, .ovr-btn.ovr-fail.active { background: #5a2d2d; border-color: #f87171; }
+  .ovr-category-select {
+    background: #0a0a0a;
+    border: 1px solid #333;
+    color: #e0e0e0;
+    padding: 5px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: inherit;
+  }
+  .ovr-notes {
+    width: 100%;
+    max-width: 500px;
+    padding: 6px 10px;
+    background: #0a0a0a;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #e0e0e0;
+    font-size: 12px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 32px;
+    margin-bottom: 8px;
+  }
+  .ovr-notes:focus { outline: none; border-color: #60a5fa; }
+  .ovr-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .ovr-save {
+    padding: 5px 16px;
+    background: #2563eb;
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .ovr-save:hover { background: #1d4ed8; }
+  .ovr-clear {
+    padding: 5px 16px;
+    background: none;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #888;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .ovr-clear:hover { border-color: #555; color: #ccc; }
+  .ovr-status {
+    font-size: 11px;
+    color: #666;
+  }
+
+  /* ── Adjusted stats ── */
+  .adjusted-stats {
+    font-size: 11px;
+    color: #60a5fa;
+    margin-top: 4px;
+  }
+
   /* ── Responsive ── */
   @media (max-width: 600px) {
     body { padding: 12px; }
@@ -736,7 +869,8 @@
   <kbd>f</kbd> search &middot;
   <kbd>x</kbd> expand all &middot;
   <kbd>c</kbd> collapse all &middot;
-  <kbd>Esc</kbd> clear filters
+  <kbd>Esc</kbd> clear filters &middot;
+  Expanded: <kbd>p</kbd> pass &middot; <kbd>f</kbd> fail &middot; <kbd>s</kbd> save
 </div>
 
 <script>
@@ -744,7 +878,8 @@
 var allReports = [];
 var currentReport = null;
 var compareReport = null;
-var filters = { category: 'all', difficulty: 'all', result: 'all' };
+var overrides = {};
+var filters = { category: 'all', difficulty: 'all', result: 'all', override: 'all' };
 var searchQuery = '';
 var focusedIndex = -1;
 var compareVisible = false;
@@ -752,11 +887,12 @@ var compareVisible = false;
 var CATEGORIES = ['all', 'happy_path', 'filter_drift', 'edge_case', 'poor_experience', 'abuse_off_topic'];
 var DIFFICULTIES = ['all', 'must_pass', 'should_pass', 'stretch'];
 var RESULTS = ['all', 'pass', 'fail', 'error'];
+var OVERRIDE_FILTERS = ['all', 'has_override', 'no_override', 'stale'];
 
 // ── Init ──
 async function init() {
   readHashState();
-  await loadReportList();
+  await Promise.all([loadReportList(), loadOverrides()]);
   if (allReports.length === 0) {
     showEmpty();
     return;
@@ -764,6 +900,16 @@ async function init() {
   populateSelects();
   await loadReport(allReports[0].filename);
   setupEventListeners();
+}
+
+async function loadOverrides() {
+  try {
+    var res = await fetch('/api/eval-overrides');
+    overrides = await res.json();
+  } catch (e) {
+    console.error('Failed to load overrides:', e);
+    overrides = {};
+  }
 }
 
 function readHashState() {
@@ -777,6 +923,7 @@ function readHashState() {
       if (key === 'category' && CATEGORIES.indexOf(val) !== -1) filters.category = val;
       if (key === 'difficulty' && DIFFICULTIES.indexOf(val) !== -1) filters.difficulty = val;
       if (key === 'result' && RESULTS.indexOf(val) !== -1) filters.result = val;
+      if (key === 'override' && OVERRIDE_FILTERS.indexOf(val) !== -1) filters.override = val;
       if (key === 'search') searchQuery = val;
     }
   });
@@ -787,6 +934,7 @@ function writeHashState() {
   if (filters.category !== 'all') parts.push('category=' + encodeURIComponent(filters.category));
   if (filters.difficulty !== 'all') parts.push('difficulty=' + encodeURIComponent(filters.difficulty));
   if (filters.result !== 'all') parts.push('result=' + encodeURIComponent(filters.result));
+  if (filters.override !== 'all') parts.push('override=' + encodeURIComponent(filters.override));
   if (searchQuery) parts.push('search=' + encodeURIComponent(searchQuery));
   var hash = parts.length > 0 ? '#' + parts.join('&') : '';
   if (window.location.hash !== hash) {
@@ -809,6 +957,7 @@ async function loadReport(filename) {
   try {
     var res = await fetch('/api/eval-reports/' + encodeURIComponent(filename));
     currentReport = await res.json();
+    currentReport._filename = filename;
     render();
   } catch (e) {
     console.error('Failed to load report:', e);
@@ -842,6 +991,40 @@ function sortScenarios(scenarios) {
     var bTier = tierOrder[b.difficulty] != null ? tierOrder[b.difficulty] : 9;
     return aTier - bTier;
   });
+}
+
+// ── Override helpers ──
+function getOverride(scenarioName) {
+  return overrides[scenarioName] || null;
+}
+
+function isOverrideStale(scenario, ovr) {
+  if (!ovr) return false;
+  var llmPass = scenario.error ? false : !!scenario.pass;
+  return ovr.against_llm_verdict !== llmPass;
+}
+
+function computeAdjustedStats(scenarios) {
+  var passed = 0, failed = 0, excluded = 0, total = scenarios.length;
+  scenarios.forEach(function(s) {
+    var ovr = getOverride(s.name);
+    if (ovr && ovr.category === 'data_dependent') {
+      excluded++;
+      return;
+    }
+    var adjustedPass;
+    if (ovr && ovr.category === 'false_failure') {
+      adjustedPass = true;
+    } else if (ovr && ovr.category === 'false_pass') {
+      adjustedPass = false;
+    } else {
+      adjustedPass = !s.error && !!s.pass;
+    }
+    if (adjustedPass) passed++;
+    else failed++;
+  });
+  var denom = total - excluded;
+  return { passed: passed, failed: failed, excluded: excluded, total: denom, rate: denom > 0 ? (100 * passed / denom) : 0 };
 }
 
 // ── Render ──
@@ -948,6 +1131,14 @@ function renderSummary(passRate, scenarios) {
   if (cmpRate != null) html += deltaHtml(passRate, cmpRate, '%');
   html += '</div>';
   html += '<div class="sub">' + r.passed + ' of ' + r.total + ' scenarios</div>';
+  var adj = computeAdjustedStats(scenarios);
+  var hasOverrides = Object.keys(overrides).length > 0;
+  if (hasOverrides) {
+    var adjColor = passRateColor(adj.rate);
+    html += '<div class="adjusted-stats">Human-adjusted: ' + Math.round(adj.rate) + '% (' + adj.passed + '/' + adj.total;
+    if (adj.excluded > 0) html += ', ' + adj.excluded + ' excluded';
+    html += ')</div>';
+  }
   html += '</div>';
 
   // Stats column
@@ -1054,6 +1245,15 @@ function renderFilterRows() {
   });
   html += '</div>';
 
+  // Override row
+  html += '<div class="filter-row">';
+  html += '<span class="filter-row-label">Override</span>';
+  OVERRIDE_FILTERS.forEach(function(o) {
+    html += '<button class="filter-btn' + (filters.override === o ? ' active' : '') +
+      '" data-filter="override" data-value="' + escAttr(o) + '">' + formatLabel(o) + '</button>';
+  });
+  html += '</div>';
+
   html += '</div>';
   return html;
 }
@@ -1072,6 +1272,9 @@ function renderChips() {
   if (filters.result !== 'all') {
     var rClass = 'result-' + filters.result;
     chips.push('<span class="chip ' + rClass + '" data-chip-clear="result">' + formatLabel(filters.result) + '<span class="chip-x">&times;</span></span>');
+  }
+  if (filters.override !== 'all') {
+    chips.push('<span class="chip category" data-chip-clear="override">' + formatLabel(filters.override) + '<span class="chip-x">&times;</span></span>');
   }
   if (chips.length > 0) {
     el.innerHTML = '<span class="active-chips-label">Active:</span>' + chips.join('') +
@@ -1107,11 +1310,16 @@ function renderScenarioCard(s, sortIdx) {
   }
   if (preview.length > 120) preview = preview.substring(0, 120) + '...';
 
+  var ovr = getOverride(s.name);
+  var ovrStale = isOverrideStale(s, ovr);
+  var ovrFilter = ovr ? (ovrStale ? 'stale' : 'has_override') : 'no_override';
+
   var html = '<div class="scenario-card ' + resultClass + changedClass + '" ' +
     'data-sort-idx="' + sortIdx + '" ' +
     'data-category="' + escAttr(s.category || '') + '" ' +
     'data-difficulty="' + escAttr(s.difficulty || '') + '" ' +
     'data-result="' + (s.error ? 'error' : (s.pass ? 'pass' : 'fail')) + '" ' +
+    'data-override="' + escAttr(ovrFilter) + '" ' +
     'data-name="' + escAttr((s.name || '').toLowerCase()) + '" ' +
     'data-name-exact="' + escAttr(s.name || '') + '">';
 
@@ -1119,6 +1327,10 @@ function renderScenarioCard(s, sortIdx) {
   html += '<div class="scenario-header">';
   html += '<div class="scenario-header-top">';
   html += '<span class="status-pill ' + resultClass + '">' + resultLabel + '</span>';
+  if (ovr) {
+    html += '<span class="override-pill ' + escAttr(ovr.verdict) + '">HUMAN: ' + ovr.verdict.toUpperCase() + '</span>';
+    if (ovrStale) html += '<span class="stale-badge">STALE</span>';
+  }
   html += '<span class="scenario-name">' + escHtml(s.name || 'Scenario ' + s.index) + '</span>';
   html += '<div class="scenario-badges">';
   if (s.category) html += '<span class="badge category">' + formatLabel(s.category) + '</span>';
@@ -1214,8 +1426,55 @@ function renderScenarioCard(s, sortIdx) {
     }
   }
 
+  // Override panel
+  html += renderOverridePanel(s, ovr);
+
   html += '</div></div>'; // .scenario-body-inner, .scenario-body
   html += '</div>'; // .scenario-card
+  return html;
+}
+
+function renderOverridePanel(s, ovr) {
+  var scenarioName = escAttr(s.name || '');
+  var currentVerdict = ovr ? ovr.verdict : '';
+  var currentCategory = ovr ? ovr.category : 'false_failure';
+  var currentNotes = ovr ? ovr.notes : '';
+
+  var html = '<div class="override-panel" data-override-panel="' + scenarioName + '">';
+  html += '<h4>Human Override</h4>';
+
+  html += '<div class="override-btns">';
+  html += '<button class="ovr-btn ovr-pass' + (currentVerdict === 'pass' ? ' active' : '') + '" ' +
+    'data-ovr-verdict="pass" data-ovr-scenario="' + scenarioName + '">PASS</button>';
+  html += '<button class="ovr-btn ovr-fail' + (currentVerdict === 'fail' ? ' active' : '') + '" ' +
+    'data-ovr-verdict="fail" data-ovr-scenario="' + scenarioName + '">FAIL</button>';
+
+  html += '<select class="ovr-category-select" data-ovr-category="' + scenarioName + '">';
+  var cats = [
+    ['false_failure', 'False Failure (flip to PASS)'],
+    ['false_pass', 'False Pass (flip to FAIL)'],
+    ['data_dependent', 'Data Dependent (exclude)'],
+    ['known_bug', 'Known Bug (stays FAIL)']
+  ];
+  cats.forEach(function(c) {
+    html += '<option value="' + c[0] + '"' + (currentCategory === c[0] ? ' selected' : '') + '>' + escHtml(c[1]) + '</option>';
+  });
+  html += '</select>';
+  html += '</div>';
+
+  html += '<textarea class="ovr-notes" data-ovr-notes="' + scenarioName + '" placeholder="Notes (optional)...">' + escHtml(currentNotes) + '</textarea>';
+
+  html += '<div class="ovr-actions">';
+  html += '<button class="ovr-save" data-ovr-save="' + scenarioName + '">Save</button>';
+  if (ovr) {
+    html += '<button class="ovr-clear" data-ovr-clear="' + scenarioName + '">Clear Override</button>';
+  }
+  html += '<span class="ovr-status" data-ovr-status="' + scenarioName + '">';
+  if (ovr) html += 'Overridden ' + formatTimestamp(ovr.overridden_at);
+  html += '</span>';
+  html += '</div>';
+
+  html += '</div>';
   return html;
 }
 
@@ -1232,10 +1491,15 @@ function applyFilters() {
     var res = card.dataset.result;
     var name = card.dataset.name || '';
 
+    var ovrState = card.dataset.override || '';
+
     var visible = true;
     if (filters.category !== 'all' && cat !== filters.category) visible = false;
     if (filters.difficulty !== 'all' && diff !== filters.difficulty) visible = false;
     if (filters.result !== 'all' && res !== filters.result) visible = false;
+    if (filters.override === 'has_override' && ovrState !== 'has_override' && ovrState !== 'stale') visible = false;
+    if (filters.override === 'no_override' && ovrState !== 'no_override') visible = false;
+    if (filters.override === 'stale' && ovrState !== 'stale') visible = false;
     if (q && name.indexOf(q) === -1) visible = false;
 
     card.style.display = visible ? '' : 'none';
@@ -1250,6 +1514,7 @@ function clearAllFilters() {
   filters.category = 'all';
   filters.difficulty = 'all';
   filters.result = 'all';
+  filters.override = 'all';
   searchQuery = '';
   focusedIndex = -1;
   document.querySelectorAll('.scenario-card').forEach(function(c) { c.classList.remove('focused'); });
@@ -1329,6 +1594,35 @@ function showEmpty(msg) {
 function setupEventListeners() {
   // Delegated click handlers
   document.addEventListener('click', function(e) {
+    // Override verdict buttons
+    var ovrVerdictBtn = e.target.closest('[data-ovr-verdict]');
+    if (ovrVerdictBtn) {
+      var scenario = ovrVerdictBtn.dataset.ovrScenario;
+      var panel = document.querySelector('[data-override-panel="' + CSS.escape(scenario) + '"]');
+      if (panel) {
+        panel.querySelectorAll('.ovr-btn').forEach(function(b) { b.classList.remove('active'); });
+        ovrVerdictBtn.classList.add('active');
+      }
+      e.stopPropagation();
+      return;
+    }
+
+    // Override save
+    var saveBtn = e.target.closest('[data-ovr-save]');
+    if (saveBtn) {
+      saveOverride(saveBtn.dataset.ovrSave);
+      e.stopPropagation();
+      return;
+    }
+
+    // Override clear
+    var clearBtn = e.target.closest('[data-ovr-clear]');
+    if (clearBtn) {
+      clearOverride(clearBtn.dataset.ovrClear);
+      e.stopPropagation();
+      return;
+    }
+
     // Expand/collapse scenario card
     var header = e.target.closest('.scenario-header');
     if (header) {
@@ -1473,6 +1767,34 @@ function setupEventListeners() {
       if (c.style.display !== 'none') visibleCards.push(c);
     });
 
+    // Override shortcuts when card is expanded
+    var expandedName = getExpandedScenarioName();
+    if (expandedName) {
+      if (e.key === 'p') {
+        e.preventDefault();
+        var panel = document.querySelector('[data-override-panel="' + CSS.escape(expandedName) + '"]');
+        if (panel) {
+          panel.querySelectorAll('.ovr-btn').forEach(function(b) { b.classList.remove('active'); });
+          panel.querySelector('[data-ovr-verdict="pass"]').classList.add('active');
+        }
+        return;
+      }
+      if (e.key === 'f') {
+        e.preventDefault();
+        var panel = document.querySelector('[data-override-panel="' + CSS.escape(expandedName) + '"]');
+        if (panel) {
+          panel.querySelectorAll('.ovr-btn').forEach(function(b) { b.classList.remove('active'); });
+          panel.querySelector('[data-ovr-verdict="fail"]').classList.add('active');
+        }
+        return;
+      }
+      if (e.key === 's') {
+        e.preventDefault();
+        saveOverride(expandedName);
+        return;
+      }
+    }
+
     switch (e.key) {
       case 'j':
         e.preventDefault();
@@ -1527,6 +1849,83 @@ function setupEventListeners() {
     readHashState();
     render();
   });
+}
+
+async function saveOverride(scenarioName) {
+  var panel = document.querySelector('[data-override-panel="' + CSS.escape(scenarioName) + '"]');
+  if (!panel) return;
+
+  var activeBtn = panel.querySelector('.ovr-btn.active');
+  if (!activeBtn) {
+    setOvrStatus(scenarioName, 'Select PASS or FAIL first');
+    return;
+  }
+  var verdict = activeBtn.dataset.ovrVerdict;
+  var category = panel.querySelector('.ovr-category-select').value;
+  var notes = panel.querySelector('.ovr-notes').value.trim();
+
+  // Get LLM verdict from the scenario
+  var card = panel.closest('.scenario-card');
+  var llmResult = card ? card.dataset.result : null;
+  var llmPass = llmResult === 'pass';
+
+  var reportFilename = currentReport ? (currentReport._filename || '') : '';
+
+  try {
+    var res = await fetch('/api/eval-overrides/' + encodeURIComponent(scenarioName), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        verdict: verdict,
+        category: category,
+        notes: notes,
+        against_report: reportFilename,
+        against_llm_verdict: llmPass,
+      }),
+    });
+    var data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    // Update local state
+    overrides[scenarioName] = {
+      verdict: verdict,
+      category: category,
+      notes: notes,
+      overridden_at: new Date().toISOString(),
+      against_report: reportFilename,
+      against_llm_verdict: llmPass,
+    };
+
+    render();
+  } catch (err) {
+    setOvrStatus(scenarioName, 'Save failed: ' + err.message);
+  }
+}
+
+async function clearOverride(scenarioName) {
+  try {
+    var res = await fetch('/api/eval-overrides/' + encodeURIComponent(scenarioName), {
+      method: 'DELETE',
+    });
+    var data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    delete overrides[scenarioName];
+    render();
+  } catch (err) {
+    setOvrStatus(scenarioName, 'Clear failed: ' + err.message);
+  }
+}
+
+function setOvrStatus(scenarioName, msg) {
+  var el = document.querySelector('[data-ovr-status="' + CSS.escape(scenarioName) + '"]');
+  if (el) el.textContent = msg;
+}
+
+function getExpandedScenarioName() {
+  var expanded = document.querySelector('.scenario-card.expanded');
+  if (!expanded) return null;
+  return expanded.dataset.nameExact || null;
 }
 
 function focusCard(visibleCards) {

@@ -121,6 +121,61 @@ app.get('/api/eval-reports/:filename', (req, res) => {
   res.sendFile(filePath);
 });
 
+// Eval overrides API — human judge overrides for scenario verdicts
+app.get('/api/eval-overrides', (req, res) => {
+  const fs = require('fs');
+  const filePath = require('path').join(__dirname, '..', 'data', 'reports', 'scenario-overrides.json');
+  if (!fs.existsSync(filePath)) return res.json({});
+  try {
+    res.json(JSON.parse(fs.readFileSync(filePath, 'utf8')));
+  } catch { res.json({}); }
+});
+
+app.put('/api/eval-overrides/:scenarioName', (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+  const reportsDir = path.join(__dirname, '..', 'data', 'reports');
+  const filePath = path.join(reportsDir, 'scenario-overrides.json');
+  const { verdict, category, notes, against_report, against_llm_verdict } = req.body;
+
+  if (!verdict || !['pass', 'fail'].includes(verdict)) {
+    return res.status(400).json({ error: 'verdict must be "pass" or "fail"' });
+  }
+  if (!category || !['false_failure', 'false_pass', 'data_dependent', 'known_bug'].includes(category)) {
+    return res.status(400).json({ error: 'category must be one of: false_failure, false_pass, data_dependent, known_bug' });
+  }
+
+  fs.mkdirSync(reportsDir, { recursive: true });
+  let overrides = {};
+  if (fs.existsSync(filePath)) {
+    try { overrides = JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch {}
+  }
+
+  overrides[req.params.scenarioName] = {
+    verdict,
+    category,
+    notes: notes || '',
+    overridden_at: new Date().toISOString(),
+    against_report: against_report || null,
+    against_llm_verdict: against_llm_verdict != null ? against_llm_verdict : null,
+  };
+
+  fs.writeFileSync(filePath, JSON.stringify(overrides, null, 2));
+  res.json({ ok: true });
+});
+
+app.delete('/api/eval-overrides/:scenarioName', (req, res) => {
+  const fs = require('fs');
+  const filePath = require('path').join(__dirname, '..', 'data', 'reports', 'scenario-overrides.json');
+  if (!fs.existsSync(filePath)) return res.json({ ok: true });
+
+  let overrides = {};
+  try { overrides = JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch {}
+  delete overrides[req.params.scenarioName];
+  fs.writeFileSync(filePath, JSON.stringify(overrides, null, 2));
+  res.json({ ok: true });
+});
+
 // Events browser (read-only, always available)
 app.get('/events', (req, res) => {
   res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
