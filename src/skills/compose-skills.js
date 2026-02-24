@@ -40,7 +40,7 @@ Every response MUST follow this exact structure:
   Blank line
   Last line: "Reply 1-N for details, MORE for extra picks, or FREE for free events"
 
-Even with only 1 pick, use "1)" numbered format. Even with 3 picks, use numbered format.
+With 2+ picks, always use numbered format ("1)", "2)", "3)").
 Do NOT include URLs or links — they are sent as separate follow-up messages.
 
 NEVER write paragraph/prose style. NEVER combine events into a flowing sentence.
@@ -151,6 +151,16 @@ const nearbySuggestion = {
 NEARBY NEIGHBORHOODS: When picks are thin (< 2 good options) or nothing matches the user's request, suggest a nearby neighborhood conversationally — e.g. "Slim pickings in Fort Greene tonight — Park Slope is right nearby, want picks from there?"`,
 };
 
-const ALL_SKILLS = { core, tonightPriority, sourceTiers, neighborhoodMismatch, perennialFraming, venueFraming, lastBatch, freeEmphasis, pendingIntent, activityAdherence, conversationAwareness, nearbySuggestion };
+const singlePick = {
+  id: 'single-pick',
+  text: `
+SINGLE PICK OVERRIDE:
+There is only one matching event. Override the normal numbered format:
+- Do NOT number it with "1)". Write it naturally — e.g. "There's a great jazz show at Smalls tonight at 9pm, $20 cover — always a vibe."
+- Do NOT use "Reply 1-N for details". Instead, close with something like "Reply for details, or want picks from [nearby neighborhood]?" using the nearby neighborhood if available.
+- Keep the same voice and character limit (480 chars).`,
+};
+
+const ALL_SKILLS = { core, tonightPriority, sourceTiers, neighborhoodMismatch, perennialFraming, venueFraming, lastBatch, freeEmphasis, pendingIntent, activityAdherence, conversationAwareness, nearbySuggestion, singlePick };
 
 module.exports = ALL_SKILLS;

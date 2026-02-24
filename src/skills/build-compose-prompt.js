@@ -86,6 +86,12 @@ function buildComposePrompt(events, options = {}) {
     parts.push(skills.nearbySuggestion.text);
   }
 
+  // Single pick — when exactly 1 filter match or pool is truly tiny
+  if (options.matchCount === 1 ||
+      (options.poolSize != null && options.poolSize <= 1)) {
+    parts.push(skills.singlePick.text);
+  }
+
   return parts.join('\n');
 }
 
@@ -178,6 +184,12 @@ function buildUnifiedPrompt(events, options = {}) {
     parts.push(`\nNEARBY SUGGESTION: Picks are thin — suggest ${options.suggestedNeighborhood} as an alternative (e.g. "Slim pickings tonight — ${options.suggestedNeighborhood} is nearby, want picks from there?").`);
   } else if (options.nearbyNeighborhoods?.length > 0) {
     parts.push(skills.nearbySuggestion.text);
+  }
+
+  // Single pick — when exactly 1 filter match or pool is truly tiny
+  if (options.matchCount === 1 ||
+      (options.poolSize != null && options.poolSize <= 1)) {
+    parts.push(skills.singlePick.text);
   }
 
   return parts.join('\n');

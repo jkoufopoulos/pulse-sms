@@ -609,6 +609,8 @@ Respond now.`;
     hasConversationHistory: conversationHistory?.length > 0,
     nearbyNeighborhoods: nearbyHoods,
     suggestedNeighborhood: suggestedNeighborhood || null,
+    matchCount: matchCount,
+    poolSize: events?.length || 0,
   };
   const systemPrompt = buildUnifiedPrompt(events || [], skillOptions);
 

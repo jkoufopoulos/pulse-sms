@@ -377,7 +377,7 @@ Every response MUST follow this exact structure:
   Blank line
   Last line: "Reply 1-N for details, MORE for extra picks, or FREE for free events"
 
-Even with only 1 pick, use "1)" numbered format. Even with 3 picks, use numbered format.
+With 2+ picks, always use numbered format ("1)", "2)", "3)").
 Do NOT include URLs or links — they are sent as separate follow-up messages.
 
 NEVER write paragraph/prose style. NEVER combine events into a flowing sentence.
@@ -544,7 +544,7 @@ Blank line
 Blank line
 Last line: "Reply 1-N for details, MORE for extra picks, or FREE for free events"
 
-Even with 1 pick, use "1)" numbered format. NEVER write paragraph/prose style.
+With 2+ picks, always use numbered format ("1)", "2)"). NEVER write paragraph/prose style.
 Do NOT include URLs or links.
 
 CHARACTER LIMIT: 480 characters total for sms_text.
