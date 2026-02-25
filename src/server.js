@@ -27,7 +27,7 @@ app.use(helmet());
 
 // Parse URL-encoded bodies (Twilio sends form data)
 app.use(express.urlencoded({ extended: false, limit: '5kb' }));
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
 // Public health check — no internal details (L10 fix)
 app.get('/', (req, res) => {
@@ -122,7 +122,7 @@ app.get('/api/eval-reports/:filename', (req, res) => {
 });
 
 // Eval report upload — accepts JSON report body, writes to data/reports/
-app.put('/api/eval-reports/:filename', express.json({ limit: '2mb' }), (req, res) => {
+app.put('/api/eval-reports/:filename', (req, res) => {
   const fs = require('fs');
   const path = require('path');
   const filename = req.params.filename;
