@@ -660,44 +660,18 @@
     font-weight: 500;
   }
 
-  /* ── Code eval badges ── */
+  /* ── Code eval table ── */
   .code-eval-section { margin-top: 10px; }
-  .code-eval-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
-  .code-eval-badge {
-    background: #3a2a0a;
-    color: #fbbf24;
-    padding: 3px 10px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 500;
+  .code-eval-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+    font-size: 12px;
   }
-  .code-eval-badge.pass {
-    background: #0a2a1a;
-    color: #4ade80;
-  }
-  .code-eval-detail {
-    font-size: 11px;
-    color: #888;
-    margin-top: 2px;
-    padding-left: 2px;
-  }
-  .ce-help-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: #333;
-    color: #888;
-    font-size: 10px;
-    font-weight: 700;
-    cursor: help;
-    vertical-align: middle;
-    margin-left: 4px;
-  }
-  .ce-help-icon:hover { background: #444; color: #ccc; }
-  .code-eval-badge[title] { cursor: help; }
+  .code-eval-table td { padding: 4px 8px 4px 0; vertical-align: top; }
+  .ce-fail-icon { color: #f87171; font-weight: 700; width: 16px; }
+  .ce-fail-label { color: #e0e0e0; font-weight: 500; white-space: nowrap; width: 140px; }
+  .ce-fail-detail { color: #888; }
   .code-eval-summary-bar {
     background: #141414;
     border: 1px solid #222;
@@ -1380,7 +1354,8 @@ function renderRegressionReport() {
   html += renderCodeEvalSummary(r);
 
   // Principle breakdown
-  html += '<div class="section-header">Principles <span class="ce-help-icon" title="Architecture principles (P1-P7) that govern how Pulse splits work between code and AI. Each principle has specific assertions tested across regression scenarios.">?</span></div>';
+  html += '<div class="section-header">Principles</div>';
+  html += '<div class="section-explainer">Architecture principles (P1-P7) that govern how Pulse splits work between code and AI. Each has specific behavioral assertions.</div>';
   html += '<div class="principle-grid">';
   var principleIds = Object.keys(byPrinciple).sort();
   principleIds.forEach(function(pid) {
@@ -1579,7 +1554,7 @@ function renderSummary(passRate, scenarios) {
 
   // Big pass rate
   html += '<div class="summary-big">';
-  html += '<div class="label">Pass Rate <span class="ce-help-icon" title="Percentage of scenarios where the LLM judge rated Pulse\'s behavior as correct across all conversation turns.">?</span></div>';
+  html += '<div class="label">Pass Rate</div>';
   html += '<div class="value ' + passRateColor(passRate) + '">' + Math.round(passRate) + '%';
   if (cmpRate != null) html += deltaHtml(passRate, cmpRate, '%');
   html += '</div>';
@@ -1618,15 +1593,15 @@ function renderCodeEvalSummary(r) {
   var pct = (100 * ce.passed / ce.total).toFixed(1);
   var pctClass = parseFloat(pct) >= 90 ? 'ce-good' : '';
   var html = '<div class="code-eval-summary-bar">';
-  html += '<span class="ce-label">Code Evals</span>';
-  html += ' <span class="ce-help-icon" title="Deterministic checks (no AI) that verify data accuracy: correct filters applied, valid URLs, matching neighborhoods, proper event selection. Run on every response.">?</span> ';
+  html += '<span class="ce-label">Code Evals</span> ';
   html += '<span class="' + pctClass + '">' + ce.passed + '/' + ce.total + ' passed (' + pct + '%)</span>';
+  html += '<div class="section-explainer" style="margin-top:4px;margin-bottom:0">Deterministic checks (no AI) — verify data accuracy: correct filters, valid URLs, matching neighborhoods, proper event selection.</div>';
   if (ce.by_name && Object.keys(ce.by_name).length > 0) {
     html += '<div class="code-eval-breakdown">';
     var names = Object.keys(ce.by_name).sort(function(a, b) { return ce.by_name[b] - ce.by_name[a]; });
     names.forEach(function(name) {
-      var tip = CODE_EVAL_TIPS[name] || '';
-      html += '<span title="' + escHtml(tip) + '">' + escHtml(name) + ': ' + ce.by_name[name] + '</span>';
+      var info = CODE_EVAL_INFO[name] || { label: name };
+      html += '<span>' + escHtml(info.label) + ': ' + ce.by_name[name] + '</span>';
     });
     html += '</div>';
   }
@@ -1730,26 +1705,26 @@ function renderTraceSummary(traceSummary, traceDebug) {
   return html;
 }
 
-var CODE_EVAL_TIPS = {
-  char_limit: 'SMS must be <= 480 characters',
-  valid_intent: 'Intent must be one of: events, details, more, free, help, conversational',
-  valid_neighborhood: 'Resolved neighborhood must exist in the 36-hood map',
-  picked_events_exist: 'Every picked event ID must be in the sent pool',
-  valid_urls: 'All URLs in the SMS must be parseable (no truncation)',
-  off_topic_redirect: 'Off-topic messages should redirect user back to events',
-  response_not_empty: 'Response must not be blank',
-  day_label_accuracy: '"tonight" must not refer to tomorrow events, and vice versa',
-  pick_count_accuracy: 'Numbered items in SMS (1, 2, 3) should match pick count',
-  neighborhood_accuracy: 'Picked events should be in the claimed neighborhood',
-  category_adherence: 'When category filter is active, >=75% of picks should match',
-  free_claim_accuracy: 'When free filter is active, >=75% of picks should be free',
-  compound_filter_accuracy: 'When both free + category active, picks must satisfy both',
-  filter_match_alignment: 'Picks should come from [MATCH]-tagged events when filters are active',
-  time_filter_accuracy: 'When time filter is active, picks should start after the filter time',
-  neighborhood_expansion_transparency: 'If picks are outside claimed hood, SMS should acknowledge it',
-  price_transparency: 'Event pick SMS should mention price or "free"',
-  schema_compliance: 'LLM raw response must be valid JSON with sms_text field',
-  latency_under_10s: 'Total response latency should be under 10 seconds',
+var CODE_EVAL_INFO = {
+  char_limit:            { label: 'SMS length',          desc: 'Must be under 480 characters' },
+  valid_intent:          { label: 'Valid intent',        desc: 'Recognized intent type' },
+  valid_neighborhood:    { label: 'Valid neighborhood',  desc: 'Neighborhood exists in our map' },
+  picked_events_exist:   { label: 'Picks exist',        desc: 'Picked events are in the sent pool' },
+  valid_urls:            { label: 'Valid URLs',          desc: 'No truncated or broken URLs' },
+  off_topic_redirect:    { label: 'Off-topic redirect',  desc: 'Redirects user back to events' },
+  response_not_empty:    { label: 'Has response',       desc: 'Response is not blank' },
+  day_label_accuracy:    { label: 'Day labels',          desc: '"tonight" and "tomorrow" match actual dates' },
+  pick_count_accuracy:   { label: 'Pick count',          desc: 'Numbered items match pick count' },
+  neighborhood_accuracy: { label: 'Right neighborhood',  desc: 'Picks are in the claimed neighborhood' },
+  category_adherence:    { label: 'Category match',      desc: 'Picks match the active category filter' },
+  free_claim_accuracy:   { label: 'Free accuracy',       desc: 'Picks are actually free when free filter is on' },
+  compound_filter_accuracy: { label: 'Compound filter',  desc: 'Picks satisfy both filters at once' },
+  filter_match_alignment:{ label: 'Filter alignment',    desc: 'Picks come from filter-matched events' },
+  time_filter_accuracy:  { label: 'Time accuracy',       desc: 'Picks start after the requested time' },
+  neighborhood_expansion_transparency: { label: 'Expansion noted', desc: 'SMS mentions when showing nearby hoods' },
+  price_transparency:    { label: 'Price mentioned',     desc: 'SMS includes price or "free"' },
+  schema_compliance:     { label: 'Valid JSON',           desc: 'LLM returned well-formed response' },
+  latency_under_10s:     { label: 'Fast response',       desc: 'Under 10 seconds' },
 };
 
 function renderCodeEvalFailures(s) {
@@ -1757,25 +1732,27 @@ function renderCodeEvalFailures(s) {
   var total = s.code_eval_total || 0;
   if (total === 0) return '';
   var passed = total - failures.length;
-  var html = '<div class="code-eval-section">';
-  html += '<div class="section-header" style="margin-top:12px">Code Evals';
-  html += ' <span class="ce-help-icon" title="Deterministic checks that run on every trace — no AI cost. Verify data accuracy: correct filters, valid URLs, matching neighborhoods, proper event selection.">?</span>';
   var pct = Math.round(100 * passed / total);
   var pctColor = failures.length === 0 ? '#4ade80' : '#fbbf24';
+
+  var html = '<div class="code-eval-section">';
+  html += '<div class="section-header" style="margin-top:12px">Code Evals';
   html += ' <span style="font-size:11px;color:' + pctColor + ';font-weight:400">' + passed + '/' + total + ' (' + pct + '%)</span>';
   html += '</div>';
+
   if (failures.length > 0) {
-    html += '<div class="code-eval-badges">';
+    html += '<table class="code-eval-table"><tbody>';
     failures.forEach(function(f) {
-      var tip = CODE_EVAL_TIPS[f.name] || '';
-      html += '<div style="margin-bottom:4px">';
-      html += '<span class="code-eval-badge" title="' + escHtml(tip) + '">' + escHtml(f.name) + '</span>';
-      if (f.detail) html += '<div class="code-eval-detail">' + escHtml(f.detail) + '</div>';
-      html += '</div>';
+      var info = CODE_EVAL_INFO[f.name] || { label: f.name, desc: '' };
+      html += '<tr>';
+      html += '<td class="ce-fail-icon">\u2717</td>';
+      html += '<td class="ce-fail-label">' + escHtml(info.label) + '</td>';
+      html += '<td class="ce-fail-detail">' + escHtml(f.detail || info.desc) + '</td>';
+      html += '</tr>';
     });
-    html += '</div>';
+    html += '</tbody></table>';
   } else {
-    html += '<div style="font-size:11px;color:#4ade80;margin-top:4px">All checks passed</div>';
+    html += '<div style="font-size:12px;color:#4ade80;margin-top:4px">All checks passed</div>';
   }
   html += '</div>';
   return html;
