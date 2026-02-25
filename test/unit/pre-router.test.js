@@ -116,18 +116,57 @@ const filterSession = {
   lastNeighborhood: 'East Village',
   lastFilters: { category: 'comedy', free_only: false, vibe: null, time_after: null },
 };
-check('forget the comedy → clear_filters', preRoute('forget the comedy', filterSession)?.intent === 'clear_filters');
+
+// Targeted clearing — "forget the comedy" clears category only, returns events intent
+const forgetComedy = preRoute('forget the comedy', filterSession);
+check('forget the comedy → targeted (events)', forgetComedy?.intent === 'events');
+check('forget the comedy → category null', forgetComedy?.filters?.category === null);
+check('forget the comedy → preserves neighborhood', forgetComedy?.neighborhood === 'East Village');
+
+const neverMindComedy = preRoute('never mind the comedy', filterSession);
+check('never mind the comedy → targeted (events)', neverMindComedy?.intent === 'events');
+check('never mind the comedy → category null', neverMindComedy?.filters?.category === null);
+
+// Targeted free clearing
+const filterSessionFree = { ...filterSession, lastFilters: { ...filterSession.lastFilters, free_only: true } };
+const forgetFree = preRoute('forget the free', filterSessionFree);
+check('forget the free → targeted (events)', forgetFree?.intent === 'events');
+check('forget the free → free_only false', forgetFree?.filters?.free_only === false);
+
+// Targeted time clearing
+const filterSessionTime = { ...filterSession, lastFilters: { ...filterSession.lastFilters, time_after: '22:00' } };
+const forgetLate = preRoute('forget the late', filterSessionTime);
+check('forget the late → targeted (events)', forgetLate?.intent === 'events');
+check('forget the late → time_after null', forgetLate?.filters?.time_after === null);
+
+// Targeted jazz clearing (subcategory)
+const filterSessionJazz = { ...filterSession, lastFilters: { category: 'live_music', subcategory: 'jazz' } };
+const forgetJazz = preRoute('forget the jazz', filterSessionJazz);
+check('forget the jazz → targeted (events)', forgetJazz?.intent === 'events');
+check('forget the jazz → category null', forgetJazz?.filters?.category === null);
+check('forget the jazz → subcategory null', forgetJazz?.filters?.subcategory === null);
+
+// Full clearing — generic phrases
 check('show me everything → clear_filters', preRoute('show me everything', filterSession)?.intent === 'clear_filters');
 check('everything → clear_filters', preRoute('everything', filterSession)?.intent === 'clear_filters');
 check('clear filter → clear_filters', preRoute('clear filter', filterSession)?.intent === 'clear_filters');
 check('clear filters → clear_filters', preRoute('clear filters', filterSession)?.intent === 'clear_filters');
 check('no filter → clear_filters', preRoute('no filter', filterSession)?.intent === 'clear_filters');
 check('drop the filter → clear_filters', preRoute('drop the filter', filterSession)?.intent === 'clear_filters');
-check('never mind the comedy → clear_filters', preRoute('never mind the comedy', filterSession)?.intent === 'clear_filters');
 check('show all → clear_filters', preRoute('show all', filterSession)?.intent === 'clear_filters');
 check('just regular stuff → clear_filters', preRoute('just regular stuff', filterSession)?.intent === 'clear_filters');
 check('all events → clear_filters', preRoute('all events', filterSession)?.intent === 'clear_filters');
-check('clear_filters preserves neighborhood', preRoute('forget the comedy', filterSession)?.neighborhood === 'East Village');
+check('nvm → clear_filters', preRoute('nvm', filterSession)?.intent === 'clear_filters');
+check('forget it → clear_filters', preRoute('forget it', filterSession)?.intent === 'clear_filters');
+check('nah forget it → clear_filters', preRoute('nah forget it', filterSession)?.intent === 'clear_filters');
+check('drop it → clear_filters', preRoute('drop it', filterSession)?.intent === 'clear_filters');
+check('start over → clear_filters', preRoute('start over', filterSession)?.intent === 'clear_filters');
+// Prefix messages do NOT match (full-line regex) — fall through to LLM
+check('ok forget the comedy → null (has prefix)', preRoute('ok forget the comedy', filterSession) === null);
+check('actually show me everything → null (has prefix)', preRoute('actually show me everything', filterSession) === null);
+check('yeah nvm → null (has prefix)', preRoute('yeah nvm', filterSession) === null);
+// Compound messages do NOT match — fall through to LLM
+check('forget the comedy, how about jazz → null (compound)', preRoute('forget the comedy, how about jazz', filterSession) === null);
 
 // No active filters → falls through (not clear_filters)
 const noFilterSession = { lastPicks: [{ event_id: 'e1' }], lastEvents: { e1: { name: 'Jazz Night' } }, lastNeighborhood: 'East Village', lastFilters: {} };
@@ -243,6 +282,32 @@ const undergroundTechno = preRoute('underground techno in bushwick', null);
 check('underground techno in bushwick → events', undergroundTechno?.intent === 'events');
 check('underground techno in bushwick → nightlife', undergroundTechno?.filters?.category === 'nightlife');
 check('underground techno in bushwick → Bushwick', undergroundTechno?.neighborhood === 'Bushwick');
+
+// Bare category with session → captured by bare category detection
+console.log('\npreRoute bare category detection:');
+// Use a session without category words in event names to avoid event name match
+const bareCatSession = {
+  lastPicks: [{ event_id: 'e1' }, { event_id: 'e2' }],
+  lastEvents: { e1: { name: 'DJ Honeypot' }, e2: { name: 'Sunset Social' } },
+  lastNeighborhood: 'East Village',
+};
+const bareComedy = preRoute('comedy', bareCatSession);
+check('bare comedy (session) → events', bareComedy?.intent === 'events');
+check('bare comedy (session) → comedy', bareComedy?.filters?.category === 'comedy');
+check('bare comedy (session) → session hood', bareComedy?.neighborhood === 'East Village');
+
+const bareJazz = preRoute('jazz', bareCatSession);
+check('bare jazz (session) → events', bareJazz?.intent === 'events');
+check('bare jazz (session) → live_music', bareJazz?.filters?.category === 'live_music');
+check('bare jazz (session) → subcategory jazz', bareJazz?.filters?.subcategory === 'jazz');
+
+const bareTheater = preRoute('theater', bareCatSession);
+check('bare theater (session) → events', bareTheater?.intent === 'events');
+check('bare theater (session) → theater', bareTheater?.filters?.category === 'theater');
+
+const bareComedyShows = preRoute('comedy shows', bareCatSession);
+check('bare comedy shows (session) → events', bareComedyShows?.intent === 'events');
+check('bare comedy shows (session) → comedy', bareComedyShows?.filters?.category === 'comedy');
 
 // Single dimension without session or hood → still falls through
 check('bare jazz (no session) → null', preRoute('jazz', null) === null);

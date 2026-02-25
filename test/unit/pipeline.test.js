@@ -20,14 +20,14 @@ check('compound: time_after added', compounded.time_after === '22:00');
 // Override: incoming truthy value wins
 check('override: incoming category wins', mergeFilters({ category: 'comedy' }, { category: 'theater' }).category === 'theater');
 
-// Falsy incoming falls back to existing
-check('null incoming category → existing', mergeFilters({ category: 'comedy' }, { category: null }).category === 'comedy');
-check('undefined incoming → existing', mergeFilters({ category: 'comedy' }, {}).category === 'comedy');
+// Explicit-key semantics: key present in incoming (even null/false) overrides
+check('explicit null category → null (overrides)', mergeFilters({ category: 'comedy' }, { category: null }).category === null);
+check('absent key → falls back to existing', mergeFilters({ category: 'comedy' }, {}).category === 'comedy');
 
 // free_only compounding
-check('free_only: true + null → true', mergeFilters({ free_only: true }, {}).free_only === true);
+check('free_only: true + absent → true', mergeFilters({ free_only: true }, {}).free_only === true);
 check('free_only: false + true → true', mergeFilters({ free_only: false }, { free_only: true }).free_only === true);
-check('free_only: true + false → true (||)', mergeFilters({ free_only: true }, { free_only: false }).free_only === true);
+check('free_only: true + explicit false → false', mergeFilters({ free_only: true }, { free_only: false }).free_only === false);
 
 // Full compound scenario: "comedy" then "later tonight" then "free"
 const step1 = mergeFilters({}, { category: 'comedy' });
@@ -37,6 +37,26 @@ check('3-step compound: category', step3.category === 'comedy');
 check('3-step compound: time_after', step3.time_after === '22:00');
 check('3-step compound: free_only', step3.free_only === true);
 check('3-step compound: vibe null', step3.vibe === null);
+
+// Partial clearing: explicit null clears one filter, others persist
+const partialClear = mergeFilters({ category: 'comedy', free_only: true, time_after: '22:00' }, { category: null });
+check('partial clear: category → null', partialClear.category === null);
+check('partial clear: free_only persists', partialClear.free_only === true);
+check('partial clear: time_after persists', partialClear.time_after === '22:00');
+
+// Category replacement: new category overrides old
+const catReplace = mergeFilters({ category: 'comedy' }, { category: 'jazz' });
+check('category replacement: jazz wins', catReplace.category === 'jazz');
+
+// Free clearing: explicit false clears free_only
+const freeClear = mergeFilters({ category: 'comedy', free_only: true }, { free_only: false });
+check('free clear: free_only → false', freeClear.free_only === false);
+check('free clear: category persists', freeClear.category === 'comedy');
+
+// Time clearing: explicit null clears time_after
+const timeClear = mergeFilters({ category: 'comedy', time_after: '22:00' }, { time_after: null });
+check('time clear: time_after → null', timeClear.time_after === null);
+check('time clear: category persists', timeClear.category === 'comedy');
 
 // Defaults
 const defaults = mergeFilters({}, {});
@@ -50,7 +70,7 @@ check('defaults: time_after null', defaults.time_after === null);
 check('subcategory: incoming wins', mergeFilters({}, { subcategory: 'jazz' }).subcategory === 'jazz');
 check('subcategory: existing preserved', mergeFilters({ subcategory: 'jazz' }, {}).subcategory === 'jazz');
 check('subcategory: incoming overrides', mergeFilters({ subcategory: 'jazz' }, { subcategory: 'rock' }).subcategory === 'rock');
-check('subcategory: null incoming → existing', mergeFilters({ subcategory: 'jazz' }, { subcategory: null }).subcategory === 'jazz');
+check('subcategory: explicit null → null (overrides)', mergeFilters({ subcategory: 'jazz' }, { subcategory: null }).subcategory === null);
 const jazzCompound = mergeFilters({ category: 'live_music', subcategory: 'jazz' }, { time_after: '22:00' });
 check('subcategory persists through compound', jazzCompound.subcategory === 'jazz');
 check('category persists through compound', jazzCompound.category === 'live_music');

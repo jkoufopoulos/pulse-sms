@@ -259,6 +259,22 @@ app.get('/eval', (req, res) => {
   res.sendFile(require('path').join(__dirname, 'eval-ui.html'));
 });
 
+// API: cache metadata for eval reproducibility
+app.get('/api/eval/cache-meta', (req, res) => {
+  const status = getCacheStatus();
+  const { getRawCache } = require('./events');
+  const { events } = getRawCache();
+  const sourceCounts = {};
+  for (const e of events) {
+    sourceCounts[e.source_name] = (sourceCounts[e.source_name] || 0) + 1;
+  }
+  res.json({
+    cache_size: status.cache_size,
+    cache_age_minutes: status.cache_age_minutes,
+    source_counts: sourceCounts,
+  });
+});
+
 // API: get all cached events
 app.get('/api/eval/events', (req, res) => {
   const { getRawCache } = require('./events');

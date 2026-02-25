@@ -89,19 +89,22 @@ function buildExhaustionMessage(hood, { adjacentHoods = [], visitedHoods = [] } 
 }
 
 /**
- * Merge two filter objects. Incoming truthy values override existing.
- * Falsy incoming values fall back to existing (enables filter compounding).
+ * Merge two filter objects with explicit-key semantics.
+ * If a key EXISTS in incoming (even with value null/false), it overrides.
+ * If a key is ABSENT from incoming, fall back to existing (enables compounding).
+ * This lets pre-router set only the keys it detects, compounding with existing filters,
+ * while also enabling partial clearing (e.g. { category: null } clears category only).
  */
 function mergeFilters(existing, incoming) {
   if (!existing && !incoming) return {};
   const base = existing || {};
   const next = incoming || {};
   return {
-    free_only: next.free_only || base.free_only || false,
-    category: next.category || base.category || null,
-    subcategory: next.subcategory || base.subcategory || null,
-    vibe: next.vibe || base.vibe || null,
-    time_after: next.time_after || base.time_after || null,
+    free_only: 'free_only' in next ? (next.free_only || false) : (base.free_only || false),
+    category: 'category' in next ? (next.category || null) : (base.category || null),
+    subcategory: 'subcategory' in next ? (next.subcategory || null) : (base.subcategory || null),
+    vibe: 'vibe' in next ? (next.vibe || null) : (base.vibe || null),
+    time_after: 'time_after' in next ? (next.time_after || null) : (base.time_after || null),
   };
 }
 

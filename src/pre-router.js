@@ -103,14 +103,7 @@ function preRoute(message, session) {
     return { ...base, intent: 'conversational', neighborhood: null, reply: "Hey! Text me a neighborhood and I'll find you something good tonight." };
   }
 
-  // Explicit filter clearing — requires active filters in session
-  if (session?.lastFilters && Object.values(session.lastFilters).some(Boolean)) {
-    if (/^(show me everything|all events|no filter|drop the filter|clear filters?|forget the .+|never mind the .+|just regular stuff|everything|show all|nvm|forget it|nah forget it|drop it)$/i.test(msg)) {
-      return { ...base, intent: 'clear_filters', neighborhood: session.lastNeighborhood };
-    }
-  }
-
-  // Category map — shared between session-aware checks and compound extraction
+  // Category map — shared between filter clearing, session-aware checks, and compound extraction
   const catMap = {
     'comedy|standup|stand-up|improv': { category: 'comedy' },
     'theater|theatre': { category: 'theater' },
@@ -124,6 +117,36 @@ function preRoute(message, session) {
     'salsa|bachata|swing': { category: 'nightlife' },
   };
 
+  // Explicit filter clearing — requires active filters in session
+  if (session?.lastFilters && Object.values(session.lastFilters).some(Boolean)) {
+    // Targeted filter clearing — "forget the comedy", "drop the free", "never mind the time"
+    const targetedCatClear = msg.match(/^(?:forget|never mind|drop|lose|ditch)\s+(?:the\s+)?(.+)$/i);
+    if (targetedCatClear) {
+      const target = targetedCatClear[1].trim().toLowerCase();
+      // Check if target matches an active category
+      for (const [pattern, catInfo] of Object.entries(catMap)) {
+        if (new RegExp(`^(?:${pattern})(?:\\s+(?:filter|stuff))?$`, 'i').test(target)) {
+          const clearFilters = {};
+          for (const key of Object.keys(catInfo)) clearFilters[key] = null;
+          return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, ...clearFilters } };
+        }
+      }
+      // Check for free clear
+      if (/^free(?:\s+(?:filter|stuff|only))?$/i.test(target)) {
+        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, free_only: false } };
+      }
+      // Check for time clear
+      if (/^(?:time|late|tonight|after midnight|time (?:filter|constraint))$/i.test(target)) {
+        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, time_after: null } };
+      }
+    }
+
+    // Full filter clearing — generic phrases
+    if (/^(show me everything|all events|no filter|drop the filter|clear filters?|just regular stuff|everything|show all|nvm|forget it|nah forget it|drop it|start over)$/i.test(msg)) {
+      return { ...base, intent: 'clear_filters', neighborhood: session.lastNeighborhood };
+    }
+  }
+
   // --- Session-aware filter follow-ups (deterministic detection → unified LLM composition) ---
   // These return intent='events' with filters; the handler injects filters and uses the unified branch.
   if (session?.lastNeighborhood && session?.lastPicks?.length > 0) {
@@ -136,6 +159,16 @@ function preRoute(message, session) {
     for (const [pattern, catInfo] of Object.entries(catMap)) {
       const catRegex = new RegExp(`^(?:how about|what about|any|show me|got any|have any|know any)\\s+(?:${pattern})(?:\\s+(?:night|stuff|shows?|events?|tonight|picks?|options?))*$`, 'i');
       if (catRegex.test(msg)) {
+        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, ...catInfo } };
+      }
+    }
+
+    // Bare category words (no prefix): "comedy", "jazz", "live music", "comedy shows"
+    // Excludes "tonight"/"late" suffixes — those have a time component and should fall through
+    // to compound extraction which handles category + time together.
+    for (const [pattern, catInfo] of Object.entries(catMap)) {
+      const bareRegex = new RegExp(`^(?:${pattern})(?:\\s+(?:stuff|shows?|events?|picks?))?$`, 'i');
+      if (bareRegex.test(msg)) {
         return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, ...catInfo } };
       }
     }

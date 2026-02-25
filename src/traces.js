@@ -198,6 +198,16 @@ function getTraceById(traceId) {
   return traceBuffer.find(t => t.id === traceId) || null;
 }
 
+/**
+ * Get the most recent trace for a given masked phone number.
+ */
+function getLatestTraceForPhone(phone_masked) {
+  for (let i = traceBuffer.length - 1; i >= 0; i--) {
+    if (traceBuffer[i].phone_masked === phone_masked) return traceBuffer[i];
+  }
+  return null;
+}
+
 // --- Conversation capture (test mode only) ---
 
 const conversations = new Map(); // phone_masked → { turns, lastActivity, startedAt }
@@ -311,6 +321,6 @@ function stopConversationCapture() {
 }
 
 module.exports = {
-  startTrace, saveTrace, loadTraces, annotateTrace, getRecentTraces, getTraceById,
+  startTrace, saveTrace, loadTraces, annotateTrace, getRecentTraces, getTraceById, getLatestTraceForPhone,
   recordConversationTurn, startConversationCapture, stopConversationCapture
 };

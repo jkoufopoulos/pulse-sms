@@ -8,6 +8,7 @@ const { filterIncomplete, filterKidsEvents } = require('./curation');
 const { eventMatchesFilters, failsTimeGate } = require('./pipeline');
 const { computeCompleteness } = require('./sources/shared');
 const { runExtractionAudit } = require('./evals/extraction-audit');
+const { checkSourceCompleteness } = require('./evals/source-completeness');
 const { captureExtractionInput, getExtractionInputs, clearExtractionInputs } = require('./extraction-capture');
 
 // Source tier classification for compose prompt
@@ -362,6 +363,13 @@ async function refreshCache() {
       }
     } catch (err) {
       console.error('Extraction audit failed:', err.message);
+    }
+
+    // Run source field-completeness checks (structured sources only)
+    try {
+      checkSourceCompleteness(fetchMap);
+    } catch (err) {
+      console.error('Source completeness check failed:', err.message);
     }
 
     console.log(`Cache refreshed: ${validEvents.length} events (${totalRaw} raw, ${allEvents.length} deduped, ${staleCount} stale removed | ${sourcesOk} ok / ${sourcesFailed} failed / ${sourcesEmpty} empty)`);

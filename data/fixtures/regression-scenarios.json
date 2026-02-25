@@ -3254,6 +3254,210 @@
           "anti_pattern": "Wrong list"
         }
       ]
+    },
+    {
+      "name": "P10: pre-router full clear — 'forget it' clears all filters",
+      "category": "edge_case",
+      "tests_principles": ["P10", "P7"],
+      "user_turns": [
+        { "turn": 1, "message": "east village" },
+        { "turn": 2, "message": "how about comedy" },
+        { "turn": 3, "message": "forget it" },
+        { "turn": 4, "message": "more" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 2,
+          "id": "CC1",
+          "principle": "P3",
+          "check": "Comedy picks in East Village",
+          "anti_pattern": "Non-comedy events"
+        },
+        {
+          "after_turn": 3,
+          "id": "CC2",
+          "principle": "P10",
+          "check": "Filters cleared. Pulse returns unfiltered East Village picks (comedy and non-comedy). Response acknowledges the change or naturally serves a broader mix.",
+          "anti_pattern": "Comedy filter persists (still only comedy), or error/crash, or session/neighborhood lost"
+        },
+        {
+          "after_turn": 4,
+          "id": "CC3",
+          "principle": "P7",
+          "check": "More unfiltered East Village picks. Neighborhood persists. No filters active.",
+          "anti_pattern": "Comedy filter re-appears, or wrong neighborhood, or repeats"
+        }
+      ]
+    },
+    {
+      "name": "P10: pre-router full clear — 'nvm' clears all filters",
+      "category": "edge_case",
+      "tests_principles": ["P10", "P7"],
+      "user_turns": [
+        { "turn": 1, "message": "williamsburg" },
+        { "turn": 2, "message": "free" },
+        { "turn": 3, "message": "nvm" },
+        { "turn": 4, "message": "1" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 2,
+          "id": "DD1",
+          "principle": "P1",
+          "check": "Free filter applied. Picks are free events in Williamsburg.",
+          "anti_pattern": "Paid events shown"
+        },
+        {
+          "after_turn": 3,
+          "id": "DD2",
+          "principle": "P10",
+          "check": "Free filter cleared. Pulse returns unfiltered Williamsburg picks (free and paid). Neighborhood persists.",
+          "anti_pattern": "Free filter persists, or error, or neighborhood lost"
+        },
+        {
+          "after_turn": 4,
+          "id": "DD3",
+          "principle": "P7",
+          "check": "Detail for pick #1 from the unfiltered list (turn 3). Correct event info displayed.",
+          "anti_pattern": "Details from the old free-only list, or error"
+        }
+      ]
+    },
+    {
+      "name": "P10: LLM semantic clear — 'just show me what's good'",
+      "category": "edge_case",
+      "tests_principles": ["P10", "P7"],
+      "user_turns": [
+        { "turn": 1, "message": "bushwick" },
+        { "turn": 2, "message": "any jazz" },
+        { "turn": 3, "message": "just show me whats good" },
+        { "turn": 4, "message": "more" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 2,
+          "id": "EE1",
+          "principle": "P3",
+          "check": "Jazz/live_music picks in Bushwick",
+          "anti_pattern": "Non-music events"
+        },
+        {
+          "after_turn": 3,
+          "id": "EE2",
+          "principle": "P10",
+          "check": "Filters cleared. 'Just show me what's good' is a semantic clear — Pulse returns unfiltered Bushwick picks across all categories. Neighborhood persists.",
+          "anti_pattern": "Jazz filter persists (still only jazz), or error, or neighborhood lost"
+        },
+        {
+          "after_turn": 4,
+          "id": "EE3",
+          "principle": "P7",
+          "check": "More unfiltered Bushwick picks. No filters active. Neighborhood persists.",
+          "anti_pattern": "Jazz filter re-appears, or wrong neighborhood"
+        }
+      ]
+    },
+    {
+      "name": "P10: pre-router clear then re-apply new filter",
+      "category": "edge_case",
+      "tests_principles": ["P10", "P1"],
+      "user_turns": [
+        { "turn": 1, "message": "lower east side" },
+        { "turn": 2, "message": "how about comedy" },
+        { "turn": 3, "message": "show me everything" },
+        { "turn": 4, "message": "how about jazz" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 2,
+          "id": "FF1",
+          "principle": "P3",
+          "check": "Comedy picks in LES",
+          "anti_pattern": "Non-comedy events"
+        },
+        {
+          "after_turn": 3,
+          "id": "FF2",
+          "principle": "P10",
+          "check": "All filters cleared. Pulse returns unfiltered LES picks. Neighborhood persists.",
+          "anti_pattern": "Comedy filter persists, or error, or neighborhood lost"
+        },
+        {
+          "after_turn": 4,
+          "id": "FF3",
+          "principle": "P1",
+          "check": "New jazz filter applied. Picks are jazz/live_music in LES. Previous comedy filter does not re-appear.",
+          "anti_pattern": "Comedy filter re-appears alongside jazz, or no filter applied"
+        }
+      ]
+    },
+    {
+      "name": "P10: LLM semantic clear — 'I'm open to anything'",
+      "category": "edge_case",
+      "tests_principles": ["P10", "P7"],
+      "user_turns": [
+        { "turn": 1, "message": "greenpoint" },
+        { "turn": 2, "message": "free comedy" },
+        { "turn": 3, "message": "im open to anything" },
+        { "turn": 4, "message": "2" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 2,
+          "id": "GG1",
+          "principle": "P1",
+          "check": "Free + comedy compound filter applied. Picks are free comedy in Greenpoint.",
+          "anti_pattern": "Paid events or non-comedy events"
+        },
+        {
+          "after_turn": 3,
+          "id": "GG2",
+          "principle": "P10",
+          "check": "All filters cleared. 'I'm open to anything' is a semantic clear — Pulse returns unfiltered Greenpoint picks across all categories and price points. Neighborhood persists.",
+          "anti_pattern": "Free or comedy filters persist, or error, or neighborhood lost"
+        },
+        {
+          "after_turn": 4,
+          "id": "GG3",
+          "principle": "P7",
+          "check": "Detail for pick #2 from the unfiltered list (turn 3)",
+          "anti_pattern": "Details from old free-comedy list, or error"
+        }
+      ]
+    },
+    {
+      "name": "P10: pre-router 'drop it' with compound filters",
+      "category": "edge_case",
+      "tests_principles": ["P10", "P1", "P7"],
+      "user_turns": [
+        { "turn": 1, "message": "east village" },
+        { "turn": 2, "message": "free jazz" },
+        { "turn": 3, "message": "drop it" },
+        { "turn": 4, "message": "1" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 2,
+          "id": "HH1",
+          "principle": "P1",
+          "check": "Free + jazz compound filter applied. Picks are free jazz/live_music in East Village.",
+          "anti_pattern": "Paid events or non-jazz events"
+        },
+        {
+          "after_turn": 3,
+          "id": "HH2",
+          "principle": "P10",
+          "check": "All filters cleared. 'Drop it' clears the entire compound (free + jazz). Pulse returns unfiltered East Village picks. Neighborhood persists.",
+          "anti_pattern": "Any filter persists (still free, or still jazz), or error, or neighborhood lost"
+        },
+        {
+          "after_turn": 4,
+          "id": "HH3",
+          "principle": "P7",
+          "check": "Detail for pick #1 from the unfiltered list (turn 3)",
+          "anti_pattern": "Details from old free-jazz list, or error"
+        }
+      ]
     }
   ]
 }

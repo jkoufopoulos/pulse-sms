@@ -236,6 +236,16 @@ async function handleMore(ctx) {
     visitedHoods: ctx.session?.visitedHoods || [hood],
   });
   const sms = finalExhaust.message;
+  saveResponseFrame(ctx.phone, {
+    mode: 'more',
+    picks: [],
+    prevSession: ctx.session,
+    eventMap: ctx.session?.lastEvents || {},
+    neighborhood: hood,
+    filters: activeFilters,
+    offeredIds: [],
+    pending: finalExhaust.suggestedHood ? { neighborhood: finalExhaust.suggestedHood } : null,
+  });
   await sendSMS(ctx.phone, sms);
   ctx.finalizeTrace(sms, 'more');
 }
