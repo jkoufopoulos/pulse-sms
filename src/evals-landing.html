@@ -30,6 +30,7 @@
   }
   .pulse-nav-link:hover { color: #ccc; }
   .pulse-nav-link.active { color: #FF6B35; font-weight: 600; }
+  .pulse-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
 
   /* ── Header ── */
   .header {
@@ -230,9 +231,11 @@
 <nav class="pulse-nav">
   <a href="/health" class="pulse-nav-link">Health</a>
   <a href="/events" class="pulse-nav-link">Events</a>
+  <span class="pulse-nav-sep"></span>
   <a href="/eval" class="pulse-nav-link">Traces</a>
   <a href="/eval-report" class="pulse-nav-link">Reports</a>
-  <a href="/evals" class="pulse-nav-link active">Guide</a>
+  <a href="/evals" class="pulse-nav-link active">Eval Guide</a>
+  <span class="pulse-nav-sep"></span>
   <a href="/test" class="pulse-nav-link">Simulator</a>
 </nav>
 
@@ -354,9 +357,9 @@
       </div>
     </div>
     <div class="eval-card-desc">
-      Behavioral regression tests organized by architecture principles (P1&ndash;P12).
-      Each principle has targeted scenarios that validate specific system behaviors.
-      Requires a running server.
+      Behavioral regression tests organized by architecture principles (e.g. "code owns state",
+      "deterministic extraction first"). Each principle has targeted scenarios that validate
+      that specific system behaviors haven't regressed. Requires a running server.
     </div>
     <div class="eval-card-stat">
       <span class="stat-label">Latest</span>
@@ -468,12 +471,11 @@ async function loadStats() {
 
   // Traces count
   try {
-    var res = await fetch('/api/eval/traces?limit=1');
+    var res = await fetch('/api/eval/traces?limit=200');
     if (res.ok) {
       var traces = await res.json();
       var el = document.getElementById('traces-stat');
-      // The API returns an array; check if there are traces
-      el.textContent = traces.length > 0 ? traces.length + ' recent' : 'none';
+      el.textContent = traces.length > 0 ? traces.length + ' stored' : 'none yet';
       el.className = 'stat-value neutral';
     }
   } catch (e) {

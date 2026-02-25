@@ -470,6 +470,7 @@
   }
   .pulse-nav-link:hover { color: #ccc; }
   .pulse-nav-link.active { color: #FF6B35; font-weight: 600; }
+  .pulse-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
   @media (max-width: 600px) {
     .pulse-nav { margin: -12px -12px 12px -12px; }
   }
@@ -480,14 +481,19 @@
 <nav class="pulse-nav">
   <a href="/health" class="pulse-nav-link active">Health</a>
   <a href="/events" class="pulse-nav-link">Events</a>
+  <span class="pulse-nav-sep"></span>
   <a href="/eval" class="pulse-nav-link">Traces</a>
   <a href="/eval-report" class="pulse-nav-link">Reports</a>
-  <a href="/evals" class="pulse-nav-link">Guide</a>
+  <a href="/evals" class="pulse-nav-link">Eval Guide</a>
+  <span class="pulse-nav-sep"></span>
   <a href="/test" class="pulse-nav-link">Simulator</a>
 </nav>
 
 <div class="header">
-  <h1><span>Pulse</span> Health Dashboard</h1>
+  <div>
+    <h1><span>Pulse</span> Health</h1>
+    <p style="font-size:13px;color:#777;margin-top:4px">Source scrape status, timing, extraction quality, and alert history. Auto-refreshes every 60 seconds.</p>
+  </div>
   <div class="header-right">
     <span><span class="refresh-indicator"></span>Auto-refresh 60s</span>
     <span id="system-status" class="status-pill pending">loading</span>
@@ -504,7 +510,7 @@
 </div>
 
 <div class="timing-section">
-  <h2>Extraction Quality</h2>
+  <h2>Extraction Quality <span style="font-size:11px;font-weight:400;color:#666">— accuracy of Claude-extracted events vs. source text</span></h2>
   <div id="extraction-quality">
     <div class="no-data">Loading audit data...</div>
   </div>
@@ -625,7 +631,7 @@ function renderSourceCards(sources) {
             <div class="stat-value">${s.success_rate || '--'}</div>
           </div>
           <div class="source-card-stat">
-            <div class="stat-label">Zero Streak</div>
+            <div class="stat-label">Empty Scrapes</div>
             <div class="stat-value ${czClass}">${s.consecutive_zeros}</div>
           </div>
           <div class="source-card-stat">

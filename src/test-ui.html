@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Pulse SMS Simulator</title>
+<title>Pulse Simulator</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -29,6 +29,7 @@
   }
   .pulse-nav-link:hover { color: #ccc; }
   .pulse-nav-link.active { color: #FF6B35; font-weight: 600; }
+  .pulse-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
 
   .phone {
     width: 100vw;
@@ -272,9 +273,11 @@
 <nav class="pulse-nav">
   <a href="/health" class="pulse-nav-link">Health</a>
   <a href="/events" class="pulse-nav-link">Events</a>
+  <span class="pulse-nav-sep"></span>
   <a href="/eval" class="pulse-nav-link">Traces</a>
   <a href="/eval-report" class="pulse-nav-link">Reports</a>
-  <a href="/evals" class="pulse-nav-link">Guide</a>
+  <a href="/evals" class="pulse-nav-link">Eval Guide</a>
+  <span class="pulse-nav-sep"></span>
   <a href="/test" class="pulse-nav-link active">Simulator</a>
 </nav>
 
@@ -296,10 +299,11 @@
       <div class="name">Pulse</div>
       <div class="number">+1 (646) 722-6926</div>
     </div>
+    <button onclick="newSession()" style="background:none;border:1px solid #3a3a3c;color:#007AFF;font-size:12px;padding:4px 10px;border-radius:12px;cursor:pointer" title="Start a fresh conversation with a new phone number">New Session</button>
   </div>
 
   <div class="messages" id="messages">
-    <div class="msg system">SMS Simulator &mdash; messages hit the live pipeline</div>
+    <div class="msg system">SMS Simulator &mdash; messages hit the live pipeline (~$0.001/msg AI cost)</div>
     <div class="msg received">Hey! I'm Pulse — text me a neighborhood and I'll send you tonight's best picks. Try "East Village" or "Williamsburg" to start. You can ask for free events, specific vibes like comedy or live music, or reply "more" after any rec to keep exploring.</div>
   </div>
 
@@ -324,7 +328,13 @@ const sendBtn = document.getElementById('sendBtn');
 const typingEl = document.getElementById('typing');
 const clockEl = document.getElementById('clock');
 
-const SESSION_PHONE = '+1555' + String(Math.floor(Math.random() * 9000000 + 1000000));
+let SESSION_PHONE = '+1555' + String(Math.floor(Math.random() * 9000000 + 1000000));
+
+function newSession() {
+  SESSION_PHONE = '+1555' + String(Math.floor(Math.random() * 9000000 + 1000000));
+  messagesEl.innerHTML = '<div class="msg system">SMS Simulator \u2014 messages hit the live pipeline (~$0.001/msg AI cost)</div>' +
+    '<div class="msg received">Hey! I\u2019m Pulse \u2014 text me a neighborhood and I\u2019ll send you tonight\u2019s best picks. Try \u201cEast Village\u201d or \u201cWilliamsburg\u201d to start. You can ask for free events, specific vibes like comedy or live music, or reply \u201cmore\u201d after any rec to keep exploring.</div>';
+}
 
 function updateClock() {
   const now = new Date();

@@ -24,6 +24,7 @@
   }
   .pulse-nav-link:hover { color: #ccc; }
   .pulse-nav-link.active { color: #FF6B35; font-weight: 600; }
+  .pulse-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
 
   /* Header */
   .header {
@@ -200,15 +201,20 @@
 <nav class="pulse-nav">
   <a href="/health" class="pulse-nav-link">Health</a>
   <a href="/events" class="pulse-nav-link active">Events</a>
+  <span class="pulse-nav-sep"></span>
   <a href="/eval" class="pulse-nav-link">Traces</a>
   <a href="/eval-report" class="pulse-nav-link">Reports</a>
-  <a href="/evals" class="pulse-nav-link">Guide</a>
+  <a href="/evals" class="pulse-nav-link">Eval Guide</a>
+  <span class="pulse-nav-sep"></span>
   <a href="/test" class="pulse-nav-link">Simulator</a>
 </nav>
 
 <!-- Header -->
 <div class="header">
-  <h1><span>Pulse</span> Events</h1>
+  <div>
+    <h1><span>Pulse</span> Events</h1>
+    <p style="font-size:12px;color:#777;margin-top:2px">All events in the daily cache. Click a row for details.</p>
+  </div>
   <div class="stat">
     <span class="stat-label">Total Events</span>
     <span class="stat-value" id="total-count">--</span>
@@ -233,7 +239,7 @@
     <input type="text" class="search-input" id="f-search" placeholder="Search events, venues..." oninput="debouncedFilter()">
   </div>
   <div class="filter-group">
-    <label>Hood:</label>
+    <label>Neighborhood:</label>
     <select id="f-neighborhood" onchange="applyFilters()">
       <option value="">All</option>
     </select>
@@ -322,15 +328,21 @@ let searchTimer = null;
 // ========== Load ==========
 
 async function loadEvents() {
+  document.getElementById('event-table').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#666;padding:40px">Loading events...</td></tr>';
   try {
     const res = await fetch('/api/events');
     const data = await res.json();
     allEvents = data.events || [];
+    if (allEvents.length === 0) {
+      document.getElementById('event-table').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#666;padding:40px">No events in cache. The daily scrape runs at 10am ET, or force one with <code>POST /api/scrape</code>.</td></tr>';
+      return;
+    }
     updateSummary(data);
     populateDynamicFilters();
     applyFilters();
   } catch (err) {
     console.error('Failed to load events:', err);
+    document.getElementById('event-table').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#f87171;padding:40px">Failed to load events: ' + err.message + '</td></tr>';
   }
 }
 

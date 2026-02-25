@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pulse Eval Report</title>
+<title>Pulse Eval Reports</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -941,6 +941,7 @@
   }
   .pulse-nav-link:hover { color: #ccc; }
   .pulse-nav-link.active { color: #FF6B35; font-weight: 600; }
+  .pulse-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
 
   /* ── Responsive ── */
   @media (max-width: 600px) {
@@ -962,14 +963,19 @@
 <nav class="pulse-nav">
   <a href="/health" class="pulse-nav-link">Health</a>
   <a href="/events" class="pulse-nav-link">Events</a>
+  <span class="pulse-nav-sep"></span>
   <a href="/eval" class="pulse-nav-link">Traces</a>
   <a href="/eval-report" class="pulse-nav-link active">Reports</a>
-  <a href="/evals" class="pulse-nav-link">Guide</a>
+  <a href="/evals" class="pulse-nav-link">Eval Guide</a>
+  <span class="pulse-nav-sep"></span>
   <a href="/test" class="pulse-nav-link">Simulator</a>
 </nav>
 
 <div class="header">
-  <h1>Pulse <span>Eval Report</span></h1>
+  <div>
+    <h1><span>Pulse</span> Eval Reports</h1>
+    <p style="font-size:13px;color:#777;margin-top:4px">Scenario, regression, and extraction audit results. Select a report to view, compare runs, or override false failures.</p>
+  </div>
 </div>
 
 <div id="content">
@@ -1308,8 +1314,8 @@ function renderRegressionReport() {
       html += '<div class="section-header" style="margin-top:12px">Conversation</div>';
       html += '<div class="chat-transcript">';
       s.conversation.forEach(function(turn) {
-        if (turn.user) html += '<div class="chat-bubble user">' + escHtml(turn.user) + '</div>';
-        if (turn.response) html += '<div class="chat-bubble pulse">' + escHtml(turn.response) + '</div>';
+        var bubbleClass = turn.sender === 'user' ? 'user' : 'pulse';
+        if (turn.message) html += '<div class="chat-bubble ' + bubbleClass + '">' + escHtml(turn.message) + '</div>';
       });
       html += '</div>';
     }
@@ -1402,7 +1408,7 @@ function renderToolbar() {
   html += '</select>';
 
   // Compare toggle
-  html += '<button class="toolbar-vs' + (compareVisible ? ' active' : '') + '" id="compare-btn">vs</button>';
+  html += '<button class="toolbar-vs' + (compareVisible ? ' active' : '') + '" id="compare-btn" title="Compare two reports side by side">Compare</button>';
   html += '<div class="compare-wrap' + (compareVisible ? ' visible' : '') + '" id="compare-wrap">';
   html += '<select id="compare-select"><option value="">-- compare to --</option>';
   REPORT_TYPES.forEach(function(t) {
@@ -1542,11 +1548,12 @@ function renderFilterRows() {
   html += '</div>';
 
   // Difficulty row
+  var diffTips = { all: 'Show all tiers', must_pass: 'Core behaviors that must always work', should_pass: 'Expected behaviors that should work in most cases', stretch: 'Aspirational behaviors, nice to have' };
   html += '<div class="filter-row">';
   html += '<span class="filter-row-label">Tier</span>';
   DIFFICULTIES.forEach(function(d) {
     html += '<button class="filter-btn' + (filters.difficulty === d ? ' active' : '') +
-      '" data-filter="difficulty" data-value="' + escAttr(d) + '">' + formatLabel(d) + '</button>';
+      '" data-filter="difficulty" data-value="' + escAttr(d) + '" title="' + escAttr(diffTips[d] || '') + '">' + formatLabel(d) + '</button>';
   });
   html += '</div>';
 
@@ -1765,10 +1772,10 @@ function renderOverridePanel(s, ovr) {
 
   html += '<select class="ovr-category-select" data-ovr-category="' + scenarioName + '">';
   var cats = [
-    ['false_failure', 'False Failure (flip to PASS)'],
-    ['false_pass', 'False Pass (flip to FAIL)'],
-    ['data_dependent', 'Data Dependent (exclude)'],
-    ['known_bug', 'Known Bug (stays FAIL)']
+    ['false_failure', 'False Failure \u2014 LLM judge was wrong, this actually passed'],
+    ['false_pass', 'False Pass \u2014 LLM judge was wrong, this actually failed'],
+    ['data_dependent', 'Data Dependent \u2014 result depends on scrape data, exclude from rate'],
+    ['known_bug', 'Known Bug \u2014 real failure, tracked separately']
   ];
   cats.forEach(function(c) {
     html += '<option value="' + c[0] + '"' + (currentCategory === c[0] ? ' selected' : '') + '>' + escHtml(c[1]) + '</option>';
