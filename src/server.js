@@ -121,6 +121,20 @@ app.get('/api/eval-reports/:filename', (req, res) => {
   res.sendFile(filePath);
 });
 
+// Eval report upload — accepts JSON report body, writes to data/reports/
+app.put('/api/eval-reports/:filename', express.json({ limit: '2mb' }), (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+  const filename = req.params.filename;
+  if (!filename.startsWith('scenario-eval-') || !filename.endsWith('.json')) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+  const reportsDir = path.join(__dirname, '..', 'data', 'reports');
+  if (!fs.existsSync(reportsDir)) fs.mkdirSync(reportsDir, { recursive: true });
+  fs.writeFileSync(path.join(reportsDir, filename), JSON.stringify(req.body, null, 2));
+  res.json({ ok: true, filename });
+});
+
 // Eval overrides API — human judge overrides for scenario verdicts
 app.get('/api/eval-overrides', (req, res) => {
   const fs = require('fs');
