@@ -286,6 +286,460 @@ const dayLabelTmrwBadTrace = {
 const dayLabelTmrwBadResults = runCodeEvals(dayLabelTmrwBadTrace);
 check('day_label_accuracy fails: says tomorrow but event is today', findEval(dayLabelTmrwBadResults, 'day_label_accuracy').pass === false);
 
+// ---- price_transparency eval ----
+console.log('\nCode evals (price_transparency):');
+
+const priceGoodTrace = {
+  ...goodTrace,
+  id: 'test-price-good',
+  output_sms: '1) Jazz Night at Smalls — $20, 9pm 2) Punk Show at Bowery — Free! 10pm',
+  composition: {
+    ...goodTrace.composition,
+    picks: [
+      { rank: 1, event_id: 'e1', why: 'jazz' },
+      { rank: 2, event_id: 'e3', why: 'punk' },
+    ],
+  },
+};
+const priceGoodResults = runCodeEvals(priceGoodTrace);
+check('price_transparency passes with $20 and Free', findEval(priceGoodResults, 'price_transparency').pass === true);
+
+const priceBadTrace = {
+  ...goodTrace,
+  id: 'test-price-bad',
+  output_sms: '1) Jazz Night at Smalls 9pm 2) Punk Show at Bowery 10pm — both great vibes',
+  composition: {
+    ...goodTrace.composition,
+    picks: [
+      { rank: 1, event_id: 'e1', why: 'jazz' },
+      { rank: 2, event_id: 'e3', why: 'punk' },
+    ],
+  },
+};
+const priceBadResults = runCodeEvals(priceBadTrace);
+check('price_transparency fails without price info', findEval(priceBadResults, 'price_transparency').pass === false);
+
+const priceNaTrace = {
+  ...goodTrace,
+  id: 'test-price-na',
+  output_intent: 'conversational',
+  output_sms: "I only know events — text a neighborhood!",
+  composition: { ...goodTrace.composition, picks: [] },
+};
+const priceNaResults = runCodeEvals(priceNaTrace);
+check('price_transparency skips for non-event intent', findEval(priceNaResults, 'price_transparency').pass === true);
+
+const priceNoCoverTrace = {
+  ...goodTrace,
+  id: 'test-price-nocover',
+  output_sms: '1) Jazz Night at Smalls — no cover, 9pm 2) Punk at Bowery 10pm',
+  composition: {
+    ...goodTrace.composition,
+    picks: [
+      { rank: 1, event_id: 'e1', why: 'jazz' },
+      { rank: 2, event_id: 'e3', why: 'punk' },
+    ],
+  },
+};
+const priceNoCoverResults = runCodeEvals(priceNoCoverTrace);
+check('price_transparency passes with "no cover"', findEval(priceNoCoverResults, 'price_transparency').pass === true);
+
+// ---- schema_compliance eval ----
+console.log('\nCode evals (schema_compliance):');
+
+const schemaGoodTrace = {
+  ...goodTrace,
+  id: 'test-schema-good',
+  composition: {
+    ...goodTrace.composition,
+    raw_response: '```json\n{"type":"event_picks","sms_text":"Check out Jazz Night","picks":[{"rank":1,"event_id":"e1"}],"clear_filters":false}\n```',
+  },
+};
+const schemaGoodResults = runCodeEvals(schemaGoodTrace);
+check('schema_compliance passes with valid JSON', findEval(schemaGoodResults, 'schema_compliance').pass === true);
+
+const schemaBadTrace = {
+  ...goodTrace,
+  id: 'test-schema-bad',
+  output_sms: "Having a moment — try again in a sec!",
+  composition: {
+    ...goodTrace.composition,
+    raw_response: 'This is not JSON at all, just random text from Claude',
+  },
+};
+const schemaBadResults = runCodeEvals(schemaBadTrace);
+check('schema_compliance fails for fallback error', findEval(schemaBadResults, 'schema_compliance').pass === false);
+
+const schemaNoJsonTrace = {
+  ...goodTrace,
+  id: 'test-schema-nojson',
+  output_sms: 'Some response that worked anyway',
+  composition: {
+    ...goodTrace.composition,
+    raw_response: 'Sure! Here are some picks for tonight in the East Village',
+  },
+};
+const schemaNoJsonResults = runCodeEvals(schemaNoJsonTrace);
+check('schema_compliance fails when no JSON object in response', findEval(schemaNoJsonResults, 'schema_compliance').pass === false);
+
+const schemaPreRoutedTrace = {
+  ...goodTrace,
+  id: 'test-schema-prerouted',
+  composition: {
+    ...goodTrace.composition,
+    raw_response: null,
+  },
+};
+const schemaPreRoutedResults = runCodeEvals(schemaPreRoutedTrace);
+check('schema_compliance passes for pre-routed (no LLM call)', findEval(schemaPreRoutedResults, 'schema_compliance').pass === true);
+
+const schemaMissingSmsTrace = {
+  ...goodTrace,
+  id: 'test-schema-nosms',
+  output_sms: 'Some text',
+  composition: {
+    ...goodTrace.composition,
+    raw_response: '{"type":"event_picks","picks":[]}',
+  },
+};
+const schemaMissingSmsResults = runCodeEvals(schemaMissingSmsTrace);
+check('schema_compliance fails when sms_text missing', findEval(schemaMissingSmsResults, 'schema_compliance').pass === false);
+
+// ---- category_adherence with subcategory mapping ----
+console.log('\nCode evals (category_adherence subcategory mapping):');
+
+const catSubTrace = {
+  ...goodTrace,
+  id: 'test-cat-sub',
+  composition: {
+    ...goodTrace.composition,
+    picks: [
+      { rank: 1, event_id: 'e1', category: 'jazz' },
+      { rank: 2, event_id: 'e2', category: 'rock' },
+      { rank: 3, event_id: 'e3', category: 'live_music' },
+    ],
+    active_filters: { category: 'live_music' },
+  },
+};
+const catSubResults = runCodeEvals(catSubTrace);
+check('category_adherence passes: jazz+rock map to live_music (100%)', findEval(catSubResults, 'category_adherence').pass === true);
+
+const catBorderlineTrace = {
+  ...goodTrace,
+  id: 'test-cat-borderline',
+  composition: {
+    ...goodTrace.composition,
+    picks: [
+      { rank: 1, event_id: 'e1', category: 'comedy' },
+      { rank: 2, event_id: 'e2', category: 'live_music' },
+      { rank: 3, event_id: 'e3', category: 'nightlife' },
+      { rank: 4, event_id: 'e4', category: 'art' },
+    ],
+    active_filters: { category: 'comedy' },
+  },
+};
+const catBorderlineResults = runCodeEvals(catBorderlineTrace);
+check('category_adherence fails: 1/4 comedy (25%) < 75%', findEval(catBorderlineResults, 'category_adherence').pass === false);
+
+// ---- compound_filter_accuracy ----
+console.log('\nCode evals (compound_filter_accuracy):');
+
+const compoundPassTrace = {
+  ...goodTrace,
+  id: 'test-compound-pass',
+  composition: {
+    ...goodTrace.composition,
+    picks: [
+      { rank: 1, event_id: 'e1', is_free: true, category: 'comedy' },
+      { rank: 2, event_id: 'e2', is_free: true, category: 'standup' },
+    ],
+    active_filters: { free_only: true, category: 'comedy' },
+  },
+};
+const compoundPassResults = runCodeEvals(compoundPassTrace);
+check('compound_filter_accuracy passes: all picks are free + comedy', findEval(compoundPassResults, 'compound_filter_accuracy').pass === true);
+
+const compoundFailTrace = {
+  ...goodTrace,
+  id: 'test-compound-fail',
+  composition: {
+    ...goodTrace.composition,
+    picks: [
+      { rank: 1, event_id: 'e1', is_free: true, category: 'live_music' },
+      { rank: 2, event_id: 'e2', is_free: true, category: 'nightlife' },
+    ],
+    active_filters: { free_only: true, category: 'comedy' },
+  },
+};
+const compoundFailResults = runCodeEvals(compoundFailTrace);
+check('compound_filter_accuracy fails: picks are free but not comedy', findEval(compoundFailResults, 'compound_filter_accuracy').pass === false);
+
+const compoundSkipTrace = {
+  ...goodTrace,
+  id: 'test-compound-skip',
+  composition: {
+    ...goodTrace.composition,
+    picks: [
+      { rank: 1, event_id: 'e1', is_free: true, category: 'comedy' },
+    ],
+    active_filters: { category: 'comedy' },
+  },
+};
+const compoundSkipResults = runCodeEvals(compoundSkipTrace);
+check('compound_filter_accuracy skips: only category filter (no free_only)', findEval(compoundSkipResults, 'compound_filter_accuracy').pass === true);
+
+// ---- filter_match_alignment ----
+console.log('\nCode evals (filter_match_alignment):');
+
+const matchAlignPassTrace = {
+  ...goodTrace,
+  id: 'test-match-align-pass',
+  events: {
+    ...goodTrace.events,
+    sent_pool: [
+      { event_id: 'e1', filter_match: 'hard' },
+      { event_id: 'e2', filter_match: 'soft' },
+      { event_id: 'e3', filter_match: false },
+    ],
+  },
+  composition: {
+    ...goodTrace.composition,
+    picks: [
+      { rank: 1, event_id: 'e1' },
+      { rank: 2, event_id: 'e2' },
+    ],
+    pool_meta: { matchCount: 2 },
+  },
+};
+const matchAlignPassResults = runCodeEvals(matchAlignPassTrace);
+check('filter_match_alignment passes: picks from matched pool', findEval(matchAlignPassResults, 'filter_match_alignment').pass === true);
+
+const matchAlignFailTrace = {
+  ...goodTrace,
+  id: 'test-match-align-fail',
+  events: {
+    ...goodTrace.events,
+    sent_pool: [
+      { event_id: 'e1', filter_match: 'hard' },
+      { event_id: 'e2', filter_match: false },
+      { event_id: 'e3', filter_match: false },
+    ],
+  },
+  composition: {
+    ...goodTrace.composition,
+    picks: [
+      { rank: 1, event_id: 'e2' },
+      { rank: 2, event_id: 'e3' },
+    ],
+    pool_meta: { matchCount: 1 },
+  },
+};
+const matchAlignFailResults = runCodeEvals(matchAlignFailTrace);
+check('filter_match_alignment fails: picks from unmatched despite matches', findEval(matchAlignFailResults, 'filter_match_alignment').pass === false);
+
+const matchAlignSkipTrace = {
+  ...goodTrace,
+  id: 'test-match-align-skip',
+  composition: {
+    ...goodTrace.composition,
+    picks: [
+      { rank: 1, event_id: 'e1' },
+    ],
+  },
+};
+const matchAlignSkipResults = runCodeEvals(matchAlignSkipTrace);
+check('filter_match_alignment skips: no pool_meta', findEval(matchAlignSkipResults, 'filter_match_alignment').pass === true);
+
+// ---- time_filter_accuracy ----
+console.log('\nCode evals (time_filter_accuracy):');
+
+const timePassTrace = {
+  ...goodTrace,
+  id: 'test-time-pass',
+  composition: {
+    ...goodTrace.composition,
+    picks: [
+      { rank: 1, event_id: 'e1', start_time_local: '2026-02-25T22:00:00' },
+      { rank: 2, event_id: 'e2', start_time_local: '2026-02-25T23:30:00' },
+    ],
+    active_filters: { time_after: '21:00' },
+  },
+};
+const timePassResults = runCodeEvals(timePassTrace);
+check('time_filter_accuracy passes: picks after 21:00', findEval(timePassResults, 'time_filter_accuracy').pass === true);
+
+const timeFailTrace = {
+  ...goodTrace,
+  id: 'test-time-fail',
+  composition: {
+    ...goodTrace.composition,
+    picks: [
+      { rank: 1, event_id: 'e1', start_time_local: '2026-02-25T18:00:00' },
+      { rank: 2, event_id: 'e2', start_time_local: '2026-02-25T19:00:00' },
+    ],
+    active_filters: { time_after: '21:00' },
+  },
+};
+const timeFailResults = runCodeEvals(timeFailTrace);
+check('time_filter_accuracy fails: picks before 21:00', findEval(timeFailResults, 'time_filter_accuracy').pass === false);
+
+const timeSkipTrace = {
+  ...goodTrace,
+  id: 'test-time-skip',
+  composition: {
+    ...goodTrace.composition,
+    picks: [
+      { rank: 1, event_id: 'e1', start_time_local: '2026-02-25T22:00:00' },
+    ],
+  },
+};
+const timeSkipResults = runCodeEvals(timeSkipTrace);
+check('time_filter_accuracy skips: no time filter', findEval(timeSkipResults, 'time_filter_accuracy').pass === true);
+
+// After-midnight wrapping: 1am event should pass a 21:00 filter (it's late-night, not early morning)
+const timeWrapTrace = {
+  ...goodTrace,
+  id: 'test-time-wrap',
+  composition: {
+    ...goodTrace.composition,
+    picks: [
+      { rank: 1, event_id: 'e1', start_time_local: '2026-02-26T01:00:00' },
+      { rank: 2, event_id: 'e2', start_time_local: '2026-02-25T23:00:00' },
+    ],
+    active_filters: { time_after: '21:00' },
+  },
+};
+const timeWrapResults = runCodeEvals(timeWrapTrace);
+check('time_filter_accuracy passes with after-midnight wrapping (1am > 21:00)', findEval(timeWrapResults, 'time_filter_accuracy').pass === true);
+
+// ---- neighborhood_expansion_transparency ----
+console.log('\nCode evals (neighborhood_expansion_transparency):');
+
+const expansionPassTrace = {
+  ...goodTrace,
+  id: 'test-expansion-pass',
+  output_sms: 'Not much in Greenpoint tonight — checking nearby Williamsburg: 1) Jazz Night 9pm 2) Punk Show 10pm',
+  composition: {
+    ...goodTrace.composition,
+    neighborhood_used: 'Greenpoint',
+    picks: [
+      { rank: 1, event_id: 'e1', neighborhood: 'Williamsburg' },
+      { rank: 2, event_id: 'e2', neighborhood: 'Williamsburg' },
+    ],
+  },
+};
+const expansionPassResults = runCodeEvals(expansionPassTrace);
+check('neighborhood_expansion_transparency passes: different hood, SMS acknowledges', findEval(expansionPassResults, 'neighborhood_expansion_transparency').pass === true);
+
+const expansionFailTrace = {
+  ...goodTrace,
+  id: 'test-expansion-fail',
+  output_sms: 'Greenpoint tonight: 1) Jazz Night 9pm 2) Punk Show 10pm',
+  composition: {
+    ...goodTrace.composition,
+    neighborhood_used: 'Greenpoint',
+    picks: [
+      { rank: 1, event_id: 'e1', neighborhood: 'Williamsburg' },
+      { rank: 2, event_id: 'e2', neighborhood: 'Williamsburg' },
+    ],
+  },
+};
+const expansionFailResults = runCodeEvals(expansionFailTrace);
+check('neighborhood_expansion_transparency fails: different hood, no acknowledgment', findEval(expansionFailResults, 'neighborhood_expansion_transparency').pass === false);
+
+const expansionSkipTrace = {
+  ...goodTrace,
+  id: 'test-expansion-skip',
+  composition: {
+    ...goodTrace.composition,
+    neighborhood_used: 'East Village',
+    picks: [
+      { rank: 1, event_id: 'e1', neighborhood: 'East Village' },
+      { rank: 2, event_id: 'e2', neighborhood: 'East Village' },
+    ],
+  },
+};
+const expansionSkipResults = runCodeEvals(expansionSkipTrace);
+check('neighborhood_expansion_transparency skips: picks in claimed hood', findEval(expansionSkipResults, 'neighborhood_expansion_transparency').pass === true);
+
+// ---- source-completeness eval ----
+console.log('\nSource completeness evals:');
+
+const { checkEvent, checkSourceCompleteness } = require('../src/evals/source-completeness');
+
+// Good BAM event — should pass all checks
+const goodBamEvent = {
+  id: 'bam_123', source_name: 'bam', source_type: 'venue_calendar', name: 'Film Night',
+  venue_name: 'BAM', venue_address: '30 Lafayette Ave, Brooklyn, NY', neighborhood: 'Fort Greene',
+  start_time_local: '2026-02-24T19:00:00', date_local: '2026-02-24', is_free: false,
+  category: 'film', subcategory: null, price_display: null, map_hint: '30 Lafayette Ave, Brooklyn',
+  extraction_confidence: null,
+};
+check('BAM good event passes', checkEvent(goodBamEvent, 'BAM').length === 0);
+
+// BAM event missing neighborhood — should fail
+const badBamEvent = { ...goodBamEvent, neighborhood: null };
+const bamIssues = checkEvent(badBamEvent, 'BAM');
+check('BAM missing neighborhood fails', bamIssues.length > 0);
+check('BAM failure mentions neighborhood', bamIssues.some(i => i.includes('neighborhood')));
+
+// BAM event with wrong invariant
+const wrongBamEvent = { ...goodBamEvent, neighborhood: 'Williamsburg' };
+const wrongBamIssues = checkEvent(wrongBamEvent, 'BAM');
+check('BAM wrong neighborhood invariant fails', wrongBamIssues.some(i => i.includes('invariant')));
+
+// SmallsLIVE good event
+const goodSmallsEvent = {
+  id: 'smalls_123', source_name: 'smallslive', source_type: 'venue_calendar', name: 'Jazz Set',
+  venue_name: 'Smalls Jazz Club', venue_address: '183 W 10th St', neighborhood: 'West Village',
+  description_short: 'Live jazz at Smalls Jazz Club', short_detail: '9:00 PM at Smalls Jazz Club',
+  start_time_local: '2026-02-24T21:00:00', date_local: '2026-02-24', is_free: false,
+  category: 'live_music', subcategory: 'jazz', map_hint: '183 W 10th St',
+  extraction_confidence: null,
+};
+check('SmallsLIVE good event passes', checkEvent(goodSmallsEvent, 'SmallsLIVE').length === 0);
+
+// SmallsLIVE missing subcategory — should fail
+const badSmallsEvent = { ...goodSmallsEvent, subcategory: null };
+check('SmallsLIVE missing subcategory fails', checkEvent(badSmallsEvent, 'SmallsLIVE').length > 0);
+
+// Universal field check — missing name
+const noNameEvent = { ...goodBamEvent, name: null };
+check('missing name fails universal check', checkEvent(noNameEvent, 'BAM').some(i => i.includes('"name"')));
+
+// is_free wrong type
+const badFreeEvent = { ...goodBamEvent, is_free: null };
+check('is_free null fails type check', checkEvent(badFreeEvent, 'BAM').some(i => i.includes('boolean')));
+
+// Structured source should not have extraction_confidence
+const badConfEvent = { ...goodBamEvent, extraction_confidence: 0.8 };
+check('extraction_confidence on structured source fails', checkEvent(badConfEvent, 'BAM').some(i => i.includes('extraction_confidence')));
+
+// checkSourceCompleteness integration
+const mockFetchMap = {
+  BAM: { events: [goodBamEvent, badBamEvent], status: 'ok' },
+  Skint: { events: [{ id: 'x' }], status: 'ok' },  // extracted source — should be skipped
+  RA: { events: [], status: 'ok' },  // empty — should be skipped
+  Dice: { events: [], status: 'error', error: 'timeout' },  // failed — should be skipped
+};
+const completenessResults = checkSourceCompleteness(mockFetchMap);
+check('BAM in results', 'BAM' in completenessResults);
+check('Skint skipped (extracted)', !('Skint' in completenessResults));
+check('RA skipped (empty)', !('RA' in completenessResults));
+check('Dice skipped (error)', !('Dice' in completenessResults));
+check('BAM: 1 passed, 1 failed', completenessResults.BAM.passed === 1 && completenessResults.BAM.failed === 1);
+
+// NYC Parks invariant — always free
+const goodParksEvent = {
+  id: 'parks_1', source_name: 'nyc_parks', source_type: 'government', name: 'Concert in the Park',
+  venue_name: 'Central Park', is_free: true, price_display: 'free', category: 'live_music',
+  extraction_confidence: null,
+};
+check('NYC Parks good event passes', checkEvent(goodParksEvent, 'NYC Parks').length === 0);
+
+const badParksEvent = { ...goodParksEvent, is_free: false };
+check('NYC Parks paid event fails invariant', checkEvent(badParksEvent, 'NYC Parks').some(i => i.includes('invariant') && i.includes('is_free')));
+
 // ---- Summary ----
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

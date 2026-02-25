@@ -18,6 +18,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
+const { runCodeEvals } = require('../src/evals/code-evals');
 
 const args = process.argv.slice(2);
 const nameFilter = args.find(a => a.startsWith('--name='))?.split('=')[1]
@@ -134,9 +135,11 @@ async function runScenario(scenario, phoneNumber) {
       continue;
     }
 
+    const traceSummary = data.trace_summary || null;
+    const trace = data.trace || null;
     const messages = data.messages || [];
     for (const msg of messages) {
-      conversation.push({ turn: turnNumber, sender: 'pulse', message: msg.body });
+      conversation.push({ turn: turnNumber, sender: 'pulse', message: msg.body, trace_summary: traceSummary, trace });
     }
 
     if (messages.length === 0) {
@@ -179,10 +182,18 @@ async function main() {
 
   console.log(`Running ${scenarios.length} regression scenarios against ${BASE}\n`);
 
+  // Fetch cache metadata for reproducibility
+  let cacheMeta = null;
+  try {
+    const cacheRes = await fetch(`${BASE}/api/eval/cache-meta`);
+    cacheMeta = await cacheRes.json();
+  } catch {}
+
   const report = {
     timestamp: new Date().toISOString(),
     base_url: BASE,
     judge_model: JUDGE_MODEL,
+    cache_meta: cacheMeta,
     principles,
     total_scenarios: scenarios.length,
     scenarios_passed: 0,
@@ -211,6 +222,31 @@ async function main() {
 
       if (!judgment || !judgment.assertions) {
         throw new Error('Judge returned unparseable response');
+      }
+
+      // Run code evals on every pulse turn that has a trace
+      const codeEvalFailures = [];
+      let codeEvalTotal = 0;
+      for (const turn of conversation) {
+        if (turn.sender === 'pulse' && turn.trace) {
+          const results = runCodeEvals(turn.trace);
+          codeEvalTotal += results.length;
+          for (const r of results) {
+            if (!r.pass) codeEvalFailures.push(r);
+          }
+        }
+      }
+
+      // Replace full trace with key fields for debuggability
+      for (const turn of conversation) {
+        if (turn.trace) {
+          turn.trace_debug = {
+            active_filters: turn.trace.composition?.active_filters || null,
+            output_intent: turn.trace.output_intent || null,
+            input_message: turn.trace.input_message || null,
+          };
+          delete turn.trace;
+        }
       }
 
       // Build a lookup from judge results
@@ -251,9 +287,14 @@ async function main() {
       }
 
       const allPassed = scenarioPassed === scenarioTotal;
+      const codeFailNames = codeEvalFailures.map(f => f.name);
+      const codeTag = codeFailNames.length > 0
+        ? `  \x1b[33mCode: ${[...new Set(codeFailNames)].join(', ')}\x1b[0m`
+        : '';
+
       if (allPassed) {
         report.scenarios_passed++;
-        console.log(`\x1b[32mPASS\x1b[0m (${scenarioPassed}/${scenarioTotal} assertions)`);
+        console.log(`\x1b[32mPASS\x1b[0m (${scenarioPassed}/${scenarioTotal} assertions)${codeTag}`);
       } else {
         report.scenarios_failed++;
         console.log(`\x1b[31mFAIL\x1b[0m (${scenarioPassed}/${scenarioTotal} assertions)`);
@@ -264,6 +305,7 @@ async function main() {
             console.log(`       ${ar.id} [${ar.principle}]: ${ar.reasoning || ar.check}`);
           }
         }
+        if (codeTag) console.log(`      ${codeTag}`);
       }
 
       report.scenarios.push({
@@ -273,6 +315,7 @@ async function main() {
         assertions_total: scenarioTotal,
         assertions: assertionResults,
         conversation,
+        code_eval_failures: codeEvalFailures, code_eval_total: codeEvalTotal,
       });
 
     } catch (err) {
@@ -306,6 +349,30 @@ async function main() {
     console.log(`  ${color}${p.id} ${p.name}: ${stats.passed}/${stats.total} (${pct}%)\x1b[0m`);
   }
   console.log(`${'='.repeat(60)}`);
+
+  // Code eval summary
+  const codeEvalStats = { total: 0, passed: 0, failed: 0, by_name: {} };
+  for (const s of report.scenarios) {
+    codeEvalStats.total += s.code_eval_total || 0;
+    const failCount = (s.code_eval_failures || []).length;
+    codeEvalStats.failed += failCount;
+    codeEvalStats.passed += (s.code_eval_total || 0) - failCount;
+    for (const f of (s.code_eval_failures || [])) {
+      if (!codeEvalStats.by_name[f.name]) codeEvalStats.by_name[f.name] = 0;
+      codeEvalStats.by_name[f.name]++;
+    }
+  }
+  report.code_evals = codeEvalStats;
+
+  if (codeEvalStats.total > 0) {
+    const cePct = ((codeEvalStats.passed / codeEvalStats.total) * 100).toFixed(1);
+    console.log(`\nCode evals: ${codeEvalStats.passed}/${codeEvalStats.total} passed (${cePct}%)`);
+    if (Object.keys(codeEvalStats.by_name).length > 0) {
+      for (const [name, count] of Object.entries(codeEvalStats.by_name).sort((a, b) => b[1] - a[1])) {
+        console.log(`  ${name}: ${count} failures`);
+      }
+    }
+  }
 
   // Save report
   const reportsDir = path.join(__dirname, '..', 'data', 'reports');

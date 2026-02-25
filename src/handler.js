@@ -3,12 +3,12 @@ const twilio = require('twilio');
 const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
 const { composeResponse, unifiedRespond } = require('./ai');
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
-const { startTrace, saveTrace } = require('./traces');
+const { startTrace, saveTrace, getLatestTraceForPhone } = require('./traces');
 const { getSession, setSession, clearSession, addToHistory, clearSessionInterval } = require('./session');
 const { preRoute, getAdjacentNeighborhoods } = require('./pre-router');
 const { handleHelp, handleConversational, handleDetails, handleMore } = require('./intent-handlers');
 const { sendRuntimeAlert } = require('./alerts');
-const { getEvents, getEventById, scanCityWide } = require('./events');
+const { getEvents, getEventById, scanCityWide, getCacheStatus } = require('./events');
 const { lookupReferralCode, recordAttribution } = require('./referral');
 const { filterKidsEvents, validatePerennialActivity } = require('./curation');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
@@ -142,7 +142,19 @@ if (process.env.PULSE_TEST_MODE === 'true') {
     try {
       await handleMessage(testPhone, message.trim());
       const captured = disableTestCapture(testPhone);
-      res.json({ ok: true, messages: captured });
+      const trace = getLatestTraceForPhone(maskPhone(testPhone));
+      const trace_summary = trace ? {
+        id: trace.id,
+        intent: trace.output_intent,
+        neighborhood: trace.routing?.resolved_neighborhood,
+        cache_size: trace.events?.cache_size,
+        candidates_count: trace.events?.candidates_count,
+        sent_to_claude: trace.events?.sent_to_claude,
+        sent_pool: trace.events?.sent_pool,
+        pool_meta: trace.events?.pool_meta,
+        picks: trace.composition?.picks,
+      } : null;
+      res.json({ ok: true, messages: captured, trace_summary, trace });
     } catch (err) {
       const captured = disableTestCapture(testPhone);
       res.status(500).json({ error: err.message, messages: captured });
@@ -347,8 +359,11 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
     const eventsStart = Date.now();
     const raw = await getEvents(hood);
     trace.events.getEvents_ms = Date.now() - eventsStart;
+    trace.events.cache_size = getCacheStatus().cache_size;
     curated = filterKidsEvents(raw);
     const taggedResult = buildTaggedPool(curated, activeFilters);
+    trace.events.candidates_count = curated.length;
+    trace.events.candidate_ids = curated.map(e => e.id);
     events = taggedResult.pool;
     matchCount = taggedResult.matchCount;
     hardCount = taggedResult.hardCount;
@@ -464,8 +479,12 @@ async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, 
   let { hood, activeFilters, curated, taggedPerennials, suggestedHood } = unifiedCtx;
 
   // Filter state management after unified call
-  // Zero activeFilters so downstream saveResponseFrame persists no filters.
-  if (result.clear_filters) {
+  // Only trust LLM's clear_filters when user message contains clear-intent language.
+  // This prevents hallucination on normal conversational turns (BUG 1) while
+  // preserving semantic clearing ("just show me what's good"). P1 compliant:
+  // code validates LLM's claim against user's actual input.
+  const CLEAR_SIGNALS = /\b(everything|all\b|fresh|reset|start over|no filter|drop|forget|nvm|never\s?mind|clear|what's good|whats good|whatever|surprise me)\b/i;
+  if (result.clear_filters && CLEAR_SIGNALS.test(message)) {
     activeFilters = {};
   }
 

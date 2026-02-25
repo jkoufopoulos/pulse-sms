@@ -521,6 +521,41 @@
     text-align: center;
     padding: 2px 0;
   }
+  .trace-inline {
+    align-self: flex-start;
+    max-width: 80%;
+    font-size: 11px;
+    color: #666;
+    margin-top: -4px;
+  }
+  .trace-inline summary {
+    cursor: pointer;
+    font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Monaco, monospace;
+    padding: 2px 0;
+  }
+  .trace-inline summary:hover { color: #999; }
+  .trace-pool {
+    font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Monaco, monospace;
+    font-size: 10px;
+    color: #555;
+    padding: 4px 8px;
+    background: #111;
+    border-radius: 6px;
+    margin-top: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
+  .cache-meta-bar {
+    font-size: 12px;
+    color: #666;
+    padding: 6px 12px;
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Monaco, monospace;
+  }
 
   /* ── Judgment section ── */
   .judgment-section {
@@ -554,6 +589,41 @@
     font-size: 11px;
     font-weight: 500;
   }
+
+  /* ── Code eval badges ── */
+  .code-eval-section { margin-top: 10px; }
+  .code-eval-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .code-eval-badge {
+    background: #3a2a0a;
+    color: #fbbf24;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .code-eval-badge.pass {
+    background: #0a2a1a;
+    color: #4ade80;
+  }
+  .code-eval-detail {
+    font-size: 11px;
+    color: #888;
+    margin-top: 2px;
+    padding-left: 2px;
+  }
+  .code-eval-summary-bar {
+    background: #141414;
+    border: 1px solid #222;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-top: 12px;
+    font-size: 12px;
+    color: #aaa;
+  }
+  .code-eval-summary-bar .ce-label { color: #fbbf24; font-weight: 600; }
+  .code-eval-summary-bar .ce-good { color: #4ade80; }
+  .code-eval-breakdown { margin-top: 6px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .code-eval-breakdown span { font-size: 11px; color: #888; }
 
   /* ── Turn grades ── */
   .turn-grades { display: flex; flex-direction: column; gap: 6px; }
@@ -1181,6 +1251,7 @@ function render() {
 
   // Summary section
   html += renderSummary(passRate, scenarios);
+  html += renderCacheMeta();
 
   // Category breakdown
   html += renderCategoryBreakdown(scenarios);
@@ -1252,6 +1323,9 @@ function renderRegressionReport() {
   html += '</div>';
   html += '</div>';
 
+  html += renderCacheMeta();
+  html += renderCodeEvalSummary(r);
+
   // Principle breakdown
   html += '<div class="section-header">Principles</div>';
   html += '<div class="principle-grid">';
@@ -1309,6 +1383,9 @@ function renderRegressionReport() {
       });
     }
 
+    // Code eval failures
+    html += renderCodeEvalFailures(s);
+
     // Conversation transcript (if present)
     if (s.conversation && s.conversation.length > 0) {
       html += '<div class="section-header" style="margin-top:12px">Conversation</div>';
@@ -1316,6 +1393,9 @@ function renderRegressionReport() {
       s.conversation.forEach(function(turn) {
         var bubbleClass = turn.sender === 'user' ? 'user' : 'pulse';
         if (turn.message) html += '<div class="chat-bubble ' + bubbleClass + '">' + escHtml(turn.message) + '</div>';
+        if (turn.sender === 'pulse' && turn.trace_summary) {
+          html += renderTraceSummary(turn.trace_summary, turn.trace_debug);
+        }
       });
       html += '</div>';
     }
@@ -1472,6 +1552,30 @@ function renderSummary(passRate, scenarios) {
   html += '</div>';
 
   html += '</div>';
+
+  // Code eval summary bar
+  html += renderCodeEvalSummary(r);
+
+  return html;
+}
+
+function renderCodeEvalSummary(r) {
+  var ce = r.code_evals;
+  if (!ce || !ce.total) return '';
+  var pct = (100 * ce.passed / ce.total).toFixed(1);
+  var pctClass = parseFloat(pct) >= 90 ? 'ce-good' : '';
+  var html = '<div class="code-eval-summary-bar">';
+  html += '<span class="ce-label">Code Evals:</span> ';
+  html += '<span class="' + pctClass + '">' + ce.passed + '/' + ce.total + ' passed (' + pct + '%)</span>';
+  if (ce.by_name && Object.keys(ce.by_name).length > 0) {
+    html += '<div class="code-eval-breakdown">';
+    var names = Object.keys(ce.by_name).sort(function(a, b) { return ce.by_name[b] - ce.by_name[a]; });
+    names.forEach(function(name) {
+      html += '<span>' + escHtml(name) + ': ' + ce.by_name[name] + '</span>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
   return html;
 }
 
@@ -1480,6 +1584,82 @@ function statRow(label, value, colorClass, delta) {
     '<span class="stat-label">' + escHtml(label) + '</span>' +
     '<span class="stat-value ' + (colorClass || '') + '">' + escHtml(String(value)) + (delta || '') + '</span>' +
     '</div>';
+}
+
+function renderCacheMeta() {
+  var r = currentReport;
+  if (!r.cache_meta) return '';
+  var cm = r.cache_meta;
+  var parts = ['Cache: ' + (cm.cache_size || 0) + ' events'];
+  if (cm.source_counts) {
+    var srcCount = Object.keys(cm.source_counts).length;
+    parts.push('from ' + srcCount + ' sources');
+  }
+  if (cm.cache_age_minutes != null) {
+    var age = cm.cache_age_minutes < 60 ? cm.cache_age_minutes + 'min old' : Math.round(cm.cache_age_minutes / 60) + 'hr old';
+    parts.push('(' + age + ')');
+  }
+  return '<div class="cache-meta-bar">' + escHtml(parts.join(' ')) + '</div>';
+}
+
+function renderTraceSummary(traceSummary, traceDebug) {
+  if (!traceSummary) return '';
+  var sent = traceSummary.sent_to_claude || 0;
+  var matched = (traceSummary.pool_meta && traceSummary.pool_meta.matchCount) || 0;
+  var picked = (traceSummary.picks && traceSummary.picks.length) || 0;
+  var label = 'Pool: ' + sent + ' sent, ' + matched + ' matched, ' + picked + ' picked';
+
+  // Show active filters in summary line if available
+  if (traceDebug && traceDebug.active_filters) {
+    var af = traceDebug.active_filters;
+    var filterParts = [];
+    if (af.category) filterParts.push(af.category);
+    if (af.free_only) filterParts.push('free');
+    if (af.time_after) filterParts.push('after ' + af.time_after);
+    if (filterParts.length > 0) label += ' | Filters: ' + filterParts.join(', ');
+  }
+
+  var pool = traceSummary.sent_pool || [];
+  var lines = pool.map(function(e) {
+    var tag = e.filter_match ? '[MATCH] ' : '';
+    var venue = e.venue_name ? ' @ ' + e.venue_name : '';
+    return tag + (e.name || e.id) + venue;
+  });
+
+  var html = '<details class="trace-inline">';
+  html += '<summary>' + escHtml(label) + '</summary>';
+  if (lines.length > 0) {
+    html += '<div class="trace-pool">' + escHtml(lines.join('\n')) + '</div>';
+  }
+  html += '</details>';
+  return html;
+}
+
+function renderCodeEvalFailures(s) {
+  var failures = s.code_eval_failures || [];
+  var total = s.code_eval_total || 0;
+  if (total === 0) return '';
+  var passed = total - failures.length;
+  var html = '<div class="code-eval-section">';
+  html += '<div class="section-header" style="margin-top:12px">Code Evals';
+  var pct = Math.round(100 * passed / total);
+  var pctColor = failures.length === 0 ? '#4ade80' : '#fbbf24';
+  html += ' <span style="font-size:11px;color:' + pctColor + ';font-weight:400">' + passed + '/' + total + ' (' + pct + '%)</span>';
+  html += '</div>';
+  if (failures.length > 0) {
+    html += '<div class="code-eval-badges">';
+    failures.forEach(function(f) {
+      html += '<div style="margin-bottom:4px">';
+      html += '<span class="code-eval-badge">' + escHtml(f.name) + '</span>';
+      if (f.detail) html += '<div class="code-eval-detail">' + escHtml(f.detail) + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  } else {
+    html += '<div style="font-size:11px;color:#4ade80;margin-top:4px">All checks passed</div>';
+  }
+  html += '</div>';
+  return html;
 }
 
 function renderCategoryBreakdown(scenarios) {
@@ -1688,6 +1868,9 @@ function renderScenarioCard(s, sortIdx) {
         }
         var bubbleClass = msg.sender === 'user' ? 'user' : 'pulse';
         html += '<div class="chat-bubble ' + bubbleClass + '">' + escHtml(msg.message) + '</div>';
+        if (msg.sender === 'pulse' && msg.trace_summary) {
+          html += renderTraceSummary(msg.trace_summary, msg.trace_debug);
+        }
       });
       html += '</div>';
     }
@@ -1728,6 +1911,9 @@ function renderScenarioCard(s, sortIdx) {
 
       html += '</div>'; // .judgment-section
     }
+
+    // Code eval failures
+    html += renderCodeEvalFailures(s);
 
     // Assertions
     if (s.assertions && s.assertions.length > 0) {

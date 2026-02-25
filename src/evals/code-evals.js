@@ -8,6 +8,13 @@ const { NEIGHBORHOODS } = require('../neighborhoods');
 const VALID_INTENTS = ['events', 'details', 'more', 'free', 'help', 'conversational'];
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
 
+// Subcategory→category mapping shared by category_adherence and compound_filter_accuracy
+const CATEGORY_PARENTS = {
+  jazz: 'live_music', rock: 'live_music', indie: 'live_music', folk: 'live_music',
+  punk: 'live_music', hip_hop: 'live_music', electronic: 'nightlife',
+  standup: 'comedy', improv: 'comedy', sketch: 'comedy',
+};
+
 const evals = {
   /**
    * SMS must be <= 480 chars
@@ -165,6 +172,297 @@ const evals = {
       pass: errors.length === 0,
       detail: errors.length > 0 ? errors.join('; ') : 'day labels correct',
     };
+  },
+
+  /**
+   * Pick count: numbered items in SMS should match picks.length.
+   * Skip for non-event intents, single-pick (natural prose), and details.
+   */
+  pick_count_accuracy(trace) {
+    const picks = trace.composition.picks || [];
+    const sms = trace.output_sms || '';
+    const intent = trace.output_intent;
+    if (!['events', 'more'].includes(intent) || picks.length === 0) {
+      return { name: 'pick_count_accuracy', pass: true, detail: 'not applicable' };
+    }
+    // Single-pick responses use natural prose (singlePick skill), no numbered list
+    if (picks.length === 1) {
+      return { name: 'pick_count_accuracy', pass: true, detail: 'single pick (prose)' };
+    }
+    // Count numbered items (e.g. "1)", "2)", "3)")
+    const numbered = sms.match(/\d\)/g) || [];
+    const smsCount = numbered.length;
+    const match = smsCount === picks.length;
+    return {
+      name: 'pick_count_accuracy',
+      pass: match,
+      detail: match ? `${picks.length} picks, ${smsCount} numbered` : `${picks.length} picks but ${smsCount} numbered in SMS`,
+    };
+  },
+
+  /**
+   * Neighborhood accuracy: picked events should be in the claimed neighborhood.
+   * Pass if no picks, no neighborhood claim, or at least 1 pick is in the claimed hood.
+   */
+  neighborhood_accuracy(trace) {
+    const picks = trace.composition.picks || [];
+    const hood = trace.composition.neighborhood_used;
+    if (picks.length === 0 || !hood) {
+      return { name: 'neighborhood_accuracy', pass: true, detail: 'no picks or no neighborhood' };
+    }
+    const picksWithHood = picks.filter(p => p.neighborhood);
+    if (picksWithHood.length === 0) {
+      return { name: 'neighborhood_accuracy', pass: true, detail: 'no neighborhood data on picks' };
+    }
+    const inHood = picksWithHood.filter(p => p.neighborhood === hood);
+    const pass = inHood.length > 0;
+    return {
+      name: 'neighborhood_accuracy',
+      pass,
+      detail: pass
+        ? `${inHood.length}/${picksWithHood.length} picks in ${hood}`
+        : `0/${picksWithHood.length} picks in ${hood} (found: ${[...new Set(picksWithHood.map(p => p.neighborhood))].join(', ')})`,
+    };
+  },
+
+  /**
+   * Category adherence: when a category filter is active, picked events should match.
+   * Pass if no category filter, or >=50% of picks match the filtered category.
+   */
+  category_adherence(trace) {
+    const picks = trace.composition.picks || [];
+    const filters = trace.composition.active_filters;
+    if (!filters?.category || picks.length === 0) {
+      return { name: 'category_adherence', pass: true, detail: 'no category filter or no picks' };
+    }
+    const picksWithCat = picks.filter(p => p.category);
+    if (picksWithCat.length === 0) {
+      return { name: 'category_adherence', pass: true, detail: 'no category data on picks' };
+    }
+    const filterCat = filters.category;
+    const matching = picksWithCat.filter(p =>
+      p.category === filterCat || CATEGORY_PARENTS[p.category] === filterCat
+    );
+    const ratio = matching.length / picksWithCat.length;
+    const pass = ratio >= 0.75;
+    return {
+      name: 'category_adherence',
+      pass,
+      detail: `${matching.length}/${picksWithCat.length} picks match "${filters.category}" (${Math.round(ratio * 100)}%)`,
+    };
+  },
+
+  /**
+   * Free claim accuracy: when free_only filter is active, picked events should be free.
+   * Pass if no free filter, or >=50% of picks are free.
+   */
+  free_claim_accuracy(trace) {
+    const picks = trace.composition.picks || [];
+    const filters = trace.composition.active_filters;
+    if (!filters?.free_only || picks.length === 0) {
+      return { name: 'free_claim_accuracy', pass: true, detail: 'no free filter or no picks' };
+    }
+    const freePicks = picks.filter(p => p.is_free);
+    const ratio = freePicks.length / picks.length;
+    const pass = ratio >= 0.75;
+    return {
+      name: 'free_claim_accuracy',
+      pass,
+      detail: `${freePicks.length}/${picks.length} picks are free (${Math.round(ratio * 100)}%)`,
+    };
+  },
+
+  /**
+   * Compound filter accuracy: when both free_only AND category are active,
+   * picks must satisfy both simultaneously (not just each independently).
+   */
+  compound_filter_accuracy(trace) {
+    const picks = trace.composition.picks || [];
+    const filters = trace.composition.active_filters;
+    if (!filters?.free_only || !filters?.category || picks.length === 0) {
+      return { name: 'compound_filter_accuracy', pass: true, detail: 'no compound filter or no picks' };
+    }
+    const filterCat = filters.category;
+    const bothMatch = picks.filter(p =>
+      p.is_free === true && (p.category === filterCat || CATEGORY_PARENTS[p.category] === filterCat)
+    );
+    const ratio = bothMatch.length / picks.length;
+    const pass = ratio >= 0.75;
+    return {
+      name: 'compound_filter_accuracy',
+      pass,
+      detail: `${bothMatch.length}/${picks.length} picks match free+${filterCat} (${Math.round(ratio * 100)}%)`,
+    };
+  },
+
+  /**
+   * Filter match alignment: when filters are active and matched events exist,
+   * picked events should have been from the [MATCH]-tagged pool.
+   */
+  filter_match_alignment(trace) {
+    const picks = trace.composition.picks || [];
+    const poolMeta = trace.composition.pool_meta;
+    const sentPool = trace.events.sent_pool;
+    if (!poolMeta || !poolMeta.matchCount || !sentPool || picks.length === 0) {
+      return { name: 'filter_match_alignment', pass: true, detail: 'no pool_meta, no matches, no sent_pool, or no picks' };
+    }
+    const poolById = new Map(sentPool.map(e => [e.event_id, e]));
+    const fromMatched = picks.filter(p => {
+      const poolEvent = poolById.get(p.event_id);
+      return poolEvent && poolEvent.filter_match && poolEvent.filter_match !== false;
+    });
+    const ratio = fromMatched.length / picks.length;
+    const pass = ratio >= 0.5;
+    return {
+      name: 'filter_match_alignment',
+      pass,
+      detail: `${fromMatched.length}/${picks.length} picks from matched pool (${Math.round(ratio * 100)}%)`,
+    };
+  },
+
+  /**
+   * Time filter accuracy: when time_after filter is active, picked events
+   * should start after the filter time. Uses after-midnight wrapping (6am boundary).
+   */
+  time_filter_accuracy(trace) {
+    const picks = trace.composition.picks || [];
+    const filters = trace.composition.active_filters;
+    if (!filters?.time_after || picks.length === 0) {
+      return { name: 'time_filter_accuracy', pass: true, detail: 'no time filter or no picks' };
+    }
+    const picksWithTime = picks.filter(p => p.start_time_local);
+    if (picksWithTime.length === 0) {
+      return { name: 'time_filter_accuracy', pass: true, detail: 'no picks with parseable start times' };
+    }
+    // Parse filter time (e.g. "21:00" or "9pm") into minutes since midnight
+    const filterStr = filters.time_after;
+    let filterMinutes;
+    const hhmm = filterStr.match(/^(\d{1,2}):(\d{2})$/);
+    if (hhmm) {
+      filterMinutes = parseInt(hhmm[1]) * 60 + parseInt(hhmm[2]);
+    } else {
+      const ampm = filterStr.match(/^(\d{1,2})\s*(am|pm)$/i);
+      if (ampm) {
+        let h = parseInt(ampm[1]);
+        if (ampm[2].toLowerCase() === 'pm' && h < 12) h += 12;
+        if (ampm[2].toLowerCase() === 'am' && h === 12) h = 0;
+        filterMinutes = h * 60;
+      } else {
+        return { name: 'time_filter_accuracy', pass: true, detail: `unparseable filter time: ${filterStr}` };
+      }
+    }
+    // After-midnight wrapping: times before 6am are treated as next-day (add 24h)
+    const WRAP_HOUR = 6;
+    const wrapMinutes = (m) => m < WRAP_HOUR * 60 ? m + 1440 : m;
+    const filterWrapped = wrapMinutes(filterMinutes);
+
+    let passing = 0;
+    for (const pick of picksWithTime) {
+      try {
+        // Extract hour:minute from ISO local time (e.g. "2026-02-25T21:00:00")
+        const tMatch = pick.start_time_local.match(/T(\d{2}):(\d{2})/);
+        if (!tMatch) continue;
+        const pickMinutes = parseInt(tMatch[1]) * 60 + parseInt(tMatch[2]);
+        const pickWrapped = wrapMinutes(pickMinutes);
+        if (pickWrapped >= filterWrapped) passing++;
+      } catch {
+        // skip unparseable
+      }
+    }
+    const ratio = passing / picksWithTime.length;
+    const pass = ratio >= 0.75;
+    return {
+      name: 'time_filter_accuracy',
+      pass,
+      detail: `${passing}/${picksWithTime.length} picks after ${filterStr} (${Math.round(ratio * 100)}%)`,
+    };
+  },
+
+  /**
+   * Neighborhood expansion transparency: when picks are from a different
+   * neighborhood than claimed, the SMS should acknowledge the expansion.
+   */
+  neighborhood_expansion_transparency(trace) {
+    const picks = trace.composition.picks || [];
+    const hood = trace.composition.neighborhood_used;
+    const sms = (trace.output_sms || '').toLowerCase();
+    if (!hood || picks.length === 0) {
+      return { name: 'neighborhood_expansion_transparency', pass: true, detail: 'no neighborhood or no picks' };
+    }
+    const picksWithHood = picks.filter(p => p.neighborhood);
+    if (picksWithHood.length === 0) {
+      return { name: 'neighborhood_expansion_transparency', pass: true, detail: 'no neighborhood data on picks' };
+    }
+    const outOfHood = picksWithHood.filter(p => p.neighborhood !== hood);
+    const majorityOutside = outOfHood.length / picksWithHood.length > 0.5;
+    if (!majorityOutside) {
+      return { name: 'neighborhood_expansion_transparency', pass: true, detail: 'majority of picks in claimed hood' };
+    }
+    // Majority of picks are outside claimed hood — SMS should acknowledge
+    const hasAck = /nearby|next door|not much in|checking|close to|over in|around\b/.test(sms);
+    return {
+      name: 'neighborhood_expansion_transparency',
+      pass: hasAck,
+      detail: hasAck
+        ? `expansion acknowledged (${outOfHood.length}/${picksWithHood.length} outside ${hood})`
+        : `${outOfHood.length}/${picksWithHood.length} picks outside ${hood} but SMS doesn't acknowledge expansion`,
+    };
+  },
+
+  /**
+   * Price transparency: event picks in SMS should mention price or "free".
+   * Skip for non-event intents, details, and single-pick prose.
+   */
+  price_transparency(trace) {
+    const picks = trace.composition.picks || [];
+    const sms = trace.output_sms || '';
+    const intent = trace.output_intent;
+    if (!['events', 'more'].includes(intent) || picks.length === 0) {
+      return { name: 'price_transparency', pass: true, detail: 'not applicable' };
+    }
+    // Check for price-like patterns in the SMS: "$5", "$10-20", "Free", "free!", "no cover"
+    const pricePattern = /\$\d|free\b|no cover/i;
+    const hasPrice = pricePattern.test(sms);
+    return {
+      name: 'price_transparency',
+      pass: hasPrice,
+      detail: hasPrice ? 'price info found in SMS' : 'no price or "free" mention in SMS',
+    };
+  },
+
+  /**
+   * Schema compliance: LLM raw response must be valid JSON with required fields.
+   * Detects parse failures that produce the "hit a snag" fallback.
+   */
+  schema_compliance(trace) {
+    const raw = trace.composition.raw_response;
+    const sms = trace.output_sms || '';
+    // Skip if no raw response (mechanical pre-router shortcuts have no LLM call)
+    if (raw === null || raw === undefined) {
+      return { name: 'schema_compliance', pass: true, detail: 'no LLM call (pre-routed)' };
+    }
+    // Detect the fallback error message
+    if (sms === "Having a moment — try again in a sec!" || sms === "Pulse hit a snag — try again in a sec!") {
+      return { name: 'schema_compliance', pass: false, detail: 'fallback error response (JSON parse likely failed)' };
+    }
+    // Try to parse the raw response
+    try {
+      const fenceMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+      const jsonStr = fenceMatch ? fenceMatch[1].trim() : raw;
+      const start = jsonStr.indexOf('{');
+      if (start === -1) {
+        return { name: 'schema_compliance', pass: false, detail: 'no JSON object in raw response' };
+      }
+      const parsed = JSON.parse(jsonStr.slice(start));
+      const hasType = typeof parsed.type === 'string';
+      const hasSmsText = typeof parsed.sms_text === 'string';
+      if (!hasSmsText) {
+        return { name: 'schema_compliance', pass: false, detail: `missing sms_text field (has: ${Object.keys(parsed).join(', ')})` };
+      }
+      return { name: 'schema_compliance', pass: true, detail: 'valid JSON with required fields' };
+    } catch {
+      return { name: 'schema_compliance', pass: false, detail: 'raw response is not valid JSON' };
+    }
   },
 
   /**

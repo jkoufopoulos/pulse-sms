@@ -20,6 +20,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
+const { runCodeEvals } = require('../src/evals/code-evals');
 
 const args = process.argv.slice(2);
 const categoryFilter = args.find(a => a.startsWith('--category='))?.split('=')[1]
@@ -209,9 +210,11 @@ async function runScenario(scenario, phoneNumber) {
     }
 
     // Collect all response messages (main text + follow-up links)
+    const traceSummary = data.trace_summary || null;
+    const trace = data.trace || null;
     const messages = data.messages || [];
     for (const msg of messages) {
-      actualConversation.push({ sender: 'pulse', message: msg.body });
+      actualConversation.push({ sender: 'pulse', message: msg.body, trace_summary: traceSummary, trace });
     }
 
     if (messages.length === 0) {
@@ -255,12 +258,20 @@ async function main() {
 
   console.log(`Running ${scenarios.length} multi-turn scenarios against ${BASE} (concurrency: ${CONCURRENCY})\n`);
 
+  // Fetch cache metadata for reproducibility
+  let cacheMeta = null;
+  try {
+    const cacheRes = await fetch(`${BASE}/api/eval/cache-meta`);
+    cacheMeta = await cacheRes.json();
+  } catch {}
+
   const report = {
     timestamp: new Date().toISOString(),
     base_url: BASE,
     judge_model: JUDGE_MODEL,
     concurrency: CONCURRENCY,
     budget_limit: BUDGET_LIMIT,
+    cache_meta: cacheMeta,
     total: scenarios.length,
     passed: 0,
     failed: 0,
@@ -278,11 +289,37 @@ async function main() {
       const actualConversation = await runScenario(scenario, phoneNumber);
       const assertions = checkAssertions(scenario, actualConversation);
 
+      // Run code evals on every pulse turn that has a trace
+      const codeEvalFailures = [];
+      let codeEvalTotal = 0;
+      for (const turn of actualConversation) {
+        if (turn.sender === 'pulse' && turn.trace) {
+          const results = runCodeEvals(turn.trace);
+          codeEvalTotal += results.length;
+          for (const r of results) {
+            if (!r.pass) codeEvalFailures.push(r);
+          }
+        }
+      }
+
+      // Replace full trace with key fields for debuggability
+      for (const turn of actualConversation) {
+        if (turn.trace) {
+          turn.trace_debug = {
+            active_filters: turn.trace.composition?.active_filters || null,
+            output_intent: turn.trace.output_intent || null,
+            input_message: turn.trace.input_message || null,
+          };
+          delete turn.trace;
+        }
+      }
+
       if (assertions.passed === false) {
         return {
           index, name: scenario.name, category: scenario.category,
           difficulty: scenario.difficulty, pass: false, user_turns: userTurnCount,
           actual_conversation: actualConversation, assertions: assertions.results, judgment: null,
+          code_eval_failures: codeEvalFailures, code_eval_total: codeEvalTotal,
         };
       }
 
@@ -300,6 +337,7 @@ async function main() {
         user_turns: userTurnCount, actual_conversation: actualConversation,
         assertions: assertions.results.length > 0 ? assertions.results : undefined,
         judgment,
+        code_eval_failures: codeEvalFailures, code_eval_total: codeEvalTotal,
       };
     } catch (err) {
       return {
@@ -326,6 +364,11 @@ async function main() {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
       const prefix = `[${completed}/${scenarios.length} ${pct}% ${elapsed}s]`;
 
+      const codeFailNames = (result.code_eval_failures || []).map(f => f.name);
+      const codeTag = codeFailNames.length > 0
+        ? `  \x1b[33mCode: ${[...new Set(codeFailNames)].join(', ')}\x1b[0m`
+        : '';
+
       if (result.error) {
         console.log(`${prefix} \x1b[33mERROR\x1b[0m  ${result.name}: ${result.error}`);
       } else if (!result.pass && !result.judgment) {
@@ -335,15 +378,17 @@ async function main() {
           const truncActual = r.actual ? (r.actual.length > 60 ? r.actual.slice(0, 60) + '...' : r.actual) : '[missing]';
           console.log(`  Turn ${r.turn}: expected ${r.assert_type} ${JSON.stringify(truncExpected)} got ${JSON.stringify(truncActual)}`);
         }
+        if (codeTag) console.log(`      ${codeTag}`);
       } else if (result.pass) {
         const det = result.judgment?.overall_note?.includes('deterministic') ? ' (deterministic)' : '';
-        console.log(`${prefix} \x1b[32mPASS\x1b[0m  ${result.name}${det}`);
+        console.log(`${prefix} \x1b[32mPASS\x1b[0m  ${result.name}${det}${codeTag}`);
       } else {
         console.log(`${prefix} \x1b[31mFAIL\x1b[0m  ${result.name}: ${result.judgment?.overall_note || 'no detail'}`);
         const triggered = result.judgment?.failure_modes_triggered || [];
         if (triggered.length > 0) {
           console.log(`       Failure modes: ${triggered.join(', ')}`);
         }
+        if (codeTag) console.log(`      ${codeTag}`);
       }
     }
   }
@@ -404,6 +449,30 @@ async function main() {
   for (const [cat, counts] of Object.entries(byCategory)) {
     const total = counts.pass + counts.fail + counts.error;
     console.log(`  ${cat}: ${counts.pass}/${total} passed`);
+  }
+
+  // Code eval summary
+  const codeEvalStats = { total: 0, passed: 0, failed: 0, by_name: {} };
+  for (const s of report.scenarios) {
+    codeEvalStats.total += s.code_eval_total || 0;
+    const failCount = (s.code_eval_failures || []).length;
+    codeEvalStats.failed += failCount;
+    codeEvalStats.passed += (s.code_eval_total || 0) - failCount;
+    for (const f of (s.code_eval_failures || [])) {
+      if (!codeEvalStats.by_name[f.name]) codeEvalStats.by_name[f.name] = 0;
+      codeEvalStats.by_name[f.name]++;
+    }
+  }
+  report.code_evals = codeEvalStats;
+
+  if (codeEvalStats.total > 0) {
+    const cePct = ((codeEvalStats.passed / codeEvalStats.total) * 100).toFixed(1);
+    console.log(`\nCode evals: ${codeEvalStats.passed}/${codeEvalStats.total} passed (${cePct}%)`);
+    if (Object.keys(codeEvalStats.by_name).length > 0) {
+      for (const [name, count] of Object.entries(codeEvalStats.by_name).sort((a, b) => b[1] - a[1])) {
+        console.log(`  ${name}: ${count} failures`);
+      }
+    }
   }
 
   // Failure details
