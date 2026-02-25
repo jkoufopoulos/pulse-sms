@@ -406,7 +406,6 @@
   .scenario-card.pass { border-left-color: #4ade80; }
   .scenario-card.fail { border-left-color: #f87171; }
   .scenario-card.error { border-left-color: #c084fc; }
-  .scenario-card.focused { box-shadow: 0 0 0 2px #FF6B35; }
   .scenario-card.changed { position: relative; }
   .scenario-card.changed::after {
     content: 'CHANGED';
@@ -638,7 +637,20 @@
   }
 
   /* ── Failure modes ── */
-  .failure-modes { margin-top: 10px; margin-bottom: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .section-explainer {
+    font-size: 11px;
+    color: #666;
+    margin-top: 2px;
+    margin-bottom: 8px;
+    line-height: 1.4;
+  }
+  .failure-modes-label {
+    font-size: 11px;
+    color: #888;
+    margin-top: 8px;
+    margin-bottom: 4px;
+  }
+  .failure-modes { margin-bottom: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
   .failure-badge {
     background: #3a1a1a;
     color: #f87171;
@@ -669,6 +681,23 @@
     margin-top: 2px;
     padding-left: 2px;
   }
+  .ce-help-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #333;
+    color: #888;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: help;
+    vertical-align: middle;
+    margin-left: 4px;
+  }
+  .ce-help-icon:hover { background: #444; color: #ccc; }
+  .code-eval-badge[title] { cursor: help; }
   .code-eval-summary-bar {
     background: #141414;
     border: 1px solid #222;
@@ -804,30 +833,6 @@
   .back-to-top:hover { opacity: 0.85; }
 
   /* ── Keyboard hint ── */
-  .keyboard-hint {
-    position: fixed;
-    bottom: 24px;
-    left: 24px;
-    background: #1a1a1a;
-    border: 1px solid #333;
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 10px;
-    color: #555;
-    z-index: 200;
-    display: none;
-  }
-  .keyboard-hint kbd {
-    background: #222;
-    border: 1px solid #444;
-    padding: 1px 5px;
-    border-radius: 3px;
-    font-family: inherit;
-    color: #888;
-  }
-  @media (min-width: 1024px) {
-    .keyboard-hint { display: block; }
-  }
 
   /* ── Override badges ── */
   .override-pill {
@@ -1115,15 +1120,6 @@
 
 <button class="back-to-top" id="back-to-top" title="Back to top">&#8593;</button>
 
-<div class="keyboard-hint">
-  <kbd>j</kbd>/<kbd>k</kbd> navigate &middot;
-  <kbd>Enter</kbd> expand &middot;
-  <kbd>f</kbd> search &middot;
-  <kbd>x</kbd> expand all &middot;
-  <kbd>c</kbd> collapse all &middot;
-  <kbd>Esc</kbd> clear filters &middot;
-  Expanded: <kbd>p</kbd> pass &middot; <kbd>f</kbd> fail &middot; <kbd>s</kbd> save
-</div>
 
 <script>
 // ── State ──
@@ -1133,7 +1129,6 @@ var compareReport = null;
 var overrides = {};
 var filters = { category: 'all', difficulty: 'all', result: 'all', override: 'all' };
 var searchQuery = '';
-var focusedIndex = -1;
 var compareVisible = false;
 
 var REPORT_TYPES = [
@@ -1385,7 +1380,7 @@ function renderRegressionReport() {
   html += renderCodeEvalSummary(r);
 
   // Principle breakdown
-  html += '<div class="section-header">Principles</div>';
+  html += '<div class="section-header">Principles <span class="ce-help-icon" title="Architecture principles (P1-P7) that govern how Pulse splits work between code and AI. Each principle has specific assertions tested across regression scenarios.">?</span></div>';
   html += '<div class="principle-grid">';
   var principleIds = Object.keys(byPrinciple).sort();
   principleIds.forEach(function(pid) {
@@ -1584,7 +1579,7 @@ function renderSummary(passRate, scenarios) {
 
   // Big pass rate
   html += '<div class="summary-big">';
-  html += '<div class="label">Pass Rate</div>';
+  html += '<div class="label">Pass Rate <span class="ce-help-icon" title="Percentage of scenarios where the LLM judge rated Pulse\'s behavior as correct across all conversation turns.">?</span></div>';
   html += '<div class="value ' + passRateColor(passRate) + '">' + Math.round(passRate) + '%';
   if (cmpRate != null) html += deltaHtml(passRate, cmpRate, '%');
   html += '</div>';
@@ -1623,13 +1618,15 @@ function renderCodeEvalSummary(r) {
   var pct = (100 * ce.passed / ce.total).toFixed(1);
   var pctClass = parseFloat(pct) >= 90 ? 'ce-good' : '';
   var html = '<div class="code-eval-summary-bar">';
-  html += '<span class="ce-label">Code Evals:</span> ';
+  html += '<span class="ce-label">Code Evals</span>';
+  html += ' <span class="ce-help-icon" title="Deterministic checks (no AI) that verify data accuracy: correct filters applied, valid URLs, matching neighborhoods, proper event selection. Run on every response.">?</span> ';
   html += '<span class="' + pctClass + '">' + ce.passed + '/' + ce.total + ' passed (' + pct + '%)</span>';
   if (ce.by_name && Object.keys(ce.by_name).length > 0) {
     html += '<div class="code-eval-breakdown">';
     var names = Object.keys(ce.by_name).sort(function(a, b) { return ce.by_name[b] - ce.by_name[a]; });
     names.forEach(function(name) {
-      html += '<span>' + escHtml(name) + ': ' + ce.by_name[name] + '</span>';
+      var tip = CODE_EVAL_TIPS[name] || '';
+      html += '<span title="' + escHtml(tip) + '">' + escHtml(name) + ': ' + ce.by_name[name] + '</span>';
     });
     html += '</div>';
   }
@@ -1733,6 +1730,28 @@ function renderTraceSummary(traceSummary, traceDebug) {
   return html;
 }
 
+var CODE_EVAL_TIPS = {
+  char_limit: 'SMS must be <= 480 characters',
+  valid_intent: 'Intent must be one of: events, details, more, free, help, conversational',
+  valid_neighborhood: 'Resolved neighborhood must exist in the 36-hood map',
+  picked_events_exist: 'Every picked event ID must be in the sent pool',
+  valid_urls: 'All URLs in the SMS must be parseable (no truncation)',
+  off_topic_redirect: 'Off-topic messages should redirect user back to events',
+  response_not_empty: 'Response must not be blank',
+  day_label_accuracy: '"tonight" must not refer to tomorrow events, and vice versa',
+  pick_count_accuracy: 'Numbered items in SMS (1, 2, 3) should match pick count',
+  neighborhood_accuracy: 'Picked events should be in the claimed neighborhood',
+  category_adherence: 'When category filter is active, >=75% of picks should match',
+  free_claim_accuracy: 'When free filter is active, >=75% of picks should be free',
+  compound_filter_accuracy: 'When both free + category active, picks must satisfy both',
+  filter_match_alignment: 'Picks should come from [MATCH]-tagged events when filters are active',
+  time_filter_accuracy: 'When time filter is active, picks should start after the filter time',
+  neighborhood_expansion_transparency: 'If picks are outside claimed hood, SMS should acknowledge it',
+  price_transparency: 'Event pick SMS should mention price or "free"',
+  schema_compliance: 'LLM raw response must be valid JSON with sms_text field',
+  latency_under_10s: 'Total response latency should be under 10 seconds',
+};
+
 function renderCodeEvalFailures(s) {
   var failures = s.code_eval_failures || [];
   var total = s.code_eval_total || 0;
@@ -1740,6 +1759,7 @@ function renderCodeEvalFailures(s) {
   var passed = total - failures.length;
   var html = '<div class="code-eval-section">';
   html += '<div class="section-header" style="margin-top:12px">Code Evals';
+  html += ' <span class="ce-help-icon" title="Deterministic checks that run on every trace — no AI cost. Verify data accuracy: correct filters, valid URLs, matching neighborhoods, proper event selection.">?</span>';
   var pct = Math.round(100 * passed / total);
   var pctColor = failures.length === 0 ? '#4ade80' : '#fbbf24';
   html += ' <span style="font-size:11px;color:' + pctColor + ';font-weight:400">' + passed + '/' + total + ' (' + pct + '%)</span>';
@@ -1747,8 +1767,9 @@ function renderCodeEvalFailures(s) {
   if (failures.length > 0) {
     html += '<div class="code-eval-badges">';
     failures.forEach(function(f) {
+      var tip = CODE_EVAL_TIPS[f.name] || '';
       html += '<div style="margin-bottom:4px">';
-      html += '<span class="code-eval-badge">' + escHtml(f.name) + '</span>';
+      html += '<span class="code-eval-badge" title="' + escHtml(tip) + '">' + escHtml(f.name) + '</span>';
       if (f.detail) html += '<div class="code-eval-detail">' + escHtml(f.detail) + '</div>';
       html += '</div>';
     });
@@ -1978,9 +1999,11 @@ function renderScenarioCard(s, sortIdx) {
       html += '<div class="judgment-section">';
       html += '<h4>Judge Verdict <span class="status-pill ' + (s.judgment.overall_pass ? 'pass' : 'fail') + '" style="margin-left:8px">' +
         (s.judgment.overall_pass ? 'PASS' : 'FAIL') + '</span></h4>';
+      html += '<div class="section-explainer">An LLM judge (Sonnet) reads the conversation and grades whether Pulse behaved correctly — tone, relevance, filter respect, and conversation flow.</div>';
 
       // Failure modes right after verdict header
       if (s.judgment.failure_modes_triggered && s.judgment.failure_modes_triggered.length > 0) {
+        html += '<div class="failure-modes-label">Failure reasons:</div>';
         html += '<div class="failure-modes">';
         s.judgment.failure_modes_triggered.forEach(function(fm) {
           html += '<span class="failure-badge">' + escHtml(fm) + '</span>';
@@ -1995,6 +2018,7 @@ function renderScenarioCard(s, sortIdx) {
       // Per-turn grades
       if (s.judgment.turns && s.judgment.turns.length > 0) {
         html += '<h4>Per-Turn Grades</h4>';
+        html += '<div class="section-explainer">How the judge scored each individual turn in the conversation.</div>';
         html += '<div class="turn-grades">';
         s.judgment.turns.forEach(function(t) {
           var tResult = t.pass ? 'pass' : 'fail';
@@ -2017,6 +2041,7 @@ function renderScenarioCard(s, sortIdx) {
     if (s.assertions && s.assertions.length > 0) {
       html += '<div class="assertions">';
       html += '<div class="section-header">Assertions</div>';
+      html += '<div class="section-explainer">Deterministic checks on the response — exact text matches, expected intents, required fields. These don\'t use AI.</div>';
       s.assertions.forEach(function(a) {
         var icon = a.passed ? 'PASS' : 'FAIL';
         var cls = a.passed ? 'pass' : 'fail';
@@ -2121,8 +2146,6 @@ function clearAllFilters() {
   filters.result = 'all';
   filters.override = 'all';
   searchQuery = '';
-  focusedIndex = -1;
-  document.querySelectorAll('.scenario-card').forEach(function(c) { c.classList.remove('focused'); });
   render();
 }
 
@@ -2358,87 +2381,6 @@ function setupEventListeners() {
     }
   });
 
-  // Keyboard shortcuts
-  document.addEventListener('keydown', function(e) {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
-      if (e.key === 'Escape') {
-        e.target.blur();
-      }
-      return;
-    }
-
-    var visibleCards = [];
-    document.querySelectorAll('.scenario-card').forEach(function(c) {
-      if (c.style.display !== 'none') visibleCards.push(c);
-    });
-
-    // Override shortcuts when card is expanded
-    var expandedName = getExpandedScenarioName();
-    if (expandedName) {
-      if (e.key === 'p') {
-        e.preventDefault();
-        var panel = document.querySelector('[data-override-panel="' + CSS.escape(expandedName) + '"]');
-        if (panel) {
-          panel.querySelectorAll('.ovr-btn').forEach(function(b) { b.classList.remove('active'); });
-          panel.querySelector('[data-ovr-verdict="pass"]').classList.add('active');
-        }
-        return;
-      }
-      if (e.key === 'f') {
-        e.preventDefault();
-        var panel = document.querySelector('[data-override-panel="' + CSS.escape(expandedName) + '"]');
-        if (panel) {
-          panel.querySelectorAll('.ovr-btn').forEach(function(b) { b.classList.remove('active'); });
-          panel.querySelector('[data-ovr-verdict="fail"]').classList.add('active');
-        }
-        return;
-      }
-      if (e.key === 's') {
-        e.preventDefault();
-        saveOverride(expandedName);
-        return;
-      }
-    }
-
-    switch (e.key) {
-      case 'j':
-        e.preventDefault();
-        focusedIndex = Math.min(focusedIndex + 1, visibleCards.length - 1);
-        focusCard(visibleCards);
-        break;
-      case 'k':
-        e.preventDefault();
-        focusedIndex = Math.max(focusedIndex - 1, 0);
-        focusCard(visibleCards);
-        break;
-      case 'Enter':
-        e.preventDefault();
-        if (focusedIndex >= 0 && focusedIndex < visibleCards.length) {
-          visibleCards[focusedIndex].classList.toggle('expanded');
-        }
-        break;
-      case 'f':
-        e.preventDefault();
-        var searchInput = document.getElementById('search-input');
-        if (searchInput) searchInput.focus();
-        break;
-      case 'x':
-        e.preventDefault();
-        document.querySelectorAll('.scenario-card').forEach(function(c) {
-          if (c.style.display !== 'none') c.classList.add('expanded');
-        });
-        break;
-      case 'c':
-        e.preventDefault();
-        document.querySelectorAll('.scenario-card').forEach(function(c) {
-          c.classList.remove('expanded');
-        });
-        break;
-      case 'Escape':
-        clearAllFilters();
-        break;
-    }
-  });
 
   // Back to top
   var topBtn = document.getElementById('back-to-top');
@@ -2531,14 +2473,6 @@ function getExpandedScenarioName() {
   var expanded = document.querySelector('.scenario-card.expanded');
   if (!expanded) return null;
   return expanded.dataset.nameExact || null;
-}
-
-function focusCard(visibleCards) {
-  document.querySelectorAll('.scenario-card').forEach(function(c) { c.classList.remove('focused'); });
-  if (focusedIndex >= 0 && focusedIndex < visibleCards.length) {
-    visibleCards[focusedIndex].classList.add('focused');
-    visibleCards[focusedIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
 }
 
 // ── Boot ──
