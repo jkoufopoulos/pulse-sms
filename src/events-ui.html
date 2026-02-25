@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pulse Events</title>
+<title>Bestie Events</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -12,19 +12,19 @@
   }
 
   /* ── Shared nav ── */
-  .pulse-nav {
+  .bestie-nav {
     position: sticky; top: 0; z-index: 100;
     display: flex; align-items: center; height: 36px;
     background: #111; border-bottom: 1px solid #222;
     padding: 0 16px; font-size: 13px;
   }
-  .pulse-nav-link {
+  .bestie-nav-link {
     color: #888; text-decoration: none; padding: 0 12px;
     line-height: 36px; transition: color 0.15s;
   }
-  .pulse-nav-link:hover { color: #ccc; }
-  .pulse-nav-link.active { color: #FF6B35; font-weight: 600; }
-  .pulse-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
+  .bestie-nav-link:hover { color: #ccc; }
+  .bestie-nav-link.active { color: #FF6B35; font-weight: 600; }
+  .bestie-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
 
   /* Header */
   .header {
@@ -167,6 +167,53 @@
   .free-badge { color: #68d391; font-weight: 600; }
   .no-data { color: #555; }
 
+  /* Analytics panel */
+  .analytics-toggle {
+    display: flex; align-items: center; gap: 8px; padding: 8px 20px;
+    background: #111; border-bottom: 1px solid #282828; cursor: pointer;
+    user-select: none; font-size: 13px; color: #aaa;
+  }
+  .analytics-toggle:hover { color: #ccc; }
+  .analytics-toggle .tri { display: inline-block; transition: transform 0.2s; font-size: 10px; }
+  .analytics-toggle .tri.open { transform: rotate(90deg); }
+  .analytics-toggle .filtered-badge {
+    font-size: 10px; background: #FF6B35; color: #fff; padding: 1px 6px;
+    border-radius: 8px; font-weight: 600; display: none;
+  }
+  .analytics-panel { display: none; padding: 16px 20px; background: #0f0f0f; border-bottom: 1px solid #282828; }
+  .analytics-panel.open { display: block; }
+  .analytics-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .analytics-card { background: #1a1a1a; border: 1px solid #282828; border-radius: 8px; padding: 12px; }
+  .analytics-card h4 { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+  .analytics-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .analytics-bar-label { font-size: 11px; color: #bbb; width: 90px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
+  .analytics-bar-track { flex: 1; height: 16px; background: #222; border-radius: 3px; overflow: hidden; }
+  .analytics-bar-fill { height: 100%; border-radius: 3px; min-width: 2px; transition: width 0.3s; }
+  .analytics-bar-value { font-size: 11px; color: #888; width: 70px; flex-shrink: 0; white-space: nowrap; }
+  .analytics-more-row { font-size: 11px; color: #666; text-align: center; margin-top: 4px; cursor: pointer; }
+  .analytics-more-row:hover { color: #aaa; }
+
+  /* Category bar fills — match .cat-* badge colors */
+  .bar-fill-comedy { background: linear-gradient(90deg, #3d3420, #f6e05e); }
+  .bar-fill-live_music { background: linear-gradient(90deg, #3d1f2d, #f687b3); }
+  .bar-fill-nightlife { background: linear-gradient(90deg, #2d1f4e, #b794f6); }
+  .bar-fill-art { background: linear-gradient(90deg, #1f2d4e, #90cdf4); }
+  .bar-fill-theater { background: linear-gradient(90deg, #3d2d1f, #f6ad55); }
+  .bar-fill-food_drink { background: linear-gradient(90deg, #1f3d2d, #68d391); }
+  .bar-fill-community { background: linear-gradient(90deg, #1f3d3d, #76e4f7); }
+  .bar-fill-other { background: linear-gradient(90deg, #2a2a2a, #aaa); }
+  .bar-fill-source { background: linear-gradient(90deg, #3d2200, #FF6B35); }
+  .bar-fill-hood { background: linear-gradient(90deg, #1a2a4e, #3b82f6); }
+
+  /* Gaps callout */
+  .analytics-gaps {
+    margin-top: 12px; padding: 10px 14px; border-radius: 6px;
+    background: #2a2200; border: 1px solid #554400; font-size: 12px; color: #f6e05e;
+  }
+  .analytics-gaps strong { color: #fbbf24; }
+  .analytics-gaps ul { margin: 4px 0 0 18px; list-style: disc; }
+  .analytics-gaps li { margin-bottom: 2px; }
+
   /* Showing count */
   .showing-count { font-size: 12px; color: #666; padding: 8px 20px 0; }
 
@@ -181,6 +228,10 @@
     .search-input { width: 100%; }
     .filter-group { width: 100%; }
     .filter-group select { flex: 1; }
+
+    .analytics-toggle { padding: 8px 12px; }
+    .analytics-panel { padding: 12px; }
+    .analytics-grid { grid-template-columns: 1fr; }
 
     .table-wrap { padding: 0 8px 80px; }
     td, th { padding: 6px 6px; font-size: 12px; }
@@ -198,21 +249,21 @@
 </head>
 <body>
 
-<nav class="pulse-nav">
-  <a href="/health" class="pulse-nav-link">Health</a>
-  <a href="/events" class="pulse-nav-link active">Events</a>
-  <span class="pulse-nav-sep"></span>
-  <a href="/eval" class="pulse-nav-link">Traces</a>
-  <a href="/eval-report" class="pulse-nav-link">Reports</a>
-  <a href="/evals" class="pulse-nav-link">Eval Guide</a>
-  <span class="pulse-nav-sep"></span>
-  <a href="/test" class="pulse-nav-link">Simulator</a>
+<nav class="bestie-nav">
+  <a href="/health" class="bestie-nav-link">Health</a>
+  <a href="/events" class="bestie-nav-link active">Events</a>
+  <span class="bestie-nav-sep"></span>
+  <a href="/eval" class="bestie-nav-link">Traces</a>
+  <a href="/eval-report" class="bestie-nav-link">Reports</a>
+  <a href="/evals" class="bestie-nav-link">Eval Guide</a>
+  <span class="bestie-nav-sep"></span>
+  <a href="/test" class="bestie-nav-link">Simulator</a>
 </nav>
 
 <!-- Header -->
 <div class="header">
   <div>
-    <h1><span>Pulse</span> Events</h1>
+    <h1><span>Bestie</span> Events</h1>
     <p style="font-size:12px;color:#777;margin-top:2px">All events in the daily cache. Click a row for details.</p>
   </div>
   <div class="stat">
@@ -282,6 +333,21 @@
       <option value="">All</option>
     </select>
   </div>
+</div>
+
+<!-- Analytics panel -->
+<div class="analytics-toggle" onclick="toggleAnalytics()">
+  <span class="tri" id="analytics-tri">&#9654;</span>
+  <span>Analytics</span>
+  <span class="filtered-badge" id="analytics-filtered-badge">filtered</span>
+</div>
+<div class="analytics-panel" id="analytics-panel">
+  <div class="analytics-grid">
+    <div class="analytics-card"><h4>Category Distribution</h4><div id="analytics-categories"></div></div>
+    <div class="analytics-card"><h4>Source Coverage</h4><div id="analytics-sources"></div></div>
+    <div class="analytics-card"><h4>Neighborhood Coverage</h4><div id="analytics-hoods"></div></div>
+  </div>
+  <div class="analytics-gaps" id="analytics-gaps" style="display:none"></div>
 </div>
 
 <!-- Showing count -->
@@ -463,6 +529,8 @@ function applyFilters() {
   } else {
     countEl.textContent = '';
   }
+
+  updateAnalytics();
 }
 
 // ========== Sort ==========
@@ -679,6 +747,128 @@ document.addEventListener('keydown', e => {
     document.getElementById('f-search').focus();
   }
 });
+
+// ========== Analytics ==========
+
+const CANONICAL_CATEGORIES = ['comedy', 'live_music', 'nightlife', 'art', 'theater', 'food_drink', 'community'];
+let analyticsOpen = false;
+let hoodShowAll = false;
+
+function toggleAnalytics() {
+  analyticsOpen = !analyticsOpen;
+  document.getElementById('analytics-panel').classList.toggle('open', analyticsOpen);
+  document.getElementById('analytics-tri').classList.toggle('open', analyticsOpen);
+  if (analyticsOpen) updateAnalytics();
+}
+
+function computeDistribution(events, field) {
+  const counts = {};
+  for (const e of events) {
+    const val = e[field] || 'unknown';
+    counts[val] = (counts[val] || 0) + 1;
+  }
+  return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+}
+
+function renderBars(container, dist, total, fillClass, maxItems) {
+  const maxVal = dist.length ? dist[0][1] : 1;
+  const items = maxItems ? dist.slice(0, maxItems) : dist;
+  const isFiltered = filteredEvents.length < allEvents.length;
+
+  let html = '';
+  for (const [label, count] of items) {
+    const pct = ((count / maxVal) * 100).toFixed(1);
+    const sharePct = ((count / total) * 100).toFixed(1);
+    const valueText = isFiltered ? `${count} / ${total} (${sharePct}%)` : `${count} (${sharePct}%)`;
+    const displayLabel = label.replace(/_/g, ' ');
+    const barClass = typeof fillClass === 'function' ? fillClass(label) : fillClass;
+    html += `<div class="analytics-bar-row">
+      <span class="analytics-bar-label" title="${esc(displayLabel)}">${esc(displayLabel)}</span>
+      <div class="analytics-bar-track"><div class="analytics-bar-fill ${barClass}" style="width:${pct}%"></div></div>
+      <span class="analytics-bar-value">${valueText}</span>
+    </div>`;
+  }
+
+  if (maxItems && dist.length > maxItems) {
+    const rest = dist.length - maxItems;
+    html += `<div class="analytics-more-row" onclick="toggleHoodShowAll()">${hoodShowAll ? 'show less' : `+${rest} more`}</div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+function toggleHoodShowAll() {
+  hoodShowAll = !hoodShowAll;
+  updateAnalytics();
+}
+
+function renderGapsCallout(catDist, hoodDist, total) {
+  const el = document.getElementById('analytics-gaps');
+  const gaps = [];
+
+  // Categories with < 5% share or < 5 events
+  const catMap = Object.fromEntries(catDist);
+  for (const cat of CANONICAL_CATEGORIES) {
+    const count = catMap[cat] || 0;
+    const pct = total > 0 ? (count / total) * 100 : 0;
+    if (count === 0) {
+      gaps.push(`<strong>${cat.replace(/_/g, ' ')}</strong>: 0 events (missing)`);
+    } else if (count < 5) {
+      gaps.push(`<strong>${cat.replace(/_/g, ' ')}</strong>: only ${count} event${count > 1 ? 's' : ''}`);
+    } else if (pct < 5) {
+      gaps.push(`<strong>${cat.replace(/_/g, ' ')}</strong>: ${count} events (${pct.toFixed(1)}% — under 5%)`);
+    }
+  }
+
+  // Neighborhoods with only 1 event
+  const thinHoods = hoodDist.filter(([, c]) => c === 1).map(([h]) => h);
+  if (thinHoods.length > 0) {
+    const list = thinHoods.slice(0, 5).join(', ');
+    const extra = thinHoods.length > 5 ? ` +${thinHoods.length - 5} more` : '';
+    gaps.push(`<strong>Thin neighborhoods</strong> (1 event): ${list}${extra}`);
+  }
+
+  if (gaps.length === 0) {
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = 'block';
+  el.innerHTML = `<strong>Coverage gaps</strong><ul>${gaps.map(g => `<li>${g}</li>`).join('')}</ul>`;
+}
+
+function updateAnalytics() {
+  if (!analyticsOpen) return;
+
+  const isFiltered = filteredEvents.length < allEvents.length;
+  const events = isFiltered ? filteredEvents : allEvents;
+  const total = events.length;
+
+  // Filtered badge
+  const badge = document.getElementById('analytics-filtered-badge');
+  badge.style.display = isFiltered ? 'inline' : 'none';
+
+  // Category distribution
+  const catDist = computeDistribution(events, 'category');
+  renderBars(
+    document.getElementById('analytics-categories'),
+    catDist, total,
+    label => 'bar-fill-' + label.replace(/[^a-z_]/g, '')
+  );
+
+  // Source distribution
+  const srcDist = computeDistribution(events, 'source_name');
+  renderBars(document.getElementById('analytics-sources'), srcDist, total, 'bar-fill-source');
+
+  // Neighborhood distribution
+  const hoodDist = computeDistribution(events, 'neighborhood');
+  const hoodLimit = hoodShowAll ? null : 15;
+  renderBars(document.getElementById('analytics-hoods'), hoodDist, total, 'bar-fill-hood', hoodLimit);
+
+  // Gaps callout — always computed against allEvents for meaningful coverage analysis
+  const allCatDist = isFiltered ? computeDistribution(allEvents, 'category') : catDist;
+  const allHoodDist = isFiltered ? computeDistribution(allEvents, 'neighborhood') : hoodDist;
+  renderGapsCallout(allCatDist, allHoodDist, allEvents.length);
+}
 
 // ========== Init ==========
 loadEvents();
