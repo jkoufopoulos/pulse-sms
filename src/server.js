@@ -135,6 +135,19 @@ app.put('/api/eval-reports/:filename', (req, res) => {
   res.json({ ok: true, filename });
 });
 
+app.delete('/api/eval-reports/:filename', (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+  const filename = req.params.filename;
+  if (!filename.startsWith('scenario-eval-') || !filename.endsWith('.json')) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+  const filePath = path.join(__dirname, '..', 'data', 'reports', filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
+  fs.unlinkSync(filePath);
+  res.json({ ok: true, deleted: filename });
+});
+
 // Eval overrides API — human judge overrides for scenario verdicts
 app.get('/api/eval-overrides', (req, res) => {
   const fs = require('fs');
