@@ -367,6 +367,19 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
 
   trace.events.sent_to_claude = events.length;
   trace.events.sent_ids = events.map(e => e.id);
+  trace.events.sent_pool = events.map(e => ({
+    id: e.id,
+    name: e.name,
+    venue_name: e.venue_name,
+    neighborhood: e.neighborhood,
+    category: e.category,
+    start_time_local: e.start_time_local,
+    is_free: e.is_free,
+    price_display: e.price_display,
+    source_name: e.source_name,
+    filter_match: e.filter_match,
+  }));
+  trace.events.pool_meta = { matchCount, hardCount, softCount, isSparse };
 
   // Derive suggested neighborhood deterministically (P5: code owns state)
   const suggestedHood = isSparse && nearbyHoods.length > 0 ? nearbyHoods[0] : null;
@@ -413,9 +426,31 @@ async function callUnified(message, unifiedCtx, session, history, phone, trace) 
   trace.composition.raw_response = result._raw || null;
   trace.composition.picks = (result.picks || []).map(p => {
     const evt = events.find(e => e.id === p.event_id);
-    return { ...p, date_local: evt?.date_local || null };
+    return {
+      ...p,
+      date_local: evt?.date_local || null,
+      event_name: evt?.name || null,
+      venue_name: evt?.venue_name || null,
+      neighborhood: evt?.neighborhood || null,
+      category: evt?.category || null,
+      is_free: evt?.is_free || false,
+      start_time_local: evt?.start_time_local || null,
+    };
   });
+  trace.composition.active_filters = activeFilters || null;
   trace.composition.neighborhood_used = hood;
+  // Derive which prompt skills were activated (mirrors buildUnifiedPrompt logic)
+  const activeSkills = ['core', 'sourceTiers'];
+  if (events.some(e => (e.date_local || e.day) === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) || e.day === 'TODAY')) activeSkills.push('tonightPriority');
+  if (hood && !events.some(e => e.neighborhood === hood)) activeSkills.push('neighborhoodMismatch');
+  if (events.some(e => e.source_name === 'perennial')) activeSkills.push('perennialFraming');
+  if (events.some(e => e.source_name === 'tavily')) activeSkills.push('venueFraming');
+  if (activeFilters?.free_only) activeSkills.push('freeEmphasis');
+  if (history.length > 0) activeSkills.push('conversationAwareness');
+  if (suggestedHood) activeSkills.push('nearbySuggestion');
+  if (matchCount === 1 || (events.length <= 1)) activeSkills.push('singlePick');
+  if (cityScanResults?.length > 0) activeSkills.push('cityScan');
+  trace.composition.active_skills = activeSkills;
   trackAICost(phone, result._usage, result._provider);
 
   return result;
@@ -581,6 +616,18 @@ async function handleMessageAI(phone, message) {
       const enrichedSkills = { ...(skills || {}), hasConversationHistory: history.length > 0 };
       trace.events.sent_to_claude = composeEvents.length;
       trace.events.sent_ids = composeEvents.map(e => e.id);
+      trace.events.sent_pool = composeEvents.map(e => ({
+        id: e.id,
+        name: e.name,
+        venue_name: e.venue_name,
+        neighborhood: e.neighborhood,
+        category: e.category,
+        start_time_local: e.start_time_local,
+        is_free: e.is_free,
+        price_display: e.price_display,
+        source_name: e.source_name,
+        filter_match: e.filter_match,
+      }));
       const composeStart = Date.now();
       const result = await composeResponse(message, composeEvents, hood, filters, { excludeIds, skills: enrichedSkills, conversationHistory: history });
       trace.composition.latency_ms = Date.now() - composeStart;
@@ -588,7 +635,16 @@ async function handleMessageAI(phone, message) {
       trace.composition.raw_response = result._raw || null;
       trace.composition.picks = (result.picks || []).map(p => {
         const evt = composeEvents.find(e => e.id === p.event_id);
-        return { ...p, date_local: evt?.date_local || null };
+        return {
+          ...p,
+          date_local: evt?.date_local || null,
+          event_name: evt?.name || null,
+          venue_name: evt?.venue_name || null,
+          neighborhood: evt?.neighborhood || null,
+          category: evt?.category || null,
+          is_free: evt?.is_free || false,
+          start_time_local: evt?.start_time_local || null,
+        };
       });
       trace.composition.not_picked_reason = result.not_picked_reason || null;
       trace.composition.neighborhood_used = result.neighborhood_used || hood;

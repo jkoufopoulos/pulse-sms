@@ -273,7 +273,7 @@
   .trace-meta-label { font-size: 10px; color: #666; text-transform: uppercase; }
   .trace-meta-value { color: #e0e0e0; }
 
-  /* Event mini cards */
+  /* Event mini cards (legacy fallback) */
   .pick-card {
     display: inline-flex; gap: 8px; align-items: center;
     background: #1f1f1f; border: 1px solid #333; border-radius: 8px;
@@ -282,6 +282,36 @@
   .pick-rank { color: #3b82f6; font-weight: 700; }
   .pick-name { color: #e0e0e0; }
   .pick-why { color: #888; font-style: italic; }
+
+  /* Pool tables */
+  .pool-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  .pool-table th { text-align: left; padding: 6px 8px; color: #888; font-size: 10px; text-transform: uppercase; border-bottom: 1px solid #333; }
+  .pool-table td { padding: 6px 8px; border-bottom: 1px solid #222; }
+  .pool-table tr:hover { background: #1a1a1a; }
+
+  /* Match tag badges */
+  .match-badge {
+    display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;
+  }
+  .match-hard { background: #1a3a1a; color: #68d391; }
+  .match-soft { background: #3d2d1f; color: #f6ad55; }
+
+  /* Filter chips */
+  .filter-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .filter-chip {
+    display: inline-flex; align-items: center; padding: 3px 10px;
+    border-radius: 12px; font-size: 11px; font-weight: 500;
+    background: #1f2d4e; color: #90cdf4; border: 1px solid #2d4a7a;
+  }
+
+  /* Pool meta badges */
+  .pool-meta { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+  .pool-meta-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 4px; font-size: 11px;
+    background: #1a1a1a; border: 1px solid #333; color: #aaa;
+  }
+  .pool-meta-badge.sparse { background: #3d2020; border-color: #5a2d2d; color: #fc8181; }
 
   /* Collapsible raw */
   .raw-toggle {
@@ -627,10 +657,22 @@
     <div class="sim-funnel" id="td-funnel"></div>
   </div>
 
+  <!-- Active filters -->
+  <div class="trace-section" id="td-filters-section" style="display:none;">
+    <h4>Active Filters</h4>
+    <div class="filter-chips" id="td-filter-chips"></div>
+  </div>
+
   <!-- Picked events -->
   <div class="trace-section" id="td-picks-section">
-    <h4>Picked Events</h4>
+    <h4>Picked by Claude</h4>
     <div id="td-picks"></div>
+  </div>
+
+  <!-- Not picked events -->
+  <div class="trace-section" id="td-not-picked-section" style="display:none;">
+    <h4>Sent but Not Picked</h4>
+    <div id="td-not-picked"></div>
   </div>
 
   <!-- Pulse SMS bubble -->
@@ -1332,7 +1374,8 @@ function showTraceDetail(t) {
 
   // Event funnel
   const ev = t.events || {};
-  document.getElementById('td-funnel').innerHTML = `
+  const poolMeta = ev.pool_meta || {};
+  let funnelHtml = `
     <span class="funnel-step"><span class="funnel-num">${ev.cache_size || 0}</span> in cache</span>
     <span class="funnel-arrow">&rarr;</span>
     <span class="funnel-step"><span class="funnel-num">${ev.candidates_count || 0}</span> candidates</span>
@@ -1341,22 +1384,103 @@ function showTraceDetail(t) {
     <span class="funnel-arrow">&rarr;</span>
     <span class="funnel-step"><span class="funnel-num">${(t.composition?.picks || []).length}</span> picked</span>
   `;
+  if (poolMeta.matchCount != null) {
+    funnelHtml += `<div class="pool-meta">
+      <span class="pool-meta-badge">${poolMeta.hardCount || 0} hard match</span>
+      <span class="pool-meta-badge">${poolMeta.softCount || 0} soft match</span>
+      <span class="pool-meta-badge">${poolMeta.matchCount || 0} total match</span>
+      ${poolMeta.isSparse ? '<span class="pool-meta-badge sparse">SPARSE</span>' : ''}
+    </div>`;
+  }
+  document.getElementById('td-funnel').innerHTML = funnelHtml;
 
-  // Picks
+  // Active filters
+  const activeFilters = t.composition?.active_filters || {};
+  const filtersSection = document.getElementById('td-filters-section');
+  const filterChips = [];
+  if (activeFilters.category) filterChips.push(activeFilters.category);
+  if (activeFilters.free_only) filterChips.push('free');
+  if (activeFilters.time_after) filterChips.push('late (' + activeFilters.time_after + '+)');
+  if (activeFilters.vibe) filterChips.push(activeFilters.vibe);
+  if (filterChips.length > 0) {
+    filtersSection.style.display = 'block';
+    document.getElementById('td-filter-chips').innerHTML = filterChips.map(f =>
+      `<span class="filter-chip">${esc(f)}</span>`
+    ).join('');
+  } else {
+    filtersSection.style.display = 'none';
+  }
+
+  // Picks + Pool tables
   const picks = t.composition?.picks || [];
+  const sentPool = ev.sent_pool || [];
   const picksEl = document.getElementById('td-picks');
   const picksSection = document.getElementById('td-picks-section');
+  const notPickedEl = document.getElementById('td-not-picked');
+  const notPickedSection = document.getElementById('td-not-picked-section');
+
   if (picks.length > 0) {
     picksSection.style.display = 'block';
-    picksEl.innerHTML = picks.map(p => `
-      <div class="pick-card">
-        <span class="pick-rank">#${p.rank || '?'}</span>
-        <span class="pick-name">${esc(p.event_id)}</span>
-        ${p.why ? `<span class="pick-why">${esc(p.why)}</span>` : ''}
-      </div>
-    `).join('');
+    if (sentPool.length > 0) {
+      // Rich table view: join picks with sent_pool data
+      picksEl.innerHTML = `<table class="pool-table">
+        <thead><tr><th>#</th><th>Name</th><th>Venue</th><th>Time</th><th>Category</th><th>Why</th></tr></thead>
+        <tbody>${picks.map(p => {
+          const poolEvt = sentPool.find(e => e.id === p.event_id);
+          const name = p.event_name || poolEvt?.name || p.event_id;
+          const venue = p.venue_name || poolEvt?.venue_name || '';
+          const time = p.start_time_local || poolEvt?.start_time_local || '';
+          const cat = p.category || poolEvt?.category || '';
+          return `<tr>
+            <td><span class="pick-rank">${p.rank || '?'}</span></td>
+            <td>${esc(name)}</td>
+            <td>${esc(venue)}</td>
+            <td>${esc(time)}</td>
+            <td>${esc(cat)}</td>
+            <td><span class="pick-why">${esc(p.why || '')}</span></td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>`;
+    } else {
+      // Fallback for old traces without sent_pool — use event_name from picks
+      picksEl.innerHTML = picks.map(p => `
+        <div class="pick-card">
+          <span class="pick-rank">#${p.rank || '?'}</span>
+          <span class="pick-name">${esc(p.event_name || p.event_id)}</span>
+          ${p.why ? `<span class="pick-why">${esc(p.why)}</span>` : ''}
+        </div>
+      `).join('');
+    }
   } else {
     picksSection.style.display = 'none';
+  }
+
+  // Not-picked table
+  if (sentPool.length > 0) {
+    const pickedIds = new Set(picks.map(p => p.event_id));
+    const notPicked = sentPool.filter(e => !pickedIds.has(e.id));
+    if (notPicked.length > 0) {
+      notPickedSection.style.display = 'block';
+      notPickedEl.innerHTML = `<table class="pool-table">
+        <thead><tr><th>Name</th><th>Venue</th><th>Time</th><th>Category</th><th>Match</th></tr></thead>
+        <tbody>${notPicked.map(e => {
+          let matchHtml = '';
+          if (e.filter_match === 'hard') matchHtml = '<span class="match-badge match-hard">[MATCH]</span>';
+          else if (e.filter_match === 'soft') matchHtml = '<span class="match-badge match-soft">[SOFT]</span>';
+          return `<tr>
+            <td>${esc(e.name || e.id)}</td>
+            <td>${esc(e.venue_name || '')}</td>
+            <td>${esc(e.start_time_local || '')}</td>
+            <td>${esc(e.category || '')}</td>
+            <td>${matchHtml}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>`;
+    } else {
+      notPickedSection.style.display = 'none';
+    }
+  } else {
+    notPickedSection.style.display = 'none';
   }
 
   // Pulse SMS
