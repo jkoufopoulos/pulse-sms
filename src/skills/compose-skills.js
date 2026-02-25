@@ -161,6 +161,18 @@ There is only one matching event. Override the normal numbered format:
 - Keep the same voice and character limit (480 chars).`,
 };
 
-const ALL_SKILLS = { core, tonightPriority, sourceTiers, neighborhoodMismatch, perennialFraming, venueFraming, lastBatch, freeEmphasis, pendingIntent, activityAdherence, conversationAwareness, nearbySuggestion, singlePick };
+const cityScan = {
+  id: 'city-scan',
+  text: `
+CITY SCAN MODE:
+The user asked for events without specifying a neighborhood. You have scan results showing which neighborhoods have matching events.
+- Present the top neighborhoods naturally: "I've got [category] tonight in [hood1], [hood2], and [hood3] — which one?"
+- Include match counts only if useful (e.g. "East Village has the most with 4 options")
+- If zero neighborhoods matched, suggest broadening: "No [category] tonight — want to try [alternative category] or a different night?"
+- Do NOT show individual events. Just tell them WHERE to look.
+- Keep under 480 chars. Stay conversational.`,
+};
+
+const ALL_SKILLS = { core, tonightPriority, sourceTiers, neighborhoodMismatch, perennialFraming, venueFraming, lastBatch, freeEmphasis, pendingIntent, activityAdherence, conversationAwareness, nearbySuggestion, singlePick, cityScan };
 
 module.exports = ALL_SKILLS;

@@ -91,7 +91,7 @@ function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
     price_display: e.price_display || null,
     category: e.category || 'other',
     subcategory: e.subcategory || null,
-    extraction_confidence: e.confidence ?? null,
+    extraction_confidence: e.extraction_confidence ?? e.confidence ?? null,
     completeness: computeCompleteness({
       name: e.name,
       date_local: e.date_local,

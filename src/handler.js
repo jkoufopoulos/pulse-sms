@@ -8,7 +8,7 @@ const { getSession, setSession, clearSession, addToHistory, clearSessionInterval
 const { preRoute, getAdjacentNeighborhoods } = require('./pre-router');
 const { handleHelp, handleConversational, handleDetails, handleMore } = require('./intent-handlers');
 const { sendRuntimeAlert } = require('./alerts');
-const { getEvents, getEventById } = require('./events');
+const { getEvents, getEventById, scanCityWide } = require('./events');
 const { lookupReferralCode, recordAttribution } = require('./referral');
 const { filterKidsEvents, validatePerennialActivity } = require('./curation');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
@@ -328,6 +328,17 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
   let softCount = 0;
   let isSparse = false;
 
+  // City-wide scan: when no neighborhood but filters are active, find matching neighborhoods
+  let cityScanResults = null;
+  if (!hood) {
+    const hasSubstantiveFilter = activeFilters &&
+      (activeFilters.category || activeFilters.free_only || activeFilters.time_after);
+    if (hasSubstantiveFilter) {
+      cityScanResults = scanCityWide(activeFilters);
+      console.log(`City scan: ${cityScanResults.length} neighborhoods match filters ${JSON.stringify(activeFilters)}`);
+    }
+  }
+
   // Fetch events if we have a neighborhood
   let events = [];
   let curated = [];
@@ -367,14 +378,14 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
   const prevOfferedIds = session?.allOfferedIds || [];
   const excludeIds = [...new Set([...prevPickIds, ...prevOfferedIds])];
 
-  return { hood, activeFilters, events, curated, taggedPerennials, matchCount, hardCount, softCount, isSparse, nearbyHoods, suggestedHood, excludeIds, now, userHoodAlias };
+  return { hood, activeFilters, events, curated, taggedPerennials, matchCount, hardCount, softCount, isSparse, nearbyHoods, suggestedHood, excludeIds, now, userHoodAlias, cityScanResults };
 }
 
 /**
  * Call unifiedRespond and capture trace/cost data.
  */
 async function callUnified(message, unifiedCtx, session, history, phone, trace) {
-  const { hood, events, nearbyHoods, now, activeFilters, isSparse, matchCount, hardCount, softCount, excludeIds, suggestedHood, userHoodAlias } = unifiedCtx;
+  const { hood, events, nearbyHoods, now, activeFilters, isSparse, matchCount, hardCount, softCount, excludeIds, suggestedHood, userHoodAlias, cityScanResults } = unifiedCtx;
 
   const composeStart = Date.now();
   const result = await unifiedRespond(message, {
@@ -393,6 +404,7 @@ async function callUnified(message, unifiedCtx, session, history, phone, trace) 
     excludeIds,
     suggestedNeighborhood: suggestedHood,
     userHoodAlias,
+    cityScanResults,
   });
   trace.routing.latency_ms = Date.now() - composeStart; // unified call replaces both route + compose
   trace.composition.latency_ms = trace.routing.latency_ms;

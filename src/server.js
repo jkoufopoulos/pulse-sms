@@ -200,24 +200,68 @@ app.get('/e/:eventId', (req, res) => {
   }
 });
 
-// SMS simulator UI + Eval dashboard (test mode only)
+// --- Read-only dashboards & APIs (always available) ---
+
+// Eval dashboard UI
+app.get('/eval', (req, res) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
+  res.sendFile(require('path').join(__dirname, 'eval-ui.html'));
+});
+
+// API: get all cached events
+app.get('/api/eval/events', (req, res) => {
+  const { getRawCache } = require('./events');
+  res.json(getRawCache());
+});
+
+// API: trace endpoints
+const { getRecentTraces, getTraceById, annotateTrace, loadTraces, startConversationCapture } = require('./traces');
+loadTraces(); // Load existing traces from disk at startup
+startConversationCapture(); // Thread traces into conversations for golden dataset
+
+app.get('/api/eval/traces', (req, res) => {
+  const limit = parseInt(req.query.limit) || 100;
+  res.json(getRecentTraces(limit));
+});
+
+app.get('/api/eval/traces/:id', (req, res) => {
+  const trace = getTraceById(req.params.id);
+  if (!trace) return res.status(404).json({ error: 'Trace not found' });
+  res.json(trace);
+});
+
+app.post('/api/eval/traces/:id/annotate', (req, res) => {
+  const { verdict, failure_modes, notes } = req.body;
+  if (!verdict || !['pass', 'fail'].includes(verdict)) {
+    return res.status(400).json({ error: 'verdict must be "pass" or "fail"' });
+  }
+  const ok = annotateTrace(req.params.id, { verdict, failure_modes, notes });
+  if (!ok) return res.status(404).json({ error: 'Trace not found' });
+  res.json({ ok: true });
+});
+
+// API: extraction audit (GET = read latest report)
+app.get('/api/eval/audit', (req, res) => {
+  const fs = require('fs');
+  const reportsDir = require('path').join(__dirname, '../data/reports');
+  try {
+    const files = fs.readdirSync(reportsDir)
+      .filter(f => f.startsWith('extraction-audit-'))
+      .sort()
+      .reverse();
+    if (files.length === 0) return res.json({ error: 'No audit reports yet' });
+    const report = JSON.parse(fs.readFileSync(require('path').join(reportsDir, files[0]), 'utf8'));
+    res.json(report);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Test mode: SMS simulator + mutating APIs ---
 if (process.env.PULSE_TEST_MODE === 'true') {
   app.get('/test', (req, res) => {
-    // Allow inline scripts for the simulator UI (gated behind PULSE_TEST_MODE)
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
     res.sendFile(require('path').join(__dirname, 'test-ui.html'));
-  });
-
-  // Eval dashboard UI
-  app.get('/eval', (req, res) => {
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
-    res.sendFile(require('path').join(__dirname, 'eval-ui.html'));
-  });
-
-  // API: get all cached events
-  app.get('/api/eval/events', (req, res) => {
-    const { getRawCache } = require('./events');
-    res.json(getRawCache());
   });
 
   // API: run AI scoring on cached events
@@ -262,50 +306,7 @@ if (process.env.PULSE_TEST_MODE === 'true') {
     }
   });
 
-  // API: trace endpoints
-  const { getRecentTraces, getTraceById, annotateTrace, loadTraces, startConversationCapture } = require('./traces');
-  loadTraces(); // Load existing traces from disk at startup
-  startConversationCapture(); // Thread traces into conversations for golden dataset
-
-  app.get('/api/eval/traces', (req, res) => {
-    const limit = parseInt(req.query.limit) || 100;
-    res.json(getRecentTraces(limit));
-  });
-
-  app.get('/api/eval/traces/:id', (req, res) => {
-    const trace = getTraceById(req.params.id);
-    if (!trace) return res.status(404).json({ error: 'Trace not found' });
-    res.json(trace);
-  });
-
-  app.post('/api/eval/traces/:id/annotate', (req, res) => {
-    const { verdict, failure_modes, notes } = req.body;
-    if (!verdict || !['pass', 'fail'].includes(verdict)) {
-      return res.status(400).json({ error: 'verdict must be "pass" or "fail"' });
-    }
-    const ok = annotateTrace(req.params.id, { verdict, failure_modes, notes });
-    if (!ok) return res.status(404).json({ error: 'Trace not found' });
-    res.json({ ok: true });
-  });
-
-  // API: extraction audit
-  app.get('/api/eval/audit', (req, res) => {
-    // Return latest audit report from disk
-    const fs = require('fs');
-    const reportsDir = require('path').join(__dirname, '../data/reports');
-    try {
-      const files = fs.readdirSync(reportsDir)
-        .filter(f => f.startsWith('extraction-audit-'))
-        .sort()
-        .reverse();
-      if (files.length === 0) return res.json({ error: 'No audit reports yet' });
-      const report = JSON.parse(fs.readFileSync(require('path').join(reportsDir, files[0]), 'utf8'));
-      res.json(report);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
+  // API: run full extraction audit (POST = costs AI tokens)
   app.post('/api/eval/audit', async (req, res) => {
     try {
       const { getRawCache, getExtractionInputs } = require('./events');
@@ -314,7 +315,6 @@ if (process.env.PULSE_TEST_MODE === 'true') {
       const inputs = getExtractionInputs();
       const sampleSize = parseInt(req.query.sample) || 10;
       const report = await runFullAudit(events, inputs, sampleSize);
-      // Save report
       const fs = require('fs');
       const reportsDir = require('path').join(__dirname, '../data/reports');
       fs.mkdirSync(reportsDir, { recursive: true });
@@ -351,13 +351,8 @@ if (process.env.PULSE_TEST_MODE === 'true') {
       const { getEvents } = require('./events');
       const { composeResponse } = require('./ai');
 
-      // Step 1: getEvents returns top 20 (filtered upcoming + ranked by proximity)
       const candidates = await getEvents(neighborhood);
-
-      // Step 2: top 8 sent to Claude (mirrors handler.js line 337)
       const sent_to_claude = candidates.slice(0, 8);
-
-      // Step 3: compose response
       const compose_result = await composeResponse(
         "what's happening in " + neighborhood,
         sent_to_claude,
@@ -365,7 +360,6 @@ if (process.env.PULSE_TEST_MODE === 'true') {
         {}
       );
 
-      // Step 4: split sent_to_claude into picked vs not_picked
       const pickedIds = new Set((compose_result.picks || []).map(p => p.event_id));
       const picked = sent_to_claude.filter(e => pickedIds.has(e.id));
       const not_picked = sent_to_claude.filter(e => !pickedIds.has(e.id));

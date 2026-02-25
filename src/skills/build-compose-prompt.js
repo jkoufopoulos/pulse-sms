@@ -92,6 +92,11 @@ function buildComposePrompt(events, options = {}) {
     parts.push(skills.singlePick.text);
   }
 
+  // City scan — when scan results are available
+  if (options.cityScanResults?.length > 0) {
+    parts.push(skills.cityScan.text);
+  }
+
   return parts.join('\n');
 }
 
@@ -190,6 +195,11 @@ function buildUnifiedPrompt(events, options = {}) {
   if (options.matchCount === 1 ||
       (options.poolSize != null && options.poolSize <= 1)) {
     parts.push(skills.singlePick.text);
+  }
+
+  // City scan — when scan results are available
+  if (options.cityScanResults?.length > 0) {
+    parts.push(skills.cityScan.text);
   }
 
   return parts.join('\n');

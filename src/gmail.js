@@ -38,7 +38,7 @@ async function fetchYutoriEmails(sinceHours = 48) {
     const listRes = await gmail.users.messages.list({
       userId: 'me',
       q: query,
-      maxResults: 20,
+      maxResults: 30,
     });
 
     const messages = listRes.data.messages || [];

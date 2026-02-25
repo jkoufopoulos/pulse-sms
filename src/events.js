@@ -5,6 +5,7 @@ const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventD
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues } = require('./venues');
 const { sendHealthAlert } = require('./alerts');
 const { filterIncomplete, filterKidsEvents } = require('./curation');
+const { eventMatchesFilters, failsTimeGate } = require('./pipeline');
 const { computeCompleteness } = require('./sources/shared');
 const { runExtractionAudit } = require('./evals/extraction-audit');
 const { captureExtractionInput, getExtractionInputs, clearExtractionInputs } = require('./extraction-capture');
@@ -610,4 +611,43 @@ function getEventById(id) {
   return eventCache.find(e => e.id === id) || null;
 }
 
-module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, getEvents, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs };
+// ============================================================
+// City-wide scan — find which neighborhoods have filter-matching events
+// ============================================================
+
+function scanCityWide(filters) {
+  const upcoming = filterUpcomingEvents(eventCache);
+  const qualityFiltered = filterIncomplete(
+    upcoming.filter(e => {
+      if (e.needs_review) return false;
+      if (e.extraction_confidence != null && e.extraction_confidence < 0.4) return false;
+      return true;
+    }), 0.4
+  );
+
+  const todayNyc = getNycDateString(0);
+  const tomorrowNyc = getNycDateString(1);
+  const dateFiltered = qualityFiltered.filter(e => {
+    const d = getEventDate(e);
+    return !d || d === todayNyc || d === tomorrowNyc;
+  });
+
+  let candidates = dateFiltered;
+  if (filters.time_after && /^\d{2}:\d{2}$/.test(filters.time_after)) {
+    candidates = dateFiltered.filter(e => !failsTimeGate(e, filters.time_after));
+  }
+
+  const hoodCounts = {};
+  for (const e of candidates) {
+    if (eventMatchesFilters(e, filters) && e.neighborhood) {
+      hoodCounts[e.neighborhood] = (hoodCounts[e.neighborhood] || 0) + 1;
+    }
+  }
+
+  return Object.entries(hoodCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([neighborhood, matchCount]) => ({ neighborhood, matchCount }));
+}
+
+module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, getEvents, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs, scanCityWide };

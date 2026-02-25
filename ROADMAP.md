@@ -275,6 +275,16 @@ Users saying "forget the comedy" or "show me everything" should clear filters. T
 - 4 no-picks transition paths now clear stale picks
 - 13 unit tests for atomic replacement behavior
 
+### City-Wide Scan (2026-02-24)
+
+- When user texts a filter query without a neighborhood ("where is there trivia tonight?"), Pulse now scans the full event cache and tells them which neighborhoods have matching events
+- `scanCityWide(filters)` in events.js — pure JS over in-memory cache, no I/O, <1ms. Applies same quality gates as `getEvents()`, groups matches by neighborhood, returns top 5 sorted by count
+- `cityScan` skill in compose-skills.js — guides LLM to present neighborhoods naturally ("I've got trivia tonight in East Village, Williamsburg, and Gowanus — which one?")
+- Trigger: deterministic gate in `resolveUnifiedContext` — `hood === null` AND at least one substantive filter (category, free_only, or time_after). No scan when there are no filters (preserves existing ask_neighborhood behavior)
+- Follow-up: user picks a neighborhood → existing `pendingFilters` + `pendingMessage` session flow serves filtered picks
+- P1 compliant — scan is deterministic, LLM only composes natural language from scan results
+- 5 files changed: events.js (+scanCityWide), handler.js (+scan gate), ai.js (+cityScanBlock in prompt), compose-skills.js (+cityScan skill), build-compose-prompt.js (+skill activation)
+
 ### Compound Pre-Router Extraction (2026-02-22)
 
 - Word-boundary matching extracts free (`\bfree\b`), time (`\btonight\b`, `\blate\b`, `\bafter midnight\b`), and category (shared `catMap`) signals from any message
@@ -396,7 +406,7 @@ Users saying "forget the comedy" or "show me everything" should clear filters. T
 - Scout worker — Background process to fill neighborhood gaps after daily scrape
 - Perennial picks evolution — Auto-detect candidates from scrape data
 - Second daily scrape — 5pm ET pass catches events posted mid-day
-- Borough + multi-day queries — "what's in brooklyn this weekend?"
+- ~~Borough + multi-day queries — "what's in brooklyn this weekend?"~~ City-wide scan partially addresses this (see below)
 
 ### Long-term — Infrastructure + Product
 
