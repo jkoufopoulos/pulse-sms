@@ -834,9 +834,118 @@
     margin-top: 4px;
   }
 
+  /* ── Regression report ── */
+  .principle-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .principle-card {
+    background: #141414;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .principle-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .principle-id {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .principle-name {
+    font-size: 11px;
+    color: #888;
+    margin-left: 6px;
+    font-weight: 400;
+  }
+  .principle-rate {
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .principle-rate.good { color: #4ade80; }
+  .principle-rate.warn { color: #fbbf24; }
+  .principle-rate.bad { color: #f87171; }
+  .principle-bar-track {
+    height: 6px;
+    background: #222;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .principle-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+  }
+  .principle-bar-fill.good { background: #4ade80; }
+  .principle-bar-fill.warn { background: #fbbf24; }
+  .principle-bar-fill.bad { background: #f87171; }
+  .principle-detail {
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+  }
+
+  .regression-scenario-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .regression-assertion {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12px;
+    padding: 6px 10px;
+    background: #111;
+    border-radius: 6px;
+  }
+  .regression-assertion .ra-icon { font-weight: 700; flex-shrink: 0; }
+  .regression-assertion .ra-icon.pass { color: #4ade80; }
+  .regression-assertion .ra-icon.fail { color: #f87171; }
+  .regression-assertion .ra-principle {
+    color: #60a5fa;
+    font-weight: 600;
+    flex-shrink: 0;
+    min-width: 28px;
+  }
+  .regression-assertion .ra-check { color: #ccc; flex: 1; }
+  .regression-assertion .ra-evidence {
+    color: #777;
+    font-size: 11px;
+    margin-top: 2px;
+  }
+  .regression-assertion .ra-reasoning {
+    color: #999;
+    font-size: 11px;
+    font-style: italic;
+    margin-top: 2px;
+  }
+
+  /* ── Shared nav ── */
+  .pulse-nav {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; height: 36px;
+    background: #111; border-bottom: 1px solid #222;
+    padding: 0 16px; font-size: 13px;
+    margin: -24px -24px 24px -24px;
+  }
+  .pulse-nav-link {
+    color: #888; text-decoration: none; padding: 0 12px;
+    line-height: 36px; transition: color 0.15s;
+  }
+  .pulse-nav-link:hover { color: #ccc; }
+  .pulse-nav-link.active { color: #FF6B35; font-weight: 600; }
+
   /* ── Responsive ── */
   @media (max-width: 600px) {
     body { padding: 12px; }
+    .pulse-nav { margin: -12px -12px 12px -12px; }
     .header h1 { font-size: 20px; }
     .summary-big .value { font-size: 32px; }
     .scenario-name { font-size: 12px; min-width: 140px; }
@@ -849,6 +958,15 @@
 </style>
 </head>
 <body>
+
+<nav class="pulse-nav">
+  <a href="/health" class="pulse-nav-link">Health</a>
+  <a href="/events" class="pulse-nav-link">Events</a>
+  <a href="/eval" class="pulse-nav-link">Traces</a>
+  <a href="/eval-report" class="pulse-nav-link active">Reports</a>
+  <a href="/evals" class="pulse-nav-link">Guide</a>
+  <a href="/test" class="pulse-nav-link">Simulator</a>
+</nav>
 
 <div class="header">
   <h1>Pulse <span>Eval Report</span></h1>
@@ -883,6 +1001,18 @@ var filters = { category: 'all', difficulty: 'all', result: 'all', override: 'al
 var searchQuery = '';
 var focusedIndex = -1;
 var compareVisible = false;
+
+var REPORT_TYPES = [
+  { key: 'scenario', label: 'Scenario Evals' },
+  { key: 'regression', label: 'Regression Evals' },
+  { key: 'extraction', label: 'Extraction Audits' },
+];
+function detectReportType(filename) {
+  if (filename.startsWith('scenario-eval-')) return 'scenario';
+  if (filename.startsWith('regression-eval-')) return 'regression';
+  if (filename.startsWith('extraction-audit-')) return 'extraction';
+  return 'unknown';
+}
 
 var CATEGORIES = ['all', 'happy_path', 'filter_drift', 'edge_case', 'poor_experience', 'abuse_off_topic'];
 var DIFFICULTIES = ['all', 'must_pass', 'should_pass', 'stretch'];
@@ -1030,6 +1160,9 @@ function computeAdjustedStats(scenarios) {
 // ── Render ──
 function render() {
   if (!currentReport) return;
+  var type = detectReportType(currentReport._filename);
+  if (type === 'regression') { renderRegressionReport(); return; }
+  if (type === 'extraction') { renderExtractionReport(); return; }
   var c = document.getElementById('content');
   var scenarios = currentReport.scenarios || [];
   var sorted = sortScenarios(scenarios);
@@ -1080,16 +1213,191 @@ function render() {
   writeHashState();
 }
 
+function renderRegressionReport() {
+  var c = document.getElementById('content');
+  var r = currentReport;
+  var scenarios = r.scenarios || [];
+  var byPrinciple = r.by_principle || {};
+  var totalScenarios = r.total_scenarios || scenarios.length;
+  var passedScenarios = r.scenarios_passed || scenarios.filter(function(s) { return s.pass; }).length;
+  var passRate = totalScenarios > 0 ? (100 * passedScenarios / totalScenarios) : 0;
+
+  var html = '';
+
+  // Toolbar (shared)
+  html += renderToolbar();
+
+  // Summary
+  html += '<div class="summary-section">';
+  html += '<div class="summary-big">';
+  html += '<div class="label">Scenario Pass Rate</div>';
+  html += '<div class="value ' + passRateColor(passRate) + '">' + Math.round(passRate) + '%</div>';
+  html += '<div class="sub">' + passedScenarios + ' of ' + totalScenarios + ' scenarios</div>';
+  if (r.total_assertions) {
+    var assertRate = (100 * r.assertions_passed / r.total_assertions).toFixed(0);
+    html += '<div class="sub" style="color:#60a5fa">' + r.assertions_passed + '/' + r.total_assertions + ' assertions (' + assertRate + '%)</div>';
+  }
+  html += '</div>';
+  html += '<div class="summary-stats">';
+  html += statRow('Passed', passedScenarios, 'green');
+  html += statRow('Failed', r.scenarios_failed || 0, (r.scenarios_failed || 0) > 0 ? 'red' : '');
+  html += statRow('Errors', r.scenarios_errored || 0, (r.scenarios_errored || 0) > 0 ? 'purple' : '');
+  if (r.judge_model) html += statRow('Judge', r.judge_model, '');
+  html += '</div>';
+  html += '</div>';
+
+  // Principle breakdown
+  html += '<div class="section-header">Principles</div>';
+  html += '<div class="principle-grid">';
+  var principleIds = Object.keys(byPrinciple).sort();
+  principleIds.forEach(function(pid) {
+    var p = byPrinciple[pid];
+    var rate = p.total > 0 ? Math.round(100 * p.passed / p.total) : 0;
+    var rateClass = rate === 100 ? 'good' : rate >= 50 ? 'warn' : 'bad';
+    html += '<div class="principle-card">';
+    html += '<div class="principle-card-header">';
+    html += '<div><span class="principle-id">' + escHtml(pid) + '</span>';
+    if (p.name) html += '<span class="principle-name">' + escHtml(p.name) + '</span>';
+    html += '</div>';
+    html += '<span class="principle-rate ' + rateClass + '">' + rate + '%</span>';
+    html += '</div>';
+    html += '<div class="principle-bar-track"><div class="principle-bar-fill ' + rateClass + '" style="width:' + rate + '%"></div></div>';
+    html += '<div class="principle-detail">' + p.passed + '/' + p.total + ' assertions</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Scenario list
+  html += '<div class="section-header">Scenarios</div>';
+  html += '<div class="regression-scenario-list">';
+  scenarios.forEach(function(s, i) {
+    var sPass = s.pass;
+    var borderColor = s.error ? '#c084fc' : (sPass ? '#4ade80' : '#f87171');
+    html += '<div class="scenario-card ' + (sPass ? 'pass' : s.error ? 'error' : 'fail') + '">';
+    html += '<div class="scenario-header" onclick="toggleRegressionScenario(' + i + ')">';
+    html += '<div class="scenario-header-top">';
+    html += '<span class="scenario-name">' + escHtml(s.name) + '</span>';
+    html += '<div class="scenario-badges">';
+    if (s.assertions_total != null) {
+      html += '<span class="badge turns">' + (s.assertions_passed || 0) + '/' + s.assertions_total + ' assertions</span>';
+    }
+    html += '<span class="status-pill ' + (sPass ? 'pass' : s.error ? 'error' : 'fail') + '">' + (sPass ? 'PASS' : s.error ? 'ERROR' : 'FAIL') + '</span>';
+    html += '</div></div></div>';
+
+    // Expandable body
+    html += '<div class="scenario-body" id="reg-body-' + i + '">';
+    html += '<div class="scenario-body-inner">';
+
+    if (s.error) {
+      html += '<div class="error-message">' + escHtml(s.error) + '</div>';
+    } else if (s.assertions) {
+      s.assertions.forEach(function(a) {
+        html += '<div class="regression-assertion">';
+        html += '<span class="ra-icon ' + (a.pass ? 'pass' : 'fail') + '">' + (a.pass ? '\u2713' : '\u2717') + '</span>';
+        html += '<span class="ra-principle">' + escHtml(a.principle || '') + '</span>';
+        html += '<div style="flex:1">';
+        html += '<div class="ra-check">' + escHtml(a.check || a.id || '') + '</div>';
+        if (a.evidence) html += '<div class="ra-evidence">' + escHtml(a.evidence) + '</div>';
+        if (a.reasoning && !a.pass) html += '<div class="ra-reasoning">' + escHtml(a.reasoning) + '</div>';
+        html += '</div></div>';
+      });
+    }
+
+    // Conversation transcript (if present)
+    if (s.conversation && s.conversation.length > 0) {
+      html += '<div class="section-header" style="margin-top:12px">Conversation</div>';
+      html += '<div class="chat-transcript">';
+      s.conversation.forEach(function(turn) {
+        if (turn.user) html += '<div class="chat-bubble user">' + escHtml(turn.user) + '</div>';
+        if (turn.response) html += '<div class="chat-bubble pulse">' + escHtml(turn.response) + '</div>';
+      });
+      html += '</div>';
+    }
+
+    html += '</div></div></div>';
+  });
+  html += '</div>';
+
+  c.innerHTML = html;
+  setupEventListeners();
+}
+
+function toggleRegressionScenario(i) {
+  var card = document.getElementById('reg-body-' + i);
+  if (!card) return;
+  var parent = card.parentElement;
+  parent.classList.toggle('expanded');
+}
+
+function renderExtractionReport() {
+  var c = document.getElementById('content');
+  var r = currentReport;
+  var html = '';
+  html += renderToolbar();
+
+  html += '<div class="summary-section">';
+  html += '<div class="summary-big">';
+  html += '<div class="label">Extraction Pass Rate</div>';
+  if (r.summary) {
+    var rate = parseFloat(r.summary.passRate) || 0;
+    html += '<div class="value ' + passRateColor(rate) + '">' + r.summary.passRate + '</div>';
+    html += '<div class="sub">' + r.summary.passed + ' of ' + r.summary.total + ' events</div>';
+  } else {
+    html += '<div class="value neutral">N/A</div>';
+  }
+  html += '</div>';
+  html += '<div class="summary-stats">';
+  if (r.summary) {
+    html += statRow('Total', r.summary.total, '');
+    html += statRow('Passed', r.summary.passed, 'green');
+    html += statRow('Issues', r.summary.issues || 0, (r.summary.issues || 0) > 0 ? 'red' : '');
+  }
+  if (r.tier) html += statRow('Tier', r.tier, '');
+  html += '</div></div>';
+
+  // Source breakdown
+  if (r.sourceStats) {
+    html += '<div class="section-header">By Source</div>';
+    html += '<div class="principle-grid">';
+    Object.keys(r.sourceStats).sort().forEach(function(source) {
+      var stats = r.sourceStats[source];
+      var rate = stats.total > 0 ? Math.round(100 * stats.passed / stats.total) : 0;
+      var rateClass = rate >= 90 ? 'good' : rate >= 70 ? 'warn' : 'bad';
+      html += '<div class="principle-card">';
+      html += '<div class="principle-card-header">';
+      html += '<span class="principle-id">' + escHtml(source) + '</span>';
+      html += '<span class="principle-rate ' + rateClass + '">' + rate + '%</span>';
+      html += '</div>';
+      html += '<div class="principle-bar-track"><div class="principle-bar-fill ' + rateClass + '" style="width:' + rate + '%"></div></div>';
+      html += '<div class="principle-detail">' + stats.passed + '/' + stats.total + ' events</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  c.innerHTML = html;
+  setupEventListeners();
+}
+
 function renderToolbar() {
   var html = '<div class="toolbar">';
 
-  // Report selector
+  // Report selector — grouped by type
   html += '<select id="report-select">';
-  allReports.forEach(function(r, i) {
-    var rate = r.total > 0 ? Math.round(100 * r.passed / r.total) : 0;
-    var ts = formatTimestamp(r.timestamp);
-    var label = ts + ' \u2014 ' + rate + '% (' + r.passed + '/' + r.total + ')';
-    html += '<option value="' + escAttr(r.filename) + '"' + (i === 0 ? ' selected' : '') + '>' + escHtml(label) + '</option>';
+  var isFirstOpt = true;
+  REPORT_TYPES.forEach(function(t) {
+    var group = allReports.filter(function(r) { return (r.type || detectReportType(r.filename)) === t.key; });
+    if (group.length === 0) return;
+    html += '<optgroup label="' + escAttr(t.label) + '">';
+    group.forEach(function(r) {
+      var rate = r.total > 0 ? Math.round(100 * r.passed / r.total) : 0;
+      var ts = formatTimestamp(r.timestamp);
+      var label = ts + ' \u2014 ' + rate + '% (' + r.passed + '/' + r.total + ')';
+      var sel = isFirstOpt ? ' selected' : '';
+      isFirstOpt = false;
+      html += '<option value="' + escAttr(r.filename) + '"' + sel + '>' + escHtml(label) + '</option>';
+    });
+    html += '</optgroup>';
   });
   html += '</select>';
 
@@ -1097,11 +1405,17 @@ function renderToolbar() {
   html += '<button class="toolbar-vs' + (compareVisible ? ' active' : '') + '" id="compare-btn">vs</button>';
   html += '<div class="compare-wrap' + (compareVisible ? ' visible' : '') + '" id="compare-wrap">';
   html += '<select id="compare-select"><option value="">-- compare to --</option>';
-  allReports.forEach(function(r) {
-    var rate = r.total > 0 ? Math.round(100 * r.passed / r.total) : 0;
-    var ts = formatTimestamp(r.timestamp);
-    var label = ts + ' \u2014 ' + rate + '% (' + r.passed + '/' + r.total + ')';
-    html += '<option value="' + escAttr(r.filename) + '">' + escHtml(label) + '</option>';
+  REPORT_TYPES.forEach(function(t) {
+    var group = allReports.filter(function(r) { return (r.type || detectReportType(r.filename)) === t.key; });
+    if (group.length === 0) return;
+    html += '<optgroup label="' + escAttr(t.label) + '">';
+    group.forEach(function(r) {
+      var rate = r.total > 0 ? Math.round(100 * r.passed / r.total) : 0;
+      var ts = formatTimestamp(r.timestamp);
+      var label = ts + ' \u2014 ' + rate + '% (' + r.passed + '/' + r.total + ')';
+      html += '<option value="' + escAttr(r.filename) + '">' + escHtml(label) + '</option>';
+    });
+    html += '</optgroup>';
   });
   html += '</select></div>';
 

@@ -455,9 +455,36 @@
 
     .audit-grid { grid-template-columns: 1fr; }
   }
+
+  /* ── Shared nav ── */
+  .pulse-nav {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; height: 36px;
+    background: #111; border-bottom: 1px solid #222;
+    padding: 0 16px; font-size: 13px;
+    margin: -24px -24px 24px -24px;
+  }
+  .pulse-nav-link {
+    color: #888; text-decoration: none; padding: 0 12px;
+    line-height: 36px; transition: color 0.15s;
+  }
+  .pulse-nav-link:hover { color: #ccc; }
+  .pulse-nav-link.active { color: #FF6B35; font-weight: 600; }
+  @media (max-width: 600px) {
+    .pulse-nav { margin: -12px -12px 12px -12px; }
+  }
 </style>
 </head>
 <body>
+
+<nav class="pulse-nav">
+  <a href="/health" class="pulse-nav-link active">Health</a>
+  <a href="/events" class="pulse-nav-link">Events</a>
+  <a href="/eval" class="pulse-nav-link">Traces</a>
+  <a href="/eval-report" class="pulse-nav-link">Reports</a>
+  <a href="/evals" class="pulse-nav-link">Guide</a>
+  <a href="/test" class="pulse-nav-link">Simulator</a>
+</nav>
 
 <div class="header">
   <h1><span>Pulse</span> Health Dashboard</h1>

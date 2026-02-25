@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse Eval Guide</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+    background: #0a0a0a;
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 24px;
+    padding-bottom: 80px;
+  }
+
+  /* ── Shared nav ── */
+  .pulse-nav {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; height: 36px;
+    background: #111; border-bottom: 1px solid #222;
+    padding: 0 16px; font-size: 13px;
+    margin: -24px -24px 24px -24px;
+  }
+  .pulse-nav-link {
+    color: #888; text-decoration: none; padding: 0 12px;
+    line-height: 36px; transition: color 0.15s;
+  }
+  .pulse-nav-link:hover { color: #ccc; }
+  .pulse-nav-link.active { color: #FF6B35; font-weight: 600; }
+
+  /* ── Header ── */
+  .header {
+    margin-bottom: 8px;
+  }
+  .header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .header h1 span { color: #FF6B35; }
+
+  .intro {
+    color: #999;
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 680px;
+    margin-bottom: 28px;
+  }
+
+  /* ── Card grid ── */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .eval-card {
+    background: #141414;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 20px;
+    transition: border-color 0.15s;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .eval-card:hover { border-color: #333; }
+
+  .eval-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .eval-card-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .eval-card-badges {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .cost-badge {
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .cost-badge.free { background: #1a3a1a; color: #4ade80; }
+  .cost-badge.paid { background: #3a2a0a; color: #fbbf24; }
+
+  .eval-card-desc {
+    font-size: 13px;
+    color: #999;
+    line-height: 1.5;
+  }
+
+  .eval-card-stat {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+  }
+  .stat-label {
+    font-size: 10px;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .stat-value {
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .stat-value.good { color: #4ade80; }
+  .stat-value.warn { color: #fbbf24; }
+  .stat-value.bad { color: #f87171; }
+  .stat-value.neutral { color: #888; }
+  .stat-value.loading { color: #555; font-size: 13px; font-weight: 400; }
+
+  .eval-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: auto;
+    flex-wrap: wrap;
+  }
+  .card-link {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1px solid #333;
+    color: #ccc;
+    transition: all 0.15s;
+  }
+  .card-link:hover { background: #1a1a1a; border-color: #555; color: #fff; }
+  .card-link.primary { background: #1a2a4a; border-color: #2563eb; color: #93c5fd; }
+  .card-link.primary:hover { background: #1d3a6a; }
+
+  .cli-cmd {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #0f0f0f;
+    border: 1px solid #222;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Monaco, monospace;
+    font-size: 12px;
+    color: #aaa;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+  .cli-cmd:hover { border-color: #444; }
+  .cli-cmd code { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cli-cmd .copy-icon { color: #555; flex-shrink: 0; font-size: 11px; }
+  .cli-cmd.copied { border-color: #4ade80; }
+  .cli-cmd.copied .copy-icon { color: #4ade80; }
+
+  /* ── How it works ── */
+  .how-section {
+    margin-top: 16px;
+  }
+  .how-section h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #aaa;
+    margin-bottom: 12px;
+  }
+  .how-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+  }
+  .how-card {
+    background: #141414;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .how-card h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #ccc;
+    margin-bottom: 6px;
+  }
+  .how-card p {
+    font-size: 12px;
+    color: #777;
+    line-height: 1.5;
+  }
+  .how-card .step-num {
+    display: inline-block;
+    width: 22px;
+    height: 22px;
+    line-height: 22px;
+    text-align: center;
+    border-radius: 50%;
+    background: #1a2a3a;
+    color: #60a5fa;
+    font-size: 11px;
+    font-weight: 700;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 600px) {
+    body { padding: 12px; }
+    .pulse-nav { margin: -12px -12px 12px -12px; }
+    .header h1 { font-size: 20px; }
+    .card-grid { grid-template-columns: 1fr; }
+    .how-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="pulse-nav">
+  <a href="/health" class="pulse-nav-link">Health</a>
+  <a href="/events" class="pulse-nav-link">Events</a>
+  <a href="/eval" class="pulse-nav-link">Traces</a>
+  <a href="/eval-report" class="pulse-nav-link">Reports</a>
+  <a href="/evals" class="pulse-nav-link active">Guide</a>
+  <a href="/test" class="pulse-nav-link">Simulator</a>
+</nav>
+
+<div class="header">
+  <h1><span>Pulse</span> Eval Guide</h1>
+</div>
+<p class="intro">
+  Pulse has six evaluation layers, from free deterministic checks to LLM-judged conversation tests.
+  Start from the top &mdash; run the free checks first, fix anything they catch, then move down to the costlier layers.
+  Each card below shows the live pass rate (when available), what it costs, and how to run it.
+</p>
+
+<div class="card-grid">
+  <!-- Unit Tests -->
+  <div class="eval-card">
+    <div class="eval-card-header">
+      <div class="eval-card-title">Unit Tests</div>
+      <div class="eval-card-badges">
+        <span class="cost-badge free">Free</span>
+      </div>
+    </div>
+    <div class="eval-card-desc">
+      Pure function correctness &mdash; formatters, geo math, filter logic, session helpers. No server needed.
+      Run these first after any code change.
+    </div>
+    <div class="eval-card-stat">
+      <span class="stat-label">Status</span>
+      <span class="stat-value neutral">--</span>
+    </div>
+    <div class="eval-card-actions">
+      <div class="cli-cmd" onclick="copyCmd(this)" title="Click to copy">
+        <code>npm test</code>
+        <span class="copy-icon">copy</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Extraction Audit -->
+  <div class="eval-card">
+    <div class="eval-card-header">
+      <div class="eval-card-title">Extraction Audit</div>
+      <div class="eval-card-badges">
+        <span class="cost-badge free">Free</span>
+      </div>
+    </div>
+    <div class="eval-card-desc">
+      Checks that Claude-extracted events (from Skint, Nonsense NYC, etc.) have evidence in their source text.
+      Catches hallucinated venues, dates, and prices. Runs against the live event cache.
+    </div>
+    <div class="eval-card-stat">
+      <span class="stat-label">Pass rate</span>
+      <span class="stat-value loading" id="audit-stat">loading...</span>
+    </div>
+    <div class="eval-card-actions">
+      <a href="/health" class="card-link primary">Health dashboard</a>
+      <div class="cli-cmd" onclick="copyCmd(this)" title="Click to copy">
+        <code>curl localhost:3000/api/eval/audit | jq .summary</code>
+        <span class="copy-icon">copy</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pipeline Evals -->
+  <div class="eval-card">
+    <div class="eval-card-header">
+      <div class="eval-card-title">Pipeline Evals</div>
+      <div class="eval-card-badges">
+        <span class="cost-badge free">Free</span>
+      </div>
+    </div>
+    <div class="eval-card-desc">
+      9 deterministic checks on request traces &mdash; character limits, valid intents and neighborhoods,
+      picked events exist in pool, valid URLs. Runs on stored traces with zero AI cost.
+    </div>
+    <div class="eval-card-stat">
+      <span class="stat-label">Traces</span>
+      <span class="stat-value loading" id="traces-stat">loading...</span>
+    </div>
+    <div class="eval-card-actions">
+      <a href="/eval" class="card-link primary">Trace viewer</a>
+      <div class="cli-cmd" onclick="copyCmd(this)" title="Click to copy">
+        <code>npm run eval</code>
+        <span class="copy-icon">copy</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scenario Evals -->
+  <div class="eval-card">
+    <div class="eval-card-header">
+      <div class="eval-card-title">Scenario Evals</div>
+      <div class="eval-card-badges">
+        <span class="cost-badge paid">~$1.20</span>
+      </div>
+    </div>
+    <div class="eval-card-desc">
+      64 multi-turn SMS conversations with LLM judge scoring. Tests happy paths, filter drift,
+      edge cases, abuse handling, and poor experience recovery. Requires a running server.
+    </div>
+    <div class="eval-card-stat">
+      <span class="stat-label">Latest</span>
+      <span class="stat-value loading" id="scenario-stat">loading...</span>
+    </div>
+    <div class="eval-card-actions">
+      <a href="/eval-report" class="card-link primary">Reports</a>
+      <div class="cli-cmd" onclick="copyCmd(this)" title="Click to copy">
+        <code>node scripts/run-scenario-evals.js --url http://localhost:3000</code>
+        <span class="copy-icon">copy</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Regression Evals -->
+  <div class="eval-card">
+    <div class="eval-card-header">
+      <div class="eval-card-title">Regression Evals</div>
+      <div class="eval-card-badges">
+        <span class="cost-badge paid">~$0.80</span>
+      </div>
+    </div>
+    <div class="eval-card-desc">
+      Behavioral regression tests organized by architecture principles (P1&ndash;P12).
+      Each principle has targeted scenarios that validate specific system behaviors.
+      Requires a running server.
+    </div>
+    <div class="eval-card-stat">
+      <span class="stat-label">Latest</span>
+      <span class="stat-value loading" id="regression-stat">loading...</span>
+    </div>
+    <div class="eval-card-actions">
+      <a href="/eval-report" class="card-link primary">Reports</a>
+      <div class="cli-cmd" onclick="copyCmd(this)" title="Click to copy">
+        <code>node scripts/run-regression-evals.js --url http://localhost:3000</code>
+        <span class="copy-icon">copy</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- A/B Eval -->
+  <div class="eval-card">
+    <div class="eval-card-header">
+      <div class="eval-card-title">A/B Eval</div>
+      <div class="eval-card-badges">
+        <span class="cost-badge paid">~$1.50</span>
+      </div>
+    </div>
+    <div class="eval-card-desc">
+      Head-to-head model comparison &mdash; runs the same prompts through two models and has an LLM judge
+      pick a winner. Use this when considering a model swap or prompt change. CLI only.
+    </div>
+    <div class="eval-card-stat">
+      <span class="stat-label">Status</span>
+      <span class="stat-value neutral">CLI only</span>
+    </div>
+    <div class="eval-card-actions">
+      <div class="cli-cmd" onclick="copyCmd(this)" title="Click to copy">
+        <code>node scripts/run-ab-eval.js --a haiku --b sonnet</code>
+        <span class="copy-icon">copy</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="how-section">
+  <h2>Typical Workflow</h2>
+  <div class="how-grid">
+    <div class="how-card">
+      <h3><span class="step-num">1</span>Run unit tests</h3>
+      <p>After any code change, run <code>npm test</code>. These are instant and free. Fix anything before moving on.</p>
+    </div>
+    <div class="how-card">
+      <h3><span class="step-num">2</span>Start the server</h3>
+      <p>Run <code>npm run dev</code> and wait for the event cache to load (~3 min on first boot, instant on restart).</p>
+    </div>
+    <div class="how-card">
+      <h3><span class="step-num">3</span>Smoke test in the simulator</h3>
+      <p>Open <a href="/test" style="color:#93c5fd">/test</a> and try a few neighborhoods. Confirm the change works manually before running eval suites.</p>
+    </div>
+    <div class="how-card">
+      <h3><span class="step-num">4</span>Run targeted regressions</h3>
+      <p>If your change affects a specific principle, run just that principle's tests: <code>--principle P1</code>.</p>
+    </div>
+    <div class="how-card">
+      <h3><span class="step-num">5</span>Run the full eval suite</h3>
+      <p>Run scenario evals to validate end-to-end behavior. Review failures in the <a href="/eval-report" style="color:#93c5fd">Reports</a> dashboard.</p>
+    </div>
+    <div class="how-card">
+      <h3><span class="step-num">6</span>Override false failures</h3>
+      <p>In the Reports dashboard, mark data-dependent or false failures with human overrides so they don't pollute the pass rate.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+function copyCmd(el) {
+  var text = el.querySelector('code').textContent;
+  navigator.clipboard.writeText(text).then(function() {
+    el.classList.add('copied');
+    el.querySelector('.copy-icon').textContent = 'copied!';
+    setTimeout(function() {
+      el.classList.remove('copied');
+      el.querySelector('.copy-icon').textContent = 'copy';
+    }, 1500);
+  });
+}
+
+function rateColor(pct) {
+  if (pct >= 80) return 'good';
+  if (pct >= 50) return 'warn';
+  return 'bad';
+}
+
+async function loadStats() {
+  // Extraction audit
+  try {
+    var res = await fetch('/api/eval/audit');
+    if (res.ok) {
+      var data = await res.json();
+      var el = document.getElementById('audit-stat');
+      if (data.summary && data.summary.passRate) {
+        var rate = parseFloat(data.summary.passRate);
+        el.textContent = data.summary.passRate;
+        el.className = 'stat-value ' + rateColor(rate);
+      } else {
+        el.textContent = 'no data';
+        el.className = 'stat-value neutral';
+      }
+    }
+  } catch (e) {
+    document.getElementById('audit-stat').textContent = '--';
+    document.getElementById('audit-stat').className = 'stat-value neutral';
+  }
+
+  // Traces count
+  try {
+    var res = await fetch('/api/eval/traces?limit=1');
+    if (res.ok) {
+      var traces = await res.json();
+      var el = document.getElementById('traces-stat');
+      // The API returns an array; check if there are traces
+      el.textContent = traces.length > 0 ? traces.length + ' recent' : 'none';
+      el.className = 'stat-value neutral';
+    }
+  } catch (e) {
+    document.getElementById('traces-stat').textContent = '--';
+    document.getElementById('traces-stat').className = 'stat-value neutral';
+  }
+
+  // Scenario evals
+  try {
+    var res = await fetch('/api/eval-reports?type=scenario');
+    if (res.ok) {
+      var reports = await res.json();
+      var el = document.getElementById('scenario-stat');
+      if (reports.length > 0) {
+        var latest = reports[0];
+        var rate = latest.total > 0 ? Math.round(100 * latest.passed / latest.total) : 0;
+        el.textContent = rate + '% (' + latest.passed + '/' + latest.total + ')';
+        el.className = 'stat-value ' + rateColor(rate);
+      } else {
+        el.textContent = 'no reports';
+        el.className = 'stat-value neutral';
+      }
+    }
+  } catch (e) {
+    document.getElementById('scenario-stat').textContent = '--';
+    document.getElementById('scenario-stat').className = 'stat-value neutral';
+  }
+
+  // Regression evals
+  try {
+    var res = await fetch('/api/eval-reports?type=regression');
+    if (res.ok) {
+      var reports = await res.json();
+      var el = document.getElementById('regression-stat');
+      if (reports.length > 0) {
+        var latest = reports[0];
+        var rate = latest.total > 0 ? Math.round(100 * latest.passed / latest.total) : 0;
+        el.textContent = rate + '% (' + latest.passed + '/' + latest.total + ')';
+        el.className = 'stat-value ' + rateColor(rate);
+      } else {
+        el.textContent = 'no reports';
+        el.className = 'stat-value neutral';
+      }
+    }
+  } catch (e) {
+    document.getElementById('regression-stat').textContent = '--';
+    document.getElementById('regression-stat').className = 'stat-value neutral';
+  }
+}
+
+loadStats();
+</script>
+</body>
+</html>

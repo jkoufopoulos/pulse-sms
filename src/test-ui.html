@@ -10,16 +10,32 @@
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
     background: #000;
-    height: 100vh;
+    min-height: 100vh;
     display: flex;
-    justify-content: center;
+    flex-direction: column;
     align-items: center;
   }
+
+  /* ── Shared nav ── */
+  .pulse-nav {
+    align-self: stretch;
+    display: flex; align-items: center; height: 36px;
+    background: #111; border-bottom: 1px solid #222;
+    padding: 0 16px; font-size: 13px; flex-shrink: 0;
+  }
+  .pulse-nav-link {
+    color: #888; text-decoration: none; padding: 0 12px;
+    line-height: 36px; transition: color 0.15s;
+  }
+  .pulse-nav-link:hover { color: #ccc; }
+  .pulse-nav-link.active { color: #FF6B35; font-weight: 600; }
 
   .phone {
     width: 100vw;
     max-width: 390px;
     height: 844px;
+    margin-top: auto;
+    margin-bottom: auto;
     background: #000;
     border-radius: 47px;
     border: 3px solid #333;
@@ -237,8 +253,10 @@
   @media (max-width: 420px) {
     .phone {
       width: 100%;
-      height: 100vh;
-      height: 100dvh;
+      height: calc(100vh - 36px);
+      height: calc(100dvh - 36px);
+      margin-top: 0;
+      margin-bottom: 0;
       border-radius: 0;
       border: none;
       box-shadow: none;
@@ -250,6 +268,15 @@
 </style>
 </head>
 <body>
+
+<nav class="pulse-nav">
+  <a href="/health" class="pulse-nav-link">Health</a>
+  <a href="/events" class="pulse-nav-link">Events</a>
+  <a href="/eval" class="pulse-nav-link">Traces</a>
+  <a href="/eval-report" class="pulse-nav-link">Reports</a>
+  <a href="/evals" class="pulse-nav-link">Guide</a>
+  <a href="/test" class="pulse-nav-link active">Simulator</a>
+</nav>
 
 <div class="phone">
   <div class="notch"></div>

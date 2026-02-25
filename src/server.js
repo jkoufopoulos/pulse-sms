@@ -82,30 +82,48 @@ app.get('/eval-report', (req, res) => {
 });
 
 // Eval report API — list available reports and serve report data
+const REPORT_PREFIXES = {
+  'scenario-eval-': 'scenario',
+  'regression-eval-': 'regression',
+  'extraction-audit-': 'extraction',
+};
+function getReportType(filename) {
+  for (const [prefix, type] of Object.entries(REPORT_PREFIXES)) {
+    if (filename.startsWith(prefix)) return type;
+  }
+  return null;
+}
+function isValidReportFilename(filename) {
+  return filename.endsWith('.json') && getReportType(filename) !== null;
+}
+
 app.get('/api/eval-reports', (req, res) => {
   const reportsDir = require('path').join(__dirname, '..', 'data', 'reports');
   const fs = require('fs');
   if (!fs.existsSync(reportsDir)) return res.json([]);
+  const typeFilter = req.query.type || null;
   const files = fs.readdirSync(reportsDir)
-    .filter(f => f.startsWith('scenario-eval-') && f.endsWith('.json'))
+    .filter(f => f.endsWith('.json') && getReportType(f) !== null)
+    .filter(f => !typeFilter || getReportType(f) === typeFilter)
     .sort()
     .reverse();
   const summaries = files.map(f => {
     try {
       const data = JSON.parse(fs.readFileSync(require('path').join(reportsDir, f), 'utf8'));
-      return {
-        filename: f,
-        timestamp: data.timestamp,
-        total: data.total,
-        passed: data.passed,
-        failed: data.failed,
-        errors: data.errors,
-        judge_model: data.judge_model,
-        judge_cost: data.judge_cost,
-        elapsed_seconds: data.elapsed_seconds,
-        concurrency: data.concurrency,
-        base_url: data.base_url,
-      };
+      const type = getReportType(f);
+      const base = { filename: f, type, timestamp: data.timestamp };
+      if (type === 'scenario') {
+        return { ...base, total: data.total, passed: data.passed, failed: data.failed, errors: data.errors, judge_model: data.judge_model, judge_cost: data.judge_cost, elapsed_seconds: data.elapsed_seconds, concurrency: data.concurrency, base_url: data.base_url };
+      }
+      if (type === 'regression') {
+        const scenarios = data.scenarios || [];
+        const passed = scenarios.filter(s => s.pass).length;
+        return { ...base, total: scenarios.length, passed, failed: scenarios.length - passed, principles: data.principles || [], elapsed_seconds: data.elapsed_seconds, base_url: data.base_url };
+      }
+      if (type === 'extraction') {
+        return { ...base, total: data.summary?.total, passed: data.summary?.passed, pass_rate: data.summary?.passRate, tier: data.tier };
+      }
+      return base;
     } catch { return null; }
   }).filter(Boolean);
   res.json(summaries);
@@ -114,7 +132,7 @@ app.get('/api/eval-reports', (req, res) => {
 app.get('/api/eval-reports/:filename', (req, res) => {
   const fs = require('fs');
   const filePath = require('path').join(__dirname, '..', 'data', 'reports', req.params.filename);
-  if (!req.params.filename.startsWith('scenario-eval-') || !req.params.filename.endsWith('.json')) {
+  if (!isValidReportFilename(req.params.filename)) {
     return res.status(400).json({ error: 'Invalid filename' });
   }
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
@@ -126,7 +144,7 @@ app.put('/api/eval-reports/:filename', (req, res) => {
   const fs = require('fs');
   const path = require('path');
   const filename = req.params.filename;
-  if (!filename.startsWith('scenario-eval-') || !filename.endsWith('.json')) {
+  if (!isValidReportFilename(filename)) {
     return res.status(400).json({ error: 'Invalid filename' });
   }
   const reportsDir = path.join(__dirname, '..', 'data', 'reports');
@@ -139,7 +157,7 @@ app.delete('/api/eval-reports/:filename', (req, res) => {
   const fs = require('fs');
   const path = require('path');
   const filename = req.params.filename;
-  if (!filename.startsWith('scenario-eval-') || !filename.endsWith('.json')) {
+  if (!isValidReportFilename(filename)) {
     return res.status(400).json({ error: 'Invalid filename' });
   }
   const filePath = path.join(__dirname, '..', 'data', 'reports', filename);
@@ -201,6 +219,12 @@ app.delete('/api/eval-overrides/:scenarioName', (req, res) => {
   delete overrides[req.params.scenarioName];
   fs.writeFileSync(filePath, JSON.stringify(overrides, null, 2));
   res.json({ ok: true });
+});
+
+// Evals landing page (read-only, always available)
+app.get('/evals', (req, res) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
+  res.sendFile(require('path').join(__dirname, 'evals-landing.html'));
 });
 
 // Events browser (read-only, always available)

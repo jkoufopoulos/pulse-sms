@@ -11,9 +11,23 @@
     background: #0a0a0a; color: #e0e0e0; font-size: 14px; line-height: 1.4;
   }
 
+  /* ── Shared nav ── */
+  .pulse-nav {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; height: 36px;
+    background: #111; border-bottom: 1px solid #222;
+    padding: 0 16px; font-size: 13px;
+  }
+  .pulse-nav-link {
+    color: #888; text-decoration: none; padding: 0 12px;
+    line-height: 36px; transition: color 0.15s;
+  }
+  .pulse-nav-link:hover { color: #ccc; }
+  .pulse-nav-link.active { color: #FF6B35; font-weight: 600; }
+
   /* Header */
   .header {
-    position: sticky; top: 0; z-index: 20;
+    position: sticky; top: 36px; z-index: 20;
     display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
     padding: 14px 20px; background: #1a1a1a; border-bottom: 1px solid #333;
   }
@@ -25,7 +39,7 @@
 
   /* Filter bar */
   .filters {
-    position: sticky; top: 55px; z-index: 19;
+    position: sticky; top: 91px; z-index: 19;
     display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
     padding: 10px 20px; background: #111; border-bottom: 1px solid #282828;
   }
@@ -182,6 +196,15 @@
 </style>
 </head>
 <body>
+
+<nav class="pulse-nav">
+  <a href="/health" class="pulse-nav-link">Health</a>
+  <a href="/events" class="pulse-nav-link active">Events</a>
+  <a href="/eval" class="pulse-nav-link">Traces</a>
+  <a href="/eval-report" class="pulse-nav-link">Reports</a>
+  <a href="/evals" class="pulse-nav-link">Guide</a>
+  <a href="/test" class="pulse-nav-link">Simulator</a>
+</nav>
 
 <!-- Header -->
 <div class="header">
