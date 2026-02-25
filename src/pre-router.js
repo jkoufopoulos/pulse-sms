@@ -25,6 +25,38 @@ function getAdjacentNeighborhoods(hood, count = 3) {
     .map(d => d.name);
 }
 
+// --- Parse natural time expressions → HH:MM or null ---
+function parseTimeExpr(text) {
+  // "after 8pm", "around 9:30pm", "8 pm or later", "starting at 10pm"
+  const m = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+  if (m) {
+    let h = parseInt(m[1], 10);
+    const min = m[2] ? parseInt(m[2], 10) : 0;
+    const isPm = m[3].toLowerCase() === 'pm';
+    if (isPm && h < 12) h += 12;
+    if (!isPm && h === 12) h = 0;
+    if (h > 23 || min > 59) return null;
+    return String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
+  }
+  // "after 21:00" or "after 9:30" (24h format)
+  const m24 = text.match(/\b(\d{1,2}):(\d{2})\b/);
+  if (m24) {
+    const h = parseInt(m24[1], 10);
+    const min = parseInt(m24[2], 10);
+    if (h > 23 || min > 59) return null;
+    return String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
+  }
+  // Bare hour without am/pm: "after 10", "around 9" — assume PM for nightlife context
+  const mBare = text.match(/\b(?:after|around|past|starting\s+(?:at|around))\s+(\d{1,2})\b/i);
+  if (mBare) {
+    let h = parseInt(mBare[1], 10);
+    if (h >= 1 && h <= 11) h += 12; // assume PM
+    if (h > 23) return null;
+    return String(h).padStart(2, '0') + ':00';
+  }
+  return null;
+}
+
 // --- Deterministic pre-router (mechanical shortcuts only) ---
 // All semantic understanding (neighborhoods, categories, time, vibes, free,
 // nudge accepts, boroughs, off-topic) goes through the unified LLM call.
@@ -173,7 +205,18 @@ function preRoute(message, session) {
       }
     }
 
-    // Time follow-ups (single-dimension)
+    // Specific time follow-ups: "after 8pm", "around 9:30", "anything after 10"
+    // Skip if a category word is present — let compound extraction handle "comedy after 9pm"
+    const specificTime = parseTimeExpr(msg);
+    if (specificTime && /\b(?:after|around|past|by|at|starting|from)\b/i.test(msg)) {
+      const hasCatWord = Object.keys(catMap).some(p => new RegExp(`\\b(?:${p})\\b`, 'i').test(msg));
+      const hasFreeWord = /\bfree\b/i.test(msg);
+      if (!hasCatWord && !hasFreeWord) {
+        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, time_after: specificTime } };
+      }
+    }
+
+    // Time follow-ups (single-dimension) — fuzzy phrases
     if (/^(?:how about\s+)?(?:later(?:\s+tonight)?|after\s+midnight|late(?:r)?\s*night|anything?\s+late)$/i.test(msg)) {
       const timeAfter = /midnight/i.test(msg) ? '00:00' : '22:00';
       return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, time_after: timeAfter } };
@@ -197,6 +240,8 @@ function preRoute(message, session) {
     compoundTime = '00:00';
   } else if (/\b(?:tonight|later?|late\s*night)\b/i.test(lower)) {
     compoundTime = '22:00';
+  } else {
+    compoundTime = parseTimeExpr(lower);
   }
 
   let detectedCat = null;

@@ -315,6 +315,47 @@ check('bare free (no session) → null', preRoute('free', null) === null);
 check('bare tonight (no session) → null', preRoute('tonight', null) === null);
 check('bare comedy (no session) → null', preRoute('comedy', null) === null);
 
+// Specific time follow-ups (single-dimension, session-aware)
+console.log('\npreRoute specific time follow-ups:');
+const after8pm = preRoute('after 8pm', followUpSession);
+check('after 8pm → events', after8pm?.intent === 'events');
+check('after 8pm → time_after 20:00', after8pm?.filters?.time_after === '20:00');
+check('after 8pm → session hood', after8pm?.neighborhood === 'East Village');
+
+const around930pm = preRoute('around 9:30pm', followUpSession);
+check('around 9:30pm → events', around930pm?.intent === 'events');
+check('around 9:30pm → time_after 21:30', around930pm?.filters?.time_after === '21:30');
+
+const anythingAfter10pm = preRoute('anything after 10pm', followUpSession);
+check('anything after 10pm → time_after 22:00', anythingAfter10pm?.filters?.time_after === '22:00');
+
+const jazzAfter11pm = preRoute('jazz after 11pm', followUpSession);
+check('jazz after 11pm → time_after 23:00 (compound)', jazzAfter11pm?.filters?.time_after === '23:00');
+check('jazz after 11pm → live_music', jazzAfter11pm?.filters?.category === 'live_music');
+
+// Existing fuzzy patterns still work
+const laterTonight = preRoute('later tonight', followUpSession);
+check('later tonight → still 22:00', laterTonight?.filters?.time_after === '22:00');
+const afterMidnight = preRoute('after midnight', followUpSession);
+check('after midnight → still 00:00', afterMidnight?.filters?.time_after === '00:00');
+
+// Compound: specific time + category
+const comedyAfter9pm = preRoute('comedy after 9pm', followUpSession);
+check('comedy after 9pm → events', comedyAfter9pm?.intent === 'events');
+check('comedy after 9pm → comedy', comedyAfter9pm?.filters?.category === 'comedy');
+check('comedy after 9pm → time_after 21:00', comedyAfter9pm?.filters?.time_after === '21:00');
+
+// Compound: free + specific time + neighborhood
+const freeAfter8pmBushwick = preRoute('free stuff after 8pm in bushwick', null);
+check('free after 8pm bushwick → events', freeAfter8pmBushwick?.intent === 'events');
+check('free after 8pm bushwick → free_only', freeAfter8pmBushwick?.filters?.free_only === true);
+check('free after 8pm bushwick → time_after 20:00', freeAfter8pmBushwick?.filters?.time_after === '20:00');
+check('free after 8pm bushwick → Bushwick', freeAfter8pmBushwick?.neighborhood === 'Bushwick');
+
+// Bare hour without am/pm assumes PM: "after 10" → 22:00
+const after10bare = preRoute('after 10', followUpSession);
+check('after 10 (bare) → time_after 22:00', after10bare?.filters?.time_after === '22:00');
+
 // Bare neighborhoods still fall through (0 filter dimensions)
 check('east village alone → null', preRoute('east village', null) === null);
 check('bushwick alone → null', preRoute('bushwick', null) === null);

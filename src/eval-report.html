@@ -2061,7 +2061,7 @@ function renderOverridePanel(s, ovr) {
     ['false_failure', 'False Failure \u2014 LLM judge was wrong, this actually passed'],
     ['false_pass', 'False Pass \u2014 LLM judge was wrong, this actually failed'],
     ['data_dependent', 'Data Dependent \u2014 result depends on scrape data, exclude from rate'],
-    ['known_bug', 'Known Bug \u2014 real failure, tracked separately']
+    ['product_gap', 'Product Gap \u2014 real failure, needs a code fix']
   ];
   cats.forEach(function(c) {
     html += '<option value="' + c[0] + '"' + (currentCategory === c[0] ? ' selected' : '') + '>' + escHtml(c[1]) + '</option>';

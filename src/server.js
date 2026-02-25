@@ -186,8 +186,8 @@ app.put('/api/eval-overrides/:scenarioName', (req, res) => {
   if (!verdict || !['pass', 'fail'].includes(verdict)) {
     return res.status(400).json({ error: 'verdict must be "pass" or "fail"' });
   }
-  if (!category || !['false_failure', 'false_pass', 'data_dependent', 'known_bug'].includes(category)) {
-    return res.status(400).json({ error: 'category must be one of: false_failure, false_pass, data_dependent, known_bug' });
+  if (!category || !['false_failure', 'false_pass', 'data_dependent', 'product_gap', 'known_bug'].includes(category)) {
+    return res.status(400).json({ error: 'category must be one of: false_failure, false_pass, data_dependent, product_gap' });
   }
 
   fs.mkdirSync(reportsDir, { recursive: true });
