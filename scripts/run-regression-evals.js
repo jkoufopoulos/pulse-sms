@@ -11,6 +11,7 @@
  *   node scripts/run-regression-evals.js --name "filter"     # Name substring
  *   node scripts/run-regression-evals.js --principle P1       # By principle
  *   node scripts/run-regression-evals.js --url http://...     # Custom server
+ *   node scripts/run-regression-evals.js --concurrency 10     # Parallel scenarios (default: 5)
  */
 
 require('dotenv').config();
@@ -28,6 +29,10 @@ const principleFilter = args.find(a => a.startsWith('--principle='))?.split('=')
 const BASE = args.find(a => a.startsWith('--url='))?.split('=')[1]
   || (args.includes('--url') ? args[args.indexOf('--url') + 1] : null)
   || 'http://localhost:3000';
+const CONCURRENCY = parseInt(
+  args.find(a => a.startsWith('--concurrency='))?.split('=')[1]
+  || (args.includes('--concurrency') ? args[args.indexOf('--concurrency') + 1] : null)
+  || '5', 10);
 const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-sonnet-4-5-20250929';
 
 const client = new Anthropic();
@@ -180,7 +185,7 @@ async function main() {
     process.exit(0);
   }
 
-  console.log(`Running ${scenarios.length} regression scenarios against ${BASE}\n`);
+  console.log(`Running ${scenarios.length} regression scenarios against ${BASE} (concurrency: ${CONCURRENCY})\n`);
 
   // Fetch cache metadata for reproducibility
   let cacheMeta = null;
@@ -210,12 +215,9 @@ async function main() {
     report.by_principle[p.id] = { name: p.name, total: 0, passed: 0 };
   }
 
-  for (let i = 0; i < scenarios.length; i++) {
-    const scenario = scenarios[i];
-    const phoneNumber = `+1666${String(i).padStart(7, '0')}`;
-
-    process.stdout.write(`[${i + 1}/${scenarios.length}] ${scenario.name}... `);
-
+  // Run one scenario and return result object
+  async function runOne(scenario, index) {
+    const phoneNumber = `+1666${String(index).padStart(7, '0')}`;
     try {
       const conversation = await runScenario(scenario, phoneNumber);
       const judgment = await judgeScenario(scenario, conversation);
@@ -257,7 +259,7 @@ async function main() {
 
       // Score assertions
       let scenarioPassed = 0;
-      let scenarioTotal = scenario.assertions.length;
+      const scenarioTotal = scenario.assertions.length;
       const assertionResults = [];
 
       for (const assertion of scenario.assertions) {
@@ -271,62 +273,90 @@ async function main() {
           evidence: result?.evidence || null,
           reasoning: result?.reasoning || null,
         });
-
-        report.total_assertions++;
-        if (pass) {
-          report.assertions_passed++;
-          scenarioPassed++;
-        }
-
-        // Principle tracking
-        const pid = assertion.principle;
-        if (report.by_principle[pid]) {
-          report.by_principle[pid].total++;
-          if (pass) report.by_principle[pid].passed++;
-        }
+        if (pass) scenarioPassed++;
       }
 
-      const allPassed = scenarioPassed === scenarioTotal;
-      const codeFailNames = codeEvalFailures.map(f => f.name);
-      const codeTag = codeFailNames.length > 0
-        ? `  \x1b[33mCode: ${[...new Set(codeFailNames)].join(', ')}\x1b[0m`
-        : '';
-
-      if (allPassed) {
-        report.scenarios_passed++;
-        console.log(`\x1b[32mPASS\x1b[0m (${scenarioPassed}/${scenarioTotal} assertions)${codeTag}`);
-      } else {
-        report.scenarios_failed++;
-        console.log(`\x1b[31mFAIL\x1b[0m (${scenarioPassed}/${scenarioTotal} assertions)`);
-
-        // Print failed assertions
-        for (const ar of assertionResults) {
-          if (!ar.pass) {
-            console.log(`       ${ar.id} [${ar.principle}]: ${ar.reasoning || ar.check}`);
-          }
-        }
-        if (codeTag) console.log(`      ${codeTag}`);
-      }
-
-      report.scenarios.push({
+      return {
         name: scenario.name,
-        pass: allPassed,
+        pass: scenarioPassed === scenarioTotal,
         assertions_passed: scenarioPassed,
         assertions_total: scenarioTotal,
         assertions: assertionResults,
         conversation,
-        code_eval_failures: codeEvalFailures, code_eval_total: codeEvalTotal,
-      });
-
+        code_eval_failures: codeEvalFailures,
+        code_eval_total: codeEvalTotal,
+      };
     } catch (err) {
-      report.scenarios_errored++;
-      console.log(`\x1b[33mERROR\x1b[0m  ${err.message}`);
-      report.scenarios.push({
-        name: scenario.name,
-        pass: false,
-        error: err.message,
-      });
+      return { name: scenario.name, pass: false, error: err.message };
     }
+  }
+
+  // Run scenarios with concurrency, print results in order
+  const results = new Array(scenarios.length);
+  let nextToPrint = 0;
+  let completed = 0;
+
+  async function worker(startIdx) {
+    for (let i = startIdx; i < scenarios.length; i += CONCURRENCY) {
+      results[i] = await runOne(scenarios[i], i);
+      completed++;
+
+      // Print all consecutive completed results from nextToPrint
+      while (nextToPrint < scenarios.length && results[nextToPrint]) {
+        const r = results[nextToPrint];
+        const idx = nextToPrint + 1;
+        const codeFailNames = (r.code_eval_failures || []).map(f => f.name);
+        const codeTag = codeFailNames.length > 0
+          ? `  \x1b[33mCode: ${[...new Set(codeFailNames)].join(', ')}\x1b[0m`
+          : '';
+
+        if (r.error) {
+          console.log(`[${idx}/${scenarios.length}] ${r.name}... \x1b[33mERROR\x1b[0m  ${r.error}`);
+        } else if (r.pass) {
+          console.log(`[${idx}/${scenarios.length}] ${r.name}... \x1b[32mPASS\x1b[0m (${r.assertions_passed}/${r.assertions_total} assertions)${codeTag}`);
+        } else {
+          console.log(`[${idx}/${scenarios.length}] ${r.name}... \x1b[31mFAIL\x1b[0m (${r.assertions_passed}/${r.assertions_total} assertions)`);
+          for (const ar of (r.assertions || [])) {
+            if (!ar.pass) {
+              console.log(`       ${ar.id} [${ar.principle}]: ${ar.reasoning || ar.check}`);
+            }
+          }
+          if (codeTag) console.log(`      ${codeTag}`);
+        }
+        nextToPrint++;
+      }
+    }
+  }
+
+  // Launch workers
+  const workers = [];
+  for (let w = 0; w < Math.min(CONCURRENCY, scenarios.length); w++) {
+    workers.push(worker(w));
+  }
+  await Promise.all(workers);
+
+  // Aggregate results into report
+  for (const r of results) {
+    if (r.error) {
+      report.scenarios_errored++;
+    } else if (r.pass) {
+      report.scenarios_passed++;
+    } else {
+      report.scenarios_failed++;
+    }
+
+    // Aggregate assertions
+    for (const ar of (r.assertions || [])) {
+      report.total_assertions++;
+      if (ar.pass) report.assertions_passed++;
+      const pid = ar.principle;
+      if (report.by_principle[pid]) {
+        report.by_principle[pid].total++;
+        if (ar.pass) report.by_principle[pid].passed++;
+      }
+    }
+
+    report.scenarios.push(r);
   }
 
   // Summary

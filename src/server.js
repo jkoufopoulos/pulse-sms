@@ -27,7 +27,7 @@ app.use(helmet());
 
 // Parse URL-encoded bodies (Twilio sends form data)
 app.use(express.urlencoded({ extended: false, limit: '5kb' }));
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '5mb' }));
 
 // Public health check — no internal details (L10 fix)
 app.get('/', (req, res) => {
