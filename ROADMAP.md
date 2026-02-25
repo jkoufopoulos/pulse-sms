@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-02-24
+> Last updated: 2026-02-25
 
 ---
 
@@ -152,19 +152,100 @@ All 5 are pre-LLM staging — they set up state that the downstream `saveRespons
 
 ## Open Issues
 
-### P1 — Filter Persistence (was 50%, expected fixed)
+### Filter Drift — Root Cause Analysis (2026-02-25)
 
-**Fixed by step 2** (compound pre-router extraction, 2026-02-22). The pre-router now detects multi-dimension compounds ("free comedy", "late jazz", "comedy in bushwick") via word-boundary matching on free/time/category signals + `extractNeighborhood`. Requires 2+ filter dimensions OR 1 filter + detected neighborhood to trigger. Filters are persisted deterministically — no LLM involvement.
+**Status:** 2/26 scenarios passing (8%). The 2026-02-24 code fixes (mergeFilters, targeted clearing, CLEAR_SIGNALS guard, bare category, handleMore exhaustion) address **~4-6 of 24 failures**. Realistic estimate: **~25-33% pass rate** after fixes deploy. The 80% target requires work beyond filter state code.
 
-**Previous root cause:** The pre-router only detected single-dimension filters. Compounds fell through to the unified LLM, which picked correctly but didn't persist filters.
+**Analysis of all 24 failures by root cause:**
 
-**Needs verification:** Run regression evals (`--principle P1`) against live server to confirm improvement from 50%.
+#### Cause A: LLM Composition Failure (8 scenarios) — code is correct, LLM ignores it
 
-### P10 — Explicit Filter Removal (regression at 33%)
+The filter state is correct. The tagged pool has `ACTIVE_FILTER` and `[MATCH]` tags. But when `matchCount === 0` (no events match the filter), the LLM shows unmatched events without acknowledging the active filter. This is the **single biggest failure category**.
 
-Users saying "forget the comedy" or "show me everything" should clear filters. The pre-router catches common phrases, but semantic clearing ("just show me what's good") depends on the LLM's `clear_filters: true` response field.
+| # | Scenario | What LLM does wrong |
+|---|----------|---------------------|
+| 4 | comedy across hood switch | Shows mixed Bushwick picks, ignores `ACTIVE_FILTER: comedy` |
+| 11 | "what about comedy" | Says "comedy's not really my lane" despite comedy-tagged pool |
+| 13 | live music → electronic/DJ | Picks nightlife events for live_music filter (category taxonomy gap) |
+| 17 | jazz in cobble hill | Offers "film instead at BAM" — proactively abandons filter |
+| 21 | comedy in cobble hill | Shows trivia/folk events despite comedy filter |
+| 22 | free + live music | Shows karaoke (community) for live_music filter |
+| 3 | free stacking | Shows 1 event as recommendation instead of filtered list |
+| 18 | jazz in harlem → perennial | handleMore perennial path ignores active category (code bug, see Cause E) |
 
-**Status:** Pre-router regex covers the common cases. LLM semantic clearing works when it fires. The 33% failure rate needs investigation — may be pre-router regex gaps or LLM inconsistency.
+**Fix needed:** Prompt hardening in `UNIFIED_SYSTEM` — when `matchCount === 0` and `ACTIVE_FILTER` is set, the LLM MUST say "no [filter] in [hood] tonight" and offer alternatives, never silently show unfiltered events. This is the highest-impact change.
+
+#### Cause B: Thin Data Coverage (7 scenarios) — no matching events exist
+
+The filter persists correctly but the neighborhood has 0 events matching the filter. The system handles this gracefully ("not much jazz tonight") but the judge expects numbered picks. These are **not product bugs** — they're either data gaps or judge calibration issues.
+
+| # | Scenario | Coverage gap |
+|---|----------|-------------|
+| 1 | free comedy in Red Hook | 0 free comedy events in Red Hook + nearby |
+| 5 | jazz in Cobble Hill/Park Slope | 0 jazz events across 3 hoods on Monday |
+| 9 | live music in Astoria | 0 live music events |
+| 15 | free comedy in Harlem | 0 matching events → no picks saved → detail requests fail |
+| 20 | late in Astoria | 0 late events on Monday |
+| 24 | late night Crown Heights | 0 late events |
+| 6 | free in Prospect Heights | 1 event, user says "6" (invalid pick number) |
+
+**Fix needed:** Judge recalibration — pass scenarios where filter is acknowledged even with 0 picks. Separately, source coverage improvements help long-term.
+
+#### Cause C: Semantic Partial Clearing (5 scenarios) — LLM can't partially modify filters
+
+Users say "paid is fine too" or "show me paid ones too" (clear free_only, keep category). The LLM output contract has `clear_filters: boolean` (all-or-nothing). There's no way for the LLM to communicate *which* filter to clear. Our pre-router targeted clearing (Fix 2) only catches exact phrases like "forget the comedy", not semantic variants.
+
+| # | Scenario | User phrase | Expected behavior |
+|---|----------|-------------|-------------------|
+| 8 | compound cleared partially | "paid is fine too" | Clear free_only, keep jazz |
+| 12 | filter clear mid-compound | "paid is cool too just keep it jazz" | Clear free_only, keep jazz |
+| 23 | price filter removal | "show me paid ones too" | Clear free_only, keep jazz |
+| 16 | category removal preserves price | "actually just show me everything free" | Clear category, keep free_only |
+| 7 | time filter cleared by 'anytime' | "what else is going on tonight" | Ambiguous — judge expects time clear |
+
+**Fix needed:** Expand LLM contract: `clear_filters: string[]` (list of filter keys to clear). Handler maps keys to explicit nulls via `mergeFilters`. P1-sensitive: must validate LLM-reported keys against known filter names, never trust arbitrary strings.
+
+**P1 tension:** This gives the LLM limited state-writing power (naming which filters to clear). Mitigated by: (1) whitelist validation — only accept `category`, `subcategory`, `free_only`, `time_after`, `vibe`; (2) LLM only clears, never sets filter values; (3) code still owns what the filter values *are*.
+
+#### Cause D: Pre-Router Prefix/Filler Gaps (3 scenarios)
+
+Conversational prefixes prevent the pre-router from catching intent.
+
+| # | Scenario | User says | Why pre-router misses |
+|---|----------|-----------|----------------------|
+| 2 | comedy → jazz | "actually jazz" | "actually" prefix blocks bare category `^(?:jazz)$` |
+| 19 | clear stacked filters | "nah lemme just see whats happening" | Not in CLEAR_SIGNALS. "whats happening" = clear intent |
+| 14 | free filter survives pivot | MORE after 0 results | Fix 4 helps; thin coverage in NoHo is the real issue |
+
+**Fix options (tradeoffs):**
+- Add conversational prefixes ("actually", "hmm", "nah") to regex → increasingly brittle, risks false positives
+- Add "whats happening" to CLEAR_SIGNALS → specific fix, low risk
+- Accept that these are genuinely ambiguous and belong in the LLM path → principled per P6, but requires the LLM to report filter changes (see Cause C)
+
+**P6 assessment:** "actually jazz" is arguably deterministic (the word "jazz" is unambiguous), but "nah lemme just see whats happening" is genuinely ambiguous language. Adding ever-more regex patterns to the pre-router violates the spirit of P6: "reserve the LLM for genuinely ambiguous language."
+
+#### Cause E: handleMore / Perennial Path Issues (2 scenarios)
+
+| # | Scenario | Issue |
+|---|----------|-------|
+| 10 | jazz → MORE → hood switch | Exhaustion + hood switch → "no picks loaded" for detail request |
+| 18 | jazz → MORE → non-jazz perennial | Perennial path shows DJ venue for jazz-filtered session |
+
+**Fix needed:** `handleMore`'s perennial fallback at line 196-231 should filter perennials by active category before composing. Pure code fix, P1-compliant, no LLM involvement.
+
+---
+
+#### Summary: What Moves the Needle
+
+| Lever | Scenarios fixed | Effort | Principle risk |
+|-------|----------------|--------|----------------|
+| **Prompt hardening for zero-match pools** | ~8 (Cause A) | Low — prompt change only | None |
+| **Judge recalibration for thin coverage** | ~7 (Cause B) | Low — eval change only | None |
+| **Partial filter clearing via `clear_filters: string[]`** | ~5 (Cause C) | Medium — LLM contract + handler | P1 tension (mitigated by whitelist) |
+| **Perennial path filter respect** | ~2 (Cause E) | Low — pure code | None |
+| **Pre-router prefix tolerance** | ~2 (Cause D) | Low but brittle | P6 tension |
+
+Prompt hardening + judge recalibration alone would move pass rate from ~8% to ~50-60%. Adding partial clearing and perennial fix gets to ~70-80%.
 
 ### P5 — Temporal Accuracy (was 25%, expected fixed)
 
@@ -196,6 +277,22 @@ Users saying "forget the comedy" or "show me everything" should clear filters. T
 | "later tonight" time filter repeats same event | Time filter not excluding already-shown events | Needs investigation |
 | Comedy in Midtown — details fail after thin results | Session state gap: thin response may not save picks | May be fixed by step 1b |
 
+### Yutori Extraction — Series Events Missing Times (2026-02-25)
+
+**Status:** 19 Yutori events in cache have null `start_time_local` and `date_local`.
+
+**Root cause:** The extraction prompt in `src/prompts.js` has a rule: "For permanent venues with no specific date/time, set date_local and start_time_local to null." Claude interprets series/recurring events (e.g. "every Wednesday at 8pm", "running through March") as perennials and nulls their date/time fields, even when the newsletter text contains enough information to resolve a specific date.
+
+**Fix strategy:** Improve the extraction prompt to distinguish true perennials (permanent venues with no time-bound programming) from series events that have a recurring schedule. Series events should resolve to the next occurrence date. May also need post-extraction logic to resolve relative dates ("this Friday", "every Wed") against the newsletter's publication date.
+
+### Price Data Gap — 71.6% Missing Across Sources (2026-02-25)
+
+**Status:** 71.6% of events in the sent pool have no `price_display`. Worst offenders by source: DoNYC (96% missing), BAM (100%), RA (100%), Songkick (100%), SmallsLIVE (100%).
+
+**Impact:** The `free_claim_accuracy` code eval can't fully verify free filter correctness when most events lack price data. Users asking for "free" events get results where we can't confirm pricing.
+
+**Fix strategy:** Scraper-level improvements per source. Some sources have price data on detail pages but not list pages (would require extra fetches). Others genuinely don't expose pricing. Low priority — `is_free` boolean is more reliably populated than `price_display`.
+
 ### Deferred (post-MVP)
 
 | Issue | Why deferred |
@@ -210,6 +307,34 @@ Users saying "forget the comedy" or "show me everything" should clear filters. T
 ---
 
 ## Completed Work
+
+### Filter Drift Fix — 5 Bugs Across 4 Files (2026-02-24)
+
+Fixed the dominant product bug (filter_drift category at 23% pass rate). Five root causes identified and fixed:
+
+1. **`mergeFilters` explicit-key semantics** (`pipeline.js`) — Rewrote from OR logic (`next.value || base.value`) to `'key' in next` check. If a key EXISTS in incoming (even `null`/`false`), it overrides. If ABSENT, falls back to existing. Enables: category replacement (`{category:'jazz'}` overrides `{category:'comedy'}`), partial clearing (`{category:null}` clears category only), free clearing (`{free_only:false}` explicitly turns off free filter). Backward-compatible: existing callers only set keys they detect.
+
+2. **Targeted filter clearing** (`pre-router.js`) — Split single `clear_filters` regex into targeted + full branches. "forget the comedy" / "never mind the jazz" → extracts target, matches against `catMap`, returns `intent:'events'` with explicit null filter (feeds into `mergeFilters` for partial clear). "forget the free" → `{free_only:false}`. "forget the late" → `{time_after:null}`. Generic phrases ("nvm", "start over", "show me everything") → `intent:'clear_filters'` as before.
+
+3. **LLM `clear_filters` guard** (`handler.js`) — `CLEAR_SIGNALS` regex gates the LLM's `clear_filters:true` against user message content. Prevents hallucination on normal conversational turns while preserving semantic clearing ("just show me what's good", "surprise me"). P1 compliant: code validates LLM claim against user input.
+
+4. **handleMore exhaustion `saveResponseFrame`** (`intent-handlers.js`) — Final exhaustion path was sending SMS without calling `saveResponseFrame`, so `pendingNearby` was never set for nudge acceptance. Added `saveResponseFrame` before `sendSMS`.
+
+5. **Bare category detection** (`pre-router.js`) — Added bare category matching ("comedy", "jazz", "theater", "comedy shows") after structured prefix check, within `lastNeighborhood` guard. Catches single-word categories that previously fell through to LLM without filter persistence. Excludes "tonight" suffix (falls through to compound extraction for category+time).
+
+Test coverage: Updated `mergeFilters` tests for new explicit-key semantics (partial clearing, category replacement, free clearing). Added targeted clearing tests (category, free, time, subcategory). Added bare category tests. All 639 tests pass.
+
+### Eval Fidelity: Factual Verification, Source Completeness, P10 Expansion (2026-02-24)
+
+Phase 6+7 of the eval suite improvement plan — closes the gap between structural eval coverage and factual verification.
+
+- **Factual verification evals** — Enriched trace picks with event metadata (name, venue, neighborhood, category, is_free, start_time_local) at both pick-enrichment sites in handler.js. Added `active_filters` and `pool_meta` (matchCount, hardCount, softCount, isSparse) to traces. Added `active_skills` list for prompt debugging.
+- **4 new code evals** — `pick_count_accuracy` (numbered SMS items match picks), `neighborhood_accuracy` (picks are in claimed hood), `category_adherence` (≥75% match when filter active, with subcategory→category mapping), `free_claim_accuracy` (≥75% free when free filter active). Total evals: 15.
+- **Price transparency eval** — Checks that event pick SMS text contains price/free mention. Catches the "no price info" gap (P4 had 1 regression assertion).
+- **Schema compliance eval** — Checks LLM raw response is valid JSON with `sms_text` field. Detects the "hit a snag" fallback from JSON parse failures.
+- **Source field-completeness eval** (`src/evals/source-completeness.js`) — Per-source field expectations for 13 structured sources. Universal checks (id, name, venue_name, is_free, category) + source-specific required fields (BAM: neighborhood=Fort Greene, SmallsLIVE: subcategory=jazz, etc.) + invariant checks (NYC Parks: is_free=true). Runs automatically after each scrape via `refreshCache`. Logs warnings per source with sample failures.
+- **P10 clear_filters expansion** — Added 6 new regression scenarios (total: 10 P10 scenarios, 12 assertions). Tests pre-router exact patterns ("forget it", "nvm", "drop it"), LLM semantic clearing ("just show me what's good", "I'm open to anything"), and clear-then-reapply flows. Added 8 new pre-router unit tests including negative cases (prefix messages, compound messages).
+- **Pre-router regex fix** — `forget the .+` and `never mind the .+` patterns changed from `.+` to `[a-z ]+` to prevent matching compound messages like "forget the comedy, how about jazz" (which should fall through to the LLM for proper handling).
 
 ### Eval System Fix: Judge Calibration, Golden Fixes, Difficulty Tiers (2026-02-23)
 
@@ -431,6 +556,23 @@ Users saying "forget the comedy" or "show me everything" should clear filters. T
 | 3.5 | **Judge calibration + golden fixes** — calibrate judge prompt, fix MORE numbering and terse sign-offs in goldens, downgrade cache-dependent `must_pass` scenarios | **Done** (2026-02-23) |
 | 4 | **Difficulty tiers in practice** — `must_pass` failures block deploys, `should_pass` tracked as regression metric | Planned |
 | 5 | **Stability baseline** — `--repeat N` flag, per-scenario variance measurement, noise floor identification | Planned |
+| 6 | **Factual verification evals** — Enrich trace picks with event metadata, add 4 deterministic evals: pick_count_accuracy, neighborhood_accuracy, category_adherence, free_claim_accuracy | **Done** (2026-02-24) |
+| 7 | **Eval fidelity gaps** — Tighten thresholds, add price/schema/pool-metadata evals (see gap table below) | In progress |
+
+### Eval Fidelity Gaps
+
+Gaps that separate the current eval system from high-fidelity production quality. Prioritized by impact on user-facing failures.
+
+| # | Gap | Priority | Status | Notes |
+|---|-----|----------|--------|-------|
+| 1 | **Filter thresholds too lenient (50%)** — `category_adherence` and `free_claim_accuracy` pass when only half of picks match. Should be ≥75%. | P0 | **Done** (2026-02-24) | |
+| 2 | **No price transparency eval** — Prompt promises price info but no eval verifies it appears in SMS text. P4 has only 1 regression assertion. | P0 | **Done** (2026-02-24) | |
+| 3 | **No schema compliance eval** — `parseJsonFromResponse` has elaborate fallback logic but no metric on JSON parse failure rate. Failures produce "hit a snag" errors. | P0 | **Done** (2026-02-24) | |
+| 4 | **Tagged pool metadata not on traces** — `matchCount`, `hardCount`, `softCount`, `isSparse`, active skills not captured. Can't diagnose whether failures are pool tagging or LLM selection. | P0 | **Done** (2026-02-24) | |
+| 5 | **P10 clear_filters at 33% with only 4 assertions** — Three code paths (pre-router regex, LLM `clear_filters`, handler wipe) with minimal test coverage. | P1 | **Done** (2026-02-24) | 4→10 scenarios, 6→12 assertions. Fixed compound-message regex bug. |
+| 6 | **No structured source parser eval** — 13/18 sources use structured parsing with no field-completeness checks. Parser regressions only surface via downstream symptoms. | P1 | **Done** (2026-02-24) | `source-completeness.js` with per-source field expectations + invariants. Runs after each scrape. |
+| 7 | **Trace fetch race condition** — Pipeline eval runner fetches "most recent trace" after 500ms delay. Could grab wrong trace under concurrent load. | P2 | Planned | Correlate by input_message + phone |
+| 8 | **No dedicated handleMore path eval** — Legacy two-call flow not specifically tested. Filter state bugs in this path surface as vague scenario failures. | P2 | Planned | |
 
 **Phase 1 details (done):**
 - 70 scenarios assigned difficulty tiers: 5 `must_pass`, 33 `should_pass`, 32 `stretch`
@@ -454,7 +596,7 @@ First full 130-scenario eval run showed 35.4% pass rate (46/130). Analysis found
 2. **Golden fixes** — 17 pulse turns renumbered after MORE (4→1, 5→2, 6→3), 10 terse sign-off goldens replaced with warm-but-brief versions matching real system output, 8 failure_modes updated to stop penalizing warm sign-offs, 1 failure_mode flipped for correct MORE numbering expectation.
 3. **Difficulty downgrades** — 4 cache-dependent scenarios moved from `must_pass` to `should_pass`: Harlem jazz, FiDi→Brooklyn Heights, Prospect Heights MORE, Greenpoint quick pick. Tiers now: 26 must_pass, 72 should_pass, 32 stretch.
 
-**Post-fix eval results (2026-02-23):** 70/130 passed (53.8%), consistent with estimated ~54% true pass rate. must_pass: 81% (21/26). By category: abuse_off_topic 100%, happy_path 69%, edge_case 61%, poor_experience 35%, filter_drift 23%. The 5 remaining must_pass failures are real product bugs (MORE errors, LIC not recognized). filter_drift at 23% is the dominant real product problem — filters consistently drop across neighborhood switches, MORE commands, and compound stacking.
+**Post-fix eval results (2026-02-23):** 70/130 passed (53.8%), consistent with estimated ~54% true pass rate. must_pass: 81% (21/26). By category: abuse_off_topic 100%, happy_path 69%, edge_case 61%, poor_experience 35%, filter_drift 23%. The 5 remaining must_pass failures are real product bugs (MORE errors, LIC not recognized). filter_drift at 23% was the dominant real product problem — addressed by filter drift fix (2026-02-24): `mergeFilters` explicit-key semantics, targeted clearing, `CLEAR_SIGNALS` guard, bare category detection, handleMore exhaustion fix. Target: 80%+ filter_drift pass rate.
 
 ---
 
