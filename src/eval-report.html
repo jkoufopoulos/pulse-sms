@@ -523,7 +523,7 @@
   }
   .trace-inline {
     align-self: flex-start;
-    max-width: 80%;
+    max-width: 95%;
     font-size: 11px;
     color: #666;
     margin-top: -4px;
@@ -534,18 +534,76 @@
     padding: 2px 0;
   }
   .trace-inline summary:hover { color: #999; }
-  .trace-pool {
+  .trace-pool-wrap {
+    position: relative;
+    margin-top: 4px;
+  }
+  .trace-copy-btn {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    background: #222;
+    border: 1px solid #333;
+    color: #888;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    z-index: 1;
+  }
+  .trace-copy-btn:hover { color: #ccc; border-color: #555; }
+  .trace-pool-table {
+    width: 100%;
+    border-collapse: collapse;
     font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Monaco, monospace;
     font-size: 10px;
-    color: #555;
-    padding: 4px 8px;
     background: #111;
     border-radius: 6px;
-    margin-top: 4px;
-    max-height: 200px;
-    overflow-y: auto;
-    white-space: pre-wrap;
+    overflow: hidden;
   }
+  .trace-pool-table th {
+    text-align: left;
+    color: #555;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-bottom: 1px solid #222;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .trace-pool-table td {
+    padding: 3px 8px;
+    color: #777;
+    border-bottom: 1px solid #1a1a1a;
+    white-space: nowrap;
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .trace-pool-table tr.match-row td { color: #4ade80; }
+  .trace-pool-table td.event-name { max-width: 280px; }
+  .trace-pool-table td.venue-col { max-width: 180px; color: #666; }
+  .trace-pool-table a.trace-link {
+    color: #60a5fa;
+    text-decoration: none;
+    font-size: 9px;
+  }
+  .trace-pool-table a.trace-link:hover { text-decoration: underline; }
+  .trace-pool-scroll {
+    max-height: 260px;
+    overflow-y: auto;
+    border-radius: 6px;
+  }
+  .trace-tag {
+    display: inline-block;
+    font-size: 9px;
+    padding: 0 4px;
+    border-radius: 3px;
+    margin-right: 4px;
+  }
+  .trace-tag-match { background: #14532d; color: #4ade80; }
+  .trace-tag-free { background: #1e3a5f; color: #60a5fa; }
+  .trace-tag-cat { background: #3f3f46; color: #a1a1aa; }
   .cache-meta-bar {
     font-size: 12px;
     color: #666;
@@ -1620,18 +1678,58 @@ function renderTraceSummary(traceSummary, traceDebug) {
   }
 
   var pool = traceSummary.sent_pool || [];
-  var lines = pool.map(function(e) {
+  if (pool.length === 0) {
+    return '<details class="trace-inline"><summary>' + escHtml(label) + '</summary></details>';
+  }
+
+  // Build copyable plain-text version
+  var copyLines = pool.map(function(e) {
     var tag = e.filter_match ? '[MATCH] ' : '';
     var venue = e.venue_name ? ' @ ' + e.venue_name : '';
-    return tag + (e.name || e.id) + venue;
-  });
+    var price = e.is_free ? ' (free)' : (e.price_display ? ' (' + e.price_display + ')' : '');
+    var url = e.ticket_url ? ' ' + e.ticket_url : '';
+    return tag + (e.name || e.id) + venue + price + url;
+  }).join('\n');
+  var copyId = 'trace-copy-' + Math.random().toString(36).slice(2, 8);
 
   var html = '<details class="trace-inline">';
   html += '<summary>' + escHtml(label) + '</summary>';
-  if (lines.length > 0) {
-    html += '<div class="trace-pool">' + escHtml(lines.join('\n')) + '</div>';
+  html += '<div class="trace-pool-wrap">';
+  html += '<button class="trace-copy-btn" onclick="navigator.clipboard.writeText(document.getElementById(\'' + copyId + '\').dataset.copy).then(function(){var b=event.target;b.textContent=\'Copied!\';setTimeout(function(){b.textContent=\'Copy\'},1200)})">Copy</button>';
+  html += '<div id="' + copyId + '" data-copy="' + escHtml(copyLines).replace(/"/g, '&quot;') + '">';
+  html += '<div class="trace-pool-scroll"><table class="trace-pool-table">';
+  html += '<tr><th></th><th>Event</th><th>Venue</th><th>Hood</th><th>Cat</th><th>Time</th><th>Price</th><th>Link</th></tr>';
+
+  for (var i = 0; i < pool.length; i++) {
+    var e = pool[i];
+    var rowClass = e.filter_match ? ' class="match-row"' : '';
+    var tags = '';
+    if (e.filter_match) tags += '<span class="trace-tag trace-tag-match">MATCH</span>';
+
+    var time = '';
+    if (e.start_time_local) {
+      var parts = e.start_time_local.split('T');
+      time = parts.length > 1 ? parts[1].slice(0, 5) : e.start_time_local;
+    }
+
+    var price = e.is_free ? 'free' : (e.price_display || '--');
+    var link = e.ticket_url
+      ? '<a class="trace-link" href="' + escHtml(e.ticket_url) + '" target="_blank" rel="noopener">link</a>'
+      : '';
+
+    html += '<tr' + rowClass + '>';
+    html += '<td>' + tags + '</td>';
+    html += '<td class="event-name" title="' + escHtml(e.name || '') + '">' + escHtml(e.name || e.id) + '</td>';
+    html += '<td class="venue-col" title="' + escHtml(e.venue_name || '') + '">' + escHtml(e.venue_name || '--') + '</td>';
+    html += '<td>' + escHtml(e.neighborhood || '--') + '</td>';
+    html += '<td>' + escHtml(e.category || '--') + '</td>';
+    html += '<td>' + escHtml(time || '--') + '</td>';
+    html += '<td>' + escHtml(price) + '</td>';
+    html += '<td>' + link + '</td>';
+    html += '</tr>';
   }
-  html += '</details>';
+
+  html += '</table></div></div></div></details>';
   return html;
 }
 

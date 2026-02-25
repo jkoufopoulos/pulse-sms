@@ -389,10 +389,12 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
     neighborhood: e.neighborhood,
     category: e.category,
     start_time_local: e.start_time_local,
+    date_local: e.date_local,
     is_free: e.is_free,
     price_display: e.price_display,
     source_name: e.source_name,
     filter_match: e.filter_match,
+    ticket_url: e.ticket_url || null,
   }));
   trace.events.pool_meta = { matchCount, hardCount, softCount, isSparse };
 
@@ -642,10 +644,12 @@ async function handleMessageAI(phone, message) {
         neighborhood: e.neighborhood,
         category: e.category,
         start_time_local: e.start_time_local,
+        date_local: e.date_local,
         is_free: e.is_free,
         price_display: e.price_display,
         source_name: e.source_name,
         filter_match: e.filter_match,
+        ticket_url: e.ticket_url || null,
       }));
       const composeStart = Date.now();
       const result = await composeResponse(message, composeEvents, hood, filters, { excludeIds, skills: enrichedSkills, conversationHistory: history });
