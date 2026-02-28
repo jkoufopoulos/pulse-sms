@@ -104,6 +104,14 @@ function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
     map_url: null,
     map_hint: e.map_hint || null,
     evidence: e.evidence || null,
+    // Carry raw recurrence fields for downstream pattern detection (transient, not persisted to DB)
+    ...((e.is_recurring || e.recurrence_day || e.recurrence_time) ? {
+      _raw: {
+        is_recurring: e.is_recurring || false,
+        recurrence_day: e.recurrence_day || null,
+        recurrence_time: e.recurrence_time || null,
+      },
+    } : {}),
   };
 }
 

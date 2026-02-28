@@ -208,6 +208,7 @@ function preRoute(message, session) {
   // Explicit filter clearing — requires active filters in session
   if (session?.lastFilters && Object.values(session.lastFilters).some(Boolean)) {
     // Targeted filter clearing — "forget the comedy", "drop the free", "never mind the time"
+    // Only emit the key(s) being cleared so other filters compound via mergeFilters.
     const targetedCatClear = msg.match(/^(?:forget|never mind|drop|lose|ditch)\s+(?:the\s+)?(.+)$/i);
     if (targetedCatClear) {
       const target = targetedCatClear[1].trim().toLowerCase();
@@ -216,16 +217,16 @@ function preRoute(message, session) {
         if (new RegExp(`^(?:${pattern})(?:\\s+(?:filter|stuff))?$`, 'i').test(target)) {
           const clearFilters = {};
           for (const key of Object.keys(catInfo)) clearFilters[key] = null;
-          return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, ...clearFilters } };
+          return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: clearFilters };
         }
       }
       // Check for free clear
       if (/^free(?:\s+(?:filter|stuff|only))?$/i.test(target)) {
-        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, free_only: false } };
+        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { free_only: false } };
       }
       // Check for time clear
       if (/^(?:time|late|tonight|after midnight|time (?:filter|constraint))$/i.test(target)) {
-        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, time_after: null } };
+        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { time_after: null } };
       }
     }
 
@@ -236,18 +237,22 @@ function preRoute(message, session) {
   }
 
   // --- Session-aware filter follow-ups (deterministic detection → unified LLM composition) ---
-  // These return intent='events' with filters; the handler injects filters and uses the unified branch.
+  // These return intent='events' with ONLY the detected filter key(s).
+  // mergeFilters uses key-presence semantics: keys absent from the incoming object
+  // fall back to existing session filters (compounding). Including all keys from
+  // base.filters would overwrite existing filters with null — causing the
+  // "free replaces comedy" stacking bug.
   if (session?.lastNeighborhood && session?.lastPicks?.length > 0) {
     // Free (single-dimension)
     if (/^(free|free stuff|free events|anything free)$/i.test(msg)) {
-      return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, free_only: true } };
+      return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { free_only: true } };
     }
 
     // Category follow-ups (single-dimension, structured prefix required)
     for (const [pattern, catInfo] of Object.entries(catMap)) {
       const catRegex = new RegExp(`^(?:how about|what about|any|show me|got any|have any|know any)\\s+(?:${pattern})(?:\\s+(?:night|stuff|shows?|events?|tonight|picks?|options?))*$`, 'i');
       if (catRegex.test(msg)) {
-        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, ...catInfo } };
+        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...catInfo } };
       }
     }
 
@@ -257,7 +262,7 @@ function preRoute(message, session) {
     for (const [pattern, catInfo] of Object.entries(catMap)) {
       const bareRegex = new RegExp(`^(?:${pattern})(?:\\s+(?:stuff|shows?|events?|picks?))?$`, 'i');
       if (bareRegex.test(msg)) {
-        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, ...catInfo } };
+        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...catInfo } };
       }
     }
 
@@ -268,20 +273,20 @@ function preRoute(message, session) {
       const hasCatWord = Object.keys(catMap).some(p => new RegExp(`\\b(?:${p})\\b`, 'i').test(msg));
       const hasFreeWord = /\bfree\b/i.test(msg);
       if (!hasCatWord && !hasFreeWord) {
-        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, time_after: specificTime } };
+        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { time_after: specificTime } };
       }
     }
 
     // Time follow-ups (single-dimension) — fuzzy phrases
     if (/^(?:how about\s+)?(?:later(?:\s+tonight)?|after\s+midnight|late(?:r)?\s*night|anything?\s+late)$/i.test(msg)) {
       const timeAfter = /midnight/i.test(msg) ? '00:00' : '22:00';
-      return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, time_after: timeAfter } };
+      return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { time_after: timeAfter } };
     }
 
     // Vibe follow-ups (single-dimension)
     const vibeMatch = msg.match(/^(?:something|anything|how about something|got anything)\s+(chill|wild|weird|romantic|low-key|fun|crazy|mellow|cozy|rowdy|intimate|energetic|upbeat|laid-back)$/i);
     if (vibeMatch) {
-      return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...base.filters, vibe: vibeMatch[1].toLowerCase() } };
+      return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { vibe: vibeMatch[1].toLowerCase() } };
     }
   }
 
@@ -352,7 +357,8 @@ function preRoute(message, session) {
   const filterDims = [hasFree, compoundTime, detectedCat, compoundDateRange].filter(Boolean).length;
   if (filterDims >= 1) {
     const hood = detectedHood || session?.lastNeighborhood || null;
-    const filters = { ...base.filters };
+    // Only include detected keys — undetected keys fall back to session via mergeFilters
+    const filters = {};
     if (hasFree) filters.free_only = true;
     if (compoundTime) filters.time_after = compoundTime;
     if (detectedCat) Object.assign(filters, detectedCat);

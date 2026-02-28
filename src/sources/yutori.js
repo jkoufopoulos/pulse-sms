@@ -311,6 +311,49 @@ async function ingestFromGmail() {
   return saved;
 }
 
+/**
+ * Scan extracted events for recurrence markers and upsert into recurring_patterns table.
+ */
+function processRecurrencePatterns(events) {
+  const recurring = events.filter(e => e._raw?.is_recurring && e._raw?.recurrence_day);
+  if (recurring.length === 0) return;
+
+  try {
+    const { upsertPattern } = require('../db');
+    let count = 0;
+    for (const e of recurring) {
+      upsertPattern({
+        name: e.name,
+        venue_name: e.venue_name || 'TBA',
+        venue_address: e.venue_address || null,
+        neighborhood: e.neighborhood || null,
+        day_of_week: e._raw.recurrence_day,
+        time_local: e._raw.recurrence_time || null,
+        end_time_local: null,
+        category: e.category || null,
+        subcategory: e.subcategory || null,
+        is_free: e.is_free || false,
+        price_display: e.price_display || null,
+        description_short: e.description_short || null,
+        source_name: 'yutori',
+        source_url: e.source_url || null,
+        ticket_url: e.ticket_url || null,
+        extraction_confidence: e.extraction_confidence ?? null,
+        last_confirmed: new Date().toISOString().slice(0, 10),
+      });
+      count++;
+    }
+    if (count > 0) {
+      console.log(`Yutori: ${count} recurring patterns upserted`);
+    }
+  } catch (err) {
+    // SQLite not available — skip pattern detection
+    if (err.code !== 'MODULE_NOT_FOUND') {
+      console.warn('Yutori: failed to upsert recurring patterns:', err.message);
+    }
+  }
+}
+
 async function fetchYutoriEvents() {
   console.log('Fetching Yutori agent briefings...');
   try {
@@ -389,7 +432,7 @@ async function fetchYutoriEvents() {
       const results = await Promise.allSettled(
         batch.map(async ({ file, content }) => {
           console.log(`Yutori: extracting ${file} (${content.length} chars)`);
-          const preamble = `[YUTORI CONTEXT]\nThis is a curated Yutori agent briefing about NYC events.\nEach event typically has: name, description, date/time, venue, address, price, source URL.\nExtract ALL events — including listening sessions, art openings, comedy, trivia, and small one-offs.\n[END CONTEXT]\n\n`;
+          const preamble = `[YUTORI CONTEXT]\nThis is a curated Yutori agent briefing about NYC events.\nEach event typically has: name, description, date/time, venue, address, price, source URL.\nExtract ALL events — including listening sessions, art openings, comedy, trivia, and small one-offs.\n\nRECURRENCE DETECTION:\nMany Yutori events are recurring weekly. Look for:\n- "every [day]", "weekly", "[day]s at [time]"\n- "Next: [date]" with a day-of-week pattern\n- Trivia nights, open mics, DJ residencies are often recurring\nSet is_recurring=true, recurrence_day, and recurrence_time when detected.\n[END CONTEXT]\n\n`;
           const enrichedContent = preamble + content;
           captureExtractionInput('yutori', enrichedContent, null);
           const result = await extractEvents(enrichedContent, 'yutori', null);
@@ -418,6 +461,9 @@ async function fetchYutoriEvents() {
         console.warn(`Yutori: failed to move ${file}: ${err.message}`);
       }
     }
+
+    // Detect recurring patterns and upsert to SQLite
+    processRecurrencePatterns(events);
 
     saveCachedEvents(events);
     console.log(`Yutori: ${events.length} events from ${files.length} briefings`);

@@ -15,6 +15,7 @@ require('./unit/ai.test');
 require('./unit/curation.test');
 require('./unit/skills.test');
 require('./unit/scrapers.test');
+require('./unit/db.test');
 const misc = require('./unit/misc.test');
 const profile = require('./unit/preference-profile.test');
 

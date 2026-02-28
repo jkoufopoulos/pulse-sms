@@ -45,6 +45,16 @@ NEEDS_REVIEW TRIGGERS — set needs_review to true when any of these apply:
 - both venue_name and neighborhood are missing
 - price information is contradictory (e.g. "free" and "$20" in same listing)
 
+RECURRENCE DETECTION
+- If the source text describes a recurring event (e.g. "every Tuesday", "weekly",
+  "Next: March 5"), set is_recurring to true and extract recurrence_day
+  (day of week: "monday"..."sunday") and recurrence_time (HH:MM 24hr).
+- Only set is_recurring when recurrence is explicitly stated, not inferred.
+- If a recurring event has a specific next date, extract BOTH date_local for
+  the occurrence AND the recurrence fields for the pattern.
+- Signals: "every [day]", "weekly", "[day]s at [time]", "Next: [date]",
+  "recurring", "ongoing series".
+
 DEDUPE HINT
 - If multiple items appear to describe the same event, still output them separately; downstream will dedupe by name+venue+date.
 </rules>
@@ -80,7 +90,10 @@ Return STRICT JSON with an array of events:
         "time_quote": "exact text or null",
         "location_quote": "exact text or null",
         "price_quote": "exact text or null"
-      }
+      },
+      "is_recurring": "boolean, true if explicitly recurring",
+      "recurrence_day": "monday|tuesday|wednesday|thursday|friday|saturday|sunday or null",
+      "recurrence_time": "HH:MM (24hr) or null"
     }
   ]
 }

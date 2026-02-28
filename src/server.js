@@ -469,6 +469,8 @@ function shutdown(signal) {
   clearReferralInterval();
   // Flush captured conversations before exit
   try { require('./traces').stopConversationCapture(); } catch {}
+  // Close SQLite connection
+  try { require('./db').closeDb(); } catch {}
   server.close(() => {
     console.log('Server closed');
     process.exit(0);

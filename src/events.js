@@ -46,16 +46,40 @@ let refreshPromise = null; // mutex to prevent concurrent refreshes
 
 const CACHE_FILE = path.join(__dirname, '../data/events-cache.json');
 
-// Load persisted event cache on boot (stale but usable until fresh scrape completes)
+// Load persisted event cache on boot — try SQLite first, fall back to JSON
 try {
-  const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-  if (cached.events?.length > 0) {
-    eventCache = cached.events;
-    cacheTimestamp = cached.timestamp || 0;
-    const ageMin = cacheTimestamp ? Math.round((Date.now() - cacheTimestamp) / 60000) : '?';
-    console.log(`Loaded ${eventCache.length} persisted events (${ageMin}min old)`);
+  const { getEventsInRange, generateOccurrences, importFromJsonCache } = require('./db');
+  // Auto-import JSON cache on first boot with SQLite
+  importFromJsonCache(CACHE_FILE);
+  const today = getNycDateString(0);
+  const weekOut = getNycDateString(7);
+  const dbEvents = getEventsInRange(today, weekOut);
+  if (dbEvents.length > 0) {
+    const occurrences = generateOccurrences(today, weekOut);
+    const seenIds = new Set(dbEvents.map(e => e.id));
+    const fresh = occurrences.filter(o => !seenIds.has(o.id));
+    eventCache = filterKidsEvents([...dbEvents, ...fresh]);
+    cacheTimestamp = Date.now();
+    console.log(`Loaded ${eventCache.length} events from SQLite (${dbEvents.length} scraped + ${fresh.length} recurring)`);
   }
-} catch { /* file doesn't exist yet — first deploy */ }
+} catch (err) {
+  // SQLite not available or failed — fall through to JSON
+  if (err.code !== 'MODULE_NOT_FOUND') {
+    console.warn('SQLite boot failed, falling back to JSON:', err.message);
+  }
+}
+// JSON fallback (also serves as cache for non-SQLite deployments)
+if (eventCache.length === 0) {
+  try {
+    const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+    if (cached.events?.length > 0) {
+      eventCache = cached.events;
+      cacheTimestamp = cached.timestamp || 0;
+      const ageMin = cacheTimestamp ? Math.round((Date.now() - cacheTimestamp) / 60000) : '?';
+      console.log(`Loaded ${eventCache.length} persisted events from JSON (${ageMin}min old)`);
+    }
+  } catch { /* file doesn't exist yet — first deploy */ }
+}
 
 // --- Source health tracking (expanded) ---
 function makeHealthEntry() {
@@ -307,12 +331,13 @@ async function refreshCache() {
     }
 
     // Filter out stale/far-future events and kids events at scrape time
+    // 30-day window for SQLite storage; 7-day window applied at serving time
     const today = getNycDateString(0);
-    const weekOut = getNycDateString(7);
+    const monthOut = getNycDateString(30);
     const dateFiltered = allEvents.filter(e => {
       const d = getEventDate(e);
       if (!d) return true; // keep undated events (perennials, venues)
-      return d >= today && d <= weekOut;
+      return d >= today && d <= monthOut;
     });
     const validEvents = filterKidsEvents(dateFiltered);
     const staleCount = allEvents.length - dateFiltered.length;
@@ -339,13 +364,36 @@ async function refreshCache() {
       } catch (err) { console.error('Failed to persist venues:', err.message); }
     }
 
-    eventCache = validEvents;
-    cacheTimestamp = Date.now();
-
-    // Persist cache to disk so next deploy starts with usable data
+    // Write all 30-day events to SQLite, then rebuild 7-day serving cache
+    const weekOut = getNycDateString(7);
     try {
-      fs.writeFileSync(CACHE_FILE, JSON.stringify({ events: validEvents, timestamp: cacheTimestamp }));
-      console.log(`Persisted ${validEvents.length} events to cache file`);
+      const db = require('./db');
+      db.upsertEvents(validEvents);
+      db.pruneOldEvents(getNycDateString(-30));
+      // Rebuild serving cache from SQLite (7-day window) + recurring patterns
+      const dbEvents = db.getEventsInRange(today, weekOut);
+      const occurrences = db.generateOccurrences(today, weekOut);
+      const seenIds = new Set(dbEvents.map(e => e.id));
+      const freshOccurrences = occurrences.filter(o => !seenIds.has(o.id));
+      eventCache = filterKidsEvents([...dbEvents, ...freshOccurrences]);
+      cacheTimestamp = Date.now();
+      console.log(`SQLite: ${validEvents.length} events stored, serving ${eventCache.length} (${dbEvents.length} scraped + ${freshOccurrences.length} recurring)`);
+    } catch (err) {
+      // SQLite failed — fall back to 7-day in-memory cache
+      console.warn('SQLite write failed, using in-memory cache:', err.message);
+      const weekFiltered = validEvents.filter(e => {
+        const d = getEventDate(e);
+        if (!d) return true;
+        return d >= today && d <= weekOut;
+      });
+      eventCache = weekFiltered;
+      cacheTimestamp = Date.now();
+    }
+
+    // Persist JSON cache for backward compat / fallback
+    try {
+      fs.writeFileSync(CACHE_FILE, JSON.stringify({ events: eventCache, timestamp: cacheTimestamp }));
+      console.log(`Persisted ${eventCache.length} events to cache file`);
     } catch (err) { console.error('Failed to persist event cache:', err.message); }
 
     // Update scrape-level stats
@@ -469,23 +517,45 @@ async function refreshSources(sourceNames) {
     console.log(`  ${label}: ${events.length} events (${status})`);
   }
 
-  // Apply date + kids filters to new events only
+  // Apply 30-day date filter + kids filter to new events
   const today = getNycDateString(0);
-  const weekOut = getNycDateString(7);
+  const monthOut = getNycDateString(30);
   const dateFiltered = newEvents.filter(e => {
     const d = getEventDate(e);
     if (!d) return true;
-    return d >= today && d <= weekOut;
+    return d >= today && d <= monthOut;
   });
   const validNew = filterKidsEvents(dateFiltered);
 
-  eventCache = [...kept, ...validNew];
-  cacheTimestamp = Date.now();
-
   // Resolve neighborhoods for new events via venue map + geocoding
-  await batchGeocodeEvents(eventCache);
+  await batchGeocodeEvents(validNew);
 
-  // Persist updated cache
+  // Write to SQLite and rebuild 7-day serving cache
+  const weekOut = getNycDateString(7);
+  try {
+    const db = require('./db');
+    db.deleteEventsBySource(targets.map(s => s.label));
+    db.upsertEvents(validNew);
+    // Rebuild from SQLite
+    const dbEvents = db.getEventsInRange(today, weekOut);
+    const occurrences = db.generateOccurrences(today, weekOut);
+    const seenIds = new Set(dbEvents.map(e => e.id));
+    const freshOccurrences = occurrences.filter(o => !seenIds.has(o.id));
+    eventCache = filterKidsEvents([...dbEvents, ...freshOccurrences]);
+    cacheTimestamp = Date.now();
+  } catch (err) {
+    // SQLite failed — fall back to in-memory merge
+    console.warn('SQLite selective refresh failed, using in-memory:', err.message);
+    const weekFiltered = validNew.filter(e => {
+      const d = getEventDate(e);
+      if (!d) return true;
+      return d >= today && d <= weekOut;
+    });
+    eventCache = [...kept, ...weekFiltered];
+    cacheTimestamp = Date.now();
+  }
+
+  // Persist JSON cache for backward compat
   try {
     fs.writeFileSync(CACHE_FILE, JSON.stringify({ events: eventCache, timestamp: cacheTimestamp }, null, 2));
   } catch (err) {
