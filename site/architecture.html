@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pulse — Architecture</title>
+  <title>Bestie — Architecture</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -484,7 +484,7 @@
 
 <nav>
   <div class="nav-inner">
-    <a href="index.html" class="nav-logo">Pulse</a>
+    <a href="index.html" class="nav-logo">Bestie</a>
     <span class="nav-sep">/</span>
     <span class="nav-page">Architecture</span>
   </div>
@@ -493,7 +493,7 @@
 <!-- Header -->
 <header class="page-header">
   <div class="container">
-    <h1>How Pulse <em>works</em></h1>
+    <h1>How Bestie <em>works</em></h1>
     <p class="subtitle">A text message comes in. 18 scrapers, a unified AI layer, a tagged event pool, and a 480-character limit later, a recommendation goes out.</p>
   </div>
 </header>
@@ -504,8 +504,8 @@
     <p class="section-label">Overview</p>
     <h2 class="section-title">Text in, picks out</h2>
     <div class="section-body">
-      <p>Pulse is an SMS-based AI assistant that recommends NYC nightlife and events. A user texts a neighborhood name and gets back curated picks within seconds. The entire experience happens in a single SMS thread &mdash; no app, no account, no links until asked.</p>
-      <p>Behind the scenes, Pulse scrapes <strong>18 event sources</strong> every morning, deduplicates and caches them in memory, then uses a lightweight <strong>pre-router</strong> for mechanical shortcuts and a <strong>unified AI call</strong> (Claude Haiku) for everything semantic &mdash; understanding intent, picking events from a tagged pool, and writing the SMS in a single pass.</p>
+      <p>Bestie is an SMS-based AI assistant that recommends NYC nightlife and events. A user texts a neighborhood name and gets back curated picks within seconds. The entire experience happens in a single SMS thread &mdash; no app, no account, no links until asked.</p>
+      <p>Behind the scenes, Bestie scrapes <strong>18 event sources</strong> every morning, deduplicates and caches them in memory, then uses a lightweight <strong>pre-router</strong> for mechanical shortcuts and a <strong>unified AI call</strong> (Claude Haiku) for everything semantic &mdash; understanding intent, picking events from a tagged pool, and writing the SMS in a single pass.</p>
     </div>
 
     <div class="stats">
@@ -680,7 +680,7 @@
     <p class="section-label">Data Pipeline</p>
     <h2 class="section-title">Daily scrape, in-memory cache</h2>
     <div class="section-body">
-      <p>Every morning at 10am ET, Pulse runs all 18 scrapers in parallel. Each scraper extracts structured event data from its source &mdash; parsing HTML, hitting APIs, or using Claude to extract from newsletters. Events are deduped across sources (hashed by name + venue + date), ranked by source trust weight, and cached in memory. No scraping happens in the hot request path.</p>
+      <p>Every morning at 10am ET, Bestie runs all 18 scrapers in parallel. Each scraper extracts structured event data from its source &mdash; parsing HTML, hitting APIs, or using Claude to extract from newsletters. Events are deduped across sources (hashed by name + venue + date), ranked by source trust weight, and cached in memory. No scraping happens in the hot request path.</p>
     </div>
 
     <div class="flow">
@@ -1034,7 +1034,7 @@
       <summary style="color: var(--coral);">core <span class="skill-condition">&mdash; always on. Persona, format, 480-char limit.</span></summary>
       <div class="detail-body">
         <p>Defines who Claude is and how to write. This is the only skill that's always included.</p>
-        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">You are Pulse: an NYC "plugged-in friend" who curates the best upcoming events. You text like a real person — warm, opinionated, concise. Never robotic.
+        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">You are Bestie: an NYC "plugged-in friend" who curates the best upcoming events. You text like a real person — warm, opinionated, concise. Never robotic.
 
 PICK PRIORITY ORDER:
 1. Tonight first: if an event's day is "TODAY", prefer it over tomorrow events.
@@ -1191,7 +1191,7 @@ $ node scripts/run-ab-eval.js          <span class="hl-dim"># Layer 5: A/B compa
 
 <footer>
   <div class="footer-inner">
-    <span class="footer-brand">Pulse</span>
+    <span class="footer-brand">Bestie</span>
     <span class="footer-note">Built in Brooklyn</span>
   </div>
 </footer>
