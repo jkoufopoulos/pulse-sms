@@ -328,8 +328,9 @@ function parseFormatA(content, currentDate, currentDayName) {
 }
 
 /**
- * Parse Format B: "Venue — Neighborhood, Borough — [Address] — Day — Time [— recurrence]"
- * Found in curated trivia digests with em-dash separators.
+ * Parse Format B/D: em-dash separated trivia events.
+ * Format B: "Venue — Neighborhood, Borough — [Address] — Day — Time [— recurrence]"
+ * Format D: "Venue — Neighborhood, Borough — Day, Date @ Time — Price"
  */
 function parseFormatB(content, dayDateMap, baseDate) {
   const segments = content.split(/\s*—\s*/).map(s => s.trim()).filter(Boolean);
@@ -337,19 +338,33 @@ function parseFormatB(content, dayDateMap, baseDate) {
 
   const venue = segments[0];
   const locationInfo = segments[1];
+  const refYear = parseInt(baseDate.slice(0, 4), 10);
 
   let address = null;
   let dayName = null;
   let timeStr = null;
+  let explicitDate = null;
+  let priceText = null;
 
   for (let i = 2; i < segments.length; i++) {
     const seg = segments[i].replace(/\.\s*$/, '').trim();
     if (!seg) continue;
 
+    // Combined day+date+time: "Tuesday, Mar 4 @ 7:00 PM"
+    const combinedMatch = seg.match(/(\w+day),?\s+(\w+)\s+(\d{1,2})\s*@\s*(.+)/i);
+    if (combinedMatch) {
+      dayName = combinedMatch[1].toLowerCase();
+      explicitDate = resolveMonthDay(combinedMatch[2], combinedMatch[3], refYear);
+      timeStr = combinedMatch[4].trim();
+      continue;
+    }
+
     if (/^\w+day$/i.test(seg)) {
       dayName = seg.toLowerCase();
     } else if (/\d{1,2}:\d{2}\s*[AP]M/i.test(seg)) {
       timeStr = seg;
+    } else if (/^\$/.test(seg) || /^free$/i.test(seg)) {
+      priceText = seg;
     } else if (/\d/.test(seg) && seg.length > 10 && !/^yes/i.test(seg)) {
       address = seg;
     }
@@ -359,10 +374,16 @@ function parseFormatB(content, dayDateMap, baseDate) {
 
   const neighborhood = locationInfo.split(',')[0].trim();
   const { start, end } = timeStr ? parseTimeRange(timeStr) : { start: null, end: null };
-  const date = dayName ? (dayDateMap[dayName] || nextDayOfWeek(dayName, baseDate)) : null;
+  const date = explicitDate || (dayName ? (dayDateMap[dayName] || nextDayOfWeek(dayName, baseDate)) : null);
+
+  const isFree = !priceText || /free/i.test(priceText);
+  const isGameEvent = /trivia|bingo|quiz/i.test(venue);
+  const name = isGameEvent
+    ? (neighborhood ? `${venue} (${neighborhood})` : venue)
+    : (neighborhood ? `Trivia Night at ${venue} (${neighborhood})` : `Trivia Night at ${venue}`);
 
   return {
-    name: `Trivia Night at ${venue} (${neighborhood})`,
+    name,
     venue_name: venue,
     venue_address: address,
     neighborhood,
@@ -370,6 +391,44 @@ function parseFormatB(content, dayDateMap, baseDate) {
     start_time_local: start,
     end_time_local: end,
     dayName,
+    isFree,
+    priceText: isFree ? 'Free' : priceText,
+  };
+}
+
+/**
+ * Parse Format E: "Venue (Neighborhood[, Borough]) @ Time [— Price]"
+ * Found in "previously reported" sections under day-of-week headers.
+ */
+function parseFormatE(content, currentDate, currentDayName) {
+  const m = content.match(/^(.+?)\s*\(([^)]+)\)\s*@\s*(\d{1,2}:\d{2}\s*[AP]M)/i);
+  if (!m) return null;
+
+  const [, venue, hoodBoro, timeStr] = m;
+  const neighborhood = hoodBoro.split(',')[0].trim();
+  const startTime = parseTo24h(timeStr);
+
+  // Check for price after em-dash
+  const priceMatch = content.match(/—\s*(.+)$/);
+  const priceText = priceMatch ? priceMatch[1].trim() : null;
+  const isFree = !priceText || /free/i.test(priceText);
+
+  const isGameEvent = /trivia|bingo|quiz/i.test(venue);
+  const name = isGameEvent
+    ? (neighborhood ? `${venue} (${neighborhood})` : venue)
+    : (neighborhood ? `Trivia Night at ${venue} (${neighborhood})` : `Trivia Night at ${venue}`);
+
+  return {
+    name,
+    venue_name: venue.trim(),
+    venue_address: null,
+    neighborhood,
+    date_local: currentDate,
+    start_time_local: startTime,
+    end_time_local: null,
+    dayName: currentDayName,
+    isFree,
+    priceText: isFree ? 'Free' : priceText,
   };
 }
 
@@ -455,7 +514,7 @@ function parseTriviaEvents(text, filename) {
     if (!content || content.length < 10) continue;
 
     // Skip metadata/summary lines
-    if (/^(Entry fee|Registration|Format:|Prizes|Most events|Themed nights|Weekly recurring|21\+ requirement|Earliest upcoming)/i.test(content)) continue;
+    if (/^(Entry fee|Registration|Format:|Prizes|Most events|Themed nights|Weekly recurring|21\+ requirement|Earliest upcoming|Event:|Day & time:|Locations:|Team size:)/i.test(content)) continue;
 
     let event = null;
 
@@ -466,13 +525,21 @@ function parseTriviaEvents(text, filename) {
       event = parseFormatC(content, refYear);
     } else if (hasEmDash) {
       event = parseFormatB(content, dayDateMap, baseDate);
+      // Format B returns null for 2-segment lines — try Format E
+      if (!event) {
+        event = parseFormatE(content, currentDate, currentDayName);
+      }
     } else {
-      event = parseFormatA(content, currentDate, currentDayName);
+      event = parseFormatE(content, currentDate, currentDayName);
+      if (!event) {
+        event = parseFormatA(content, currentDate, currentDayName);
+      }
     }
 
     if (!event) continue;
 
     const dayName = event.dayName || (event.date_local ? getDayName(event.date_local) : null);
+    const isFree = event.isFree !== false;
 
     events.push({
       name: event.name,
@@ -482,8 +549,8 @@ function parseTriviaEvents(text, filename) {
       date_local: event.date_local,
       start_time_local: event.start_time_local,
       end_time_local: event.end_time_local,
-      is_free: true,
-      price_display: 'Free',
+      is_free: isFree,
+      price_display: event.priceText || (isFree ? 'Free' : null),
       category: 'trivia',
       extraction_confidence: 0.95,
       source_url: null,
