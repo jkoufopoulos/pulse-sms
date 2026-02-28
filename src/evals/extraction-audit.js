@@ -10,20 +10,31 @@
 const { getNycDateString } = require('../geo');
 
 // Sources that use Claude extraction (unstructured HTML → JSON)
-const CLAUDE_EXTRACTED_SOURCES = ['theskint', 'nonsensenyc', 'ohmyrockness', 'yutori', 'tavily'];
+const CLAUDE_EXTRACTED_SOURCES = ['theskint', 'nonsensenyc', 'yutori', 'tavily'];
 
 // ============================================================
 // Tier 1: Deterministic checks
 // ============================================================
 
 /**
+ * Normalize smart/curly quotes and dashes to ASCII equivalents.
+ */
+function normalizeQuotes(text) {
+  return text
+    .replace(/[\u2018\u2019\u201A\u2039\u203A]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u00AB\u00BB]/g, '"')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/\u2026/g, '...');
+}
+
+/**
  * Check if an evidence quote appears in the raw source text.
- * Uses case-insensitive substring matching with whitespace normalization.
+ * Uses case-insensitive substring matching with whitespace and quote normalization.
  */
 function evidenceInSource(rawText, quote) {
   if (!rawText || !quote) return null; // can't check
-  const normRaw = rawText.toLowerCase().replace(/\s+/g, ' ');
-  const normQuote = quote.toLowerCase().replace(/\s+/g, ' ').trim();
+  const normRaw = normalizeQuotes(rawText.toLowerCase()).replace(/\s+/g, ' ');
+  const normQuote = normalizeQuotes(quote.toLowerCase()).replace(/\s+/g, ' ').trim();
   if (!normQuote) return null;
   return normRaw.includes(normQuote);
 }
