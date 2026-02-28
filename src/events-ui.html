@@ -182,7 +182,8 @@
   }
   .analytics-panel { display: none; padding: 16px 20px; background: #0f0f0f; border-bottom: 1px solid #282828; }
   .analytics-panel.open { display: block; }
-  .analytics-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .analytics-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 12px; }
+  .analytics-grid-top { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 12px; }
   .analytics-card { background: #1a1a1a; border: 1px solid #282828; border-radius: 8px; padding: 12px; }
   .analytics-card h4 { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
   .analytics-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
@@ -192,6 +193,25 @@
   .analytics-bar-value { font-size: 11px; color: #888; width: 70px; flex-shrink: 0; white-space: nowrap; }
   .analytics-more-row { font-size: 11px; color: #666; text-align: center; margin-top: 4px; cursor: pointer; }
   .analytics-more-row:hover { color: #aaa; }
+
+  /* Date chart */
+  .date-chart { display: flex; align-items: flex-end; gap: 6px; height: 90px; }
+  .date-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; height: 100%; justify-content: flex-end; }
+  .date-bar { width: 100%; border-radius: 3px 3px 0 0; min-height: 2px; background: #FF6B35; cursor: pointer; transition: opacity 0.15s; }
+  .date-bar:hover { opacity: 0.8; }
+  .date-bar.active { box-shadow: 0 0 0 2px #FF6B35; }
+  .date-bar.muted { background: #995530; }
+  .date-count { font-size: 10px; color: #aaa; }
+  .date-label { font-size: 10px; color: #666; }
+  .date-label.today { color: #FF6B35; font-weight: 600; }
+
+  /* Free/paid stacked bar */
+  .fp-stacked { display: flex; height: 20px; border-radius: 4px; overflow: hidden; width: 100%; margin-bottom: 6px; }
+  .fp-segment { height: 100%; }
+  .fp-free { background: #4ade80; }
+  .fp-paid { background: #444; }
+  .fp-labels { display: flex; justify-content: space-between; font-size: 11px; }
+  .fp-stat { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 8px; }
 
   /* Category bar fills — match .cat-* badge colors */
   .bar-fill-comedy { background: linear-gradient(90deg, #3d3420, #f6e05e); }
@@ -232,6 +252,7 @@
     .analytics-toggle { padding: 8px 12px; }
     .analytics-panel { padding: 12px; }
     .analytics-grid { grid-template-columns: 1fr; }
+    .analytics-grid-top { grid-template-columns: 1fr; }
 
     .table-wrap { padding: 0 8px 80px; }
     td, th { padding: 6px 6px; font-size: 12px; }
@@ -296,6 +317,12 @@
     </select>
   </div>
   <div class="filter-group">
+    <label>Date:</label>
+    <select id="f-date" onchange="applyFilters()">
+      <option value="">All</option>
+    </select>
+  </div>
+  <div class="filter-group">
     <label>Category:</label>
     <select id="f-category" onchange="applyFilters()">
       <option value="">All</option>
@@ -342,6 +369,10 @@
   <span class="filtered-badge" id="analytics-filtered-badge">filtered</span>
 </div>
 <div class="analytics-panel" id="analytics-panel">
+  <div class="analytics-grid-top">
+    <div class="analytics-card"><h4>Date Distribution</h4><div id="analytics-dates"></div></div>
+    <div class="analytics-card"><h4>Free vs Paid</h4><div id="analytics-freepaid"></div></div>
+  </div>
   <div class="analytics-grid">
     <div class="analytics-card"><h4>Category Distribution</h4><div id="analytics-categories"></div></div>
     <div class="analytics-card"><h4>Source Coverage</h4><div id="analytics-sources"></div></div>
@@ -432,6 +463,19 @@ function updateSummary(data) {
 // ========== Dynamic filter population ==========
 
 function populateDynamicFilters() {
+  // Dates
+  const dateSel = document.getElementById('f-date');
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dates = [...new Set(allEvents.map(e => e.date_local).filter(Boolean))].sort();
+  dateSel.innerHTML = '<option value="">All dates</option>';
+  for (const d of dates) {
+    const dt = new Date(d + 'T12:00:00');
+    const label = days[dt.getDay()] + ' ' + dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const opt = document.createElement('option');
+    opt.value = d; opt.textContent = label;
+    dateSel.appendChild(opt);
+  }
+
   // Neighborhoods
   const hoodSel = document.getElementById('f-neighborhood');
   const hoods = [...new Set(allEvents.map(e => e.neighborhood).filter(Boolean))].sort();
@@ -479,6 +523,7 @@ function matchesTimeSlot(hour, slot) {
 
 function applyFilters() {
   const search = document.getElementById('f-search').value.toLowerCase().trim();
+  const dateVal = document.getElementById('f-date').value;
   const hood = document.getElementById('f-neighborhood').value;
   const cat = document.getElementById('f-category').value;
   const timeSlot = document.getElementById('f-time').value;
@@ -490,6 +535,7 @@ function applyFilters() {
       const haystack = [e.name, e.venue_name, e.description].filter(Boolean).join(' ').toLowerCase();
       if (!haystack.includes(search)) return false;
     }
+    if (dateVal && e.date_local !== dateVal) return false;
     if (hood && e.neighborhood !== hood) return false;
     if (cat && e.category !== cat) return false;
     if (timeSlot) {
@@ -836,6 +882,63 @@ function renderGapsCallout(catDist, hoodDist, total) {
   el.innerHTML = `<strong>Coverage gaps</strong><ul>${gaps.map(g => `<li>${g}</li>`).join('')}</ul>`;
 }
 
+function renderDateChart(events) {
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dateCounts = {};
+  for (const e of events) {
+    if (e.date_local) dateCounts[e.date_local] = (dateCounts[e.date_local] || 0) + 1;
+  }
+  const dates = [...new Set(allEvents.map(e => e.date_local).filter(Boolean))].sort();
+  if (dates.length === 0) {
+    document.getElementById('analytics-dates').innerHTML = '<div style="color:#555;font-size:12px">No date data</div>';
+    return;
+  }
+  const maxCount = Math.max(...dates.map(d => dateCounts[d] || 0), 1);
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  const activeDateFilter = document.getElementById('f-date').value;
+
+  document.getElementById('analytics-dates').innerHTML =
+    '<div class="date-chart">' + dates.map(date => {
+      const count = dateCounts[date] || 0;
+      const d = new Date(date + 'T12:00:00');
+      const dayLabel = days[d.getDay()];
+      const hPct = Math.max((count / maxCount) * 100, 3);
+      const isToday = date === today;
+      const isActive = date === activeDateFilter;
+      const barCls = isActive ? 'active' : (isToday ? '' : 'muted');
+      return `<div class="date-col" onclick="setDateFilter('${date}')">
+        <div class="date-count">${count}</div>
+        <div class="date-bar ${barCls}" style="height:${hPct}%"></div>
+        <div class="date-label${isToday ? ' today' : ''}">${dayLabel}</div>
+      </div>`;
+    }).join('') + '</div>';
+}
+
+function setDateFilter(date) {
+  const sel = document.getElementById('f-date');
+  sel.value = sel.value === date ? '' : date;
+  applyFilters();
+}
+
+function renderFreePaid(events) {
+  const free = events.filter(e => e.is_free).length;
+  const paid = events.length - free;
+  const total = events.length;
+  const freePct = total > 0 ? (free / total * 100) : 0;
+  const paidPct = 100 - freePct;
+
+  document.getElementById('analytics-freepaid').innerHTML =
+    `<div class="fp-stat">${total} <span style="font-size:13px;color:#666;font-weight:400">events</span></div>` +
+    `<div class="fp-stacked">
+      <div class="fp-segment fp-free" style="width:${freePct}%"></div>
+      <div class="fp-segment fp-paid" style="width:${paidPct}%"></div>
+    </div>` +
+    `<div class="fp-labels">
+      <span style="color:#4ade80">${free} free (${freePct.toFixed(0)}%)</span>
+      <span style="color:#888">${paid} paid (${paidPct.toFixed(0)}%)</span>
+    </div>`;
+}
+
 function updateAnalytics() {
   if (!analyticsOpen) return;
 
@@ -846,6 +949,10 @@ function updateAnalytics() {
   // Filtered badge
   const badge = document.getElementById('analytics-filtered-badge');
   badge.style.display = isFiltered ? 'inline' : 'none';
+
+  // Date distribution + Free/Paid
+  renderDateChart(events);
+  renderFreePaid(events);
 
   // Category distribution
   const catDist = computeDistribution(events, 'category');

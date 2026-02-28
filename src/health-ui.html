@@ -438,39 +438,8 @@
     word-break: break-all;
   }
 
-  /* Event Mix */
-  .event-mix { margin-bottom: 24px; }
-  .event-mix h2 { font-size: 16px; font-weight: 600; color: #aaa; margin-bottom: 12px; }
-  .mix-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-  }
-  .mix-panel {
-    background: #141414;
-    border: 1px solid #222;
-    border-radius: 10px;
-    padding: 16px;
-  }
-  .mix-panel h3 { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
-  .mix-bar-row { display: flex; align-items: center; margin-bottom: 5px; gap: 8px; }
-  .mix-bar-label { width: 110px; font-size: 11px; color: #aaa; text-align: right; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .mix-bar-track { flex: 1; height: 16px; background: #1a1a1a; border-radius: 3px; overflow: hidden; }
-  .mix-bar-fill { height: 100%; border-radius: 3px; min-width: 2px; background: #FF6B35; }
-  .mix-bar-fill.today { background: #FF6B35; }
-  .mix-bar-fill.future { background: #995530; }
-  .mix-bar-fill.free { background: #4ade80; }
-  .mix-bar-fill.paid { background: #555; }
-  .mix-bar-count { width: 40px; font-size: 11px; color: #666; flex-shrink: 0; }
-  .mix-date-chart { display: flex; align-items: flex-end; gap: 6px; height: 100px; }
-  .mix-date-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
-  .mix-date-bar { width: 100%; border-radius: 3px 3px 0 0; min-height: 2px; }
-  .mix-date-label { font-size: 10px; color: #666; }
-  .mix-date-count { font-size: 10px; color: #aaa; }
-  .mix-stacked { display: flex; height: 24px; border-radius: 4px; overflow: hidden; width: 100%; }
-  .mix-stacked-segment { height: 100%; }
-  .mix-stacked-labels { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; }
-  .mix-more { font-size: 11px; color: #555; margin-top: 4px; }
+  /* Event Mix Summary */
+  .event-mix-summary { margin-bottom: 24px; }
 
   /* Mobile */
   @media (max-width: 600px) {
@@ -488,9 +457,6 @@
     .source-grid { grid-template-columns: 1fr; }
 
     .audit-grid { grid-template-columns: 1fr; }
-
-    .mix-grid { grid-template-columns: 1fr; }
-    .mix-bar-label { width: 80px; }
   }
 
   /* ── Shared nav ── */
@@ -539,14 +505,12 @@
 
 <div class="summary-row" id="summary-row"></div>
 
-<div class="event-mix" id="event-mix" style="display:none">
-  <h2>Event Mix <span style="font-size:11px;font-weight:400;color:#666">— what's in the cache right now</span></h2>
-  <div class="mix-grid">
-    <div class="mix-panel" id="mix-dates"><h3>By Date</h3></div>
-    <div class="mix-panel" id="mix-categories"><h3>By Category</h3></div>
-    <div class="mix-panel" id="mix-hoods"><h3>By Neighborhood</h3></div>
-    <div class="mix-panel" id="mix-free"><h3>Free vs Paid</h3></div>
+<div class="event-mix-summary" id="event-mix-summary" style="display:none">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <h2 style="font-size:16px;font-weight:600;color:#aaa">Event Mix</h2>
+    <a href="/events" style="font-size:12px;color:#FF6B35;text-decoration:none">Full analytics &rarr;</a>
   </div>
+  <div class="summary-row" id="event-mix-cards"></div>
 </div>
 
 <div class="timing-section">
@@ -795,75 +759,24 @@ async function refreshAudit() {
 }
 
 function renderEventMix(mix) {
-  const container = $('event-mix');
+  const container = $('event-mix-summary');
   if (!mix) { container.style.display = 'none'; return; }
   container.style.display = '';
 
-  // Date distribution — vertical bar chart
   const dateEntries = Object.entries(mix.dateDistribution);
-  const maxDate = Math.max(...dateEntries.map(([,c]) => c), 1);
-  const today = dateEntries.length > 0 ? dateEntries[0][0] : '';
-  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  $('mix-dates').innerHTML = '<h3>By Date</h3>' +
-    '<div class="mix-date-chart">' + dateEntries.map(([date, count]) => {
-      const d = new Date(date + 'T12:00:00');
-      const dayLabel = days[d.getDay()];
-      const hPct = Math.max((count / maxDate) * 100, 3);
-      const cls = date === today ? 'today' : 'future';
-      return `<div class="mix-date-col">
-        <div class="mix-date-count">${count}</div>
-        <div class="mix-date-bar mix-bar-fill ${cls}" style="height:${hPct}%"></div>
-        <div class="mix-date-label"${date === today ? ' style="color:#FF6B35;font-weight:600"' : ''}>${dayLabel}</div>
-      </div>`;
-    }).join('') + '</div>';
+  const daysWithEvents = dateEntries.filter(([,c]) => c > 0).length;
+  const catCount = Object.keys(mix.categoryDistribution).length;
+  const hoodCount = Object.keys(mix.neighborhoodDistribution).length;
+  const topCat = Object.entries(mix.categoryDistribution).sort((a,b) => b[1] - a[1])[0];
+  const topHood = Object.entries(mix.neighborhoodDistribution).sort((a,b) => b[1] - a[1])[0];
+  const freePct = mix.total > 0 ? Math.round(mix.freePaid.free / mix.total * 100) : 0;
 
-  // Category distribution — horizontal bars, top 12
-  const catEntries = Object.entries(mix.categoryDistribution).sort((a,b) => b[1] - a[1]);
-  const maxCat = catEntries.length > 0 ? catEntries[0][1] : 1;
-  const catShown = catEntries.slice(0, 12);
-  const catMore = catEntries.length - catShown.length;
-  $('mix-categories').innerHTML = '<h3>By Category</h3>' +
-    catShown.map(([cat, count]) => {
-      const pct = Math.max((count / maxCat) * 100, 2);
-      return `<div class="mix-bar-row">
-        <div class="mix-bar-label">${escHtml(cat)}</div>
-        <div class="mix-bar-track"><div class="mix-bar-fill" style="width:${pct}%"></div></div>
-        <div class="mix-bar-count">${count}</div>
-      </div>`;
-    }).join('') +
-    (catMore > 0 ? `<div class="mix-more">+ ${catMore} more</div>` : '');
-
-  // Neighborhood distribution — horizontal bars, top 15
-  const hoodEntries = Object.entries(mix.neighborhoodDistribution).sort((a,b) => b[1] - a[1]);
-  const maxHood = hoodEntries.length > 0 ? hoodEntries[0][1] : 1;
-  const hoodShown = hoodEntries.slice(0, 15);
-  const hoodMore = hoodEntries.length - hoodShown.length;
-  $('mix-hoods').innerHTML = '<h3>By Neighborhood</h3>' +
-    hoodShown.map(([hood, count]) => {
-      const pct = Math.max((count / maxHood) * 100, 2);
-      return `<div class="mix-bar-row">
-        <div class="mix-bar-label">${escHtml(hood)}</div>
-        <div class="mix-bar-track"><div class="mix-bar-fill" style="width:${pct}%"></div></div>
-        <div class="mix-bar-count">${count}</div>
-      </div>`;
-    }).join('') +
-    (hoodMore > 0 ? `<div class="mix-more">+ ${hoodMore} more</div>` : '');
-
-  // Free vs Paid — stacked bar
-  const { free, paid } = mix.freePaid;
-  const total = free + paid;
-  const freePct = total > 0 ? (free / total * 100) : 0;
-  const paidPct = 100 - freePct;
-  $('mix-free').innerHTML = '<h3>Free vs Paid</h3>' +
-    `<div style="font-size:28px;font-weight:700;color:#fff;margin-bottom:8px">${total} <span style="font-size:13px;color:#666;font-weight:400">events</span></div>` +
-    `<div class="mix-stacked">
-      <div class="mix-stacked-segment mix-bar-fill free" style="width:${freePct}%"></div>
-      <div class="mix-stacked-segment mix-bar-fill paid" style="width:${paidPct}%"></div>
-    </div>` +
-    `<div class="mix-stacked-labels">
-      <span style="color:#4ade80">${free} free (${freePct.toFixed(0)}%)</span>
-      <span style="color:#888">${paid} paid (${paidPct.toFixed(0)}%)</span>
-    </div>`;
+  $('event-mix-cards').innerHTML = [
+    { label: 'Date Coverage', value: `${daysWithEvents}/7 days`, sub: dateEntries.filter(([,c]) => c > 0).map(([d,c]) => { const dt = new Date(d+'T12:00:00'); return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()] + ':' + c; }).join(' ') },
+    { label: 'Categories', value: catCount, sub: topCat ? `top: ${topCat[0]} (${topCat[1]})` : '' },
+    { label: 'Neighborhoods', value: hoodCount, sub: topHood ? `top: ${topHood[0]} (${topHood[1]})` : '' },
+    { label: 'Free Events', value: `${mix.freePaid.free} (${freePct}%)`, sub: `${mix.freePaid.paid} paid` },
+  ].map(c => `<div class="summary-card"><div class="label">${c.label}</div><div class="value">${c.value}</div><div class="sub">${c.sub}</div></div>`).join('');
 }
 
 async function refresh() {
