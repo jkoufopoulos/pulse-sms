@@ -216,7 +216,7 @@ async function handleMessage(phone, message) {
     return;
   }
 
-  if (isOverBudget(phone)) {
+  if (!process.env.PULSE_TEST_MODE && isOverBudget(phone)) {
     console.warn(`Over daily AI budget: ${masked}`);
     await sendSMS(phone, "You've hit your daily limit — check back tomorrow for more picks!");
     return;
