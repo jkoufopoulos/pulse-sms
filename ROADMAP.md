@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-01
+> Last updated: 2026-03-01 (SQLite store, pre-router filter fix)
 
 ---
 
@@ -279,11 +279,13 @@ Prompt hardening + judge recalibration alone would move pass rate from ~8% to ~5
 
 ### Yutori Extraction — Series Events Missing Times (2026-02-25)
 
-**Status:** 19 Yutori events in cache have null `start_time_local` and `date_local`.
+**Status:** Partially addressed by SQLite recurring patterns (2026-03-01). 19 Yutori events in cache had null `start_time_local` and `date_local`.
 
 **Root cause:** The extraction prompt in `src/prompts.js` has a rule: "For permanent venues with no specific date/time, set date_local and start_time_local to null." Claude interprets series/recurring events (e.g. "every Wednesday at 8pm", "running through March") as perennials and nulls their date/time fields, even when the newsletter text contains enough information to resolve a specific date.
 
-**Fix strategy:** Improve the extraction prompt to distinguish true perennials (permanent venues with no time-bound programming) from series events that have a recurring schedule. Series events should resolve to the next occurrence date. May also need post-extraction logic to resolve relative dates ("this Friday", "every Wed") against the newsletter's publication date.
+**Partial fix (2026-03-01):** Added RECURRENCE DETECTION rules to extraction prompt — Claude now extracts `is_recurring`, `recurrence_day`, `recurrence_time` when explicitly stated. Yutori post-extraction `processRecurrencePatterns()` upserts these into the `recurring_patterns` table, which generates dated occurrences at serving time. This means "every Wednesday at 8pm" now produces concrete events with proper dates and times. However, non-recurring series events ("running through March") are not yet handled.
+
+**Remaining gap:** Non-recurring series events and one-off Yutori events with dates >7 days out are now stored in SQLite (30-day window) but only appear in the serving cache when their date falls within the 7-day serving window. This is correct behavior — they'll surface when their date arrives.
 
 ### Price Data Gap — 71.6% Missing Across Sources (2026-02-25)
 
@@ -298,7 +300,7 @@ Prompt hardening + judge recalibration alone would move pass rate from ~8% to ~5
 | Issue | Why deferred |
 |-------|-------------|
 | Concurrent session race conditions | Rare at current traffic |
-| All in-memory state lost on restart | Fine for single-process MVP |
+| All in-memory state lost on restart | Mitigated: events now persist in SQLite, sessions still in-memory |
 | No processing ack during slow Claude calls | Adds extra Twilio cost |
 | No horizontal scalability | Single-process fine at current traffic |
 | No structured logging or correlation IDs | Operational improvement for scale |
@@ -307,6 +309,40 @@ Prompt hardening + judge recalibration alone would move pass rate from ~8% to ~5
 ---
 
 ## Completed Work
+
+### SQLite Event Store + Recurring Patterns (2026-03-01)
+
+Replaced the JSON-only event cache with SQLite (`data/pulse.db`) as a durable 30-day event store, while keeping the 7-day window at serving time. Recurring patterns table detects weekly events from Yutori extractions and generates occurrences automatically.
+
+**Problem solved:** Yutori scouts find hundreds of events but Pulse only saw ~12 at any given time. Three compounding losses: (1) 7-day ingestion window killed 65% of Yutori events with dates >7 days out, (2) recurring events (weekly trivia, open mics) treated as one-offs and dropped when outside the window, (3) JSON cache only held the latest extraction batch.
+
+**Changes:**
+- `src/db.js` **(new)** — SQLite connection (WAL mode), schema (events + recurring_patterns tables), CRUD operations. `upsertEvents()` with higher-`source_weight`-wins conflict resolution. `generateOccurrences()` walks active patterns and emits event objects with `makeEventId` for natural dedup against scraped one-offs. Generated events get `source_weight: 0.65` (below all scraped sources). `importFromJsonCache()` for one-time migration.
+- `src/events.js` — Boot tries SQLite first (auto-imports JSON cache on first boot), falls back to JSON. `refreshCache()` ingests 30-day window into SQLite, rebuilds 7-day serving cache from SQLite + recurring occurrences. `refreshSources()` same pattern. JSON cache still written for backward compat.
+- `src/prompts.js` — Added RECURRENCE DETECTION rules and 3 fields (`is_recurring`, `recurrence_day`, `recurrence_time`) to `EXTRACTION_PROMPT`.
+- `src/sources/shared.js` — `normalizeExtractedEvent()` carries `_raw` recurrence fields through for downstream pattern detection (transient, not persisted to events table).
+- `src/sources/yutori.js` — Updated extraction preamble with recurrence guidance. Added `processRecurrencePatterns()` — scans for `_raw.is_recurring`, upserts to `recurring_patterns` table via `db.upsertPattern()`.
+- `src/server.js` — `closeDb()` in shutdown.
+- `test/unit/db.test.js` **(new)** — 17 tests: schema, upsert, weight conflict, date range, pruning, boolean/JSON round-trips, pattern lifecycle, occurrence generation, ID dedup consistency.
+
+**Architecture notes:**
+- Hot path unchanged — SMS requests read from in-memory `eventCache` only, never touch SQLite. SQLite is queried once per scrape to rebuild the serving cache.
+- P1 compliant — recurring patterns are detected by extraction prompt + deterministic post-processing, not LLM state management.
+- P4 compliant — no new session save paths.
+- Recurring patterns have 6-month lifetime (`active_until = last_confirmed + 6 months`), `deactivated` flag for manual kills, and low `source_weight: 0.65` so scraped one-offs always win dedup.
+- `better-sqlite3` native addon — compiles on Railway via Nixpacks. Fallback: entire SQLite layer is wrapped in try/catch, JSON cache still works if SQLite fails.
+
+**Eval results (post-deploy):** Code evals 96.1-96.3% (unchanged from baseline). 7 scenario failures were transient 502s during Railway deploy — all passed on rerun. No regressions introduced.
+
+### Pre-Router Filter Stacking Fix (2026-03-01)
+
+Fixed a bug where pre-router filter detection would overwrite existing session filters instead of compounding them. When a user said "how about comedy" after already filtering for "free", the pre-router returned `{ ...base.filters, ...catInfo }` which spread `base.filters` (containing `category: null, free_only: null, time_after: null`) into the result, overwriting the session's existing `free_only: true` with `null`.
+
+**Root cause:** `base.filters` contains all filter keys initialized to `null`. Spreading it into the returned filters object inserted explicit `null` values for every key, which `mergeFilters` interpreted as "explicitly clear this filter" (per the explicit-key semantics from the 2026-02-24 fix).
+
+**Fix:** All pre-router filter detection paths now return only the detected filter keys (e.g. `{ category: 'comedy' }` instead of `{ ...base.filters, category: 'comedy' }`). Absent keys fall back to existing session filters via `mergeFilters` key-presence semantics, enabling proper compounding.
+
+**Files changed:** `src/pre-router.js` — 11 return statements across filter detection (category, free, time, vibe) and targeted clearing paths.
 
 ### Tavily Live-Search Fallback for Exhausted Neighborhoods (2026-03-01)
 
