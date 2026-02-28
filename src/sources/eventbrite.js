@@ -6,7 +6,7 @@ const { learnVenueCoords } = require('../venues');
 async function fetchEventbriteEvents() {
   console.log('Fetching Eventbrite...');
   try {
-    const res = await fetch('https://www.eventbrite.com/d/ny--new-york/events--today/', {
+    const res = await fetch('https://www.eventbrite.com/d/ny--new-york/events--this-week/', {
       headers: FETCH_HEADERS,
       signal: AbortSignal.timeout(10000),
     });
@@ -192,7 +192,7 @@ async function fetchEventbritePage(url, label, categoryOverride) {
 
 function fetchEventbriteComedy() {
   return fetchEventbritePage(
-    'https://www.eventbrite.com/d/ny--new-york/comedy--today/',
+    'https://www.eventbrite.com/d/ny--new-york/comedy--this-week/',
     'Comedy',
     'comedy'
   );
@@ -200,7 +200,7 @@ function fetchEventbriteComedy() {
 
 function fetchEventbriteArts() {
   return fetchEventbritePage(
-    'https://www.eventbrite.com/d/ny--new-york/arts--today/',
+    'https://www.eventbrite.com/d/ny--new-york/arts--this-week/',
     'Arts',
     'art'
   );

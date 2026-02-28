@@ -1,5 +1,5 @@
 const { setResponseState } = require('./session');
-const { filterByTimeAfter, parseAsNycTime } = require('./geo');
+const { filterByTimeAfter, parseAsNycTime, getEventDate } = require('./geo');
 
 /**
  * Apply event filters (free, category, time).
@@ -63,6 +63,7 @@ function saveResponseFrame(phone, { mode = 'fresh', picks = [], prevSession,
     offeredIds: isMore ? [...(prevSession?.allOfferedIds || []), ...offeredIds] : offeredIds,
     eventMap,
     neighborhood,
+    dateRange: filters?.date_range || null,
     filters: filters || null,
     visitedHoods: visitedHoods
       ? visitedHoods
@@ -105,6 +106,7 @@ function mergeFilters(existing, incoming) {
     subcategory: 'subcategory' in next ? (next.subcategory || null) : (base.subcategory || null),
     vibe: 'vibe' in next ? (next.vibe || null) : (base.vibe || null),
     time_after: 'time_after' in next ? (next.time_after || null) : (base.time_after || null),
+    date_range: 'date_range' in next ? (next.date_range || null) : (base.date_range || null),
   };
 }
 
@@ -139,6 +141,15 @@ function failsTimeGate(event, timeAfter) {
 function eventMatchesFilters(event, filters) {
   if (filters.free_only && !event.is_free) return false;
   if (filters.category && event.category !== filters.category) return false;
+  // Date range filter: check event's date falls within range
+  if (filters.date_range) {
+    const eventDate = getEventDate(event);
+    if (eventDate) {
+      if (eventDate < filters.date_range.start || eventDate > filters.date_range.end) return false;
+    }
+    // Events without dates get soft match — we don't know if they're in range
+    if (!eventDate) return 'soft';
+  }
   // vibe has no event field to match — LLM handles vibe selection
   // If time filter active but event has no parseable time, downgrade to soft —
   // we don't know if it matches, so [SOFT] lets the LLM deprioritize vs confirmed-late events
@@ -153,11 +164,24 @@ function eventMatchesFilters(event, filters) {
  * Build a tagged event pool. Matched events come first (up to 10),
  * padded to 15 total with unmatched events. Returns pool + metadata.
  */
-function buildTaggedPool(events, activeFilters) {
+function buildTaggedPool(events, activeFilters, { citywide = false } = {}) {
   const hasFilters = activeFilters && Object.values(activeFilters).some(Boolean);
   if (!hasFilters) {
+    let pool = events.slice(0, 15);
+    // For citywide pools, apply neighborhood diversity even without filters
+    if (citywide) {
+      const diversePool = [];
+      const hoodCounts = {};
+      for (const e of events) {
+        const hood = e.neighborhood || 'unknown';
+        hoodCounts[hood] = (hoodCounts[hood] || 0) + 1;
+        if (hoodCounts[hood] <= 3) diversePool.push(e);
+        if (diversePool.length >= 15) break;
+      }
+      pool = diversePool;
+    }
     return {
-      pool: events.slice(0, 15).map(e => ({ ...e, filter_match: false })),
+      pool: pool.map(e => ({ ...e, filter_match: false })),
       matchCount: 0,
       hardCount: 0,
       softCount: 0,
@@ -187,9 +211,23 @@ function buildTaggedPool(events, activeFilters) {
     }
   }
 
-  const hardSlice = hard.slice(0, 10);
-  const softSlice = soft.slice(0, Math.max(0, 10 - hardSlice.length));
-  const unmatchedSlice = unmatched.slice(0, Math.max(0, 15 - hardSlice.length - softSlice.length));
+  // For citywide pools, apply neighborhood diversity: max 3 per neighborhood
+  const applyDiversity = (arr, cap) => {
+    if (!citywide) return arr.slice(0, cap);
+    const result = [];
+    const hoodCounts = {};
+    for (const e of arr) {
+      const hood = e.neighborhood || 'unknown';
+      hoodCounts[hood] = (hoodCounts[hood] || 0) + 1;
+      if (hoodCounts[hood] <= 3) result.push(e);
+      if (result.length >= cap) break;
+    }
+    return result;
+  };
+
+  const hardSlice = applyDiversity(hard, 10);
+  const softSlice = applyDiversity(soft, Math.max(0, 10 - hardSlice.length));
+  const unmatchedSlice = applyDiversity(unmatched, Math.max(0, 15 - hardSlice.length - softSlice.length));
   const pool = [...hardSlice, ...softSlice, ...unmatchedSlice];
 
   const totalMatched = hard.length + soft.length;
@@ -248,6 +286,9 @@ function normalizeFilters(filters) {
   }
   if (filters.vibe) {
     result.vibe = filters.vibe;
+  }
+  if (filters.date_range && filters.date_range.start && filters.date_range.end) {
+    result.date_range = filters.date_range;
   }
   return Object.keys(result).length > 0 ? result : null;
 }

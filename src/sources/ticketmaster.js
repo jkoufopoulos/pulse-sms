@@ -60,9 +60,9 @@ async function fetchTicketmasterEvents() {
   console.log('Fetching Ticketmaster...');
   try {
     const today = getNycDateString(0);
-    const dayAfterTomorrow = getNycDateString(2);
+    const endDate = getNycDateString(7);
     const startDateTime = today + 'T00:00:00Z';
-    const endDateTime = dayAfterTomorrow + 'T06:00:00Z';
+    const endDateTime = endDate + 'T06:00:00Z';
 
     const allEvents = [];
     let page = 0;

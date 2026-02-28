@@ -50,7 +50,7 @@ function buildRoutePrompt(message, session, neighborhoodNames) {
 
   const historyBlock = session?.conversationHistory?.length > 0
     ? '\nRecent conversation:\n' + session.conversationHistory.map(h =>
-        `${h.role === 'user' ? 'User' : 'Pulse'}: ${h.content}`
+        `${h.role === 'user' ? 'User' : 'Bestie'}: ${h.content}`
       ).join('\n') + '\n'
     : '';
 
@@ -214,7 +214,7 @@ async function composeResponse(message, events, neighborhood, filters, { exclude
 
   const historyBlock = conversationHistory?.length > 0
     ? '\nCONVERSATION HISTORY (recent):\n' + conversationHistory.map(h =>
-        `${h.role === 'user' ? 'User' : 'Pulse'}: ${h.content}`
+        `${h.role === 'user' ? 'User' : 'Bestie'}: ${h.content}`
       ).join('\n') + '\n'
     : '';
 
@@ -445,7 +445,7 @@ function fixJsonNewlines(text) {
  * Used when user asks for more info on a pick (e.g. "what is last resort").
  * Returns { sms_text }
  */
-async function composeDetails(event, pickReason, { pulseUrl } = {}) {
+async function composeDetails(event, pickReason, { bestieUrl } = {}) {
   const now = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   // Build a Google Maps URL as fallback
@@ -464,7 +464,7 @@ async function composeDetails(event, pickReason, { pulseUrl } = {}) {
     }
   }
   if (!bestUrl) bestUrl = mapsUrl;
-  if (pulseUrl) bestUrl = pulseUrl;
+  if (bestieUrl) bestUrl = bestieUrl;
 
   const eventData = {
     name: event.name,
@@ -520,7 +520,7 @@ Write the details text. Include this URL: ${bestUrl}`;
  *
  * Returns { type, sms_text, picks, clear_filters }
  */
-async function unifiedRespond(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime, validNeighborhoods, activeFilters, isSparse, matchCount, hardCount, softCount, excludeIds, suggestedNeighborhood, userHoodAlias, cityScanResults } = {}) {
+async function unifiedRespond(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime, validNeighborhoods, activeFilters, isSparse, isCitywide, matchCount, hardCount, softCount, excludeIds, suggestedNeighborhood, userHoodAlias } = {}) {
   const now = currentTime || new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   const todayNyc = getNycDateString(0);
@@ -572,7 +572,7 @@ async function unifiedRespond(message, { session, events, neighborhood, nearbyHo
 
   const historyBlock = conversationHistory?.length > 0
     ? '\nCONVERSATION HISTORY:\n' + conversationHistory.map(h =>
-        `${h.role === 'user' ? 'User' : 'Pulse'}: ${h.content}`
+        `${h.role === 'user' ? 'User' : 'Bestie'}: ${h.content}`
       ).join('\n') + '\n'
     : '';
 
@@ -592,17 +592,15 @@ async function unifiedRespond(message, { session, events, neighborhood, nearbyHo
     ? `\nEXCLUDED (already shown to user — do NOT pick these): ${excludeIds.join(', ')}`
     : '';
 
-  const cityScanBlock = cityScanResults?.length > 0
-    ? `\nCITY_SCAN_RESULTS: Matching neighborhoods: ${cityScanResults.map(r =>
-        `${r.neighborhood} (${r.matchCount})`).join(', ')}`
-    : '';
-
   const aliasNote = userHoodAlias ? ` (user said "${userHoodAlias}" — this is a known alias for ${neighborhood}, serve events normally)` : '';
+  const neighborhoodDisplay = isCitywide
+    ? 'citywide — serve best events across all NYC neighborhoods. Label each pick with its neighborhood.'
+    : (neighborhood || 'not specified') + aliasNote;
   const userPrompt = `Current time (NYC): ${now}
 <user_message>${message}</user_message>
 Session context: ${sessionContext}
-Neighborhood: ${neighborhood || 'not specified'}${aliasNote}
-${historyBlock}${nearbyBlock}${validNeighborhoodsBlock}${filterContextBlock}${cityScanBlock}${excludeNote}
+Neighborhood: ${neighborhoodDisplay}
+${historyBlock}${nearbyBlock}${validNeighborhoodsBlock}${filterContextBlock}${excludeNote}
 ${eventListStr ? `EVENT_LIST (${events.length} events):\n${eventListStr}` : 'No events available for this area.'}
 
 Respond now.`;
@@ -616,7 +614,6 @@ Respond now.`;
     suggestedNeighborhood: suggestedNeighborhood || null,
     matchCount: matchCount,
     poolSize: events?.length || 0,
-    cityScanResults,
   };
   const systemPrompt = buildUnifiedPrompt(events || [], skillOptions);
 

@@ -36,8 +36,8 @@ async function fetchBAMEvents() {
   console.log('Fetching BAM...');
   try {
     const today = getNycDateString(0);
-    const tomorrow = getNycDateString(1);
-    const url = `https://www.bam.org/api/BAMApi/GetCalendarEventsByDayWithOnGoing?start=${today}&end=${tomorrow}`;
+    const endDate = getNycDateString(7);
+    const url = `https://www.bam.org/api/BAMApi/GetCalendarEventsByDayWithOnGoing?start=${today}&end=${endDate}`;
 
     const res = await fetch(url, {
       headers: { ...FETCH_HEADERS, 'Accept': 'application/json' },

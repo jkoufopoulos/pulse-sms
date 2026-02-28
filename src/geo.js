@@ -106,12 +106,14 @@ function rankEventsByProximity(events, targetNeighborhood, { refTimeMs } = {}) {
       }
     }
 
-    // Date tier: today first, then tomorrow, then future
+    // Date tier: continuous day-offset (today=0, tomorrow=1, ..., capped at 7)
     const eventDate = getEventDate(e);
-    let dateTier;
-    if (!eventDate || eventDate === todayNyc) dateTier = 0;
-    else if (eventDate === tomorrowNyc) dateTier = 1;
-    else dateTier = 2;
+    let dateTier = 0;
+    if (eventDate && eventDate > todayNyc) {
+      const todayMs = new Date(todayNyc + 'T12:00:00').getTime();
+      const eventMs = new Date(eventDate + 'T12:00:00').getTime();
+      dateTier = Math.min(7, Math.round((eventMs - todayMs) / (24 * 60 * 60 * 1000)));
+    }
 
     return { event: e, dist, dateTier };
   });

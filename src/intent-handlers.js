@@ -36,7 +36,7 @@ function stripMoreReferences(text) {
 
 // --- Help ---
 async function handleHelp(ctx) {
-  const reply = ctx.route.reply || "Hey! I'm Pulse — text me a neighborhood and I'll find tonight's best events.\n\nTry: \"East Village\", \"prospect park\", \"bedford ave\"\n\nYou can ask for comedy, jazz, free events, or any vibe. Reply a number for details on a pick, or \"more\" for more options.";
+  const reply = ctx.route.reply || "Hey! I'm Bestie — tell me what you're in the mood for and I'll find it across NYC.\n\nTry: \"live jazz tonight\", \"something weird\", \"free comedy\", \"this weekend\", or a neighborhood like \"Williamsburg\".\n\nReply a number for details, or \"more\" for more options.";
   const sms = smartTruncate(reply);
   await sendSMS(ctx.phone, sms);
   console.log(`Help sent to ${ctx.masked}`);
@@ -45,7 +45,7 @@ async function handleHelp(ctx) {
 
 // --- Conversational ---
 async function handleConversational(ctx) {
-  let reply = ctx.route.reply || "Hey! Text a neighborhood whenever you're ready to go out.";
+  let reply = ctx.route.reply || "Hey! Tell me what you're in the mood for — a vibe, a category, or a neighborhood.";
   if (ctx.session?.lastNeighborhood) {
     reply = reply.replace(
       /text (?:me )?a neighborhood[^.]*/i,
@@ -89,14 +89,14 @@ async function handleDetails(ctx) {
     const pick = picks[pickIndex];
     const event = ctx.session.lastEvents[pick.event_id];
     if (event) {
-      // Generate referral code and Pulse URL for shareable details
+      // Generate referral code and Bestie URL for shareable details
       const refCode = generateReferralCode(ctx.phone, event.id);
       const domain = process.env.PULSE_CARD_DOMAIN || 'https://web-production-c8fdb.up.railway.app';
-      const pulseUrl = `${domain}/e/${event.id}?ref=${refCode}`;
+      const bestieUrl = `${domain}/e/${event.id}?ref=${refCode}`;
 
       try {
         const composeStart = Date.now();
-        const result = await composeDetails(event, pick.why, { pulseUrl });
+        const result = await composeDetails(event, pick.why, { bestieUrl });
         ctx.trace.composition.latency_ms = Date.now() - composeStart;
         ctx.trace.composition.raw_response = result._raw || null;
         ctx.trackAICost?.(result._usage);
@@ -107,14 +107,14 @@ async function handleDetails(ctx) {
         return;
       } catch (err) {
         console.error('composeDetails error, falling back:', err.message);
-        const sms = formatEventDetails(event, { pulseUrl });
+        const sms = formatEventDetails(event, { bestieUrl });
         await sendSMS(ctx.phone, sms);
         ctx.finalizeTrace(sms, 'details');
         return;
       }
     }
   }
-  const sms = "I don't have any recent picks to pull up — text me a neighborhood and let's start fresh!";
+  const sms = "I don't have any picks loaded — tell me what you're looking for!";
   await sendSMS(ctx.phone, sms);
   ctx.finalizeTrace(sms, 'details');
 }
@@ -130,9 +130,10 @@ async function handleMore(ctx) {
   if (ctx.session && ctx.session.lastEvents) {
     const allRemaining = Object.values(ctx.session.lastEvents).filter(e => !allShownIds.has(e.id));
 
-    // Only compose from events in the requested neighborhood — never from foreign events.
-    // This prevents geographic bleed (e.g. "Not much tonight on the UWS" when user is in West Village).
-    const inHoodRemaining = allRemaining.filter(e => e.neighborhood === hood);
+    // Filter by neighborhood when one is set; skip for citywide "more" (hood is null).
+    const inHoodRemaining = hood
+      ? allRemaining.filter(e => e.neighborhood === hood)
+      : allRemaining;
     // Hard time gate (P5): exclude events before time_after
     const timeGated = activeFilters.time_after
       ? filterByTimeAfter(inHoodRemaining, activeFilters.time_after)
@@ -187,7 +188,7 @@ async function handleMore(ctx) {
   }
 
   if (!ctx.session?.lastNeighborhood) {
-    const sms = "Text me a neighborhood and I'll find you something! East Village, Williamsburg, LES — whatever's close.";
+    const sms = "Tell me what you're in the mood for — comedy, live music, something weird? Or drop a neighborhood.";
     await sendSMS(ctx.phone, sms);
     ctx.finalizeTrace(sms, 'more');
     return;

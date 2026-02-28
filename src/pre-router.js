@@ -1,4 +1,5 @@
 const { NEIGHBORHOODS, BOROUGHS, extractNeighborhood } = require('./neighborhoods');
+const { getNycDateString } = require('./geo');
 
 // Build reverse map: neighborhood → borough
 const HOOD_TO_BOROUGH = {};
@@ -57,6 +58,61 @@ function parseTimeExpr(text) {
   return null;
 }
 
+// --- Parse natural date range expressions → { start, end } or null ---
+function parseDateRange(text) {
+  const lower = text.toLowerCase().trim();
+
+  // Get current day of week (0=Sun, 1=Mon, ... 6=Sat) in NYC timezone
+  const now = new Date();
+  const nycDay = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'narrow' }).format(now).replace(/[^0-6]/, ''), 10);
+  const dayOfWeek = new Date(getNycDateString(0) + 'T12:00:00').getDay();
+
+  const today = getNycDateString(0);
+  const tomorrow = getNycDateString(1);
+
+  // "tonight" / "today"
+  if (/^(tonight|today)$/.test(lower)) {
+    return { start: today, end: today };
+  }
+
+  // "tomorrow"
+  if (/^tomorrow(?:\s+night)?$/.test(lower)) {
+    return { start: tomorrow, end: tomorrow };
+  }
+
+  // "this weekend"
+  if (/\b(this\s+)?weekend\b/.test(lower)) {
+    // Friday=5, Saturday=6, Sunday=0
+    // If Thu(4) or Fri(5), include Friday
+    let satOffset = (6 - dayOfWeek + 7) % 7;
+    if (satOffset === 0) satOffset = 0; // Today is Saturday
+    const sunOffset = satOffset + 1;
+    // Include Friday if asked on Thu/Fri
+    const startOffset = (dayOfWeek === 4 || dayOfWeek === 5) ? (5 - dayOfWeek + 7) % 7 || 0 : satOffset;
+    return { start: getNycDateString(startOffset), end: getNycDateString(sunOffset) };
+  }
+
+  // Day names: "friday night", "this saturday", "on sunday"
+  const DAY_NAMES = { sunday: 0, sun: 0, monday: 1, mon: 1, tuesday: 2, tue: 2, tues: 2, wednesday: 3, wed: 3, thursday: 4, thu: 4, thurs: 4, friday: 5, fri: 5, saturday: 6, sat: 6 };
+  const dayMatch = lower.match(/\b(?:this\s+|on\s+|next\s+)?(sunday|sun|monday|mon|tuesday|tue|tues|wednesday|wed|thursday|thu|thurs|friday|fri|saturday|sat)\b/i);
+  if (dayMatch) {
+    const targetDay = DAY_NAMES[dayMatch[1].toLowerCase()];
+    if (targetDay !== undefined) {
+      let offset = (targetDay - dayOfWeek + 7) % 7;
+      if (offset === 0 && !/\btoday\b/.test(lower)) offset = 0; // same day = today
+      const date = getNycDateString(offset);
+      return { start: date, end: date };
+    }
+  }
+
+  // "next few days" / "this week"
+  if (/\b(next\s+few\s+days|this\s+week|coming\s+days)\b/.test(lower)) {
+    return { start: today, end: getNycDateString(6) };
+  }
+
+  return null;
+}
+
 // --- Deterministic pre-router (mechanical shortcuts only) ---
 // All semantic understanding (neighborhoods, categories, time, vibes, free,
 // nudge accepts, boroughs, off-topic) goes through the unified LLM call.
@@ -82,7 +138,7 @@ function preRoute(message, session) {
     if (session?.lastPicks?.length > 0) {
       return { ...base, intent: 'details', neighborhood: null, event_reference: msg };
     }
-    return { ...base, intent: 'conversational', neighborhood: null, reply: "I don't have any picks loaded right now — text me a neighborhood and I'll find what's good tonight!" };
+    return { ...base, intent: 'conversational', neighborhood: null, reply: "I don't have picks loaded — tell me what you're looking for!" };
   }
 
   // More
@@ -105,12 +161,12 @@ function preRoute(message, session) {
 
   // Greetings
   if (/^(hey|hi|hello|yo|sup|what's up|wassup|hola|howdy)$/i.test(msg)) {
-    return { ...base, intent: 'conversational', neighborhood: null, reply: "Hey! Text me a neighborhood and I'll find you something good tonight." };
+    return { ...base, intent: 'conversational', neighborhood: null, reply: "Hey! What are you in the mood for tonight? Drop a vibe, a category, or a neighborhood." };
   }
 
   // Thanks
   if (/^(thanks|thank you|thx|ty|appreciate it|cheers)$/i.test(msg)) {
-    return { ...base, intent: 'conversational', neighborhood: null, reply: "Anytime! Text a neighborhood when you're ready to go out again." };
+    return { ...base, intent: 'conversational', neighborhood: null, reply: "Anytime! Hit me up when you're ready to go out again." };
   }
 
   // Bye
@@ -124,15 +180,15 @@ function preRoute(message, session) {
     if (session?.lastPicks?.length > 0) {
       return { ...base, intent: 'conversational', neighborhood: null, reply: `Your ${session.lastNeighborhood || ''} picks are above — reply a number for details, MORE for extra picks, or try a different neighborhood.` };
     }
-    return { ...base, intent: 'conversational', neighborhood: null, reply: "Hey! Text me a neighborhood and I'll find you something good tonight." };
+    return { ...base, intent: 'conversational', neighborhood: null, reply: "Hey! Tell me what you're looking for — comedy, jazz, something weird — or a neighborhood." };
   }
 
   // Impatient follow-up
   if (/^(hello\?+|hey\?+|\?\?+|yo\?+|you there\??|helloooo+|hellooo+)$/i.test(msg)) {
     if (session?.lastPicks?.length > 0) {
-      return { ...base, intent: 'conversational', neighborhood: null, reply: `Sorry for the wait! Your ${session.lastNeighborhood} picks should be above — reply MORE for extra picks or try a different neighborhood.` };
+      return { ...base, intent: 'conversational', neighborhood: null, reply: `Sorry for the wait! Your ${session.lastNeighborhood || 'picks'} should be above — reply MORE for extra picks or try a different neighborhood.` };
     }
-    return { ...base, intent: 'conversational', neighborhood: null, reply: "Hey! Text me a neighborhood and I'll find you something good tonight." };
+    return { ...base, intent: 'conversational', neighborhood: null, reply: "Hey! Tell me what you're looking for — comedy, jazz, something weird — or a neighborhood." };
   }
 
   // Category map — shared between filter clearing, session-aware checks, and compound extraction
@@ -229,6 +285,41 @@ function preRoute(message, session) {
     }
   }
 
+  // --- First-message vibe/category/time detection (no session required) ---
+  // Detects single-dimension filters as first messages and routes to citywide serving.
+  if (!session?.lastNeighborhood) {
+    // Open-ended: "surprise me", "what's good", "what's happening"
+    if (/^(surprise me|what's good|whats good|what's happening|whats happening|what's out there|show me something|anything good|what do you got)$/i.test(msg)) {
+      return { ...base, intent: 'events', neighborhood: null, filters: { ...base.filters } };
+    }
+
+    // Date range: "this weekend", "friday night", "tomorrow"
+    const dateRange = parseDateRange(msg);
+    if (dateRange && /^(tonight|today|tomorrow|this weekend|weekend|friday|saturday|sunday|fri|sat|sun|next few days|this week|monday|tuesday|wednesday|thursday|mon|tue|wed|thu)(?:\s+night)?$/i.test(msg)) {
+      return { ...base, intent: 'events', neighborhood: null, filters: { ...base.filters, date_range: dateRange } };
+    }
+
+    // Bare category: "comedy", "jazz", "live music"
+    for (const [pattern, catInfo] of Object.entries(catMap)) {
+      const bareRegex = new RegExp(`^(?:${pattern})(?:\\s+(?:stuff|shows?|events?|picks?|tonight|night))?$`, 'i');
+      if (bareRegex.test(msg)) {
+        const dr = parseDateRange(msg);
+        return { ...base, intent: 'events', neighborhood: null, filters: { ...base.filters, ...catInfo, ...(dr ? { date_range: dr } : {}) } };
+      }
+    }
+
+    // Bare vibe: "something weird", "something chill", "I want to dance"
+    const vibeFirstMatch = msg.match(/^(?:something|anything|i want to|i wanna|let's|lets)\s+(chill|wild|weird|romantic|low-key|fun|crazy|mellow|cozy|rowdy|intimate|energetic|upbeat|laid-back|dance|party)$/i);
+    if (vibeFirstMatch) {
+      const vibe = vibeFirstMatch[1].toLowerCase();
+      // "dance" and "party" map to nightlife category
+      if (vibe === 'dance' || vibe === 'party') {
+        return { ...base, intent: 'events', neighborhood: null, filters: { ...base.filters, category: 'nightlife', vibe } };
+      }
+      return { ...base, intent: 'events', neighborhood: null, filters: { ...base.filters, vibe } };
+    }
+  }
+
   // --- Compound filter extraction (multi-dimension: "free comedy", "late jazz", "comedy in bushwick") ---
   // Catches compound messages that single-dimension checks miss.
   // Does NOT require session — works for first messages like "free comedy in bushwick".
@@ -255,13 +346,17 @@ function preRoute(message, session) {
 
   const detectedHood = extractNeighborhood(msg);
 
-  const filterDims = [hasFree, compoundTime, detectedCat].filter(Boolean).length;
-  if (filterDims >= 2 || (filterDims >= 1 && detectedHood)) {
+  // Date range in compound context: "free comedy this weekend", "jazz friday night"
+  const compoundDateRange = parseDateRange(lower);
+
+  const filterDims = [hasFree, compoundTime, detectedCat, compoundDateRange].filter(Boolean).length;
+  if (filterDims >= 1) {
     const hood = detectedHood || session?.lastNeighborhood || null;
     const filters = { ...base.filters };
     if (hasFree) filters.free_only = true;
     if (compoundTime) filters.time_after = compoundTime;
     if (detectedCat) Object.assign(filters, detectedCat);
+    if (compoundDateRange) filters.date_range = compoundDateRange;
     return { ...base, intent: 'events', neighborhood: hood, filters, confidence: 0.9 };
   }
 

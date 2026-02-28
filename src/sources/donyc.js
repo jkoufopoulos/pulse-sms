@@ -108,12 +108,15 @@ function parseCards($, cards, dateStr, categoryOverride) {
 
 async function fetchCategoryDates(slug, categoryOverride, dates) {
   const events = [];
-  for (const dateStr of dates) {
+  for (let di = 0; di < dates.length; di++) {
+    const dateStr = dates[di];
     const [yyyy, mm, dd] = dateStr.split('-');
     const month = String(parseInt(mm, 10));
     const day = String(parseInt(dd, 10));
+    // Limit future days (3+) to 1 page to control fetch count
+    const maxPages = di < 2 ? MAX_PAGES : 1;
 
-    for (let page = 1; page <= MAX_PAGES; page++) {
+    for (let page = 1; page <= maxPages; page++) {
       const url = `https://donyc.com/events/${slug}/${yyyy}/${month}/${day}?page=${page}`;
 
       let res;
@@ -149,7 +152,7 @@ async function fetchCategoryDates(slug, categoryOverride, dates) {
 async function fetchDoNYCEvents() {
   console.log('Fetching DoNYC...');
   try {
-    const dates = [getNycDateString(0), getNycDateString(1)];
+    const dates = Array.from({length: 7}, (_, i) => getNycDateString(i));
     const seen = new Set();
 
     const results = await Promise.allSettled(

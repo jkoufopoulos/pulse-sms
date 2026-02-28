@@ -30,6 +30,7 @@ function setResponseState(phone, frame) {
     allOfferedIds: frame.offeredIds ?? [],
     lastEvents: frame.eventMap ?? {},
     lastNeighborhood: frame.neighborhood ?? null,
+    lastDateRange: frame.dateRange ?? null,
     lastFilters: frame.filters ?? null,
     visitedHoods: frame.visitedHoods ?? [],
     pendingNearby: frame.pendingNearby ?? null,

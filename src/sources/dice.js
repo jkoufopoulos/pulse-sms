@@ -45,8 +45,6 @@ async function fetchDiceEvents() {
       return [];
     }
 
-    const today = getNycDateString(0);
-    const tomorrow = getNycDateString(1);
     const events = [];
 
     for (const e of rawEvents) {
@@ -55,7 +53,6 @@ async function fetchDiceEvents() {
 
       const startDate = e.dates.event_start_date;
       const dateLocal = startDate ? startDate.slice(0, 10) : null;
-      if (dateLocal && dateLocal !== today && dateLocal !== tomorrow) continue;
 
       const venue = (e.venues || [])[0] || {};
       const loc = venue.location || {};

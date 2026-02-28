@@ -8,7 +8,7 @@ const { getSession, setSession, clearSession, addToHistory, clearSessionInterval
 const { preRoute, getAdjacentNeighborhoods } = require('./pre-router');
 const { handleHelp, handleConversational, handleDetails, handleMore } = require('./intent-handlers');
 const { sendRuntimeAlert } = require('./alerts');
-const { getEvents, getEventById, scanCityWide, getCacheStatus } = require('./events');
+const { getEvents, getEventsCitywide, getEventById, scanCityWide, getCacheStatus } = require('./events');
 const { lookupReferralCode, recordAttribution } = require('./referral');
 const { filterKidsEvents, validatePerennialActivity } = require('./curation');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
@@ -223,7 +223,7 @@ async function handleMessage(phone, message) {
   } catch (err) {
     console.error('AI flow error:', err.message);
     try {
-      await sendSMS(phone, "Pulse hit a snag — try again in a sec!");
+      await sendSMS(phone, "Bestie hit a snag — try again in a sec!");
     } catch (smsErr) {
       console.error(`[CRITICAL] Double failure for ${masked}: AI error="${err.message}", SMS error="${smsErr.message}" — user received nothing`);
     }
@@ -252,14 +252,14 @@ async function dispatchPreRouterIntent(route, ctx) {
         responseType: 'referral',
       }).catch(err => console.error('profile update failed:', err.message));
       const sms = referredEvent?.neighborhood
-        ? `Hey! Text me a neighborhood and I'll find tonight's best events. Try "${referredEvent.neighborhood}" to get started!`
-        : "Hey! I'm Pulse — text me a NYC neighborhood and I'll find tonight's best events.";
+        ? `Hey! I'm Bestie — tell me what you're looking for or try "${referredEvent.neighborhood}" to get started!`
+        : "Hey! I'm Bestie — tell me what you're looking for or text a neighborhood.";
       saveResponseFrame(phone, { picks: [], eventMap: {}, neighborhood: null, filters: null, offeredIds: [] });
       await sendSMS(phone, sms);
       finalizeTrace(sms, 'referral');
       return;
     }
-    const sms = "Hey! I'm Pulse — text me a NYC neighborhood and I'll find tonight's best events.";
+    const sms = "Hey! I'm Bestie — tell me what you're looking for or text a neighborhood.";
     await sendSMS(phone, sms);
     finalizeTrace(sms, 'referral_expired');
     return;
@@ -340,24 +340,14 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
   let softCount = 0;
   let isSparse = false;
 
-  // City-wide scan: when no neighborhood but filters are active, find matching neighborhoods
-  let cityScanResults = null;
-  if (!hood) {
-    const hasSubstantiveFilter = activeFilters &&
-      (activeFilters.category || activeFilters.free_only || activeFilters.time_after);
-    if (hasSubstantiveFilter) {
-      cityScanResults = scanCityWide(activeFilters);
-      console.log(`City scan: ${cityScanResults.length} neighborhoods match filters ${JSON.stringify(activeFilters)}`);
-    }
-  }
-
-  // Fetch events if we have a neighborhood
+  // Fetch events — neighborhood or citywide
   let events = [];
   let curated = [];
   let taggedPerennials = [];
+  let isCitywide = false;
   if (hood) {
     const eventsStart = Date.now();
-    const raw = await getEvents(hood);
+    const raw = await getEvents(hood, { dateRange: activeFilters.date_range });
     trace.events.getEvents_ms = Date.now() - eventsStart;
     trace.events.cache_size = getCacheStatus().cache_size;
     curated = filterKidsEvents(raw);
@@ -375,6 +365,22 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
     const perennialCap = Math.min(4, 15 - Math.min(events.length, 15));
     taggedPerennials = localPerennials.slice(0, perennialCap).map(e => ({ ...e, filter_match: false }));
     events = [...events, ...taggedPerennials];
+  } else {
+    // Citywide flow — serve best events across all neighborhoods
+    isCitywide = true;
+    const eventsStart = Date.now();
+    const raw = await getEventsCitywide({ dateRange: activeFilters.date_range });
+    trace.events.getEvents_ms = Date.now() - eventsStart;
+    trace.events.cache_size = getCacheStatus().cache_size;
+    curated = filterKidsEvents(raw);
+    const taggedResult = buildTaggedPool(curated, activeFilters, { citywide: true });
+    trace.events.candidates_count = curated.length;
+    trace.events.candidate_ids = curated.map(e => e.id);
+    events = taggedResult.pool;
+    matchCount = taggedResult.matchCount;
+    hardCount = taggedResult.hardCount;
+    softCount = taggedResult.softCount;
+    isSparse = taggedResult.isSparse;
   }
   const nearbyHoods = hood ? getAdjacentNeighborhoods(hood, 3) : [];
 
@@ -408,14 +414,14 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
   const prevOfferedIds = session?.allOfferedIds || [];
   const excludeIds = [...new Set([...prevPickIds, ...prevOfferedIds])];
 
-  return { hood, activeFilters, events, curated, taggedPerennials, matchCount, hardCount, softCount, isSparse, nearbyHoods, suggestedHood, excludeIds, now, userHoodAlias, cityScanResults };
+  return { hood, activeFilters, events, curated, taggedPerennials, matchCount, hardCount, softCount, isSparse, isCitywide, nearbyHoods, suggestedHood, excludeIds, now, userHoodAlias };
 }
 
 /**
  * Call unifiedRespond and capture trace/cost data.
  */
 async function callUnified(message, unifiedCtx, session, history, phone, trace) {
-  const { hood, events, nearbyHoods, now, activeFilters, isSparse, matchCount, hardCount, softCount, excludeIds, suggestedHood, userHoodAlias, cityScanResults } = unifiedCtx;
+  const { hood, events, nearbyHoods, now, activeFilters, isSparse, isCitywide, matchCount, hardCount, softCount, excludeIds, suggestedHood, userHoodAlias } = unifiedCtx;
 
   const composeStart = Date.now();
   const result = await unifiedRespond(message, {
@@ -428,13 +434,13 @@ async function callUnified(message, unifiedCtx, session, history, phone, trace) 
     validNeighborhoods: NEIGHBORHOOD_NAMES,
     activeFilters,
     isSparse,
+    isCitywide,
     matchCount,
     hardCount,
     softCount,
     excludeIds,
     suggestedNeighborhood: suggestedHood,
     userHoodAlias,
-    cityScanResults,
   });
   trace.routing.latency_ms = Date.now() - composeStart; // unified call replaces both route + compose
   trace.composition.latency_ms = trace.routing.latency_ms;
@@ -466,7 +472,9 @@ async function callUnified(message, unifiedCtx, session, history, phone, trace) 
   if (history.length > 0) activeSkills.push('conversationAwareness');
   if (suggestedHood) activeSkills.push('nearbySuggestion');
   if (matchCount === 1 || (events.length <= 1)) activeSkills.push('singlePick');
-  if (cityScanResults?.length > 0) activeSkills.push('cityScan');
+  if (isCitywide && events.length > 0) activeSkills.push('citywide');
+  const uniqueDates = new Set(events.map(e => e.date_local).filter(Boolean));
+  if (uniqueDates.size >= 2) activeSkills.push('multiDay');
   trace.composition.active_skills = activeSkills;
   trackAICost(phone, result._usage, result._provider);
 

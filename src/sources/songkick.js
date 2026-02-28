@@ -19,8 +19,6 @@ async function fetchSongkickEvents() {
     const html = await res.text();
     const $ = cheerio.load(html);
 
-    const today = getNycDateString(0);
-    const tomorrow = getNycDateString(1);
     const events = [];
 
     $('script[type="application/ld+json"]').each((i, el) => {
@@ -35,7 +33,6 @@ async function fetchSongkickEvents() {
           const geo = location.geo || {};
 
           const startDate = e.startDate ? e.startDate.slice(0, 10) : null;
-          if (startDate && startDate !== today && startDate !== tomorrow) continue;
 
           const geoLat = parseFloat(geo.latitude);
           const geoLng = parseFloat(geo.longitude);

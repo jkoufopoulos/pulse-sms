@@ -5,8 +5,6 @@ const { getNycDateString, resolveNeighborhood, inferCategory } = require('../geo
 async function fetchNYCParksEvents() {
   console.log('Fetching NYC Parks...');
   try {
-    const today = getNycDateString(0);
-    const tomorrow = getNycDateString(1);
     const events = [];
     const seen = new Set();
 
@@ -35,7 +33,6 @@ async function fetchNYCParksEvents() {
         const endDate = $el.find('meta[itemprop="endDate"]').attr('content') || null;
         const dateLocal = startDate ? startDate.slice(0, 10) : null;
 
-        if (dateLocal && dateLocal !== today && dateLocal !== tomorrow) return;
 
         const venueName = $el.find('[itemprop="location"] [itemprop="name"]').first().text().trim() || null;
         const venueAddress = $el.find('meta[itemprop="streetAddress"]').attr('content') || null;

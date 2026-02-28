@@ -37,7 +37,6 @@ async function fetchSmallsLiveEvents() {
   console.log('Fetching SmallsLIVE...');
   try {
     const today = getNycDateString(0);
-    const tomorrow = getNycDateString(1);
     const url = `https://www.smallslive.com/search/upcoming-ajax/?page=1&venue=all&starting_date=${today}`;
 
     const res = await fetch(url, {
@@ -66,8 +65,6 @@ async function fetchSmallsLiveEvents() {
       const dateHeader = $day.find('.title1[data-date]').attr('data-date');
       const dateLocal = parseDate(dateHeader);
 
-      // Only keep today and tomorrow
-      if (dateLocal && dateLocal !== today && dateLocal !== tomorrow) return;
 
       $day.find('.flex-column.day-event').each((j, eventEl) => {
         const $event = $(eventEl);

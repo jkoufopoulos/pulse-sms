@@ -97,6 +97,19 @@ function buildComposePrompt(events, options = {}) {
     parts.push(skills.cityScan.text);
   }
 
+  // Citywide — when no neighborhood and events exist
+  if (!options.requestedNeighborhood && events && events.length > 0) {
+    parts.push(skills.citywide.text);
+  }
+
+  // Multi-day — when events span 2+ distinct dates
+  if (events && events.length > 0) {
+    const uniqueDates = new Set(events.map(e => e.date_local).filter(Boolean));
+    if (uniqueDates.size >= 2) {
+      parts.push(skills.multiDay.text);
+    }
+  }
+
   return parts.join('\n');
 }
 
@@ -197,9 +210,17 @@ function buildUnifiedPrompt(events, options = {}) {
     parts.push(skills.singlePick.text);
   }
 
-  // City scan — when scan results are available
-  if (options.cityScanResults?.length > 0) {
-    parts.push(skills.cityScan.text);
+  // Citywide — when no neighborhood and events exist
+  if (!options.requestedNeighborhood && events && events.length > 0) {
+    parts.push(skills.citywide.text);
+  }
+
+  // Multi-day — when events span 2+ distinct dates
+  if (events && events.length > 0) {
+    const uniqueDates = new Set(events.map(e => e.date_local).filter(Boolean));
+    if (uniqueDates.size >= 2) {
+      parts.push(skills.multiDay.text);
+    }
   }
 
   return parts.join('\n');

@@ -24,7 +24,7 @@ async function fetchRAEvents() {
   console.log('Fetching Resident Advisor...');
   try {
     const today = getNycDateString(0);
-    const tomorrow = getNycDateString(1);
+    const endDate = getNycDateString(7);
 
     const payload = {
       operationName: 'GET_EVENT_LISTINGS',
@@ -33,7 +33,7 @@ async function fetchRAEvents() {
           areas: { eq: RA_NYC_AREA_ID },
           listingDate: {
             gte: `${today}T00:00:00.000Z`,
-            lte: `${tomorrow}T23:59:59.000Z`,
+            lte: `${endDate}T23:59:59.000Z`,
           },
         },
         filterOptions: { genre: true },
@@ -78,7 +78,6 @@ async function fetchRAEvents() {
       if (!e || !e.title) continue;
 
       const dateLocal = e.date ? e.date.slice(0, 10) : (listing.listingDate ? listing.listingDate.slice(0, 10) : null);
-      if (dateLocal && dateLocal !== today && dateLocal !== tomorrow) continue;
 
       const venueName = e.venue?.name;
       const venueCoords = lookupVenue(venueName);

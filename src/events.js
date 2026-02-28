@@ -181,7 +181,7 @@ async function checkEndpoints() {
       const res = await fetch(url, {
         method: 'HEAD',
         signal: controller.signal,
-        headers: { 'User-Agent': 'PulseSMS/1.0 HealthCheck' },
+        headers: { 'User-Agent': 'BestieSMS/1.0 HealthCheck' },
         redirect: 'follow',
       });
       clearTimeout(timeout);
@@ -477,17 +477,12 @@ async function refreshSources(sourceNames) {
 // Main entry: get events for a neighborhood (reads from cache)
 // ============================================================
 
-async function getEvents(neighborhood) {
-  if (eventCache.length === 0) {
-    // No persisted cache and scrape hasn't finished — trigger one and wait
-    await refreshCache();
-  }
-
-  const upcoming = filterUpcomingEvents(eventCache);
-
-  // Quality gate — remove events with low extraction confidence or incomplete data
-  const beforeQuality = upcoming.length;
-  const qualityFiltered = filterIncomplete(
+/**
+ * Quality-gate filter — shared between getEvents and getEventsCitywide.
+ */
+function applyQualityGates(events) {
+  const upcoming = filterUpcomingEvents(events);
+  return filterIncomplete(
     upcoming.filter(e => {
       if (e.needs_review === true) return false;
       if (e.extraction_confidence !== null && e.extraction_confidence !== undefined && e.extraction_confidence < 0.4) return false;
@@ -495,27 +490,69 @@ async function getEvents(neighborhood) {
     }),
     0.4
   );
-  const lowConfidence = upcoming.filter(e =>
-    (e.extraction_confidence !== null && e.extraction_confidence !== undefined && e.extraction_confidence < 0.4) || e.needs_review === true
-  ).length;
-  const incomplete = beforeQuality - lowConfidence - qualityFiltered.length;
-  const totalFiltered = beforeQuality - qualityFiltered.length;
-  if (totalFiltered > 0) {
-    console.log(`Filtered ${totalFiltered} low-quality events (${lowConfidence} low-confidence/needs-review, ${incomplete} incomplete)`);
+}
+
+async function getEvents(neighborhood, { dateRange } = {}) {
+  if (eventCache.length === 0) {
+    await refreshCache();
   }
 
+  const qualityFiltered = applyQualityGates(eventCache);
   const ranked = rankEventsByProximity(qualityFiltered, neighborhood);
 
-  // Return today + tomorrow events — Claude handles temporal intent via conversation context
+  // Filter by date range (defaults to today+tomorrow for backward compatibility)
   const todayNyc = getNycDateString(0);
   const tomorrowNyc = getNycDateString(1);
+  const rangeStart = dateRange?.start || todayNyc;
+  const rangeEnd = dateRange?.end || tomorrowNyc;
   const filtered = ranked.filter(e => {
     const d = getEventDate(e);
-    return !d || d === todayNyc || d === tomorrowNyc;
+    if (!d) return true; // keep undated events
+    return d >= rangeStart && d <= rangeEnd;
   });
 
-  console.log(`${filtered.length} today+tomorrow events near ${neighborhood} (${ranked.length} total upcoming, cache: ${eventCache.length})`);
+  console.log(`${filtered.length} events near ${neighborhood} (range ${rangeStart}..${rangeEnd}, cache: ${eventCache.length})`);
   return filtered.slice(0, 20);
+}
+
+/**
+ * Get events citywide — no geographic anchor. Returns best events across all neighborhoods.
+ * Applies same quality gates as getEvents.
+ */
+async function getEventsCitywide({ dateRange } = {}) {
+  if (eventCache.length === 0) {
+    await refreshCache();
+  }
+
+  const qualityFiltered = applyQualityGates(eventCache);
+
+  // Filter by date range (defaults to today+tomorrow)
+  const todayNyc = getNycDateString(0);
+  const tomorrowNyc = getNycDateString(1);
+  const rangeStart = dateRange?.start || todayNyc;
+  const rangeEnd = dateRange?.end || tomorrowNyc;
+  const dateFiltered = qualityFiltered.filter(e => {
+    const d = getEventDate(e);
+    if (!d) return true;
+    return d >= rangeStart && d <= rangeEnd;
+  });
+
+  // Rank by: date proximity (today first) × source tier quality
+  const tierOrder = { unstructured: 0, primary: 1, secondary: 2 };
+  const sorted = dateFiltered.sort((a, b) => {
+    const dateA = getEventDate(a) || rangeEnd;
+    const dateB = getEventDate(b) || rangeEnd;
+    if (dateA !== dateB) return dateA < dateB ? -1 : 1;
+    const tierA = tierOrder[a.source_tier] ?? 2;
+    const tierB = tierOrder[b.source_tier] ?? 2;
+    if (tierA !== tierB) return tierA - tierB;
+    const confA = a.extraction_confidence ?? 1;
+    const confB = b.extraction_confidence ?? 1;
+    return confB - confA;
+  });
+
+  console.log(`Citywide: ${sorted.length} events (range ${rangeStart}..${rangeEnd}, cache: ${eventCache.length})`);
+  return sorted.slice(0, 30);
 }
 
 // ============================================================
@@ -624,20 +661,16 @@ function getEventById(id) {
 // ============================================================
 
 function scanCityWide(filters) {
-  const upcoming = filterUpcomingEvents(eventCache);
-  const qualityFiltered = filterIncomplete(
-    upcoming.filter(e => {
-      if (e.needs_review) return false;
-      if (e.extraction_confidence != null && e.extraction_confidence < 0.4) return false;
-      return true;
-    }), 0.4
-  );
+  const qualityFiltered = applyQualityGates(eventCache);
 
   const todayNyc = getNycDateString(0);
   const tomorrowNyc = getNycDateString(1);
+  const rangeStart = filters.date_range?.start || todayNyc;
+  const rangeEnd = filters.date_range?.end || tomorrowNyc;
   const dateFiltered = qualityFiltered.filter(e => {
     const d = getEventDate(e);
-    return !d || d === todayNyc || d === tomorrowNyc;
+    if (!d) return true;
+    return d >= rangeStart && d <= rangeEnd;
   });
 
   let candidates = dateFiltered;
@@ -658,4 +691,4 @@ function scanCityWide(filters) {
     .map(([neighborhood, matchCount]) => ({ neighborhood, matchCount }));
 }
 
-module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, getEvents, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs, scanCityWide };
+module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, getEvents, getEventsCitywide, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs, scanCityWide };
