@@ -355,7 +355,7 @@ function preRoute(message, session) {
   const compoundDateRange = parseDateRange(lower);
 
   const filterDims = [hasFree, compoundTime, detectedCat, compoundDateRange].filter(Boolean).length;
-  if (filterDims >= 1) {
+  if (filterDims >= 2 || (filterDims >= 1 && detectedHood)) {
     const hood = detectedHood || session?.lastNeighborhood || null;
     // Only include detected keys — undetected keys fall back to session via mergeFilters
     const filters = {};

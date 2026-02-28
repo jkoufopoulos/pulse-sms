@@ -309,11 +309,13 @@ const bareComedyShows = preRoute('comedy shows', bareCatSession);
 check('bare comedy shows (session) → events', bareComedyShows?.intent === 'events');
 check('bare comedy shows (session) → comedy', bareComedyShows?.filters?.category === 'comedy');
 
-// Single dimension without session or hood → still falls through
-check('bare jazz (no session) → null', preRoute('jazz', null) === null);
+// Bare category/time without session → citywide serving (first-message detection)
+check('bare jazz (no session) → events (citywide)', preRoute('jazz', null)?.intent === 'events');
+check('bare jazz (no session) → live_music', preRoute('jazz', null)?.filters?.category === 'live_music');
 check('bare free (no session) → null', preRoute('free', null) === null);
-check('bare tonight (no session) → null', preRoute('tonight', null) === null);
-check('bare comedy (no session) → null', preRoute('comedy', null) === null);
+check('bare tonight (no session) → events (citywide)', preRoute('tonight', null)?.intent === 'events');
+check('bare comedy (no session) → events (citywide)', preRoute('comedy', null)?.intent === 'events');
+check('bare comedy (no session) → comedy', preRoute('comedy', null)?.filters?.category === 'comedy');
 
 // Specific time follow-ups (single-dimension, session-aware)
 console.log('\npreRoute specific time follow-ups:');

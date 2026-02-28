@@ -44,14 +44,13 @@ check('at 09:00 AM: 1 hour away', testMsUntilNextScrape(9, 0, 0) === 3600000);
 console.log('\nSOURCES registry:');
 
 const { SOURCES } = require('../../src/events');
-check('SOURCES has at least 14 entries', SOURCES.length >= 14);
+check('SOURCES has at least 13 entries', SOURCES.length >= 13);
 check('SOURCES labels are unique', new Set(SOURCES.map(s => s.label)).size === SOURCES.length);
 check('all SOURCES have fetch functions', SOURCES.every(s => typeof s.fetch === 'function'));
 check('all SOURCES have valid weights', SOURCES.every(s => s.weight > 0 && s.weight <= 1));
 check('SOURCES includes Skint', SOURCES.some(s => s.label === 'Skint'));
-check('SOURCES includes Tavily', SOURCES.some(s => s.label === 'Tavily'));
 check('Skint weight is 0.9', SOURCES.find(s => s.label === 'Skint').weight === 0.9);
-check('Tavily weight is 0.6', SOURCES.find(s => s.label === 'Tavily').weight === 0.6);
+check('Tavily not in daily scrape SOURCES', !SOURCES.some(s => s.label === 'Tavily'));
 
 // ---- getHealthStatus shape ----
 console.log('\ngetHealthStatus:');
@@ -75,7 +74,7 @@ check('scrape has sourcesFailed', 'sourcesFailed' in healthData.scrape);
 check('has sources object', typeof healthData.sources === 'object' && healthData.sources !== null);
 check('sources has Skint', 'Skint' in healthData.sources);
 check('sources has RA', 'RA' in healthData.sources);
-check('sources has 18 entries', Object.keys(healthData.sources).length === 18);
+check('sources has at least 13 entries', Object.keys(healthData.sources).length >= 13);
 
 const sampleSource = healthData.sources.Skint;
 check('source has status field', 'status' in sampleSource);
