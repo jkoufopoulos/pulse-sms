@@ -68,7 +68,7 @@ const ROUTE_FALLBACK = {
   neighborhood: null,
   filters: { free_only: false, category: null, vibe: null },
   event_reference: null,
-  reply: "Sorry, I didn't catch that. Text a neighborhood to see tonight's picks, or HELP for commands.",
+  reply: "Sorry, I didn't catch that. Tell me what you're in the mood for — comedy, jazz, this weekend — or try a neighborhood. HELP for more.",
   confidence: 0,
 };
 

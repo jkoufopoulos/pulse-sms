@@ -116,7 +116,7 @@ const convGoodTrace = {
   ...goodTrace,
   id: 'test-4',
   output_intent: 'conversational',
-  output_sms: "Ha — I only know events. Text a neighborhood and I'll hook you up.",
+  output_sms: "Ha — I only know events. Tell me what you're in the mood for and I'll find something good.",
 };
 
 console.log('\nCode evals (conversational with redirect):');
@@ -233,10 +233,10 @@ const convWithRedirect = {
   id: 'test-conv-redirect',
   input_message: 'who won the knicks game?',
   output_intent: 'conversational',
-  output_sms: "Ha — I only know events. Text me a neighborhood and I'll hook you up.",
+  output_sms: "Ha — I only know events. Tell me what you're in the mood for and I'll find something good.",
 };
 const convRedirectResults = runCodeEvals(convWithRedirect);
-check('off_topic_redirect passes with "text me a neighborhood"', findEval(convRedirectResults, 'off_topic_redirect').pass === true);
+check('off_topic_redirect passes with "mood for" redirect', findEval(convRedirectResults, 'off_topic_redirect').pass === true);
 
 // ---- day_label_accuracy eval ----
 console.log('\nCode evals (day_label_accuracy):');
@@ -323,7 +323,7 @@ const priceNaTrace = {
   ...goodTrace,
   id: 'test-price-na',
   output_intent: 'conversational',
-  output_sms: "I only know events — text a neighborhood!",
+  output_sms: "I only know events — tell me what vibe you're feeling!",
   composition: { ...goodTrace.composition, picks: [] },
 };
 const priceNaResults = runCodeEvals(priceNaTrace);

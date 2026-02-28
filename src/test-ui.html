@@ -304,7 +304,7 @@
 
   <div class="messages" id="messages">
     <div class="msg system">SMS Simulator &mdash; messages hit the live pipeline (~$0.001/msg AI cost)</div>
-    <div class="msg received">Hey! I'm Bestie — text me a neighborhood and I'll send you tonight's best picks. Try "East Village" or "Williamsburg" to start. You can ask for free events, specific vibes like comedy or live music, or reply "more" after any rec to keep exploring.</div>
+    <div class="msg received">Hey! I'm Bestie — tell me what you're in the mood for and I'll find it across NYC. Try "jazz tonight", "something weird", "free comedy this weekend", or a neighborhood like "Williamsburg". Reply a number for details or "more" for more picks.</div>
   </div>
 
   <div class="typing-indicator" id="typing">
@@ -333,7 +333,7 @@ let SESSION_PHONE = '+1555' + String(Math.floor(Math.random() * 9000000 + 100000
 function newSession() {
   SESSION_PHONE = '+1555' + String(Math.floor(Math.random() * 9000000 + 1000000));
   messagesEl.innerHTML = '<div class="msg system">SMS Simulator \u2014 messages hit the live pipeline (~$0.001/msg AI cost)</div>' +
-    '<div class="msg received">Hey! I\u2019m Bestie \u2014 text me a neighborhood and I\u2019ll send you tonight\u2019s best picks. Try \u201cEast Village\u201d or \u201cWilliamsburg\u201d to start. You can ask for free events, specific vibes like comedy or live music, or reply \u201cmore\u201d after any rec to keep exploring.</div>';
+    '<div class="msg received">Hey! I\u2019m Bestie \u2014 tell me what you\u2019re in the mood for and I\u2019ll find it across NYC. Try \u201cjazz tonight\u201d, \u201csomething weird\u201d, \u201cfree comedy this weekend\u201d, or a neighborhood like \u201cWilliamsburg\u201d. Reply a number for details or \u201cmore\u201d for more picks.</div>';
 }
 
 function updateClock() {

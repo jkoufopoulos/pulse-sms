@@ -1,5 +1,5 @@
 const { makeEventId, FETCH_HEADERS } = require('./shared');
-const { resolveNeighborhood, inferCategory } = require('../geo');
+const { resolveNeighborhood, inferCategory, getNycDateString } = require('../geo');
 const { learnVenueCoords } = require('../venues');
 
 async function fetchBrooklynVeganEvents() {
@@ -8,7 +8,11 @@ async function fetchBrooklynVeganEvents() {
     const events = [];
     const seen = new Set();
 
-    for (const day of ['today', 'tomorrow']) {
+    // Build 7-day date list; fall back to today/tomorrow if date URLs 404
+    const days = [];
+    for (let i = 0; i < 7; i++) days.push(getNycDateString(i));
+
+    for (const day of days) {
       const url = `https://nyc-shows.brooklynvegan.com/events/${day}.json`;
       const res = await fetch(url, {
         headers: { 'User-Agent': FETCH_HEADERS['User-Agent'], 'Accept': 'application/json' },

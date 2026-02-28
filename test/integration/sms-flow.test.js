@@ -17,7 +17,7 @@ module.exports.runAsync = async function() {
   hClearSession(intPhone);
   let msgs = await sendAndCapture(intPhone, 'help');
   check('help: sends 1 message', msgs.length === 1);
-  check('help: mentions neighborhoods', msgs[0]?.body.includes('East Village'));
+  check('help: mentions neighborhoods', msgs[0]?.body.includes('Williamsburg'));
   check('help: mentions details', msgs[0]?.body.includes('details'));
 
   // 2. Greeting flow
@@ -47,7 +47,7 @@ module.exports.runAsync = async function() {
   hClearSession(intPhone);
   msgs = await sendAndCapture(intPhone, '1');
   check('number (no session): sends 1 message', msgs.length === 1);
-  check('number (no session): asks for neighborhood', msgs[0]?.body.includes('neighborhood'));
+  check('number (no session): asks what user wants', msgs[0]?.body.includes('looking for'));
 
   // 7. Bare number with seeded session
   hClearSession(intPhone);
@@ -78,7 +78,7 @@ module.exports.runAsync = async function() {
   hClearSession(intPhone);
   hSetSession(intPhone, { lastNeighborhood: 'Bushwick', lastPicks: [{ event_id: 'x' }] });
   msgs = await sendAndCapture(intPhone, 'hey');
-  check('greeting (active session): mentions more', msgs[0]?.body.includes('more'));
+  check('greeting (active session): mentions mood/vibe', msgs[0]?.body.includes('mood') || msgs[0]?.body.includes('vibe') || msgs[0]?.body.includes('neighborhood'));
 
   // 11. Out-of-range pick number
   hClearSession(intPhone);

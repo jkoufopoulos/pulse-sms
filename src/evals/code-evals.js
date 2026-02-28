@@ -105,7 +105,7 @@ const evals = {
       return { name: 'off_topic_redirect', pass: true, detail: 'farewell/thanks (no redirect needed)' };
     }
     // Check that the response contains a redirect to neighborhoods/events
-    const hasRedirect = /text (me )?a neighborhood|text me a|drop me a|go out|tonight.s picks|when you.re ready/i.test(sms);
+    const hasRedirect = /text (me )?a neighborhood|text me a|drop me a|go out|tonight.s picks|when you.re ready|mood for|what you.re looking|vibe|try a/i.test(sms);
     return {
       name: 'off_topic_redirect',
       pass: hasRedirect,

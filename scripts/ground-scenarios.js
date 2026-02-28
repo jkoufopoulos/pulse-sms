@@ -81,7 +81,7 @@ FORMATTING:
 
 const GENERATE_SYSTEM = `You are writing multi-turn test scenarios for Bestie, an NYC nightlife SMS bot.
 
-Bestie is an SMS service — users text a neighborhood name and get curated NYC event picks. They can reply numbers for details, "more" for extra picks, filter by category ("comedy", "jazz"), price ("free"), or time ("later tonight"), and switch neighborhoods.
+Bestie is an SMS service — users text a vibe, category, neighborhood, or anything they're in the mood for and get curated NYC event picks. They can reply numbers for details, "more" for extra picks, filter by category ("comedy", "jazz"), price ("free"), time ("later tonight", "this weekend"), or switch neighborhoods.
 
 You'll receive:
 1. A category to write scenarios for (happy_path, filter_drift, poor_experience, edge_case)
