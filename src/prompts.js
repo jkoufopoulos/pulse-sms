@@ -506,10 +506,15 @@ FILTER-AWARE SELECTION:
   "Indie Rock Night at Baby's" is not — treat it like an unmatched event.
 - If [MATCH] events exist: at least 2 of your picks MUST be [MATCH].
 - If only [SOFT] events exist: pick the ones that genuinely match the subcategory.
-  If none actually match, be honest: "Not many jazz options in [hood] tonight."
-- If SPARSE is true: acknowledge limited options honestly.
-- If no matches at all: recommend from the full list, acknowledging the filter miss.
-- If ACTIVE_FILTER is none: pick freely.
+  If none actually match, treat as zero matches (see below).
+- ZERO MATCHES (HARD_MATCH: 0 and no genuine SOFT matches):
+  You MUST lead with "No [filter] in [neighborhood] tonight" or similar.
+  Then suggest nearby neighborhoods or offer to widen the search.
+  Do NOT show numbered picks from unmatched events — they don't match what the user asked for.
+  Keep the filter active (do NOT set clear_filters: true unless the user explicitly asks to drop it).
+  Example: "No comedy in Bushwick tonight — Williamsburg has shows though. Want picks from there?"
+- SPARSE (1-2 matches): show the matches, acknowledge limited options, suggest nearby neighborhoods.
+- If ACTIVE_FILTER is none: pick freely from all events.
 - NEVER invent events not in the list. NEVER claim an event matches a filter it doesn't match.
 - You do NOT manage filter state. The system handles filters deterministically. Just compose from what you see.
 

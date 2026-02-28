@@ -188,7 +188,7 @@ Same pattern in: free+comedy stacking (compound applied, nothing matched, LLM sh
 
 **Design question, not a code bug.** When filters match zero events, should Pulse: (a) show nothing and say "nothing matches" (strict, frustrating UX), (b) show alternatives with explanation (current behavior, scored as filter failure), or (c) distinguish in the eval between "filter dropped" vs "filter applied, no results"?
 
-**Fix options:** Prompt hardening (LLM MUST acknowledge the active filter before showing alternatives), eval recalibration (judge distinguishes "filter dropped" from "honest scarcity"), or both.
+**Fixed (2026-02-28):** Prompt hardening in `UNIFIED_SYSTEM` — zero-match instruction now says: "You MUST lead with 'No [filter] in [neighborhood] tonight'. Do NOT show numbered picks from unmatched events." LLM should acknowledge the filter and suggest nearby neighborhoods instead of silently showing non-matching events.
 
 #### Root Cause D: Nudge-accept ambiguity — "ok"/"sure" resets context (~10% of failures)
 
@@ -206,7 +206,7 @@ User has comedy filter → says "free" → gets free events but NOT free comedy.
 
 Two sub-cases: (1) Overlap with Root Cause C — compound filter matches nothing, LLM shows non-matching. (2) Pre-router gate — empty `lastPicks` prevents filter detection, so the new filter is treated as a standalone request.
 
-**Fix needed:** Pre-router should detect filters even when `lastPicks` is empty, as long as `lastNeighborhood` is set.
+**Fixed (2026-02-28):** Removed `lastPicks.length > 0` from the pre-router session-aware filter detection gate. Now only requires `lastNeighborhood`, so filter follow-ups work even after zero-match turns.
 
 ---
 
@@ -216,11 +216,11 @@ Two sub-cases: (1) Overlap with Root Cause C — compound filter matches nothing
 |---|---|---|---|---|
 | **A: 502/crashes** | ~35% | Infrastructure | Test endpoint timeout + session persistence | **Fixed (2026-02-28)** |
 | **B: Session loss** | ~15% | Yes | Session disk persistence | **Partially fixed (2026-02-28)** — `ask_neighborhood` empty picks remains |
-| **C: Zero-match fallback** | ~25% | Design question | Prompt hardening + eval recalibration | Open |
+| **C: Zero-match fallback** | ~25% | Design question | Prompt hardening: LLM must lead with "No [filter] in [hood]" before alternatives | **Fixed (2026-02-28)** |
 | **D: Nudge-accept** | ~10% | Yes (prompt gap) | LLM prompt or pre-router improvement | Open |
-| **E: Stacking via pre-router** | ~15% | Yes (pre-router edge case) | Remove `lastPicks.length > 0` gate from filter detection | Open |
+| **E: Stacking via pre-router** | ~15% | Yes (pre-router edge case) | Remove `lastPicks.length > 0` gate from filter detection | **Fixed (2026-02-28)** |
 
-Fixing A+B (done) should eliminate ~50% of failures. Fixing C+D+E addresses the remaining ~50% through prompt tuning and pre-router edge cases.
+Fixing A+B+C+E (done) should address ~90% of failures. Root Cause D (nudge-accept, ~10%) remains open.
 
 ### P5 — Temporal Accuracy (was 25%, expected fixed)
 

@@ -242,7 +242,7 @@ function preRoute(message, session) {
   // fall back to existing session filters (compounding). Including all keys from
   // base.filters would overwrite existing filters with null — causing the
   // "free replaces comedy" stacking bug.
-  if (session?.lastNeighborhood && session?.lastPicks?.length > 0) {
+  if (session?.lastNeighborhood) {
     // Free (single-dimension)
     if (/^(free|free stuff|free events|anything free)$/i.test(msg)) {
       return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { free_only: true } };
