@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchTavilyFreeEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchDoNYCEvents, fetchBAMEvents, fetchSmallsLiveEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents, fetchTicketmasterEvents, fetchYutoriEvents } = require('./sources');
+const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchDoNYCEvents, fetchBAMEvents, fetchSmallsLiveEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents, fetchTicketmasterEvents, fetchYutoriEvents } = require('./sources');
 const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate } = require('./geo');
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues } = require('./venues');
 const { sendHealthAlert } = require('./alerts');
@@ -30,7 +30,6 @@ const SOURCE_TIERS = {
   NYPL: 'secondary',
   EventbriteComedy: 'secondary',
   EventbriteArts: 'secondary',
-  Tavily: 'secondary',
 };
 
 // Load persisted learned venues on boot
@@ -96,7 +95,8 @@ const SOURCES = [
   { label: 'NYPL',             fetch: fetchNYPLEvents,          weight: 0.7,  mergeRank: 1, endpoint: 'https://www.eventbrite.com/o/new-york-public-library-for-the-performing-arts-5993389089' },
   { label: 'EventbriteComedy', fetch: fetchEventbriteComedy,    weight: 0.7,  mergeRank: 2, endpoint: null },
   { label: 'EventbriteArts',   fetch: fetchEventbriteArts,      weight: 0.7,  mergeRank: 3, endpoint: null },
-  { label: 'Tavily',           fetch: fetchTavilyFreeEvents,    weight: 0.6,  mergeRank: 0, endpoint: null },
+  // Tavily removed from daily scrape — consistently returns 0 events and burns API credits.
+  // Kept as hot-path fallback only (tryTavilyFallback in pipeline.js).
 ];
 
 // Boot-time validation — fail fast on config errors
