@@ -1,5 +1,6 @@
 const { setResponseState } = require('./session');
 const { filterByTimeAfter, parseAsNycTime, getEventDate } = require('./geo');
+const { searchTavilyEvents } = require('./sources/tavily');
 
 /**
  * Apply event filters (free, category, time).
@@ -293,4 +294,51 @@ function normalizeFilters(filters) {
   return Object.keys(result).length > 0 ? result : null;
 }
 
-module.exports = { applyFilters, resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, failsTimeGate };
+/**
+ * Build a filter-aware Tavily search query for a neighborhood.
+ */
+function buildTavilyQuery(hood, filters) {
+  const parts = [];
+  if (filters?.free_only) parts.push('free');
+  if (filters?.subcategory) parts.push(filters.subcategory);
+  else if (filters?.category) parts.push(filters.category.replace('_', ' '));
+  parts.push('events');
+  parts.push(hood);
+  parts.push('NYC');
+  if (filters?.time_after) {
+    const [h] = filters.time_after.split(':').map(Number);
+    if (h >= 21) parts.push('late night');
+    else parts.push('tonight');
+  } else {
+    parts.push('tonight');
+  }
+  return parts.join(' ');
+}
+
+/**
+ * Last-resort Tavily live search when cached events are exhausted.
+ * Returns { events } or null on failure/empty.
+ */
+async function tryTavilyFallback(hood, filters, excludeIds, trace) {
+  try {
+    const query = buildTavilyQuery(hood, filters);
+    const start = Date.now();
+    const results = await searchTavilyEvents(hood, { query });
+    const latency = Date.now() - start;
+    const excludeSet = new Set(excludeIds || []);
+    const fresh = results.filter(e => !excludeSet.has(e.id));
+    if (trace) {
+      trace.tavily_fallback = { triggered: true, query, latency_ms: latency, raw_count: results.length, fresh_count: fresh.length };
+    }
+    if (fresh.length === 0) return null;
+    return { events: fresh };
+  } catch (err) {
+    console.error('Tavily fallback error:', err.message);
+    if (trace) {
+      trace.tavily_fallback = { triggered: true, error: err.message };
+    }
+    return null;
+  }
+}
+
+module.exports = { applyFilters, resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, failsTimeGate, buildTavilyQuery, tryTavilyFallback };

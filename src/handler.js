@@ -12,7 +12,7 @@ const { getEvents, getEventsCitywide, getEventById, scanCityWide, getCacheStatus
 const { lookupReferralCode, recordAttribution } = require('./referral');
 const { filterKidsEvents, validatePerennialActivity } = require('./curation');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
-const { applyFilters, buildEventMap, saveResponseFrame, mergeFilters, buildTaggedPool } = require('./pipeline');
+const { applyFilters, buildEventMap, saveResponseFrame, mergeFilters, buildTaggedPool, tryTavilyFallback } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
 
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
@@ -365,6 +365,19 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
     const perennialCap = Math.min(4, 15 - Math.min(events.length, 15));
     taggedPerennials = localPerennials.slice(0, perennialCap).map(e => ({ ...e, filter_match: false }));
     events = [...events, ...taggedPerennials];
+
+    // Tavily live-search fallback: fire when pool is exhausted and user already visited this hood
+    const earlyExcludePicks = (session?.allPicks || session?.lastPicks || []).map(p => p.event_id);
+    const earlyExcludeOffered = session?.allOfferedIds || [];
+    const earlyExcludeSet = new Set([...earlyExcludePicks, ...earlyExcludeOffered]);
+    const unseenEvents = events.filter(e => !earlyExcludeSet.has(e.id));
+    if (unseenEvents.length === 0 && (session?.visitedHoods || []).includes(hood)) {
+      const tavilyResult = await tryTavilyFallback(hood, activeFilters, [...earlyExcludeSet], trace);
+      if (tavilyResult) {
+        const tavilyTagged = tavilyResult.events.map(e => ({ ...e, filter_match: false }));
+        events = [...events, ...tavilyTagged];
+      }
+    }
   } else {
     // Citywide flow — serve best events across all neighborhoods
     isCitywide = true;
