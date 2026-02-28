@@ -691,4 +691,24 @@ function scanCityWide(filters) {
     .map(([neighborhood, matchCount]) => ({ neighborhood, matchCount }));
 }
 
-module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, getEvents, getEventsCitywide, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs, scanCityWide };
+/**
+ * Inject live-fetched events into the cache (e.g. from Tavily fallback).
+ * Deduplicates by event ID. Does not persist to disk (ephemeral enrichment).
+ */
+function injectEvents(events) {
+  const seen = new Set(eventCache.map(e => e.id));
+  let added = 0;
+  for (const e of events) {
+    if (!seen.has(e.id)) {
+      seen.add(e.id);
+      eventCache.push(e);
+      added++;
+    }
+  }
+  if (added > 0) {
+    console.log(`Injected ${added} live events into cache (now ${eventCache.length} total)`);
+  }
+  return added;
+}
+
+module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, getEvents, getEventsCitywide, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs, scanCityWide, injectEvents };

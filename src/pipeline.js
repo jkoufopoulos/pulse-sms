@@ -331,6 +331,8 @@ async function tryTavilyFallback(hood, filters, excludeIds, trace) {
       trace.tavily_fallback = { triggered: true, query, latency_ms: latency, raw_count: results.length, fresh_count: fresh.length };
     }
     if (fresh.length === 0) return null;
+    // Late require to avoid circular dep (events.js → pipeline.js)
+    require('./events').injectEvents(fresh);
     return { events: fresh };
   } catch (err) {
     console.error('Tavily fallback error:', err.message);
