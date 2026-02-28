@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pulse SMS — Architecture Explorer</title>
+<title>Bestie SMS — Architecture Explorer</title>
 <style>
   :root {
     --bg: #0d1117;
@@ -320,7 +320,7 @@
 <body>
 
 <nav class="nav">
-  <span class="nav-title">Pulse Architecture</span>
+  <span class="nav-title">Bestie Architecture</span>
   <a href="#overview">Overview</a>
   <a href="#scrape-pipeline">Scrape Pipeline</a>
   <a href="#sms-pipeline">SMS Pipeline</a>
@@ -337,8 +337,8 @@
 
 <!-- ============================================================ -->
 <section id="overview">
-<h1>Pulse SMS Architecture</h1>
-<p class="subtitle">Pulse turns a text message into a curated night out. Users text a neighborhood — "Bushwick", "LES", "prospect park" — and get back 1-3 opinionated event picks under 480 characters. They can reply a number for details, "more" for extra picks, or refine with follow-ups like "how about comedy" or "later tonight." The entire experience happens in a single SMS thread with no app, no account, and no links until you ask.</p>
+<h1>Bestie SMS Architecture</h1>
+<p class="subtitle">Bestie turns a text message into a curated night out. Users text a neighborhood — "Bushwick", "LES", "prospect park" — and get back 1-3 opinionated event picks under 480 characters. They can reply a number for details, "more" for extra picks, or refine with follow-ups like "how about comedy" or "later tonight." The entire experience happens in a single SMS thread with no app, no account, and no links until you ask.</p>
 
 <div class="metrics">
   <div class="metric"><div class="metric-value">4</div><div class="metric-label">LLM prompts (system messages)</div></div>
@@ -352,7 +352,7 @@
 </div>
 
 <h3>Two Pipelines</h3>
-<p>Pulse has two completely separate execution paths that never overlap in real-time:</p>
+<p>Bestie has two completely separate execution paths that never overlap in real-time:</p>
 
 <table>
   <tr><th>Pipeline</th><th>When</th><th>LLM Usage</th><th>Duration</th><th>Frequency</th></tr>
@@ -485,7 +485,7 @@
 <!-- ============================================================ -->
 <section id="sms-pipeline">
 <h2>SMS Request Pipeline</h2>
-<p>When a user texts Pulse, the message goes through this flow. At most 2 LLM calls happen.</p>
+<p>When a user texts Bestie, the message goes through this flow. At most 2 LLM calls happen.</p>
 
 <div class="flow">
   <div class="flow-step">
@@ -758,7 +758,7 @@
     <span class="prompt-name">1. EXTRACTION_PROMPT — Event Extraction</span>
     <span class="prompt-meta">~1,600 tokens | Used by: Skint, Nonsense NYC, Oh My Rockness | ai.js:extractEvents()</span>
   </div>
-  <div class="prompt-content" id="prompt-extraction">Role: Event Extractor for Pulse (NYC). Convert messy source text into normalized event records.
+  <div class="prompt-content" id="prompt-extraction">Role: Event Extractor for Bestie (NYC). Convert messy source text into normalized event records.
 
 RULES:
 - VENUES vs EVENTS: If a venue hosts a specific event, extract the EVENT with venue as venue_name.
@@ -807,7 +807,7 @@ EXAMPLES: Skint-style newsletter, Tavily venue (no specific event)</div>
     <span class="prompt-name">2. ROUTE_SYSTEM — Message Routing (slimmed)</span>
     <span class="prompt-meta">~2,100 tokens | Used by: routeMessage() | ai.js:21 | Hot path</span>
   </div>
-  <div class="prompt-content" id="prompt-route">Role: Pulse's message router. SMS bot that recommends NYC nightlife and events.
+  <div class="prompt-content" id="prompt-route">Role: Bestie's message router. SMS bot that recommends NYC nightlife and events.
 Given incoming SMS (&lt;user_message&gt; tags), session context, and valid neighborhoods,
 determine intent and extract parameters.
 
@@ -816,10 +816,10 @@ VALID INTENTS:
 - "details" — wants more info on shown event (references specific pick)
 - "more" — wants additional options beyond what was shown
 - "free" — wants free events specifically
-- "help" — asks what Pulse is / how to use it
+- "help" — asks what Bestie is / how to use it
 - "conversational" — social niceties + off-topic (greetings, thanks, goodbyes)
 
-OFF-TOPIC HANDLING: Pulse is event discovery, not general assistant.
+OFF-TOPIC HANDLING: Bestie is event discovery, not general assistant.
 Trivia, sports, advice, jokes, opinions → "conversational" + redirect.
 
 SESSION AWARENESS:
@@ -899,7 +899,7 @@ Previous monolith: ~3,600 tokens (sent every call regardless)</div>
     <span class="prompt-name">4. DETAILS_SYSTEM — Event Details</span>
     <span class="prompt-meta">~400 tokens | Used by: composeDetails() | ai.js:320 | Lightest prompt</span>
   </div>
-  <div class="prompt-content" id="prompt-details">Role: Pulse — NYC "plugged-in friend" texting about a spot you recommended.
+  <div class="prompt-content" id="prompt-details">Role: Bestie — NYC "plugged-in friend" texting about a spot you recommended.
 Write like a real person — warm, opinionated, concise. Never robotic.
 
 CONTENT PRIORITY (include in order, cut from bottom if long):
@@ -1200,7 +1200,7 @@ CONSTRAINTS:
 <!-- ============================================================ -->
 <section id="skills">
 <h2>Where Claude Adds Value</h2>
-<p>Pulse uses Claude for exactly 4 things. Each one is chosen because code can't do it well — and Claude's specific strengths (language understanding, taste, tone, messy-input parsing) are the right tool.</p>
+<p>Bestie uses Claude for exactly 4 things. Each one is chosen because code can't do it well — and Claude's specific strengths (language understanding, taste, tone, messy-input parsing) are the right tool.</p>
 
 <h3>Claude's 4 Jobs</h3>
 
@@ -1226,7 +1226,7 @@ CONSTRAINTS:
     <div class="handler">ai.js:composeResponse() | buildComposePrompt() | SMS pipeline</div>
     <p style="margin-top: 8px;">Given 4-8 candidate events, Claude picks the best 1-3 and writes an opinionated SMS that sounds like a plugged-in friend texting. It balances tonight-vs-tomorrow, source trust, neighborhood fit, and "curation taste" (preferring indie/interesting over corporate/generic).</p>
     <p><strong>Why Claude:</strong> Two things code can't do: (1) <em>Taste</em> — ranking "DJ night at a small Bushwick venue" above "hotel bar happy hour" requires judgment that doesn't reduce to a sort function. (2) <em>Voice</em> — "legendary basement spot, incredible players" vs "Jazz at Smalls Jazz Club, 9:30pm, $20." The personality IS the product.</p>
-    <p><strong>Why not code:</strong> Code handles the pre-filtering (proximity ranking, time filtering, dedup). But the final pick + write step is where Claude's "opinion" creates the UX that makes Pulse feel like a friend, not a search engine.</p>
+    <p><strong>Why not code:</strong> Code handles the pre-filtering (proximity ranking, time filtering, dedup). But the final pick + write step is where Claude's "opinion" creates the UX that makes Bestie feel like a friend, not a search engine.</p>
   </div>
 
   <div class="intent-card" style="border-left: 3px solid var(--accent3);">
@@ -1239,7 +1239,7 @@ CONSTRAINTS:
 </div>
 
 <h3>What Stays as Code (and Should)</h3>
-<p>Every other operation in Pulse is deterministic and runs without Claude. This is intentional — Claude adds latency and cost. It should only be used where its strengths are irreplaceable.</p>
+<p>Every other operation in Bestie is deterministic and runs without Claude. This is intentional — Claude adds latency and cost. It should only be used where its strengths are irreplaceable.</p>
 
 <table>
   <tr><th>Operation</th><th>Implementation</th><th>Why Not Claude</th></tr>

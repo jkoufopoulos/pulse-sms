@@ -37,10 +37,10 @@ const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-sonnet-4-5-20250929
 
 const client = new Anthropic();
 
-const JUDGE_SYSTEM = `You are a QA judge for Pulse, an SMS bot that recommends NYC events.
+const JUDGE_SYSTEM = `You are a QA judge for Bestie, an SMS bot that recommends NYC events.
 
 You will be given:
-1. A multi-turn conversation transcript between a user and Pulse
+1. A multi-turn conversation transcript between a user and Bestie
 2. A list of specific assertions to evaluate — each with a "check" (what should be true) and an "anti_pattern" (what would be a failure)
 
 Your job: evaluate each assertion independently against the actual conversation.
@@ -50,8 +50,8 @@ GRADING RULES:
 - Focus on whether each assertion's "check" is satisfied and "anti_pattern" is avoided.
 - An assertion passes if the check is met, even if the wording is different.
 - An assertion fails if the anti_pattern is triggered OR the check is clearly not met.
-- If Pulse had no events for a category, it's acceptable to say so — judge whether it handled the scarcity honestly.
-- Be strict on filter persistence: if the user asked for "free comedy" and Pulse returned jazz or paid events without acknowledging the filter change, that's a FAIL.
+- If Bestie had no events for a category, it's acceptable to say so — judge whether it handled the scarcity honestly.
+- Be strict on filter persistence: if the user asked for "free comedy" and Bestie returned jazz or paid events without acknowledging the filter change, that's a FAIL.
 
 Return STRICT JSON (no markdown fences):
 {
@@ -136,7 +136,7 @@ async function runScenario(scenario, phoneNumber) {
     const data = await res.json();
 
     if (!res.ok) {
-      conversation.push({ turn: turnNumber, sender: 'pulse', message: `[ERROR: ${data.error || res.status}]` });
+      conversation.push({ turn: turnNumber, sender: 'bestie', message: `[ERROR: ${data.error || res.status}]` });
       continue;
     }
 
@@ -144,11 +144,11 @@ async function runScenario(scenario, phoneNumber) {
     const trace = data.trace || null;
     const messages = data.messages || [];
     for (const msg of messages) {
-      conversation.push({ turn: turnNumber, sender: 'pulse', message: msg.body, trace_summary: traceSummary, trace });
+      conversation.push({ turn: turnNumber, sender: 'bestie', message: msg.body, trace_summary: traceSummary, trace });
     }
 
     if (messages.length === 0) {
-      conversation.push({ turn: turnNumber, sender: 'pulse', message: '[NO RESPONSE]' });
+      conversation.push({ turn: turnNumber, sender: 'bestie', message: '[NO RESPONSE]' });
     }
 
     // Small delay between turns for session to settle
@@ -226,11 +226,11 @@ async function main() {
         throw new Error('Judge returned unparseable response');
       }
 
-      // Run code evals on every pulse turn that has a trace
+      // Run code evals on every bestie turn that has a trace
       const codeEvalFailures = [];
       let codeEvalTotal = 0;
       for (const turn of conversation) {
-        if (turn.sender === 'pulse' && turn.trace) {
+        if (turn.sender === 'bestie' && turn.trace) {
           const results = runCodeEvals(turn.trace);
           codeEvalTotal += results.length;
           for (const r of results) {

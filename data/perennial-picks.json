@@ -1,140 +1,312 @@
 {
-  "Bed-Stuy": [
+  "Financial District": [
     {
-      "venue": "Ode to Babel",
-      "vibe": "Wine bar with live music & DJs on weekends — great Franklin Ave hangout",
-      "days": ["fri", "sat"],
-      "category": "live_music",
-      "address": "772 Dean St",
-      "is_free": false,
-      "url": "https://www.odetobabel.com"
-    },
-    {
-      "venue": "Pearl's Social & Billy Club",
-      "vibe": "Cocktail bar with DJs — Bed-Stuy staple",
-      "days": ["fri", "sat"],
-      "category": "nightlife",
-      "address": "40 St Felix St",
-      "is_free": false
-    },
-    {
-      "venue": "Lovers Rock",
-      "vibe": "Caribbean cocktail bar with DJs on weekends — vibey and intimate",
-      "days": ["fri", "sat"],
-      "category": "nightlife",
-      "address": "419 Tompkins Ave",
-      "is_free": false,
-      "url": "https://www.loversrockbar.com"
-    },
-    {
-      "venue": "Do or Dive",
-      "vibe": "Retro dive bar — shuffleboard, frozen coffee, back garden, open 12pm-4am",
-      "days": ["any"],
-      "category": "nightlife",
-      "address": "1108 Bedford Ave",
-      "is_free": true
-    },
-    {
-      "venue": "Tip Top Bar & Grill",
-      "vibe": "Bed-Stuy's oldest bar — friendly, $4 bottles, funky backyard",
-      "days": ["any"],
-      "category": "nightlife",
-      "address": "432 Franklin Ave",
-      "is_free": true
-    },
-    {
-      "venue": "Dynaco",
-      "vibe": "Hidden candlelit cocktail bar — wood-burning stove, cash only, intimate vibes",
-      "days": ["any"],
-      "category": "nightlife",
-      "address": "1112 Bedford Ave",
-      "is_free": true
-    },
-    {
-      "venue": "Frog",
-      "vibe": "BKMAG 2025 Best Bar in Brooklyn — natural wine, pool table, hidden garden",
-      "days": ["thu", "fri", "sat", "sun", "mon"],
-      "category": "nightlife",
-      "address": "569 Myrtle Ave",
-      "is_free": true
-    },
-    {
-      "venue": "C'mon Everybody",
-      "vibe": "Queer-owned live music venue — drag, burlesque, comedy, and live acts nightly",
+      "venue": "The Dead Rabbit",
+      "vibe": "Free live Irish folk music weekly — fiddle, banjo, pipes in the world's most-awarded pub",
       "days": ["any"],
       "category": "live_music",
-      "address": "325 Franklin Ave",
-      "is_free": false,
-      "url": "https://www.cmoneverybody.com"
+      "address": "30 Water St",
+      "is_free": true,
+      "url": "https://thedeadrabbit.com"
     },
     {
-      "venue": "All Night Skate",
-      "vibe": "90s roller rink theme — arcade room, themed party nights on weekends",
-      "days": ["fri", "sat"],
+      "venue": "Daisy Duke's Honky Tonk",
+      "vibe": "Live country music Thu-Sat, line dancing nights — honky tonk on Stone Street",
+      "days": ["thu", "fri", "sat"],
+      "category": "live_music",
+      "address": "47 Stone St",
+      "is_free": true,
+      "url": "https://daisydukesnyc.com"
+    },
+    {
+      "venue": "Old Mates Pub",
+      "vibe": "DJ sets Thu-Sat in the downstairs lounge — house and electronic",
+      "days": ["thu", "fri", "sat"],
       "category": "nightlife",
-      "address": "1 Knickerbocker Ave",
-      "is_free": false
+      "address": "170 John St",
+      "is_free": true,
+      "url": "https://www.oldmates.com"
     }
   ],
-  "Upper West Side": [
+  "Tribeca": [
     {
-      "venue": "Smoke Jazz & Supper Club",
-      "vibe": "Live jazz every night — one of the best jazz rooms in the city",
+      "venue": "The Django",
+      "vibe": "Live jazz 7 nights a week, two acts per night — in the Roxy Hotel cellar",
       "days": ["any"],
       "category": "live_music",
-      "address": "2751 Broadway",
+      "address": "2 Avenue of the Americas",
       "is_free": false,
-      "url": "https://www.smokejazz.com"
+      "url": "https://www.thedjangonyc.com"
     },
     {
-      "venue": "Symphony Space",
-      "vibe": "Performances most nights — theater, music, film, literary events",
-      "days": ["any"],
-      "category": "theater",
-      "address": "2537 Broadway",
+      "venue": "Roxy Bar",
+      "vibe": "Live jazz Wed-Sat, resident pianist Tue-Sat, jazz brunch Sundays",
+      "days": ["tue", "wed", "thu", "fri", "sat", "sun"],
+      "category": "live_music",
+      "address": "2 Avenue of the Americas",
       "is_free": false,
-      "url": "https://www.symphonyspace.org"
+      "url": "https://www.roxybarnyc.com"
     },
     {
-      "venue": "The Dead Poet",
-      "vibe": "Literary Irish pub — outstanding Guinness, book library, writer portraits on the walls",
-      "days": ["any"],
-      "category": "nightlife",
-      "address": "450 Amsterdam Ave",
-      "is_free": true
+      "venue": "Tribeca Comedy Club",
+      "vibe": "Stand-up comedy Fri-Sat — national headliners, intimate 70-seat room",
+      "days": ["fri", "sat"],
+      "category": "comedy",
+      "address": "22 Warren St",
+      "is_free": false,
+      "url": "https://www.tribecacomedyclub.com"
     },
     {
-      "venue": "Dive 75",
-      "vibe": "True neighborhood dive — board games, couches, affordable drinks",
-      "days": ["any"],
-      "category": "nightlife",
-      "address": "101 W 75th St",
-      "is_free": true
+      "venue": "City Vineyard",
+      "vibe": "Live music and comedy on the riverfront — singer-songwriters, jazz, acoustic",
+      "days": ["thu", "fri", "sat"],
+      "category": "live_music",
+      "address": "233 West St",
+      "is_free": false,
+      "url": "https://citywinery.com/city-vineyard-nyc"
+    }
+  ],
+  "SoHo": [
+    {
+      "venue": "Ear Inn",
+      "vibe": "Free live jazz, blues, and zydeco Sun/Mon/Wed — one of NYC's oldest bars",
+      "days": ["sun", "mon", "wed"],
+      "category": "live_music",
+      "address": "326 Spring St",
+      "is_free": true,
+      "url": "http://www.theearinn.com"
     },
     {
-      "venue": "Jake's Dilemma",
-      "vibe": "Beer pong, foosball, trivia weekdays — DJ and dance floor on weekends",
-      "days": ["any"],
-      "category": "nightlife",
-      "address": "430 Amsterdam Ave",
-      "is_free": true
-    },
+      "venue": "SoHo Playhouse",
+      "vibe": "Open mic Wednesdays, stand-up Thursdays — off-Broadway comedy and cabaret",
+      "days": ["wed", "thu", "fri", "sat"],
+      "category": "comedy",
+      "address": "15 Vandam St",
+      "is_free": false,
+      "url": "https://www.sohoplayhouse.com"
+    }
+  ],
+  "NoHo": [
     {
-      "venue": "e's BAR",
-      "vibe": "Board games, trivia Tuesdays, good food, daily happy hour",
-      "days": ["tue"],
-      "category": "nightlife",
-      "address": "511 Amsterdam Ave",
-      "is_free": true
-    },
-    {
-      "venue": "Prohibition",
-      "vibe": "Live music every night for 25 years — quality drinks, speakeasy feel",
+      "venue": "Joe's Pub",
+      "vibe": "Live music and cabaret nightly — jazz, pop, drag, world music at The Public",
       "days": ["any"],
       "category": "live_music",
-      "address": "503 Columbus Ave",
+      "address": "425 Lafayette St",
       "is_free": false,
-      "url": "https://www.prohibitionnyc.com"
+      "url": "https://publictheater.org/joes-pub"
+    }
+  ],
+  "Lower East Side": [
+    {
+      "venue": "Arlene's Grocery",
+      "vibe": "Monday live band karaoke — full band backs your vocals. Live rock nightly",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "95 Stanton St",
+      "is_free": false,
+      "url": "https://www.arlenesgrocerynyc.com"
+    },
+    {
+      "venue": "Mercury Lounge",
+      "vibe": "Live indie and rock shows nightly — iconic LES venue",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "217 E Houston St",
+      "is_free": false,
+      "url": "https://mercuryeastpresents.com/mercurylounge"
+    },
+    {
+      "venue": "Pianos",
+      "vibe": "Live bands downstairs, DJ sets upstairs nightly — free lounge shows",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "158 Ludlow St",
+      "is_free": false,
+      "url": "https://pianosnyc.com"
+    },
+    {
+      "venue": "The Slipper Room",
+      "vibe": "Burlesque and variety shows Wed-Sun since 1999 — neo-vaudeville classic",
+      "days": ["wed", "thu", "fri", "sat", "sun"],
+      "category": "nightlife",
+      "address": "167 Orchard St",
+      "is_free": false,
+      "url": "https://www.slipperroom.com"
+    },
+    {
+      "venue": "Caveat",
+      "vibe": "Nightly comedy, variety, and storytelling — nerdy, funny art underground",
+      "days": ["any"],
+      "category": "comedy",
+      "address": "21A Clinton St",
+      "is_free": false,
+      "url": "https://www.caveat.nyc"
+    },
+    {
+      "venue": "The Fear City Comedy Club",
+      "vibe": "Nightly stand-up comedy — intimate 60-seat theater on Essex",
+      "days": ["any"],
+      "category": "comedy",
+      "address": "17 Essex St",
+      "is_free": false,
+      "url": "https://www.thefearcitycomedyclub.com"
+    },
+    {
+      "venue": "The Delancey",
+      "vibe": "DJ nights Thu-Sat across three floors — rooftop, main floor, basement",
+      "days": ["thu", "fri", "sat"],
+      "category": "nightlife",
+      "address": "168 Delancey St",
+      "is_free": false,
+      "url": "https://www.thedelancey.com"
+    },
+    {
+      "venue": "Mehanata",
+      "vibe": "Eastern European dance party Thu-Sat — 80s DJ sets, wild energy til 4am",
+      "days": ["thu", "fri", "sat"],
+      "category": "nightlife",
+      "address": "113 Ludlow St",
+      "is_free": false,
+      "url": "https://mehanata.com"
+    }
+  ],
+  "East Village": [
+    {
+      "venue": "11th St. Bar",
+      "vibe": "Free live music 5 nights — Irish sessions Sunday, jazz Monday, songwriters midweek",
+      "days": ["sun", "mon", "tue", "wed", "thu"],
+      "category": "live_music",
+      "address": "510 E 11th St",
+      "is_free": true,
+      "url": "https://11thstbar.com"
+    },
+    {
+      "venue": "Mona's",
+      "vibe": "Monday bluegrass jams, Tuesday jazz sessions since 2007 — legendary free dive",
+      "days": ["mon", "tue"],
+      "category": "live_music",
+      "address": "224 Avenue B",
+      "is_free": true
+    },
+    {
+      "venue": "New York Comedy Club",
+      "vibe": "Stand-up comedy nightly — big names, intimate East Village room",
+      "days": ["any"],
+      "category": "comedy",
+      "address": "85 E 4th St",
+      "is_free": false,
+      "url": "https://newyorkcomedyclub.com/locations/East-Village"
+    },
+    {
+      "venue": "St. Marks Comedy Club",
+      "vibe": "Nightly stand-up in a speakeasy basement — open mic nights too",
+      "days": ["any"],
+      "category": "comedy",
+      "address": "12 St Marks Pl",
+      "is_free": false,
+      "url": "https://www.stmarkscomedyclub.com"
+    },
+    {
+      "venue": "Bowery Electric",
+      "vibe": "Live music nightly, DJ dance party Fri-Sat til 4am — two floors",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "327 Bowery",
+      "is_free": false,
+      "url": "https://www.theboweryelectric.com"
+    },
+    {
+      "venue": "DROM",
+      "vibe": "Nightly live music — jazz, Afrobeat, Latin, electronic, world music",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "85 Avenue A",
+      "is_free": false,
+      "url": "https://dromnyc.com"
+    },
+    {
+      "venue": "Sing Sing Ave A",
+      "vibe": "Open karaoke every night til 4am — 14 private rooms too",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "81 Avenue A",
+      "is_free": true,
+      "url": "https://www.singsingavea.com"
+    },
+    {
+      "venue": "Lucinda's Honky Tonk",
+      "vibe": "Live country music Fridays, open mic Sundays — Lucinda Williams' honky tonk",
+      "days": ["fri", "sun"],
+      "category": "live_music",
+      "address": "169 Avenue A",
+      "is_free": false,
+      "url": "https://www.lucindasnyc.com"
+    },
+    {
+      "venue": "Duane Park",
+      "vibe": "Burlesque dinner shows Thu-Sun with live jazz band — candlelit supper club",
+      "days": ["thu", "fri", "sat", "sun"],
+      "category": "nightlife",
+      "address": "308 Bowery",
+      "is_free": false,
+      "url": "https://www.duaneparknyc.com"
+    },
+    {
+      "venue": "Live at the Barbershop",
+      "vibe": "Stand-up comedy in an actual barbershop — SNL and Netflix comics, BYOB",
+      "days": ["thu", "fri", "sat"],
+      "category": "comedy",
+      "address": "174 E 2nd St",
+      "is_free": false,
+      "url": "https://greatestshowever.com"
+    }
+  ],
+  "Greenwich Village": [
+    {
+      "venue": "Blue Note Jazz Club",
+      "vibe": "Nightly jazz at 8pm and 10:30pm — world-famous room, Sunday brunch",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "131 W 3rd St",
+      "is_free": false,
+      "url": "https://www.bluenotejazz.com/nyc"
+    },
+    {
+      "venue": "Arthur's Tavern",
+      "vibe": "Free live jazz and blues nightly — different band every night since 1937",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "57 Grove St",
+      "is_free": true,
+      "url": "https://arthurstavern.nyc"
+    },
+    {
+      "venue": "Groove",
+      "vibe": "Nightly live funk, soul, and R&B — only venue in NYC doing this every night",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "125 MacDougal St",
+      "is_free": true,
+      "url": "https://www.clubgroovenyc.com"
+    },
+    {
+      "venue": "Terra Blues",
+      "vibe": "Live music every night — blues acoustic at 7pm, featured artists at 10pm",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "149 Bleecker St",
+      "is_free": false,
+      "url": "https://www.terrablues.com"
+    },
+    {
+      "venue": "The Duplex",
+      "vibe": "Nightly piano bar, drag shows, and comedy — NYC's oldest cabaret since 1950",
+      "days": ["any"],
+      "category": "comedy",
+      "address": "61 Christopher St",
+      "is_free": false,
+      "url": "https://www.theduplex.com"
     }
   ],
   "West Village": [
@@ -215,6 +387,940 @@
       "is_free": true
     }
   ],
+  "Chelsea": [
+    {
+      "venue": "Le Bain",
+      "vibe": "Rooftop DJ sets on weekends — Standard Hotel, great views and vibes",
+      "days": ["fri", "sat"],
+      "category": "nightlife",
+      "address": "848 Washington St",
+      "is_free": false
+    },
+    {
+      "venue": "Gotham Comedy Club",
+      "vibe": "Stand-up comedy nightly — top comics, intimate showroom on 23rd",
+      "days": ["any"],
+      "category": "comedy",
+      "address": "208 W 23rd St",
+      "is_free": false,
+      "url": "https://www.gothamcomedyclub.com"
+    },
+    {
+      "venue": "The PIT",
+      "vibe": "Improv, sketch, and comedy shows 6 nights a week since 2002",
+      "days": ["tue", "wed", "thu", "fri", "sat", "sun"],
+      "category": "comedy",
+      "address": "154 W 29th St",
+      "is_free": false,
+      "url": "https://thepit-nyc.com"
+    },
+    {
+      "venue": "Chelsea Music Hall",
+      "vibe": "Live music, comedy, and burlesque — 244-seat hall with diverse programming",
+      "days": ["thu", "fri", "sat"],
+      "category": "live_music",
+      "address": "407 W 15th St",
+      "is_free": false,
+      "url": "https://www.chelseamusichall.com"
+    },
+    {
+      "venue": "Bathtub Gin",
+      "vibe": "Live jazz and burlesque — hidden 1920s speakeasy behind a coffee shop",
+      "days": ["wed", "thu", "fri", "sat"],
+      "category": "nightlife",
+      "address": "132 9th Ave",
+      "is_free": true,
+      "url": "https://www.bathtubginnyc.com"
+    },
+    {
+      "venue": "Marquee",
+      "vibe": "World-class DJs Wed-Sat — house and electronic on Funktion-One sound",
+      "days": ["wed", "thu", "fri", "sat"],
+      "category": "nightlife",
+      "address": "289 10th Ave",
+      "is_free": false,
+      "url": "https://taogroup.com/venues/marquee-new-york"
+    }
+  ],
+  "Flatiron": [
+    {
+      "venue": "The Flatiron Room",
+      "vibe": "Nightly live jazz — Cuban music Thursdays, bluegrass Sundays, 1500 whiskeys",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "37 W 26th St",
+      "is_free": false,
+      "url": "https://theflatironroom.com"
+    },
+    {
+      "venue": "Paddy Reilly's Music Bar",
+      "vibe": "Free live music 7 nights — bluegrass, Irish folk, open mic Wed and Sat",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "519 2nd Ave",
+      "is_free": true,
+      "url": "https://www.paddyreillysmusicbar.com"
+    },
+    {
+      "venue": "Gramercy Theatre",
+      "vibe": "Live indie, rock, and electronic shows — 600-capacity venue, great sound",
+      "days": ["thu", "fri", "sat"],
+      "category": "live_music",
+      "address": "127 E 23rd St",
+      "is_free": false,
+      "url": "https://www.thegramercytheatre.com"
+    }
+  ],
+  "Midtown": [
+    {
+      "venue": "Birdland Jazz Club",
+      "vibe": "Nightly jazz shows — named after Charlie Parker, a NYC institution since 1949",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "315 W 44th St",
+      "is_free": false,
+      "url": "https://www.birdlandjazz.com"
+    },
+    {
+      "venue": "Dizzy's Club",
+      "vibe": "Nightly jazz at Lincoln Center — late-night sessions Thu-Sat, skyline views",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "10 Columbus Circle",
+      "is_free": false,
+      "url": "https://jazz.org/dizzys"
+    },
+    {
+      "venue": "54 Below",
+      "vibe": "Broadway cabaret — live show nightly, up to 3 per night, basement of Studio 54",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "254 W 54th St",
+      "is_free": false,
+      "url": "https://54below.org"
+    },
+    {
+      "venue": "Tomi Jazz",
+      "vibe": "Nightly live jazz — intimate Japanese jazz bar, free weeknights",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "239 E 53rd St",
+      "is_free": true,
+      "url": "https://www.tomijazz.com"
+    },
+    {
+      "venue": "New York Comedy Club Midtown",
+      "vibe": "Nightly stand-up comedy — national touring comics, celebrity drop-ins",
+      "days": ["any"],
+      "category": "comedy",
+      "address": "241 E 24th St",
+      "is_free": false,
+      "url": "https://newyorkcomedyclub.com/home/Midtown"
+    }
+  ],
+  "Hell's Kitchen": [
+    {
+      "venue": "Don't Tell Mama",
+      "vibe": "Nightly piano bar and cabaret — live show tunes, open mic, no cover",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "343 W 46th St",
+      "is_free": true,
+      "url": "https://donttellmamanyc.com"
+    },
+    {
+      "venue": "Broadway Comedy Club",
+      "vibe": "Nightly stand-up on 2-3 stages — improv nights, open mic",
+      "days": ["any"],
+      "category": "comedy",
+      "address": "318 W 53rd St",
+      "is_free": false,
+      "url": "https://www.broadwaycomedyclub.com"
+    },
+    {
+      "venue": "Rise Bar",
+      "vibe": "Weekly drag shows, karaoke, open mic — drag brunch Sat-Sun",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "859 9th Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Industry Bar",
+      "vibe": "Drag shows every Thursday, DJ sets nightly — Hell's Kitchen staple",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "355 W 52nd St",
+      "is_free": true,
+      "url": "https://www.industry-bar.com"
+    },
+    {
+      "venue": "VERS",
+      "vibe": "Drag shows Tuesdays, Broadway trivia weekly, DJ sets nightly",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "714 9th Ave",
+      "is_free": true,
+      "url": "https://www.versnyc.com"
+    },
+    {
+      "venue": "So & So's",
+      "vibe": "Nightly live music — Broadway talent, supper-club piano bar",
+      "days": ["tue", "wed", "thu", "fri", "sat"],
+      "category": "live_music",
+      "address": "302 W 52nd St",
+      "is_free": true,
+      "url": "https://www.soandsosbar.com"
+    }
+  ],
+  "Upper East Side": [
+    {
+      "venue": "Bemelmans Bar",
+      "vibe": "Nightly jazz piano and trios — iconic Carlyle Hotel bar with Madeline murals",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "35 E 76th St",
+      "is_free": false,
+      "url": "https://www.rosewoodhotels.com/en/the-carlyle-new-york"
+    },
+    {
+      "venue": "Brandy's Piano Bar",
+      "vibe": "Live music nightly — every staffer sings, piano bar for 35+ years",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "235 E 84th St",
+      "is_free": true,
+      "url": "https://www.brandyspianobar.com"
+    },
+    {
+      "venue": "Melody's Piano Bar",
+      "vibe": "Solo pianist nightly, jazz trio from 9pm — late-night entertainers Saturdays",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "1020 Lexington Ave",
+      "is_free": false,
+      "url": "https://www.melodyspianobar.com"
+    },
+    {
+      "venue": "Rodney's Comedy Club",
+      "vibe": "Nightly stand-up comedy — America's oldest comedy club, celebrity guests",
+      "days": ["any"],
+      "category": "comedy",
+      "address": "1118 1st Ave",
+      "is_free": false,
+      "url": "https://rodneysnewyorkcomedyclub.com"
+    }
+  ],
+  "Upper West Side": [
+    {
+      "venue": "Smoke Jazz & Supper Club",
+      "vibe": "Live jazz every night — one of the best jazz rooms in the city",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "2751 Broadway",
+      "is_free": false,
+      "url": "https://www.smokejazz.com"
+    },
+    {
+      "venue": "Symphony Space",
+      "vibe": "Performances most nights — theater, music, film, literary events",
+      "days": ["any"],
+      "category": "theater",
+      "address": "2537 Broadway",
+      "is_free": false,
+      "url": "https://www.symphonyspace.org"
+    },
+    {
+      "venue": "The Dead Poet",
+      "vibe": "Literary Irish pub — outstanding Guinness, book library, writer portraits on the walls",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "450 Amsterdam Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Dive 75",
+      "vibe": "True neighborhood dive — board games, couches, affordable drinks",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "101 W 75th St",
+      "is_free": true
+    },
+    {
+      "venue": "Jake's Dilemma",
+      "vibe": "Beer pong, foosball, trivia weekdays — DJ and dance floor on weekends",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "430 Amsterdam Ave",
+      "is_free": true
+    },
+    {
+      "venue": "e's BAR",
+      "vibe": "Board games, trivia Tuesdays, good food, daily happy hour",
+      "days": ["tue"],
+      "category": "nightlife",
+      "address": "511 Amsterdam Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Prohibition",
+      "vibe": "Live music every night for 25 years — quality drinks, speakeasy feel",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "503 Columbus Ave",
+      "is_free": false,
+      "url": "https://www.prohibitionnyc.com"
+    }
+  ],
+  "Harlem": [
+    {
+      "venue": "Shrine",
+      "vibe": "Live music nightly — jazz, Afrobeat, reggae, funk, soul. No cover, 8pm-4am",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "2271 Adam Clayton Powell Blvd",
+      "is_free": true,
+      "url": "https://www.shrinenyc.com"
+    },
+    {
+      "venue": "Ginny's Supper Club",
+      "vibe": "Live jazz Thu-Sat, DJ sets, Gospel Brunch Sundays — beneath Red Rooster",
+      "days": ["thu", "fri", "sat", "sun"],
+      "category": "live_music",
+      "address": "310 Lenox Ave",
+      "is_free": false,
+      "url": "https://www.ginnyssupperclub.com"
+    },
+    {
+      "venue": "Bill's Place",
+      "vibe": "Live jazz every Fri-Sat — legendary speakeasy, BYOB, reservation only",
+      "days": ["fri", "sat"],
+      "category": "live_music",
+      "address": "148 W 133rd St",
+      "is_free": false,
+      "url": "https://billsplaceharlem.com"
+    },
+    {
+      "venue": "Silvana",
+      "vibe": "Live jazz and open mic up to 7 nights — free in the downstairs lounge",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "300 W 116th St",
+      "is_free": true,
+      "url": "https://silvana-nyc.com"
+    },
+    {
+      "venue": "Harlem Nights",
+      "vibe": "Open mic Mondays, comedy Saturdays, DJs Fri-Sat — live music nightly",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "2361 7th Ave",
+      "is_free": true,
+      "url": "http://www.harlemnights.nyc"
+    },
+    {
+      "venue": "Comedy In Harlem",
+      "vibe": "Stand-up comedy 4-5 nights a week — open mic Tuesdays, headliners Fri-Sat",
+      "days": ["tue", "thu", "fri", "sat"],
+      "category": "comedy",
+      "address": "750A St. Nicholas Ave",
+      "is_free": false,
+      "url": "https://www.comedyinharlem.com"
+    },
+    {
+      "venue": "Marjorie Eliot's Parlor",
+      "vibe": "Free parlor jazz Fri-Sun — intimate apartment concerts since 1993",
+      "days": ["fri", "sat", "sun"],
+      "category": "live_music",
+      "address": "555 Edgecombe Ave, Apt 3F",
+      "is_free": true
+    }
+  ],
+  "East Harlem": [
+    {
+      "venue": "Salsa en El Barrio",
+      "vibe": "Free salsa dancing nights — beginners welcome, Latin heritage celebration",
+      "days": ["fri"],
+      "category": "community",
+      "address": "215 E 99th St",
+      "is_free": true
+    },
+    {
+      "venue": "Ricardo Steak House",
+      "vibe": "DJs spinning salsa, R&B, and hip-hop Thu-Sat — festive steakhouse vibes",
+      "days": ["thu", "fri", "sat"],
+      "category": "nightlife",
+      "address": "2145 2nd Ave",
+      "is_free": true,
+      "url": "https://www.ricardosteakhouse.com"
+    },
+    {
+      "venue": "La Marqueta",
+      "vibe": "Free salsa dancing Saturdays with lessons — summer at the historic market",
+      "days": ["sat"],
+      "category": "community",
+      "address": "1590 Park Ave",
+      "is_free": true
+    }
+  ],
+  "Washington Heights": [
+    {
+      "venue": "Club Deportivo",
+      "vibe": "Salsa and bachata dancing Friday nights — bring your maracas, dancing til 4am",
+      "days": ["fri"],
+      "category": "nightlife",
+      "address": "2088 Amsterdam Ave",
+      "is_free": false
+    },
+    {
+      "venue": "809 Restaurant & Lounge",
+      "vibe": "Karaoke Thursdays, salsa and bachata DJ nights Fri-Sat",
+      "days": ["thu", "fri", "sat"],
+      "category": "nightlife",
+      "address": "112 Dyckman St",
+      "is_free": false,
+      "url": "https://809nyc.com"
+    },
+    {
+      "venue": "Monkey Room",
+      "vibe": "DJ sets Fri-Sat — Latin vibes on Fort Washington Ave",
+      "days": ["fri", "sat"],
+      "category": "nightlife",
+      "address": "589 Fort Washington Ave",
+      "is_free": true
+    }
+  ],
+  "DUMBO": [
+    {
+      "venue": "Superfine",
+      "vibe": "Sunday bluegrass brunch since 2002 — Brooklyn's longest-running folk brunch",
+      "days": ["sun"],
+      "category": "live_music",
+      "address": "126 Front St",
+      "is_free": true,
+      "url": "https://www.superfine.nyc"
+    },
+    {
+      "venue": "St. Ann's Warehouse",
+      "vibe": "Theater, live music, and performance art — stunning waterfront live show venue",
+      "days": ["thu", "fri", "sat", "sun"],
+      "category": "theater",
+      "address": "45 Water St",
+      "is_free": false,
+      "url": "https://stannswarehouse.org"
+    },
+    {
+      "venue": "Harriet's Rooftop",
+      "vibe": "DJ and live band nights with Manhattan skyline views — 1 Hotel Brooklyn Bridge",
+      "days": ["thu", "fri", "sat"],
+      "category": "nightlife",
+      "address": "60 Furman St",
+      "is_free": true,
+      "url": "https://www.1hotels.com/brooklyn-bridge/taste/harriets-lounge"
+    }
+  ],
+  "Brooklyn Heights": [
+    {
+      "venue": "Henry Street Ale House",
+      "vibe": "Trivia Tuesdays — neighborhood ale house, craft beer on Henry Street",
+      "days": ["tue"],
+      "category": "community",
+      "address": "62 Henry St",
+      "is_free": true,
+      "url": "https://henrystreetalehouse.com"
+    }
+  ],
+  "Downtown Brooklyn": [
+    {
+      "venue": "Alamo Drafthouse House of Wax",
+      "vibe": "Trivia Mondays at 8pm — Geeks Who Drink at the movie theater bar",
+      "days": ["mon"],
+      "category": "community",
+      "address": "445 Albee Square West",
+      "is_free": true,
+      "url": "https://drafthouse.com/theater/downtown-brooklyn"
+    },
+    {
+      "venue": "Kimoto Rooftop",
+      "vibe": "DJ sets nightly — rooftop vibes atop the Aloft Hotel",
+      "days": ["thu", "fri", "sat"],
+      "category": "nightlife",
+      "address": "229 Duffield St",
+      "is_free": true
+    },
+    {
+      "venue": "DeKalb Market Hall",
+      "vibe": "Night Market with live music last Fridays — daily stage programming",
+      "days": ["fri"],
+      "category": "community",
+      "address": "445 Albee Square West",
+      "is_free": true,
+      "url": "https://www.dekalbmarkethall.com"
+    }
+  ],
+  "Cobble Hill": [
+    {
+      "venue": "Jalopy Theatre",
+      "vibe": "Folk and roots music most nights — tiny, charming, one-of-a-kind",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "315 Columbia St",
+      "is_free": false,
+      "url": "https://www.jalopy.biz"
+    },
+    {
+      "venue": "Roulette",
+      "vibe": "Experimental music and performance — adventurous programming",
+      "days": ["thu", "fri", "sat"],
+      "category": "live_music",
+      "address": "509 Atlantic Ave",
+      "is_free": false,
+      "url": "https://rfroulette.org"
+    },
+    {
+      "venue": "Montero's Bar",
+      "vibe": "1939 dive — nautical decor, karaoke Thu-Sat, longshoreman history",
+      "days": ["thu", "fri", "sat"],
+      "category": "nightlife",
+      "address": "73 Atlantic Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Long Island Bar",
+      "vibe": "Restored 1950s art deco — pristine cocktails, comfort food, gorgeous room",
+      "days": ["tue", "wed", "thu", "fri", "sat", "sun"],
+      "category": "nightlife",
+      "address": "110 Atlantic Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Henry Public",
+      "vibe": "Old-time Brooklyn saloon — tin ceilings, dark wood, great burgers",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "329 Henry St",
+      "is_free": true
+    },
+    {
+      "venue": "Brooklyn Social",
+      "vibe": "Former Italian social club — cash only, vintage saloon vibes, backyard",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "335 Smith St",
+      "is_free": true
+    }
+  ],
+  "Fort Greene": [
+    {
+      "venue": "BAM",
+      "vibe": "Performances most nights — film, theater, music, dance at Brooklyn Academy of Music",
+      "days": ["any"],
+      "category": "theater",
+      "address": "30 Lafayette Ave",
+      "is_free": false,
+      "url": "https://www.bam.org"
+    },
+    {
+      "venue": "Sisters",
+      "vibe": "DJs every weekend, live music residencies — free shows in the back room",
+      "days": ["fri", "sat"],
+      "category": "live_music",
+      "address": "900 Fulton St",
+      "is_free": true,
+      "url": "https://www.sistersbklyn.com"
+    },
+    {
+      "venue": "Brooklyn Public House",
+      "vibe": "Trivia Mondays at 8pm — craft beer and pub vibes on DeKalb",
+      "days": ["mon"],
+      "category": "community",
+      "address": "247 DeKalb Ave",
+      "is_free": true,
+      "url": "https://www.brooklynpublic.com"
+    },
+    {
+      "venue": "Dick & Jane's",
+      "vibe": "DJ and live band nights — Clinton Hill hangout",
+      "days": ["fri", "sat"],
+      "category": "nightlife",
+      "address": "266 Adelphi St",
+      "is_free": true,
+      "url": "https://www.dickandjanesbk.com"
+    }
+  ],
+  "Prospect Heights": [
+    {
+      "venue": "Honeycomb Hi-Fi Lounge",
+      "vibe": "Vinyl listening nightly, DJ residencies Fri-Sat — hi-fi sound",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "74 5th Ave",
+      "is_free": true,
+      "url": "http://www.honeycombhifilounge.com"
+    },
+    {
+      "venue": "Bierwax",
+      "vibe": "DJs spinning vinyl nightly from 4000+ records — craft beer and hi-fi heaven",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "556 Vanderbilt Ave",
+      "is_free": true,
+      "url": "https://www.bierwaxnyc.com"
+    },
+    {
+      "venue": "Bearded Lady",
+      "vibe": "Live music and art events — neighborhood bar on Washington Ave",
+      "days": ["fri", "sat"],
+      "category": "live_music",
+      "address": "686A Washington Ave",
+      "is_free": true,
+      "url": "https://www.beardedladybrooklyn.com"
+    }
+  ],
+  "Park Slope": [
+    {
+      "venue": "Barbes",
+      "vibe": "Nightly live music residencies — Balkan brass Tuesdays, West African Wednesdays",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "376 9th St",
+      "is_free": false,
+      "url": "https://www.barbesbrooklyn.com"
+    },
+    {
+      "venue": "Union Hall",
+      "vibe": "Live comedy, bands, and dance parties nightly downstairs — bocce upstairs",
+      "days": ["any"],
+      "category": "comedy",
+      "address": "702 Union St",
+      "is_free": false,
+      "url": "https://unionhallny.com"
+    },
+    {
+      "venue": "Freddy's Bar",
+      "vibe": "Burlesque Thursdays, comedy open mic, live music Fri-Sun — free",
+      "days": ["tue", "wed", "thu", "fri", "sat", "sun"],
+      "category": "live_music",
+      "address": "627 5th Ave",
+      "is_free": true,
+      "url": "https://www.freddysbar.com"
+    },
+    {
+      "venue": "ShapeShifter Lab",
+      "vibe": "Live jazz and experimental music nightly — intimate performance space",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "837 Union St",
+      "is_free": false,
+      "url": "https://shapeshifterlab.com"
+    },
+    {
+      "venue": "Ginger's Bar",
+      "vibe": "Dance party Fridays, bingo Sundays, karaoke Thursdays — drag king shows",
+      "days": ["thu", "fri", "sun"],
+      "category": "nightlife",
+      "address": "363 5th Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Park Slope Ale House",
+      "vibe": "Trivia Tuesdays at 8pm — neighborhood craft beer staple",
+      "days": ["tue"],
+      "category": "community",
+      "address": "356 6th Ave",
+      "is_free": true
+    }
+  ],
+  "Gowanus": [
+    {
+      "venue": "The Bell House",
+      "vibe": "Live music, comedy, and dance parties multiple nights — great sound, big stage",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "149 7th St",
+      "is_free": false,
+      "url": "https://www.thebellhouseny.com"
+    },
+    {
+      "venue": "Public Records",
+      "vibe": "DJs and rare vinyl nightly, experimental jazz in the Sound Room",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "233 Butler St",
+      "is_free": false,
+      "url": "https://publicrecords.nyc"
+    },
+    {
+      "venue": "Royal Palms Shuffleboard Club",
+      "vibe": "Bingo with drag hosts, DJs spinning soul 45s — shuffleboard palace",
+      "days": ["fri", "sat", "sun"],
+      "category": "nightlife",
+      "address": "514 Union St",
+      "is_free": true,
+      "url": "https://www.royalpalmsbrooklyn.com"
+    },
+    {
+      "venue": "Lowlands Bar",
+      "vibe": "Live music Mon-Tue, karaoke Wednesdays — chill Gowanus local",
+      "days": ["mon", "tue", "wed"],
+      "category": "live_music",
+      "address": "543 3rd Ave",
+      "is_free": true,
+      "url": "https://www.lowlandsbar.com"
+    },
+    {
+      "venue": "Halyards",
+      "vibe": "Trivia nights and live comedy — neighborhood sports bar on 3rd Ave",
+      "days": ["tue", "wed"],
+      "category": "community",
+      "address": "406 3rd Ave",
+      "is_free": true,
+      "url": "https://barhalyards.com"
+    }
+  ],
+  "Red Hook": [
+    {
+      "venue": "Sunny's Bar",
+      "vibe": "Free live music nightly — bluegrass Saturdays, legendary waterfront folk dive",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "253 Conover St",
+      "is_free": true,
+      "url": "https://www.sunnysredhook.com"
+    },
+    {
+      "venue": "Pioneer Works",
+      "vibe": "Art exhibitions and live music — stunning industrial space, free gallery",
+      "days": ["wed", "thu", "fri", "sat", "sun"],
+      "category": "art",
+      "address": "159 Pioneer St",
+      "is_free": true,
+      "url": "https://pioneerworks.org"
+    },
+    {
+      "venue": "Hometown Bar-B-Que",
+      "vibe": "Live music on weekends — folk, country at Brooklyn's best BBQ",
+      "days": ["fri", "sat"],
+      "category": "live_music",
+      "address": "454 Van Brunt St",
+      "is_free": true,
+      "url": "https://hometownbbq.com"
+    }
+  ],
+  "Crown Heights": [
+    {
+      "venue": "Friends and Lovers",
+      "vibe": "All-vinyl dance parties, comedy, DJ sets Wed-Sat — Classon Ave staple",
+      "days": ["wed", "thu", "fri", "sat"],
+      "category": "nightlife",
+      "address": "641 Classon Ave",
+      "is_free": false,
+      "url": "https://www.fnlbk.com"
+    },
+    {
+      "venue": "Bar Bayeux",
+      "vibe": "Free live jazz Wed-Sun — no cover, no tickets, just great jazz on Nostrand",
+      "days": ["wed", "thu", "fri", "sat", "sun"],
+      "category": "live_music",
+      "address": "1066 Nostrand Ave",
+      "is_free": true,
+      "url": "https://www.barbayeux.com"
+    },
+    {
+      "venue": "Kissa Kissa",
+      "vibe": "Vinyl listening bar — jazz, soul, and funk from a 5000-record collection",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "667 Franklin Ave",
+      "is_free": true,
+      "url": "https://kissakissa.us"
+    },
+    {
+      "venue": "Brownstone Jazz",
+      "vibe": "Live jazz Fri-Sun with open mic — Southern fish-fry buffet included",
+      "days": ["fri", "sat", "sun"],
+      "category": "live_music",
+      "address": "107 Macon St",
+      "is_free": false
+    },
+    {
+      "venue": "The Crown Inn",
+      "vibe": "Trivia Tuesdays at 7:30pm — neighborhood bar on Franklin Ave",
+      "days": ["tue"],
+      "category": "community",
+      "address": "724 Franklin Ave",
+      "is_free": true
+    }
+  ],
+  "Bed-Stuy": [
+    {
+      "venue": "Ode to Babel",
+      "vibe": "Wine bar with live music & DJs on weekends — great Franklin Ave hangout",
+      "days": ["fri", "sat"],
+      "category": "live_music",
+      "address": "772 Dean St",
+      "is_free": false,
+      "url": "https://www.odetobabel.com"
+    },
+    {
+      "venue": "Pearl's Social & Billy Club",
+      "vibe": "Cocktail bar with DJs — Bed-Stuy staple",
+      "days": ["fri", "sat"],
+      "category": "nightlife",
+      "address": "40 St Felix St",
+      "is_free": false
+    },
+    {
+      "venue": "Lovers Rock",
+      "vibe": "Caribbean cocktail bar with DJs on weekends — vibey and intimate",
+      "days": ["fri", "sat"],
+      "category": "nightlife",
+      "address": "419 Tompkins Ave",
+      "is_free": false,
+      "url": "https://www.loversrockbar.com"
+    },
+    {
+      "venue": "Do or Dive",
+      "vibe": "Retro dive bar — shuffleboard, frozen coffee, back garden, open 12pm-4am",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "1108 Bedford Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Tip Top Bar & Grill",
+      "vibe": "Bed-Stuy's oldest bar — friendly, $4 bottles, funky backyard",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "432 Franklin Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Dynaco",
+      "vibe": "Hidden candlelit cocktail bar — wood-burning stove, cash only, intimate vibes",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "1112 Bedford Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Frog",
+      "vibe": "BKMAG 2025 Best Bar in Brooklyn — natural wine, pool table, hidden garden",
+      "days": ["thu", "fri", "sat", "sun", "mon"],
+      "category": "nightlife",
+      "address": "569 Myrtle Ave",
+      "is_free": true
+    },
+    {
+      "venue": "C'mon Everybody",
+      "vibe": "Queer-owned live music venue — drag, burlesque, comedy, and live acts nightly",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "325 Franklin Ave",
+      "is_free": false,
+      "url": "https://www.cmoneverybody.com"
+    },
+    {
+      "venue": "All Night Skate",
+      "vibe": "90s roller rink theme — arcade room, themed party nights on weekends",
+      "days": ["fri", "sat"],
+      "category": "nightlife",
+      "address": "1 Knickerbocker Ave",
+      "is_free": false
+    }
+  ],
+  "Williamsburg": [
+    {
+      "venue": "Pete's Candy Store",
+      "vibe": "Trivia Wednesdays, comedy 5x/week, open mic Sundays — all free",
+      "days": ["any"],
+      "category": "comedy",
+      "address": "709 Lorimer St",
+      "is_free": true,
+      "url": "https://www.petescandystore.com"
+    },
+    {
+      "venue": "Alligator Lounge",
+      "vibe": "Trivia Mon, bingo Tue, karaoke 5 nights, comedy Sun — free pizza with every drink",
+      "days": ["any"],
+      "category": "community",
+      "address": "600 Metropolitan Ave",
+      "is_free": true,
+      "url": "https://www.alligatorloungebrooklyn.com"
+    },
+    {
+      "venue": "The Gutter",
+      "vibe": "Comedy open mic and karaoke Mondays, stand-up showcase Wednesdays",
+      "days": ["mon", "wed"],
+      "category": "comedy",
+      "address": "200 N 14th St",
+      "is_free": true,
+      "url": "https://gutterbarbowl.com/spareroom"
+    },
+    {
+      "venue": "Metropolitan Bar",
+      "vibe": "Queer bar — karaoke Tue, trivia Wed, drag shows Thu, DJs nightly",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "559 Lorimer St",
+      "is_free": true,
+      "url": "https://www.metropolitanbarny.com"
+    },
+    {
+      "venue": "Brooklyn Comedy Collective",
+      "vibe": "30+ improv and stand-up shows weekly across two stages",
+      "days": ["any"],
+      "category": "comedy",
+      "address": "167 Graham Ave",
+      "is_free": false,
+      "url": "https://www.brooklyncc.com"
+    },
+    {
+      "venue": "Union Pool",
+      "vibe": "Live band nightly, DJ til 4am — 363 days a year, taco truck on patio",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "484 Union Ave",
+      "is_free": true,
+      "url": "https://www.union-pool.com"
+    },
+    {
+      "venue": "Baby's All Right",
+      "vibe": "Live indie, rock, and jazz shows almost every night — great restaurant too",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "146 Broadway",
+      "is_free": false,
+      "url": "https://babysallright.com"
+    },
+    {
+      "venue": "Music Hall of Williamsburg",
+      "vibe": "Indie and rock concerts 3-5 nights a week — iconic Bowery Presents venue",
+      "days": ["wed", "thu", "fri", "sat"],
+      "category": "live_music",
+      "address": "66 N 6th St",
+      "is_free": false,
+      "url": "https://www.musichallofwilliamsburg.com"
+    },
+    {
+      "venue": "National Sawdust",
+      "vibe": "Curated live music — classical, experimental, electronic, folk",
+      "days": ["thu", "fri", "sat"],
+      "category": "live_music",
+      "address": "80 N 6th St",
+      "is_free": false,
+      "url": "https://www.nationalsawdust.org"
+    },
+    {
+      "venue": "Brooklyn Bowl",
+      "vibe": "Live music 3-5 nights — rock, funk, soul, hip-hop plus bowling",
+      "days": ["wed", "thu", "fri", "sat"],
+      "category": "live_music",
+      "address": "61 Wythe Ave",
+      "is_free": false,
+      "url": "https://www.brooklynbowl.com/brooklyn"
+    }
+  ],
   "Greenpoint": [
     {
       "venue": "Good Room",
@@ -274,77 +1380,254 @@
       "is_free": true
     }
   ],
-  "Cobble Hill": [
+  "Bushwick": [
     {
-      "venue": "Jalopy Theatre",
-      "vibe": "Folk and roots music most nights — tiny, charming, one-of-a-kind",
-      "days": ["any"],
-      "category": "live_music",
-      "address": "315 Columbia St",
-      "is_free": false,
-      "url": "https://www.jalopy.biz"
-    },
-    {
-      "venue": "Roulette",
-      "vibe": "Experimental music and performance — adventurous programming",
-      "days": ["thu", "fri", "sat"],
-      "category": "live_music",
-      "address": "509 Atlantic Ave",
-      "is_free": false,
-      "url": "https://rfroulette.org"
-    },
-    {
-      "venue": "Montero's Bar",
-      "vibe": "1939 dive — nautical decor, karaoke Thu-Sat, longshoreman history",
+      "venue": "House of Yes",
+      "vibe": "Burlesque circus shows Fri-Sat — drag, aerial, dance, immersive parties",
       "days": ["thu", "fri", "sat"],
       "category": "nightlife",
-      "address": "73 Atlantic Ave",
-      "is_free": true
+      "address": "2 Wyckoff Ave",
+      "is_free": false,
+      "url": "https://www.houseofyes.org"
     },
     {
-      "venue": "Long Island Bar",
-      "vibe": "Restored 1950s art deco — pristine cocktails, comfort food, gorgeous room",
-      "days": ["tue", "wed", "thu", "fri", "sat", "sun"],
-      "category": "nightlife",
-      "address": "110 Atlantic Ave",
-      "is_free": true
+      "venue": "Elsewhere",
+      "vibe": "Live music and DJ sets nightly across three rooms — indie, electronic, dance",
+      "days": ["any"],
+      "category": "live_music",
+      "address": "599 Johnson Ave",
+      "is_free": false,
+      "url": "https://www.elsewhere.club"
     },
     {
-      "venue": "Henry Public",
-      "vibe": "Old-time Brooklyn saloon — tin ceilings, dark wood, great burgers",
+      "venue": "Bossa Nova Civic Club",
+      "vibe": "DJs nightly — techno, house, electronic. Late-night dance parties Fri-Sat",
       "days": ["any"],
       "category": "nightlife",
-      "address": "329 Henry St",
+      "address": "1271 Myrtle Ave",
       "is_free": true
     },
     {
-      "venue": "Brooklyn Social",
-      "vibe": "Former Italian social club — cash only, vintage saloon vibes, backyard",
+      "venue": "The Tiny Cupboard",
+      "vibe": "Stand-up comedy every single night — Brooklyn's coziest comedy club",
       "days": ["any"],
-      "category": "nightlife",
-      "address": "335 Smith St",
-      "is_free": true
-    }
-  ],
-  "Chelsea": [
+      "category": "comedy",
+      "address": "10 Cooper St",
+      "is_free": false,
+      "url": "https://www.thetinycupboard.com"
+    },
     {
-      "venue": "Le Bain",
-      "vibe": "Rooftop DJs on weekends — Standard Hotel, great views and vibes",
+      "venue": "Jupiter Disco",
+      "vibe": "DJs spinning house, techno, disco Wed-Sun — audiophile vinyl sessions",
+      "days": ["wed", "thu", "fri", "sat", "sun"],
+      "category": "nightlife",
+      "address": "1237 Flushing Ave",
+      "is_free": true,
+      "url": "https://www.jupiterdisco.com"
+    },
+    {
+      "venue": "Market Hotel",
+      "vibe": "Live indie, punk, and electronic shows — legendary DIY venue",
+      "days": ["thu", "fri", "sat"],
+      "category": "live_music",
+      "address": "1140 Myrtle Ave",
+      "is_free": false,
+      "url": "https://www.markethotel.org"
+    },
+    {
+      "venue": "The Rosemont",
+      "vibe": "Monday karaoke, Wednesday drag shows — queer dance nights on weekends",
+      "days": ["mon", "wed", "fri", "sat"],
+      "category": "nightlife",
+      "address": "63 Montrose Ave",
+      "is_free": true,
+      "url": "https://therosemontnyc.com"
+    },
+    {
+      "venue": "Pine Box Rock Shop",
+      "vibe": "Trivia Wed, bingo Thu, karaoke Sat — open mic nights, free live music",
+      "days": ["wed", "thu", "fri", "sat"],
+      "category": "live_music",
+      "address": "12 Grattan St",
+      "is_free": true,
+      "url": "https://www.pineboxrockshop.com"
+    },
+    {
+      "venue": "Cobra Club",
+      "vibe": "Friday karaoke til 3am, burlesque shows, rock & roll DJ nights",
       "days": ["fri", "sat"],
       "category": "nightlife",
-      "address": "848 Washington St",
-      "is_free": false
+      "address": "6 Wyckoff Ave",
+      "is_free": true,
+      "url": "https://www.cobraclubbk.com"
+    },
+    {
+      "venue": "Starr Bar",
+      "vibe": "Monthly open mic with full backline — live music, karaoke, art shows",
+      "days": ["fri", "sat"],
+      "category": "live_music",
+      "address": "214 Starr St",
+      "is_free": true,
+      "url": "https://www.starrbar.com"
     }
   ],
-  "Fort Greene": [
+  "Sunset Park": [
     {
-      "venue": "BAM",
-      "vibe": "Performances most nights — film, theater, music, dance at Brooklyn Academy of Music",
+      "venue": "Barrow's Intense",
+      "vibe": "Karaoke Cocktail Club Wednesdays — craft cocktails at Industry City",
+      "days": ["wed"],
+      "category": "nightlife",
+      "address": "86 34th St",
+      "is_free": true,
+      "url": "https://barrowsintense.com"
+    },
+    {
+      "venue": "Minnie's Bar",
+      "vibe": "Trivia Wednesdays, karaoke Saturdays — neighborhood hangout on 4th Ave",
+      "days": ["wed", "sat"],
+      "category": "community",
+      "address": "885 4th Ave",
+      "is_free": true
+    },
+    {
+      "venue": "Industry City Events",
+      "vibe": "Weekend live music, trivia Wednesdays — food hall with rotating events",
+      "days": ["wed", "fri", "sat", "sun"],
+      "category": "community",
+      "address": "220 36th St",
+      "is_free": true,
+      "url": "https://industrycity.com/events"
+    }
+  ],
+  "Astoria": [
+    {
+      "venue": "Q.E.D. Astoria",
+      "vibe": "100+ events/month — comedy, improv, burlesque, variety. Voted #1 comedy venue",
       "days": ["any"],
-      "category": "theater",
-      "address": "30 Lafayette Ave",
+      "category": "comedy",
+      "address": "27-16 23rd Ave",
       "is_free": false,
-      "url": "https://www.bam.org"
+      "url": "https://qedastoria.com"
+    },
+    {
+      "venue": "The Wolfhound",
+      "vibe": "Trivia Tuesdays, live band karaoke, weekend live music — Irish pub vibes",
+      "days": ["tue", "fri", "sat"],
+      "category": "live_music",
+      "address": "38-14 30th Ave",
+      "is_free": true,
+      "url": "https://www.wolfhoundnyc.com"
+    },
+    {
+      "venue": "The Rabbit Hole",
+      "vibe": "Trivia Tuesdays, karaoke Thursdays — pop culture themes, good crowd",
+      "days": ["tue", "thu"],
+      "category": "nightlife",
+      "address": "38-04 Broadway",
+      "is_free": true,
+      "url": "https://www.therabbithole.nyc"
+    },
+    {
+      "venue": "Kween Astoria",
+      "vibe": "Drag brunch Sat-Sun, bingo Tuesdays, karaoke Wednesdays — something every night",
+      "days": ["tue", "wed", "thu", "sat", "sun"],
+      "category": "nightlife",
+      "address": "34-10 30th Ave",
+      "is_free": false,
+      "url": "https://www.kweenastoria.com"
+    },
+    {
+      "venue": "Albatross Bar",
+      "vibe": "Karaoke, trivia, and open mic nights — Queens' oldest gay bar",
+      "days": ["any"],
+      "category": "community",
+      "address": "36-19 24th Ave",
+      "is_free": true,
+      "url": "https://www.albatrossastoria.com"
+    },
+    {
+      "venue": "Bohemian Hall & Beer Garden",
+      "vibe": "Live music weekends in NYC's oldest beer garden — Czech heritage, huge patio",
+      "days": ["fri", "sat", "sun"],
+      "category": "live_music",
+      "address": "29-19 24th Ave",
+      "is_free": true,
+      "url": "https://www.bohemianhall.com"
+    }
+  ],
+  "Long Island City": [
+    {
+      "venue": "LIC Bar",
+      "vibe": "Free live music multiple nights — indie, folk, jazz in a 100-year-old bar",
+      "days": ["thu", "fri", "sat"],
+      "category": "live_music",
+      "address": "45-58 Vernon Blvd",
+      "is_free": true,
+      "url": "https://www.licbar.com"
+    },
+    {
+      "venue": "Culture Lab LIC",
+      "vibe": "Free live jazz every Friday at 8pm — community arts in a converted warehouse",
+      "days": ["fri"],
+      "category": "community",
+      "address": "5-25 46th Ave",
+      "is_free": true,
+      "url": "https://www.culturelablic.org"
+    },
+    {
+      "venue": "Dive Bar LIC",
+      "vibe": "Latin and hip-hop DJs Fri-Sat, reggaeton and afrobeat brunch Sundays",
+      "days": ["fri", "sat", "sun"],
+      "category": "nightlife",
+      "address": "33-10 36th Ave",
+      "is_free": true,
+      "url": "https://www.divebarlic.com"
+    }
+  ],
+  "Jackson Heights": [
+    {
+      "venue": "Terraza 7",
+      "vibe": "Live Latin jazz, salsa, and Afro-Colombian music 5 nights a week since 2002",
+      "days": ["wed", "thu", "fri", "sat", "sun"],
+      "category": "live_music",
+      "address": "40-19 Gleane St",
+      "is_free": false,
+      "url": "https://www.terraza7.com"
+    },
+    {
+      "venue": "Hairo's Nightclub",
+      "vibe": "Salsa dancing nightly — El Templo de La Salsa en Nueva York",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "81-09 Roosevelt Ave",
+      "is_free": false
+    },
+    {
+      "venue": "Kabu Bar Lounge",
+      "vibe": "DJs Thu-Sun — bachata, salsa, cumbia, Latin hits til 4am",
+      "days": ["thu", "fri", "sat", "sun"],
+      "category": "nightlife",
+      "address": "85-09 Northern Blvd",
+      "is_free": false,
+      "url": "https://kabulounge.com"
+    }
+  ],
+  "Flushing": [
+    {
+      "venue": "Viva KTV",
+      "vibe": "Karaoke nightclub with private rooms — open Mon-Sat 9:30pm-3:30am",
+      "days": ["mon", "tue", "wed", "thu", "fri", "sat"],
+      "category": "nightlife",
+      "address": "37-20 Prince St",
+      "is_free": false
+    },
+    {
+      "venue": "MusicBox Karaoke",
+      "vibe": "Private room karaoke open til 6am Fri-Sat — massive song selection",
+      "days": ["any"],
+      "category": "nightlife",
+      "address": "40-15 150th St",
+      "is_free": false
     }
   ]
 }

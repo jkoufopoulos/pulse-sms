@@ -59,7 +59,7 @@ function cleanUrl(url) {
   } catch { return url; }
 }
 
-function formatEventDetails(event, { pulseUrl } = {}) {
+function formatEventDetails(event, { bestieUrl } = {}) {
   const venue = event.venue_name && event.venue_name !== 'TBA' ? event.venue_name : null;
 
   // Dedupe: skip "at Venue" if event name already contains venue
@@ -94,9 +94,9 @@ function formatEventDetails(event, { pulseUrl } = {}) {
   else if (event.price_display) detail += `\n${event.price_display}`;
 
   if (event.venue_address) detail += `\n${event.venue_address}`;
-  // URL: use pulseUrl override if provided, otherwise ticket_url > source_url > Google Maps
-  if (pulseUrl) {
-    detail += `\n${pulseUrl}`;
+  // URL: use bestieUrl override if provided, otherwise ticket_url > source_url > Google Maps
+  if (bestieUrl) {
+    detail += `\n${bestieUrl}`;
   } else {
     const directUrl = [event.ticket_url, event.source_url].find(u => u && !isSearchUrl(u));
     if (directUrl) {

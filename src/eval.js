@@ -9,7 +9,7 @@ function getClient() {
 const MODEL = process.env.PULSE_MODEL_EVAL || process.env.PULSE_MODEL_EXTRACT || 'claude-sonnet-4-5-20250929';
 const BATCH_SIZE = 15;
 
-const EVAL_SYSTEM = `You are an event quality evaluator for Pulse, an NYC event recommendation SMS bot.
+const EVAL_SYSTEM = `You are an event quality evaluator for Bestie, an NYC event recommendation SMS bot.
 
 Score each event 1-10 on how "worth recommending" it is to a cool NYC local looking for interesting things to do tonight.
 

@@ -1,9 +1,9 @@
 /**
  * Card HTML renderer — server-side rendered event card pages with OG meta tags.
- * Used for shareable Pulse URLs that show rich previews in iMessage/WhatsApp.
+ * Used for shareable Bestie URLs that show rich previews in iMessage/WhatsApp.
  */
 
-const PULSE_PHONE = process.env.TWILIO_PHONE_NUMBER || '+18337857300';
+const BESTIE_PHONE = process.env.TWILIO_PHONE_NUMBER || '+18337857300';
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -90,7 +90,7 @@ function smsUri(phone, body) {
   return { phone, body: encodeURIComponent(body) };
 }
 
-function renderEventCard(event, formattedPhone, pulsePhone, domain, refCode) {
+function renderEventCard(event, formattedPhone, bestiePhone, domain, refCode) {
   const title = escapeHtml(event.name || 'Event');
   const venue = escapeHtml(event.venue_name || '');
   const description = escapeHtml(buildDescription(event));
@@ -100,7 +100,7 @@ function renderEventCard(event, formattedPhone, pulsePhone, domain, refCode) {
   const detail = escapeHtml(event.description_short || event.short_detail || '');
   const ticketUrl = event.ticket_url || event.source_url || '';
   const sourceLabel = escapeHtml(getSourceLabel(event));
-  const sms = smsUri(pulsePhone, `ref:${refCode}`);
+  const sms = smsUri(bestiePhone, `ref:${refCode}`);
   const phoneFmt = formattedPhone;
 
   return `<!DOCTYPE html>
@@ -108,11 +108,11 @@ function renderEventCard(event, formattedPhone, pulsePhone, domain, refCode) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} — Pulse</title>
+  <title>${title} — Bestie</title>
   <meta property="og:title" content="${title}${venue ? ` at ${escapeHtml(venue)}` : ''}">
   <meta property="og:description" content="${description}">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Pulse">
+  <meta property="og:site_name" content="Bestie">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="${title}${venue ? ` at ${escapeHtml(venue)}` : ''}">
   <meta name="twitter:description" content="${description}">
@@ -213,17 +213,17 @@ function renderEventCard(event, formattedPhone, pulsePhone, domain, refCode) {
       background: rgba(255,255,255,0.05);
       margin: 28px 0 20px;
     }
-    .pulse-promo {
+    .bestie-promo {
       text-align: center;
       padding: 0 8px;
     }
-    .pulse-promo p {
+    .bestie-promo p {
       font-size: 0.82rem;
       color: var(--text-dim);
       margin-bottom: 12px;
       line-height: 1.5;
     }
-    .pulse-promo a {
+    .bestie-promo a {
       display: inline-flex;
       align-items: center;
       gap: 6px;
@@ -233,12 +233,12 @@ function renderEventCard(event, formattedPhone, pulsePhone, domain, refCode) {
       font-weight: 600;
       transition: opacity 0.2s;
     }
-    .pulse-promo a:hover { opacity: 0.8; }
+    .bestie-promo a:hover { opacity: 0.8; }
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="brand">Pulse</div>
+    <div class="brand">Bestie</div>
     <h1 class="event-name">${title}</h1>
     ${venue ? `<p class="event-venue">at ${escapeHtml(venue)}</p>` : ''}
     <div class="event-meta">
@@ -249,9 +249,9 @@ function renderEventCard(event, formattedPhone, pulsePhone, domain, refCode) {
     ${detail ? `<p class="event-detail">${detail}</p>` : ''}
     ${ticketUrl ? `<a class="cta-btn" href="${escapeHtml(ticketUrl)}">View on ${sourceLabel}</a>` : ''}
     <div class="divider"></div>
-    <div class="pulse-promo">
+    <div class="bestie-promo">
       <p>Discover more events like this via text</p>
-      <a id="sms-link" href="sms:${escapeHtml(sms.phone)}?body=${sms.body}">Text Pulse &rarr;</a>
+      <a id="sms-link" href="sms:${escapeHtml(sms.phone)}?body=${sms.body}">Text Bestie &rarr;</a>
     </div>
   </div>
   <script>
@@ -272,8 +272,8 @@ function renderEventCard(event, formattedPhone, pulsePhone, domain, refCode) {
 </html>`;
 }
 
-function renderStaleCard(formattedPhone, pulsePhone) {
-  const sms = smsUri(pulsePhone, 'hey');
+function renderStaleCard(formattedPhone, bestiePhone) {
+  const sms = smsUri(bestiePhone, 'hey');
   const phoneFmt = escapeHtml(formattedPhone);
 
   return `<!DOCTYPE html>
@@ -281,11 +281,11 @@ function renderStaleCard(formattedPhone, pulsePhone) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pulse — NYC Events</title>
-  <meta property="og:title" content="Pulse — NYC Events, One Text Away">
+  <title>Bestie — NYC Events</title>
+  <meta property="og:title" content="Bestie — NYC Events, One Text Away">
   <meta property="og:description" content="Text a neighborhood, get tonight's best events.">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Pulse">
+  <meta property="og:site_name" content="Bestie">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
@@ -359,10 +359,10 @@ function renderStaleCard(formattedPhone, pulsePhone) {
 </head>
 <body>
   <div class="card">
-    <div class="brand">Pulse</div>
+    <div class="brand">Bestie</div>
     <h1>This event has expired</h1>
     <p>Text ${phoneFmt} with any NYC neighborhood to discover tonight's best events.</p>
-    <a id="cta" class="cta-btn" href="sms:${escapeHtml(sms.phone)}?body=${sms.body}">Text Pulse</a>
+    <a id="cta" class="cta-btn" href="sms:${escapeHtml(sms.phone)}?body=${sms.body}">Text Bestie</a>
   </div>
   <script>
     (function() {

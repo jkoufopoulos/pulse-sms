@@ -82,7 +82,7 @@ async function sendHealthAlert(failures, scrapeStats) {
     return;
   }
 
-  const subject = `Pulse: ${failures.length} source${failures.length > 1 ? 's' : ''} failing`;
+  const subject = `Bestie: ${failures.length} source${failures.length > 1 ? 's' : ''} failing`;
 
   const lines = failures.map(f =>
     `- ${f.label}: ${f.consecutiveZeros} consecutive zeros` +
@@ -128,7 +128,7 @@ async function sendHealthAlert(failures, scrapeStats) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Pulse Alerts <onboarding@resend.dev>',
+        from: 'Bestie Alerts <onboarding@resend.dev>',
         to: ALERT_EMAIL,
         subject,
         text: body,
@@ -160,7 +160,7 @@ async function sendRuntimeAlert(alertType, details) {
   const lastSent = _runtimeCooldowns.get(alertType) || 0;
   if (Date.now() - lastSent < RUNTIME_COOLDOWN_MS) return;
 
-  const subject = `Pulse: ${alertType}`;
+  const subject = `Bestie: ${alertType}`;
   const body = Object.entries(details)
     .map(([k, v]) => `${k}: ${v}`)
     .join('\n');
@@ -193,7 +193,7 @@ async function sendRuntimeAlert(alertType, details) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Pulse Alerts <onboarding@resend.dev>',
+        from: 'Bestie Alerts <onboarding@resend.dev>',
         to: ALERT_EMAIL,
         subject,
         text: body,

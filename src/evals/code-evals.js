@@ -442,7 +442,7 @@ const evals = {
       return { name: 'schema_compliance', pass: true, detail: 'no LLM call (pre-routed)' };
     }
     // Detect the fallback error message
-    if (sms === "Having a moment — try again in a sec!" || sms === "Pulse hit a snag — try again in a sec!") {
+    if (sms === "Having a moment — try again in a sec!" || sms === "Bestie hit a snag — try again in a sec!") {
       return { name: 'schema_compliance', pass: false, detail: 'fallback error response (JSON parse likely failed)' };
     }
     // Try to parse the raw response

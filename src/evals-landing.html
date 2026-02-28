@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pulse Eval Guide</title>
+<title>Bestie Eval Guide</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -17,20 +17,20 @@
   }
 
   /* ── Shared nav ── */
-  .pulse-nav {
+  .bestie-nav {
     position: sticky; top: 0; z-index: 100;
     display: flex; align-items: center; height: 36px;
     background: #111; border-bottom: 1px solid #222;
     padding: 0 16px; font-size: 13px;
     margin: -24px -24px 24px -24px;
   }
-  .pulse-nav-link {
+  .bestie-nav-link {
     color: #888; text-decoration: none; padding: 0 12px;
     line-height: 36px; transition: color 0.15s;
   }
-  .pulse-nav-link:hover { color: #ccc; }
-  .pulse-nav-link.active { color: #FF6B35; font-weight: 600; }
-  .pulse-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
+  .bestie-nav-link:hover { color: #ccc; }
+  .bestie-nav-link.active { color: #FF6B35; font-weight: 600; }
+  .bestie-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
 
   /* ── Header ── */
   .header {
@@ -219,7 +219,7 @@
   /* ── Responsive ── */
   @media (max-width: 600px) {
     body { padding: 12px; }
-    .pulse-nav { margin: -12px -12px 12px -12px; }
+    .bestie-nav { margin: -12px -12px 12px -12px; }
     .header h1 { font-size: 20px; }
     .card-grid { grid-template-columns: 1fr; }
     .how-grid { grid-template-columns: 1fr; }
@@ -228,22 +228,22 @@
 </head>
 <body>
 
-<nav class="pulse-nav">
-  <a href="/health" class="pulse-nav-link">Health</a>
-  <a href="/events" class="pulse-nav-link">Events</a>
-  <span class="pulse-nav-sep"></span>
-  <a href="/eval" class="pulse-nav-link">Traces</a>
-  <a href="/eval-report" class="pulse-nav-link">Reports</a>
-  <a href="/evals" class="pulse-nav-link active">Eval Guide</a>
-  <span class="pulse-nav-sep"></span>
-  <a href="/test" class="pulse-nav-link">Simulator</a>
+<nav class="bestie-nav">
+  <a href="/health" class="bestie-nav-link">Health</a>
+  <a href="/events" class="bestie-nav-link">Events</a>
+  <span class="bestie-nav-sep"></span>
+  <a href="/eval" class="bestie-nav-link">Traces</a>
+  <a href="/eval-report" class="bestie-nav-link">Reports</a>
+  <a href="/evals" class="bestie-nav-link active">Eval Guide</a>
+  <span class="bestie-nav-sep"></span>
+  <a href="/test" class="bestie-nav-link">Simulator</a>
 </nav>
 
 <div class="header">
-  <h1><span>Pulse</span> Eval Guide</h1>
+  <h1><span>Bestie</span> Eval Guide</h1>
 </div>
 <p class="intro">
-  Pulse has six evaluation layers, from free deterministic checks to LLM-judged conversation tests.
+  Bestie has six evaluation layers, from free deterministic checks to LLM-judged conversation tests.
   Start from the top &mdash; run the free checks first, fix anything they catch, then move down to the costlier layers.
   Each card below shows the live pass rate (when available), what it costs, and how to run it.
 </p>

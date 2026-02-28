@@ -1,5 +1,5 @@
 /**
- * Trace capture + filesystem persistence for Pulse eval system.
+ * Trace capture + filesystem persistence for Bestie eval system.
  *
  * Every SMS request through handleMessageAI() generates a trace.
  * Storage: JSONL files in data/traces/, one file per day, 4-file rotation.
@@ -237,7 +237,7 @@ function recordConversationTurn(trace) {
 
   if (trace.output_sms) {
     conv.turns.push({
-      sender: 'pulse',
+      sender: 'bestie',
       message: trace.output_sms,
       timestamp: trace.timestamp,
       _meta: {

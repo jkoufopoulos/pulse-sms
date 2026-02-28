@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pulse Traces</title>
+<title>Bestie Traces</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -252,7 +252,7 @@
     padding: 12px 16px; margin-bottom: 12px; max-width: 400px;
     font-size: 14px; line-height: 1.5; color: #bfdbfe; white-space: pre-wrap;
   }
-  .bubble-pulse {
+  .bubble-bestie {
     background: #1a3a1a; border: 1px solid #2d5a2d; border-radius: 16px 16px 16px 4px;
     padding: 12px 16px; margin-bottom: 12px; max-width: 400px;
     font-size: 14px; line-height: 1.5; color: #c6f6c6; white-space: pre-wrap;
@@ -399,38 +399,38 @@
 
     .trace-detail { max-height: 80vh; padding: 12px; }
     .trace-meta { gap: 10px; }
-    .bubble-user, .bubble-pulse { max-width: 100%; }
+    .bubble-user, .bubble-bestie { max-width: 100%; }
 
     .annotation-bar { flex-direction: column; gap: 12px; }
     .anno-notes { max-width: 100%; }
   }
   /* ── Shared nav ── */
-  .pulse-nav {
+  .bestie-nav {
     position: sticky; top: 0; z-index: 100;
     display: flex; align-items: center; height: 36px;
     background: #111; border-bottom: 1px solid #222;
     padding: 0 16px; font-size: 13px;
   }
-  .pulse-nav-link {
+  .bestie-nav-link {
     color: #888; text-decoration: none; padding: 0 12px;
     line-height: 36px; transition: color 0.15s;
   }
-  .pulse-nav-link:hover { color: #ccc; }
-  .pulse-nav-link.active { color: #FF6B35; font-weight: 600; }
-  .pulse-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
+  .bestie-nav-link:hover { color: #ccc; }
+  .bestie-nav-link.active { color: #FF6B35; font-weight: 600; }
+  .bestie-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
 </style>
 </head>
 <body>
 
-<nav class="pulse-nav">
-  <a href="/health" class="pulse-nav-link">Health</a>
-  <a href="/events" class="pulse-nav-link">Events</a>
-  <span class="pulse-nav-sep"></span>
-  <a href="/eval" class="pulse-nav-link active">Traces</a>
-  <a href="/eval-report" class="pulse-nav-link">Reports</a>
-  <a href="/evals" class="pulse-nav-link">Eval Guide</a>
-  <span class="pulse-nav-sep"></span>
-  <a href="/test" class="pulse-nav-link">Simulator</a>
+<nav class="bestie-nav">
+  <a href="/health" class="bestie-nav-link">Health</a>
+  <a href="/events" class="bestie-nav-link">Events</a>
+  <span class="bestie-nav-sep"></span>
+  <a href="/eval" class="bestie-nav-link active">Traces</a>
+  <a href="/eval-report" class="bestie-nav-link">Reports</a>
+  <a href="/evals" class="bestie-nav-link">Eval Guide</a>
+  <span class="bestie-nav-sep"></span>
+  <a href="/test" class="bestie-nav-link">Simulator</a>
 </nav>
 
 <!-- Page description -->
@@ -705,10 +705,10 @@
     <div id="td-not-picked"></div>
   </div>
 
-  <!-- Pulse SMS bubble -->
+  <!-- Bestie SMS bubble -->
   <div class="trace-section">
-    <div class="bubble-label">Pulse SMS</div>
-    <div class="bubble-pulse" id="td-pulse-msg"></div>
+    <div class="bubble-label">Bestie SMS</div>
+    <div class="bubble-bestie" id="td-bestie-msg"></div>
     <div class="char-count" id="td-char-count"></div>
   </div>
 
@@ -1522,8 +1522,8 @@ function showTraceDetail(t) {
     notPickedSection.style.display = 'none';
   }
 
-  // Pulse SMS
-  document.getElementById('td-pulse-msg').textContent = t.output_sms || '(empty)';
+  // Bestie SMS
+  document.getElementById('td-bestie-msg').textContent = t.output_sms || '(empty)';
   document.getElementById('td-char-count').textContent = `${t.output_sms_length || 0} / 480 chars`;
 
   // Raw responses

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pulse Health Dashboard</title>
+<title>Bestie Health Dashboard</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -337,10 +337,10 @@
     border-radius: 50%;
     background: #4ade80;
     margin-right: 6px;
-    animation: pulse-dot 2s ease-in-out infinite;
+    animation: bestie-dot 2s ease-in-out infinite;
   }
 
-  @keyframes pulse-dot {
+  @keyframes bestie-dot {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.3; }
   }
@@ -457,41 +457,41 @@
   }
 
   /* ── Shared nav ── */
-  .pulse-nav {
+  .bestie-nav {
     position: sticky; top: 0; z-index: 100;
     display: flex; align-items: center; height: 36px;
     background: #111; border-bottom: 1px solid #222;
     padding: 0 16px; font-size: 13px;
     margin: -24px -24px 24px -24px;
   }
-  .pulse-nav-link {
+  .bestie-nav-link {
     color: #888; text-decoration: none; padding: 0 12px;
     line-height: 36px; transition: color 0.15s;
   }
-  .pulse-nav-link:hover { color: #ccc; }
-  .pulse-nav-link.active { color: #FF6B35; font-weight: 600; }
-  .pulse-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
+  .bestie-nav-link:hover { color: #ccc; }
+  .bestie-nav-link.active { color: #FF6B35; font-weight: 600; }
+  .bestie-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
   @media (max-width: 600px) {
-    .pulse-nav { margin: -12px -12px 12px -12px; }
+    .bestie-nav { margin: -12px -12px 12px -12px; }
   }
 </style>
 </head>
 <body>
 
-<nav class="pulse-nav">
-  <a href="/health" class="pulse-nav-link active">Health</a>
-  <a href="/events" class="pulse-nav-link">Events</a>
-  <span class="pulse-nav-sep"></span>
-  <a href="/eval" class="pulse-nav-link">Traces</a>
-  <a href="/eval-report" class="pulse-nav-link">Reports</a>
-  <a href="/evals" class="pulse-nav-link">Eval Guide</a>
-  <span class="pulse-nav-sep"></span>
-  <a href="/test" class="pulse-nav-link">Simulator</a>
+<nav class="bestie-nav">
+  <a href="/health" class="bestie-nav-link active">Health</a>
+  <a href="/events" class="bestie-nav-link">Events</a>
+  <span class="bestie-nav-sep"></span>
+  <a href="/eval" class="bestie-nav-link">Traces</a>
+  <a href="/eval-report" class="bestie-nav-link">Reports</a>
+  <a href="/evals" class="bestie-nav-link">Eval Guide</a>
+  <span class="bestie-nav-sep"></span>
+  <a href="/test" class="bestie-nav-link">Simulator</a>
 </nav>
 
 <div class="header">
   <div>
-    <h1><span>Pulse</span> Health</h1>
+    <h1><span>Bestie</span> Health</h1>
     <p style="font-size:13px;color:#777;margin-top:4px">Source scrape status, timing, extraction quality, and alert history. Auto-refreshes every 60 seconds.</p>
   </div>
   <div class="header-right">

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pulse Eval Reports</title>
+<title>Bestie Eval Reports</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -506,7 +506,7 @@
     color: #fff;
     border-bottom-right-radius: 4px;
   }
-  .chat-bubble.pulse {
+  .chat-bubble.bestie {
     align-self: flex-start;
     background: #2a2a2a;
     color: #e0e0e0;
@@ -1035,25 +1035,25 @@
   }
 
   /* ── Shared nav ── */
-  .pulse-nav {
+  .bestie-nav {
     position: sticky; top: 0; z-index: 100;
     display: flex; align-items: center; height: 36px;
     background: #111; border-bottom: 1px solid #222;
     padding: 0 16px; font-size: 13px;
     margin: -24px -24px 24px -24px;
   }
-  .pulse-nav-link {
+  .bestie-nav-link {
     color: #888; text-decoration: none; padding: 0 12px;
     line-height: 36px; transition: color 0.15s;
   }
-  .pulse-nav-link:hover { color: #ccc; }
-  .pulse-nav-link.active { color: #FF6B35; font-weight: 600; }
-  .pulse-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
+  .bestie-nav-link:hover { color: #ccc; }
+  .bestie-nav-link.active { color: #FF6B35; font-weight: 600; }
+  .bestie-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
 
   /* ── Responsive ── */
   @media (max-width: 600px) {
     body { padding: 12px; }
-    .pulse-nav { margin: -12px -12px 12px -12px; }
+    .bestie-nav { margin: -12px -12px 12px -12px; }
     .header h1 { font-size: 20px; }
     .summary-big .value { font-size: 32px; }
     .scenario-name { font-size: 12px; min-width: 140px; }
@@ -1067,20 +1067,20 @@
 </head>
 <body>
 
-<nav class="pulse-nav">
-  <a href="/health" class="pulse-nav-link">Health</a>
-  <a href="/events" class="pulse-nav-link">Events</a>
-  <span class="pulse-nav-sep"></span>
-  <a href="/eval" class="pulse-nav-link">Traces</a>
-  <a href="/eval-report" class="pulse-nav-link active">Reports</a>
-  <a href="/evals" class="pulse-nav-link">Eval Guide</a>
-  <span class="pulse-nav-sep"></span>
-  <a href="/test" class="pulse-nav-link">Simulator</a>
+<nav class="bestie-nav">
+  <a href="/health" class="bestie-nav-link">Health</a>
+  <a href="/events" class="bestie-nav-link">Events</a>
+  <span class="bestie-nav-sep"></span>
+  <a href="/eval" class="bestie-nav-link">Traces</a>
+  <a href="/eval-report" class="bestie-nav-link active">Reports</a>
+  <a href="/evals" class="bestie-nav-link">Eval Guide</a>
+  <span class="bestie-nav-sep"></span>
+  <a href="/test" class="bestie-nav-link">Simulator</a>
 </nav>
 
 <div class="header">
   <div>
-    <h1><span>Pulse</span> Eval Reports</h1>
+    <h1><span>Bestie</span> Eval Reports</h1>
     <p style="font-size:13px;color:#777;margin-top:4px">Scenario, regression, and extraction audit results. Select a report to view, compare runs, or override false failures.</p>
   </div>
 </div>
@@ -1355,7 +1355,7 @@ function renderRegressionReport() {
 
   // Principle breakdown
   html += '<div class="section-header">Principles</div>';
-  html += '<div class="section-explainer">Architecture principles (P1-P7) that govern how Pulse splits work between code and AI. Each has specific behavioral assertions.</div>';
+  html += '<div class="section-explainer">Architecture principles (P1-P7) that govern how Bestie splits work between code and AI. Each has specific behavioral assertions.</div>';
   html += '<div class="principle-grid">';
   var principleIds = Object.keys(byPrinciple).sort();
   principleIds.forEach(function(pid) {
@@ -1419,9 +1419,9 @@ function renderRegressionReport() {
       html += '<div class="section-header" style="margin-top:12px">Conversation</div>';
       html += '<div class="chat-transcript">';
       s.conversation.forEach(function(turn) {
-        var bubbleClass = turn.sender === 'user' ? 'user' : 'pulse';
+        var bubbleClass = turn.sender === 'user' ? 'user' : 'bestie';
         if (turn.message) html += '<div class="chat-bubble ' + bubbleClass + '">' + escHtml(turn.message) + '</div>';
-        if (turn.sender === 'pulse' && turn.trace_summary) {
+        if (turn.sender === 'bestie' && turn.trace_summary) {
           html += renderTraceSummary(turn.trace_summary, turn.trace_debug);
         }
       });
@@ -1962,9 +1962,9 @@ function renderScenarioCard(s, sortIdx) {
           turnNum++;
           html += '<div class="chat-turn-marker">Turn ' + turnNum + '</div>';
         }
-        var bubbleClass = msg.sender === 'user' ? 'user' : 'pulse';
+        var bubbleClass = msg.sender === 'user' ? 'user' : 'bestie';
         html += '<div class="chat-bubble ' + bubbleClass + '">' + escHtml(msg.message) + '</div>';
-        if (msg.sender === 'pulse' && msg.trace_summary) {
+        if (msg.sender === 'bestie' && msg.trace_summary) {
           html += renderTraceSummary(msg.trace_summary, msg.trace_debug);
         }
       });
@@ -1976,7 +1976,7 @@ function renderScenarioCard(s, sortIdx) {
       html += '<div class="judgment-section">';
       html += '<h4>Judge Verdict <span class="status-pill ' + (s.judgment.overall_pass ? 'pass' : 'fail') + '" style="margin-left:8px">' +
         (s.judgment.overall_pass ? 'PASS' : 'FAIL') + '</span></h4>';
-      html += '<div class="section-explainer">An LLM judge (Sonnet) reads the conversation and grades whether Pulse behaved correctly — tone, relevance, filter respect, and conversation flow.</div>';
+      html += '<div class="section-explainer">An LLM judge (Sonnet) reads the conversation and grades whether Bestie behaved correctly — tone, relevance, filter respect, and conversation flow.</div>';
 
       // Failure modes right after verdict header
       if (s.judgment.failure_modes_triggered && s.judgment.failure_modes_triggered.length > 0) {

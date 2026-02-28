@@ -18,7 +18,7 @@
  * Usage:
  *   node scripts/ground-scenarios.js                          # Expand parenthetical turns
  *   node scripts/ground-scenarios.js --dry-run                # Preview without writing
- *   node scripts/ground-scenarios.js --reground               # Replace ALL non-asserted pulse turns
+ *   node scripts/ground-scenarios.js --reground               # Replace ALL non-asserted bestie turns
  *   node scripts/ground-scenarios.js --category edge_case     # Filter by category
  *   node scripts/ground-scenarios.js --name "orphaned"        # Filter by name
  *   node scripts/ground-scenarios.js --generate 30            # Generate 30 new scenarios
@@ -54,9 +54,9 @@ const TARGET_DIST = {
 
 // ─── System prompts ────────────────────────────────────────────────
 
-const EXPAND_SYSTEM = `You are writing golden example SMS responses for Pulse, an NYC nightlife SMS bot.
+const EXPAND_SYSTEM = `You are writing golden example SMS responses for Bestie, an NYC nightlife SMS bot.
 
-You'll receive a multi-turn scenario with context (what's being tested, expected behavior, failure modes) and a conversation where some pulse turns are parenthetical placeholders like "(comedy picks)". Your job is to write what an IDEAL pulse response would look like for each placeholder.
+You'll receive a multi-turn scenario with context (what's being tested, expected behavior, failure modes) and a conversation where some bestie turns are parenthetical placeholders like "(comedy picks)". Your job is to write what an IDEAL bestie response would look like for each placeholder.
 
 STYLE RULES (match these exactly — study the existing golden examples):
 - Casual, opinionated, like a knowledgeable friend texting you
@@ -79,9 +79,9 @@ FORMATTING:
 - The array length must match exactly the number of parenthetical turns you're asked to expand
 - No markdown fences, no explanation — just the JSON array`;
 
-const GENERATE_SYSTEM = `You are writing multi-turn test scenarios for Pulse, an NYC nightlife SMS bot.
+const GENERATE_SYSTEM = `You are writing multi-turn test scenarios for Bestie, an NYC nightlife SMS bot.
 
-Pulse is an SMS service — users text a neighborhood name and get curated NYC event picks. They can reply numbers for details, "more" for extra picks, filter by category ("comedy", "jazz"), price ("free"), or time ("later tonight"), and switch neighborhoods.
+Bestie is an SMS service — users text a neighborhood name and get curated NYC event picks. They can reply numbers for details, "more" for extra picks, filter by category ("comedy", "jazz"), price ("free"), or time ("later tonight"), and switch neighborhoods.
 
 You'll receive:
 1. A category to write scenarios for (happy_path, filter_drift, poor_experience, edge_case)
@@ -89,7 +89,7 @@ You'll receive:
 3. Existing scenario names to avoid duplicating
 4. Example scenarios showing the exact format and tone
 
-Your job: write NEW multi-turn scenarios with fully-written golden pulse responses (no parentheticals).
+Your job: write NEW multi-turn scenarios with fully-written golden bestie responses (no parentheticals).
 
 SCENARIO STRUCTURE:
 {
@@ -97,7 +97,7 @@ SCENARIO STRUCTURE:
   "category": "the_category",
   "turns": [
     { "sender": "user", "message": "the text message" },
-    { "sender": "pulse", "message": "the ideal SMS response" }
+    { "sender": "bestie", "message": "the ideal SMS response" }
   ],
   "testing": "What this scenario specifically tests",
   "expected_behavior": "What should happen at each step",
@@ -136,7 +136,7 @@ edge_case — Unusual inputs, boundary conditions:
 - Boroughs, ambiguous inputs, unsupported neighborhoods
 - Difficulty: stretch
 
-SMS STYLE RULES (for pulse responses):
+SMS STYLE RULES (for bestie responses):
 - Casual, opinionated, like a knowledgeable friend texting
 - Use em-dashes (—) not colons for descriptions
 - Numbered picks: "1) Event Name at Venue — description. Time, Price"
@@ -160,7 +160,7 @@ FORMATTING:
 // ─── Expand mode ───────────────────────────────────────────────────
 
 function shouldGround(turn, isReground) {
-  if (turn.sender !== 'pulse') return false;
+  if (turn.sender !== 'bestie') return false;
   if (turn.assert) return false;
   if (isReground) return true;
   return turn.message.startsWith('(');
@@ -303,10 +303,10 @@ function validateScenario(scenario) {
 
   if (scenario.turns) {
     for (const turn of scenario.turns) {
-      if (turn.sender === 'pulse' && turn.message.length > 480) {
-        issues.push(`pulse turn over 480 chars (${turn.message.length})`);
+      if (turn.sender === 'bestie' && turn.message.length > 480) {
+        issues.push(`bestie turn over 480 chars (${turn.message.length})`);
       }
-      if (turn.sender === 'pulse' && turn.message.startsWith('(')) {
+      if (turn.sender === 'bestie' && turn.message.startsWith('(')) {
         issues.push('has parenthetical placeholder');
       }
     }

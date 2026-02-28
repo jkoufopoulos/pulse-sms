@@ -31,7 +31,7 @@ app.use(express.json({ limit: '5mb' }));
 
 // Public health check — no internal details (L10 fix)
 app.get('/', (req, res) => {
-  res.json({ status: 'ok', service: 'pulse' });
+  res.json({ status: 'ok', service: 'bestie' });
 });
 
 // Health dashboard — gated behind test mode or auth token
@@ -237,17 +237,17 @@ app.get('/api/events', (req, res) => {
   res.json(getRawCache());
 });
 
-// Event card page — shareable Pulse URLs with OG meta tags
+// Event card page — shareable Bestie URLs with OG meta tags
 app.get('/e/:eventId', (req, res) => {
-  const pulsePhone = process.env.TWILIO_PHONE_NUMBER || '+18337857300';
+  const bestiePhone = process.env.TWILIO_PHONE_NUMBER || '+18337857300';
   const domain = process.env.PULSE_CARD_DOMAIN || `${req.protocol}://${req.get('host')}`;
-  const formattedPhone = pulsePhone.replace(/\D/g, '').replace(/^1(\d{3})(\d{3})(\d{4})$/, '($1) $2-$3');
+  const formattedPhone = bestiePhone.replace(/\D/g, '').replace(/^1(\d{3})(\d{3})(\d{4})$/, '($1) $2-$3');
   const event = getEventById(req.params.eventId);
   if (event) {
     const refCode = req.query.ref || null;
-    res.send(renderEventCard(event, formattedPhone, pulsePhone, domain, refCode));
+    res.send(renderEventCard(event, formattedPhone, bestiePhone, domain, refCode));
   } else {
-    res.send(renderStaleCard(formattedPhone, pulsePhone));
+    res.send(renderStaleCard(formattedPhone, bestiePhone));
   }
 });
 
@@ -447,7 +447,7 @@ if (process.env.PULSE_TEST_MODE === 'true') {
 }
 
 const server = app.listen(PORT, () => {
-  console.log(`Pulse listening on port ${PORT}`);
+  console.log(`Bestie listening on port ${PORT}`);
   loadProfiles();
   loadReferrals();
   loadAlerts();
