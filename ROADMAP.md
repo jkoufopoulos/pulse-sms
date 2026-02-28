@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-01 (SQLite store, pre-router filter fix)
+> Last updated: 2026-02-28 (filter drift 5-cause analysis, session persistence, test endpoint timeout)
 
 ---
 
@@ -152,100 +152,75 @@ All 5 are pre-LLM staging — they set up state that the downstream `saveRespons
 
 ## Open Issues
 
-### Filter Drift — Root Cause Analysis (2026-02-25)
+### Filter Drift — Root Cause Analysis (updated 2026-02-28)
 
-**Status:** 2/26 scenarios passing (8%). The 2026-02-24 code fixes (mergeFilters, targeted clearing, CLEAR_SIGNALS guard, bare category, handleMore exhaustion) address **~4-6 of 24 failures**. Realistic estimate: **~25-33% pass rate** after fixes deploy. The 80% target requires work beyond filter state code.
+**Status:** 59/130 scenario evals passing (45%), 7/47 regression evals passing (15%). Updated analysis below based on 47 filter persistence failures from 2026-02-28 eval run against Railway. **The deterministic filter machinery (`mergeFilters`, `buildTaggedPool`) is working correctly.** Failures are upstream (infrastructure), downstream (LLM compose), and at the edges (nudge-accept, pre-router session requirements).
 
-**Analysis of all 24 failures by root cause:**
+#### Root Cause A: 502 errors / crashes (~35% of failures) — infrastructure, not filter logic
 
-#### Cause A: LLM Composition Failure (8 scenarios) — code is correct, LLM ignores it
+The test endpoint (`/api/sms/test`) is synchronous. If a Claude API call or Tavily fallback hangs, Railway's proxy returns 502 before the response completes. Sessions are in-memory, so a container restart wipes all state. Subsequent turns cascade — number requests hit null `lastPicks` → "I don't have picks loaded."
 
-The filter state is correct. The tagged pool has `ACTIVE_FILTER` and `[MATCH]` tags. But when `matchCount === 0` (no events match the filter), the LLM shows unmatched events without acknowledging the active filter. This is the **single biggest failure category**.
+**Affected scenarios:** Every scenario where the first or second response is "Bestie hit a snag" — free stuff in prospect heights, later tonight in bed stuy, free dance music in greenpoint, late in astoria, free jazz in fort greene (cascading 4x), live music in bushwick later→earlier, free live music in bushwick, late night crown heights, misspelled neighborhood→greenpont 502, whats closest→free 502, free jazz EV. Plus every "I don't have picks loaded" that follows a 502 in the same scenario.
 
-| # | Scenario | What LLM does wrong |
-|---|----------|---------------------|
-| 4 | comedy across hood switch | Shows mixed Bushwick picks, ignores `ACTIVE_FILTER: comedy` |
-| 11 | "what about comedy" | Says "comedy's not really my lane" despite comedy-tagged pool |
-| 13 | live music → electronic/DJ | Picks nightlife events for live_music filter (category taxonomy gap) |
-| 17 | jazz in cobble hill | Offers "film instead at BAM" — proactively abandons filter |
-| 21 | comedy in cobble hill | Shows trivia/folk events despite comedy filter |
-| 22 | free + live music | Shows karaoke (community) for live_music filter |
-| 3 | free stacking | Shows 1 event as recommendation instead of filtered list |
-| 18 | jazz in harlem → perennial | handleMore perennial path ignores active category (code bug, see Cause E) |
+**Fixed (2026-02-28):** Test endpoint now has 25s `Promise.race` timeout — returns clean 500 before Railway's proxy kills the connection. Session disk persistence means sessions survive container restarts.
 
-**Fix needed:** Prompt hardening in `UNIFIED_SYSTEM` — when `matchCount === 0` and `ACTIVE_FILTER` is set, the LLM MUST say "no [filter] in [hood] tonight" and offer alternatives, never silently show unfiltered events. This is the highest-impact change.
+#### Root Cause B: Session loss → "I don't have picks loaded" (~15% of failures)
 
-#### Cause B: Thin Data Coverage (7 scenarios) — no matching events exist
+Even without a visible 502, users text a number (1-5) and get "I don't have picks loaded." Root causes: (1) server restarted between turns (sessions were in-memory only), (2) previous turn's `saveResponseFrame` never ran due to error, (3) previous turn returned `ask_neighborhood` type which saves `session?.lastPicks || []` — if there were no previous picks, it saves empty.
 
-The filter persists correctly but the neighborhood has 0 events matching the filter. The system handles this gracefully ("not much jazz tonight") but the judge expects numbered picks. These are **not product bugs** — they're either data gaps or judge calibration issues.
+**Affected scenarios:** jazz in cobble hill→"ok"→"2", comedy in cobble hill→"more"→"1", jazz in harlem→"1", free comedy in harlem→"2", free stuff in greenpoint→"williamsburg"→"2", free jazz in soho→"tribeca"→"3", category survives ambiguous→"2".
 
-| # | Scenario | Coverage gap |
-|---|----------|-------------|
-| 1 | free comedy in Red Hook | 0 free comedy events in Red Hook + nearby |
-| 5 | jazz in Cobble Hill/Park Slope | 0 jazz events across 3 hoods on Monday |
-| 9 | live music in Astoria | 0 live music events |
-| 15 | free comedy in Harlem | 0 matching events → no picks saved → detail requests fail |
-| 20 | late in Astoria | 0 late events on Monday |
-| 24 | late night Crown Heights | 0 late events |
-| 6 | free in Prospect Heights | 1 event, user says "6" (invalid pick number) |
+**Partially fixed (2026-02-28):** Session disk persistence addresses cause (1). Causes (2) and (3) remain — `ask_neighborhood` still saves empty `lastPicks` when there are no prior picks.
 
-**Fix needed:** Judge recalibration — pass scenarios where filter is acknowledged even with 0 picks. Separately, source coverage improvements help long-term. **Partial mitigation (2026-03-01):** Tavily live-search fallback now fires when cached events are exhausted, supplementing thin neighborhoods with live web search results.
+#### Root Cause C: Filters persist correctly but match nothing — LLM abandons constraint (~25% of failures)
 
-#### Cause C: Semantic Partial Clearing (5 scenarios) — LLM can't partially modify filters
+**The deterministic filter logic is working correctly.** `mergeFilters` compounds filters across turns. The tagged pool correctly has 0 `[MATCH]` events. But then the LLM sees 15 unmatched events with no `[MATCH]` tags, composes a response saying "nothing matches your filter," and presents alternatives from the unmatched pool. The eval judges this as "filter dropped" because the response contains non-matching events.
 
-Users say "paid is fine too" or "show me paid ones too" (clear free_only, keep category). The LLM output contract has `clear_filters: boolean` (all-or-nothing). There's no way for the LLM to communicate *which* filter to clear. Our pre-router targeted clearing (Fix 2) only catches exact phrases like "forget the comedy", not semantic variants.
+Example — comedy filter persists through neighborhood switch:
+```
+User: comedy in LES → Comedy picks shown ✓
+User: try bushwick → "Bushwick tonight is all nightlife — no comedy shows on the radar"
+                     (filter DID persist, just no comedy in Bushwick)
+User: more → Shows non-comedy picks with "comedy's thin here"
+```
 
-| # | Scenario | User phrase | Expected behavior |
-|---|----------|-------------|-------------------|
-| 8 | compound cleared partially | "paid is fine too" | Clear free_only, keep jazz |
-| 12 | filter clear mid-compound | "paid is cool too just keep it jazz" | Clear free_only, keep jazz |
-| 23 | price filter removal | "show me paid ones too" | Clear free_only, keep jazz |
-| 16 | category removal preserves price | "actually just show me everything free" | Clear category, keep free_only |
-| 7 | time filter cleared by 'anytime' | "what else is going on tonight" | Ambiguous — judge expects time clear |
+Same pattern in: free+comedy stacking (compound applied, nothing matched, LLM shows alternatives), jazz→park slope (jazz filter persisted, no jazz in park slope), all "free+category in thin neighborhood" scenarios.
 
-**Fix needed:** Expand LLM contract: `clear_filters: string[]` (list of filter keys to clear). Handler maps keys to explicit nulls via `mergeFilters`. P1-sensitive: must validate LLM-reported keys against known filter names, never trust arbitrary strings.
+**Design question, not a code bug.** When filters match zero events, should Pulse: (a) show nothing and say "nothing matches" (strict, frustrating UX), (b) show alternatives with explanation (current behavior, scored as filter failure), or (c) distinguish in the eval between "filter dropped" vs "filter applied, no results"?
 
-**P1 tension:** This gives the LLM limited state-writing power (naming which filters to clear). Mitigated by: (1) whitelist validation — only accept `category`, `subcategory`, `free_only`, `time_after`, `vibe`; (2) LLM only clears, never sets filter values; (3) code still owns what the filter values *are*.
+**Fix options:** Prompt hardening (LLM MUST acknowledge the active filter before showing alternatives), eval recalibration (judge distinguishes "filter dropped" from "honest scarcity"), or both.
 
-#### Cause D: Pre-Router Prefix/Filler Gaps (3 scenarios)
+#### Root Cause D: Nudge-accept ambiguity — "ok"/"sure" resets context (~10% of failures)
 
-Conversational prefixes prevent the pre-router from catching intent.
+When the LLM suggests a nearby neighborhood ("want me to check Gowanus?"), the user says "ok" or "sure," but gets "Tell me what you're looking for" (casual ack path) instead of events from the suggested neighborhood.
 
-| # | Scenario | User says | Why pre-router misses |
-|---|----------|-----------|----------------------|
-| 2 | comedy → jazz | "actually jazz" | "actually" prefix blocks bare category `^(?:jazz)$` |
-| 19 | clear stacked filters | "nah lemme just see whats happening" | Not in CLEAR_SIGNALS. "whats happening" = clear intent |
-| 14 | free filter survives pivot | MORE after 0 results | Fix 4 helps; thin coverage in NoHo is the real issue |
+**Why:** The nudge-accept flow depends on `pendingNearby` being set in the session. `pendingNearby` is only set when `saveResponseFrame` is called with `type: 'ask_neighborhood'`. If the LLM just *mentions* nearby neighborhoods conversationally (not via the structured `ask_neighborhood` response type), `pendingNearby` is never set.
 
-**Fix options (tradeoffs):**
-- Add conversational prefixes ("actually", "hmm", "nah") to regex → increasingly brittle, risks false positives
-- Add "whats happening" to CLEAR_SIGNALS → specific fix, low risk
-- Accept that these are genuinely ambiguous and belong in the LLM path → principled per P6, but requires the LLM to report filter changes (see Cause C)
+**Affected scenarios:** jazz in cobble hill→"ok"→context lost, comedy in cobble hill→"ok"→fallback, category survives ambiguous response→"ok"/"sure"→reset.
 
-**P6 assessment:** "actually jazz" is arguably deterministic (the word "jazz" is unambiguous), but "nah lemme just see whats happening" is genuinely ambiguous language. Adding ever-more regex patterns to the pre-router violates the spirit of P6: "reserve the LLM for genuinely ambiguous language."
+**Fix options:** Improve the LLM prompt to use `ask_neighborhood` type when suggesting neighborhoods, or make the pre-router smarter about matching "ok"/"sure" to recently-mentioned neighborhoods.
 
-#### Cause E: handleMore / Perennial Path Issues (2 scenarios)
+#### Root Cause E: Filter stacking — pre-router gate blocks detection after zero-match turns (~15% of failures)
 
-| # | Scenario | Issue |
-|---|----------|-------|
-| 10 | jazz → MORE → hood switch | Exhaustion + hood switch → "no picks loaded" for detail request |
-| 18 | jazz → MORE → non-jazz perennial | Perennial path shows DJ venue for jazz-filtered session |
+User has comedy filter → says "free" → gets free events but NOT free comedy. `mergeFilters({ category: 'comedy' }, { free_only: true })` → `{ category: 'comedy', free_only: true }` is correct — the machinery works. But the pre-router's session-aware filter detection requires `session?.lastPicks?.length > 0`. If the previous turn was a zero-match response, `lastPicks` is empty → pre-router skips filter detection → "free" goes to unified LLM as a fresh query → LLM interprets it without the compound context.
 
-**Fix needed:** `handleMore`'s perennial fallback at line 196-231 should filter perennials by active category before composing. Pure code fix, P1-compliant, no LLM involvement. **Note (2026-03-01):** Tavily fallback now sits between perennial exhaustion and the final exhaustion message in `handleMore`, providing one more layer of content before dead-ending.
+Two sub-cases: (1) Overlap with Root Cause C — compound filter matches nothing, LLM shows non-matching. (2) Pre-router gate — empty `lastPicks` prevents filter detection, so the new filter is treated as a standalone request.
+
+**Fix needed:** Pre-router should detect filters even when `lastPicks` is empty, as long as `lastNeighborhood` is set.
 
 ---
 
 #### Summary: What Moves the Needle
 
-| Lever | Scenarios fixed | Effort | Principle risk |
-|-------|----------------|--------|----------------|
-| **Prompt hardening for zero-match pools** | ~8 (Cause A) | Low — prompt change only | None |
-| **Judge recalibration for thin coverage** | ~7 (Cause B) | Low — eval change only | None |
-| **Partial filter clearing via `clear_filters: string[]`** | ~5 (Cause C) | Medium — LLM contract + handler | P1 tension (mitigated by whitelist) |
-| **Perennial path filter respect** | ~2 (Cause E) | Low — pure code | None |
-| **Pre-router prefix tolerance** | ~2 (Cause D) | Low but brittle | P6 tension |
+| Root Cause | % of failures | Is it a code bug? | Fix | Status |
+|---|---|---|---|---|
+| **A: 502/crashes** | ~35% | Infrastructure | Test endpoint timeout + session persistence | **Fixed (2026-02-28)** |
+| **B: Session loss** | ~15% | Yes | Session disk persistence | **Partially fixed (2026-02-28)** — `ask_neighborhood` empty picks remains |
+| **C: Zero-match fallback** | ~25% | Design question | Prompt hardening + eval recalibration | Open |
+| **D: Nudge-accept** | ~10% | Yes (prompt gap) | LLM prompt or pre-router improvement | Open |
+| **E: Stacking via pre-router** | ~15% | Yes (pre-router edge case) | Remove `lastPicks.length > 0` gate from filter detection | Open |
 
-Prompt hardening + judge recalibration alone would move pass rate from ~8% to ~50-60%. Adding partial clearing and perennial fix gets to ~70-80%.
+Fixing A+B (done) should eliminate ~50% of failures. Fixing C+D+E addresses the remaining ~50% through prompt tuning and pre-router edge cases.
 
 ### P5 — Temporal Accuracy (was 25%, expected fixed)
 
@@ -300,7 +275,7 @@ Prompt hardening + judge recalibration alone would move pass rate from ~8% to ~5
 | Issue | Why deferred |
 |-------|-------------|
 | Concurrent session race conditions | Rare at current traffic |
-| All in-memory state lost on restart | Mitigated: events now persist in SQLite, sessions still in-memory |
+| ~~All in-memory state lost on restart~~ | ~~Mitigated: events persist in SQLite, sessions still in-memory~~ **Fixed (2026-02-28):** sessions now persist to `data/sessions.json` |
 | No processing ack during slow Claude calls | Adds extra Twilio cost |
 | No horizontal scalability | Single-process fine at current traffic |
 | No structured logging or correlation IDs | Operational improvement for scale |
@@ -309,6 +284,16 @@ Prompt hardening + judge recalibration alone would move pass rate from ~8% to ~5
 ---
 
 ## Completed Work
+
+### Session Persistence + Test Endpoint Timeout (2026-02-28)
+
+Two fixes targeting ~50% of filter persistence eval failures:
+
+1. **Test endpoint timeout (502 fix):** Wrapped `/api/sms/test` handler in `Promise.race` with 25s timeout. Previously, if Claude API or Tavily hung, Railway's proxy returned 502 after ~30s and wiped the in-flight session. Now returns a clean 500 with error message before the proxy kills the connection.
+
+2. **Session disk persistence:** Sessions now persist to `data/sessions.json` via debounced disk writes (same pattern as `profiles.json` and `referrals.json`). Phone numbers are SHA-256 hashed on disk. `loadSessions()` on boot, `flushSessions()` on graceful shutdown. `getSession()` has hash-fallback lookup so disk-loaded sessions (keyed by hash) are found when looked up by raw phone.
+
+**Impact:** ~35% of filter persistence eval failures were 502s killing sessions mid-conversation. ~15% were "I don't have picks loaded" from session loss after server restarts. Both are addressed by these changes.
 
 ### SQLite Event Store + Recurring Patterns (2026-03-01)
 

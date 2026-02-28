@@ -7,6 +7,7 @@ const { clearSmsIntervals } = require('./handler');
 const { refreshCache, getCacheStatus, getHealthStatus, getEventById, isCacheFresh, scheduleDailyScrape, clearSchedule } = require('./events');
 const { loadProfiles } = require('./preference-profile');
 const { loadReferrals, clearReferralInterval } = require('./referral');
+const { loadSessions, flushSessions, clearSessionInterval } = require('./session');
 const { loadAlerts, getRecentAlerts } = require('./alerts');
 const { renderEventCard, renderStaleCard } = require('./card');
 
@@ -450,6 +451,7 @@ const server = app.listen(PORT, () => {
   console.log(`Bestie listening on port ${PORT}`);
   loadProfiles();
   loadReferrals();
+  loadSessions();
   loadAlerts();
 
   // Scrape on startup only if no fresh persisted cache — saves time and tokens on restarts
@@ -467,7 +469,9 @@ function shutdown(signal) {
   clearSchedule();
   clearSmsIntervals();
   clearReferralInterval();
-  // Flush captured conversations before exit
+  clearSessionInterval();
+  // Flush sessions and conversations before exit
+  try { flushSessions(); } catch (e) { console.error('Session flush on shutdown:', e.message); }
   try { require('./traces').stopConversationCapture(); } catch {}
   // Close SQLite connection
   try { require('./db').closeDb(); } catch {}

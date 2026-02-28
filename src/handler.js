@@ -139,8 +139,12 @@ if (process.env.PULSE_TEST_MODE === 'true') {
     }
     const testPhone = phone || '+10000000000';
     enableTestCapture(testPhone);
+    const TEST_TIMEOUT_MS = 25000; // 25s — return before Railway's 30s proxy timeout
     try {
-      await handleMessage(testPhone, message.trim());
+      await Promise.race([
+        handleMessage(testPhone, message.trim()),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out (25s)')), TEST_TIMEOUT_MS)),
+      ]);
       const captured = disableTestCapture(testPhone);
       const trace = getLatestTraceForPhone(maskPhone(testPhone));
       const trace_summary = trace ? {
