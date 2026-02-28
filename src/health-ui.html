@@ -441,6 +441,22 @@
   /* Event Mix Summary */
   .event-mix-summary { margin-bottom: 24px; }
 
+  /* Scrape controls */
+  .scrape-btn {
+    background: #222; border: 1px solid #444; color: #ccc; font-size: 11px;
+    padding: 4px 10px; border-radius: 4px; cursor: pointer; transition: all 0.15s;
+  }
+  .scrape-btn:hover { background: #333; border-color: #666; color: #fff; }
+  .scrape-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .scrape-btn.running { border-color: #FF6B35; color: #FF6B35; }
+  .scrape-all-btn {
+    background: #1a1a1a; border: 1px solid #FF6B35; color: #FF6B35; font-size: 12px;
+    padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 600;
+    transition: all 0.15s;
+  }
+  .scrape-all-btn:hover { background: #FF6B35; color: #fff; }
+  .scrape-all-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
   /* Mobile */
   @media (max-width: 600px) {
     body { padding: 12px; }
@@ -498,6 +514,7 @@
     <p style="font-size:13px;color:#777;margin-top:4px">Source scrape status, timing, extraction quality, and alert history. Auto-refreshes every 60 seconds.</p>
   </div>
   <div class="header-right">
+    <button class="scrape-all-btn" id="scrape-all-btn" onclick="scrapeAll()">Re-scrape All</button>
     <span><span class="refresh-indicator"></span>Auto-refresh 60s</span>
     <span id="system-status" class="status-pill pending">loading</span>
   </div>
@@ -622,7 +639,10 @@ function renderSourceCards(sources) {
       <div class="source-card status-${status}">
         <div class="source-card-header">
           <div class="source-card-name">${name}</div>
-          <span class="badge ${status}">${status === 'null' ? 'no data' : status}</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="scrape-btn" id="scrape-btn-${name}" onclick="scrapeSource('${name}')">re-scrape</button>
+            <span class="badge ${status}">${status === 'null' ? 'no data' : status}</span>
+          </div>
         </div>
         <div class="source-card-stats">
           <div class="source-card-stat">
@@ -777,6 +797,61 @@ function renderEventMix(mix) {
     { label: 'Neighborhoods', value: hoodCount, sub: topHood ? `top: ${topHood[0]} (${topHood[1]})` : '' },
     { label: 'Free Events', value: `${mix.freePaid.free} (${freePct}%)`, sub: `${mix.freePaid.paid} paid` },
   ].map(c => `<div class="summary-card"><div class="label">${c.label}</div><div class="value">${c.value}</div><div class="sub">${c.sub}</div></div>`).join('');
+}
+
+// ========== Scrape controls ==========
+
+let scraping = new Set(); // track in-flight scrapes
+
+async function scrapeSource(name) {
+  const btn = $('scrape-btn-' + name);
+  if (!btn || scraping.has(name)) return;
+  scraping.add(name);
+  btn.disabled = true;
+  btn.classList.add('running');
+  btn.textContent = 'scraping...';
+  try {
+    const res = await fetch('/api/scrape?sources=' + encodeURIComponent(name), { method: 'POST' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    btn.textContent = 'done';
+    setTimeout(() => { btn.textContent = 're-scrape'; btn.classList.remove('running'); }, 2000);
+    refresh(); // immediately refresh data
+    refreshAudit();
+  } catch (err) {
+    btn.textContent = 'failed';
+    btn.classList.remove('running');
+    console.error('Scrape failed for ' + name + ':', err);
+    setTimeout(() => { btn.textContent = 're-scrape'; }, 3000);
+  } finally {
+    btn.disabled = false;
+    scraping.delete(name);
+  }
+}
+
+async function scrapeAll() {
+  const btn = $('scrape-all-btn');
+  if (!btn || scraping.has('__all__')) return;
+  scraping.add('__all__');
+  btn.disabled = true;
+  btn.textContent = 'Scraping all...';
+  // Disable per-source buttons
+  document.querySelectorAll('.scrape-btn').forEach(b => b.disabled = true);
+  try {
+    const res = await fetch('/api/scrape', { method: 'POST' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    btn.textContent = 'Done!';
+    setTimeout(() => { btn.textContent = 'Re-scrape All'; }, 3000);
+    refresh();
+    refreshAudit();
+  } catch (err) {
+    btn.textContent = 'Failed';
+    console.error('Full scrape failed:', err);
+    setTimeout(() => { btn.textContent = 'Re-scrape All'; }, 3000);
+  } finally {
+    btn.disabled = false;
+    scraping.delete('__all__');
+    document.querySelectorAll('.scrape-btn').forEach(b => b.disabled = false);
+  }
 }
 
 async function refresh() {

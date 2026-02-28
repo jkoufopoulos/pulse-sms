@@ -143,6 +143,27 @@ let lastScrapeStats = {
   sourcesEmpty: 0,
 };
 
+// --- Persist health data across deploys ---
+const HEALTH_FILE = path.join(__dirname, '../data/health-cache.json');
+
+function saveHealthData() {
+  try {
+    fs.writeFileSync(HEALTH_FILE, JSON.stringify({ sourceHealth, lastScrapeStats }));
+  } catch (err) { console.error('Failed to persist health data:', err.message); }
+}
+
+// Load persisted health data on boot
+try {
+  const cached = JSON.parse(fs.readFileSync(HEALTH_FILE, 'utf8'));
+  if (cached.sourceHealth) {
+    for (const [label, data] of Object.entries(cached.sourceHealth)) {
+      if (sourceHealth[label]) Object.assign(sourceHealth[label], data);
+    }
+  }
+  if (cached.lastScrapeStats) Object.assign(lastScrapeStats, cached.lastScrapeStats);
+  console.log(`Loaded persisted health data (last scrape: ${lastScrapeStats.completedAt || 'none'})`);
+} catch { /* file doesn't exist yet */ }
+
 // ============================================================
 // Timed fetch wrapper — captures duration + status per source
 // ============================================================
@@ -372,6 +393,7 @@ async function refreshCache() {
       console.error('Source completeness check failed:', err.message);
     }
 
+    saveHealthData();
     console.log(`Cache refreshed: ${validEvents.length} events (${totalRaw} raw, ${allEvents.length} deduped, ${staleCount} stale removed | ${sourcesOk} ok / ${sourcesFailed} failed / ${sourcesEmpty} empty)`);
     return eventCache;
   })().finally(() => { refreshPromise = null; });
@@ -470,6 +492,7 @@ async function refreshSources(sourceNames) {
     console.warn('Failed to persist cache after selective refresh:', err.message);
   }
 
+  saveHealthData();
   console.log(`Selective refresh done: ${validNew.length} new events merged, ${eventCache.length} total`);
 }
 
