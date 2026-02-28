@@ -13,7 +13,7 @@ async function fetchBrooklynVeganEvents() {
     for (let i = 0; i < 7; i++) days.push(getNycDateString(i));
 
     for (const day of days) {
-      const url = `https://nyc-shows.brooklynvegan.com/events/${day}.json`;
+      const url = `https://nyc-shows.brooklynvegan.com/events.json?date=${day}`;
       const res = await fetch(url, {
         headers: { 'User-Agent': FETCH_HEADERS['User-Agent'], 'Accept': 'application/json' },
         signal: AbortSignal.timeout(10000),
@@ -24,7 +24,8 @@ async function fetchBrooklynVeganEvents() {
       }
 
       const data = await res.json();
-      const items = Array.isArray(data) ? data : (data.events || []);
+      const groups = data.event_groups || [];
+      const items = groups.flatMap(g => g.events || []);
 
       for (const item of items) {
         if (!item.title || item.sold_out) continue;

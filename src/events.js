@@ -500,11 +500,11 @@ async function getEvents(neighborhood, { dateRange } = {}) {
   const qualityFiltered = applyQualityGates(eventCache);
   const ranked = rankEventsByProximity(qualityFiltered, neighborhood);
 
-  // Filter by date range (defaults to today+tomorrow for backward compatibility)
+  // Filter by date range (defaults to 7-day window)
   const todayNyc = getNycDateString(0);
-  const tomorrowNyc = getNycDateString(1);
+  const weekOutNyc = getNycDateString(7);
   const rangeStart = dateRange?.start || todayNyc;
-  const rangeEnd = dateRange?.end || tomorrowNyc;
+  const rangeEnd = dateRange?.end || weekOutNyc;
   const filtered = ranked.filter(e => {
     const d = getEventDate(e);
     if (!d) return true; // keep undated events
@@ -526,11 +526,11 @@ async function getEventsCitywide({ dateRange } = {}) {
 
   const qualityFiltered = applyQualityGates(eventCache);
 
-  // Filter by date range (defaults to today+tomorrow)
+  // Filter by date range (defaults to 7-day window)
   const todayNyc = getNycDateString(0);
-  const tomorrowNyc = getNycDateString(1);
+  const weekOutNyc = getNycDateString(7);
   const rangeStart = dateRange?.start || todayNyc;
-  const rangeEnd = dateRange?.end || tomorrowNyc;
+  const rangeEnd = dateRange?.end || weekOutNyc;
   const dateFiltered = qualityFiltered.filter(e => {
     const d = getEventDate(e);
     if (!d) return true;
