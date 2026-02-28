@@ -3,7 +3,7 @@
  * Used for shareable Bestie URLs that show rich previews in iMessage/WhatsApp.
  */
 
-const BESTIE_PHONE = process.env.TWILIO_PHONE_NUMBER || '+18337857300';
+const BESTIE_PHONE = process.env.TWILIO_PHONE_NUMBER || '+16467226926';
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -16,7 +16,7 @@ function escapeHtml(str) {
 }
 
 function formatPhone(phone) {
-  // Format +18337857300 → (833) 785-7300
+  // Format +16467226926 → (646) 722-6926
   const digits = phone.replace(/\D/g, '');
   if (digits.length === 11 && digits[0] === '1') {
     return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;

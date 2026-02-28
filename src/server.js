@@ -239,7 +239,7 @@ app.get('/api/events', (req, res) => {
 
 // Event card page — shareable Bestie URLs with OG meta tags
 app.get('/e/:eventId', (req, res) => {
-  const bestiePhone = process.env.TWILIO_PHONE_NUMBER || '+18337857300';
+  const bestiePhone = process.env.TWILIO_PHONE_NUMBER || '+16467226926';
   const domain = process.env.PULSE_CARD_DOMAIN || `${req.protocol}://${req.get('host')}`;
   const formattedPhone = bestiePhone.replace(/\D/g, '').replace(/^1(\d{3})(\d{3})(\d{4})$/, '($1) $2-$3');
   const event = getEventById(req.params.eventId);
