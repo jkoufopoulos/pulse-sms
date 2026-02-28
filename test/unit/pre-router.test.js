@@ -108,6 +108,33 @@ check('later tonight → events+time', late?.intent === 'events' && late?.filter
 const chill = preRoute('something chill', followUpSession);
 check('something chill → events+vibe', chill?.intent === 'events' && chill?.filters?.vibe === 'chill');
 
+// Expanded free patterns (P1 filter persistence)
+check('free again → events+free', preRoute('free again', followUpSession)?.filters?.free_only === true);
+check('free please → events+free', preRoute('free please', followUpSession)?.filters?.free_only === true);
+check('how about free stuff → events+free', preRoute('how about free stuff', followUpSession)?.filters?.free_only === true);
+check('anything free for a group → events+free', preRoute('anything free for a group', followUpSession)?.filters?.free_only === true);
+check('something free tho → events+free', preRoute('something free tho', followUpSession)?.filters?.free_only === true);
+check('free instead → events+free', preRoute('free instead', followUpSession)?.filters?.free_only === true);
+
+// Expanded category patterns (P1 filter persistence)
+check('more comedy → events+comedy', preRoute('more comedy', followUpSession)?.filters?.category === 'comedy');
+check('more jazz → events+live_music', preRoute('more jazz', followUpSession)?.filters?.category === 'live_music');
+check('no i meant comedy → events+comedy', preRoute('no i meant comedy', followUpSession)?.filters?.category === 'comedy');
+check('actually jazz → events+live_music', preRoute('actually jazz', followUpSession)?.filters?.category === 'live_music');
+check('anything with live music → events+live_music', preRoute('anything with live music', followUpSession)?.filters?.category === 'live_music');
+check('anything with live music tho → events+live_music', preRoute('anything with live music tho', followUpSession)?.filters?.category === 'live_music');
+check('i want comedy → events+comedy', preRoute('i want comedy', followUpSession)?.filters?.category === 'comedy');
+check('ok how about art → events+art', preRoute('ok how about art', followUpSession)?.filters?.category === 'art');
+
+// Session without lastNeighborhood (misspelled hood) — filters still detected
+const noHoodSession = {
+  lastPicks: [{ event_id: 'e1' }],
+  lastEvents: { e1: { name: 'DJ Honeypot' } },
+};
+check('comedy (no hood session) → events', preRoute('comedy', noHoodSession)?.intent === 'events');
+check('comedy (no hood session) → neighborhood null', preRoute('comedy', noHoodSession)?.neighborhood === null);
+check('free (no hood session) → events+free', preRoute('free', noHoodSession)?.filters?.free_only === true);
+
 // Clear filters — requires lastFilters with active values
 console.log('\npreRoute clear_filters:');
 const filterSession = {

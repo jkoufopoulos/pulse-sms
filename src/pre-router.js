@@ -242,17 +242,20 @@ function preRoute(message, session) {
   // fall back to existing session filters (compounding). Including all keys from
   // base.filters would overwrite existing filters with null — causing the
   // "free replaces comedy" stacking bug.
-  if (session?.lastNeighborhood) {
-    // Free (single-dimension)
-    if (/^(free|free stuff|free events|anything free)$/i.test(msg)) {
-      return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { free_only: true } };
+  // Guard: requires active session (picks loaded OR neighborhood set). lastNeighborhood
+  // is NOT required — misspelled neighborhoods leave it null but filters should still detect.
+  const sessionHood = session?.lastNeighborhood || null;
+  if (sessionHood || session?.lastPicks?.length > 0) {
+    // Free (single-dimension) — permissive: any message centered on "free"
+    if (/^(?:how about |what about |ok )?(?:anything |something )?free(?:\s+(?:stuff|events?|shows?|picks?|again|please|too|only))?(?:\s+(?:for .+|tho|though|instead))?$/i.test(msg)) {
+      return { ...base, intent: 'events', neighborhood: sessionHood, filters: { free_only: true } };
     }
 
-    // Category follow-ups (single-dimension, structured prefix required)
+    // Category follow-ups — permissive prefixes including corrections and "more"
     for (const [pattern, catInfo] of Object.entries(catMap)) {
-      const catRegex = new RegExp(`^(?:how about|what about|any|show me|got any|have any|know any)\\s+(?:${pattern})(?:\\s+(?:night|stuff|shows?|events?|tonight|picks?|options?))*$`, 'i');
+      const catRegex = new RegExp(`^(?:how about|what about|any|show me|got any|have any|know any|more|ok (?:how about|what about)|actually|no i meant|i (?:said|meant|want)|anything with)\\s+(?:${pattern})(?:\\s+(?:night|stuff|shows?|events?|tonight|picks?|options?|tho|though|instead|please))*$`, 'i');
       if (catRegex.test(msg)) {
-        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...catInfo } };
+        return { ...base, intent: 'events', neighborhood: sessionHood, filters: { ...catInfo } };
       }
     }
 
@@ -262,7 +265,7 @@ function preRoute(message, session) {
     for (const [pattern, catInfo] of Object.entries(catMap)) {
       const bareRegex = new RegExp(`^(?:${pattern})(?:\\s+(?:stuff|shows?|events?|picks?))?$`, 'i');
       if (bareRegex.test(msg)) {
-        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { ...catInfo } };
+        return { ...base, intent: 'events', neighborhood: sessionHood, filters: { ...catInfo } };
       }
     }
 
@@ -273,20 +276,20 @@ function preRoute(message, session) {
       const hasCatWord = Object.keys(catMap).some(p => new RegExp(`\\b(?:${p})\\b`, 'i').test(msg));
       const hasFreeWord = /\bfree\b/i.test(msg);
       if (!hasCatWord && !hasFreeWord) {
-        return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { time_after: specificTime } };
+        return { ...base, intent: 'events', neighborhood: sessionHood, filters: { time_after: specificTime } };
       }
     }
 
     // Time follow-ups (single-dimension) — fuzzy phrases
     if (/^(?:how about\s+)?(?:later(?:\s+tonight)?|after\s+midnight|late(?:r)?\s*night|anything?\s+late)$/i.test(msg)) {
       const timeAfter = /midnight/i.test(msg) ? '00:00' : '22:00';
-      return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { time_after: timeAfter } };
+      return { ...base, intent: 'events', neighborhood: sessionHood, filters: { time_after: timeAfter } };
     }
 
     // Vibe follow-ups (single-dimension)
     const vibeMatch = msg.match(/^(?:something|anything|how about something|got anything)\s+(chill|wild|weird|romantic|low-key|fun|crazy|mellow|cozy|rowdy|intimate|energetic|upbeat|laid-back)$/i);
     if (vibeMatch) {
-      return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { vibe: vibeMatch[1].toLowerCase() } };
+      return { ...base, intent: 'events', neighborhood: sessionHood, filters: { vibe: vibeMatch[1].toLowerCase() } };
     }
   }
 
