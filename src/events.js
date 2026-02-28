@@ -608,6 +608,37 @@ function getCacheStatus() {
   };
 }
 
+function computeEventMix() {
+  if (!eventCache.length) return null;
+
+  const dateCounts = {};
+  for (let i = 0; i < 7; i++) {
+    dateCounts[getNycDateString(i)] = 0;
+  }
+  const categoryCounts = {};
+  const hoodCounts = {};
+  let freeCount = 0;
+  const sourceCounts = {};
+
+  for (const e of eventCache) {
+    if (e.date_local && dateCounts.hasOwnProperty(e.date_local)) dateCounts[e.date_local]++;
+    const cat = e.category || 'other';
+    categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+    if (e.neighborhood) hoodCounts[e.neighborhood] = (hoodCounts[e.neighborhood] || 0) + 1;
+    if (e.is_free) freeCount++;
+    if (e.source_name) sourceCounts[e.source_name] = (sourceCounts[e.source_name] || 0) + 1;
+  }
+
+  return {
+    total: eventCache.length,
+    dateDistribution: dateCounts,
+    categoryDistribution: categoryCounts,
+    neighborhoodDistribution: hoodCounts,
+    freePaid: { free: freeCount, paid: eventCache.length - freeCount },
+    sourceDistribution: sourceCounts,
+  };
+}
+
 function getHealthStatus() {
   const sources = {};
   for (const [label, h] of Object.entries(sourceHealth)) {
@@ -639,6 +670,7 @@ function getHealthStatus() {
     },
     scrape: { ...lastScrapeStats },
     sources,
+    eventMix: computeEventMix(),
   };
 }
 
