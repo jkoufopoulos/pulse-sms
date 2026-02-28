@@ -231,8 +231,11 @@ async function handleMore(ctx) {
     return;
   }
 
-  // Tavily live-search fallback: try live search before showing exhaustion message
-  if (hood) {
+  // Tavily live-search fallback: try once per hood, skip if already attempted
+  const tavilyAttemptedKey = `tavily_attempted_${hood}`;
+  if (hood && !ctx.session?.[tavilyAttemptedKey]) {
+    // Mark attempted before the call so we don't retry on failure
+    setSession(ctx.phone, { [tavilyAttemptedKey]: true });
     const tavilyResult = await tryTavilyFallback(hood, activeFilters, [...allShownMoreIds], ctx.trace);
     if (tavilyResult) {
       const tavilyBatch = tavilyResult.events.slice(0, 4);

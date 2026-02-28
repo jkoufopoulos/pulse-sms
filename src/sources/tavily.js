@@ -3,7 +3,7 @@ const { normalizeExtractedEvent } = require('./shared');
 const { filterUpcomingEvents } = require('../geo');
 const { captureExtractionInput } = require('../extraction-capture');
 
-async function searchTavilyEvents(neighborhood, { query: customQuery } = {}) {
+async function searchTavilyEvents(neighborhood, { query: customQuery, minCompleteness = 0.5 } = {}) {
   const apiKey = process.env.TAVILY_API_KEY;
   if (!apiKey) return [];
 
@@ -24,7 +24,7 @@ async function searchTavilyEvents(neighborhood, { query: customQuery } = {}) {
         max_results: 5,
         include_answer: false,
       }),
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!res.ok) {
@@ -61,7 +61,7 @@ async function searchTavilyEvents(neighborhood, { query: customQuery } = {}) {
     const extracted = await extractEvents(rawText, 'tavily', query, { model: 'claude-haiku-4-5-20251001' });
     const events = (extracted.events || [])
       .map(raw => normalizeExtractedEvent(raw, 'tavily', 'search', 0.6))
-      .filter(e => e.name && e.completeness >= 0.5);
+      .filter(e => e.name && e.completeness >= minCompleteness);
 
     const upcoming = filterUpcomingEvents(events);
     if (upcoming.length < events.length) {

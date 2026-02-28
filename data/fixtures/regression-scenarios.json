@@ -3458,6 +3458,142 @@
           "anti_pattern": "Details from old free-jazz list, or error"
         }
       ]
+    },
+    {
+      "name": "Extended: exhaustion triggers Tavily fallback via MORE",
+      "category": "edge_case",
+      "tests_principles": ["P6", "P7", "P8"],
+      "user_turns": [
+        { "turn": 1, "message": "greenpoint" },
+        { "turn": 2, "message": "more" },
+        { "turn": 3, "message": "more" },
+        { "turn": 4, "message": "more" },
+        { "turn": 5, "message": "more" },
+        { "turn": 6, "message": "more" },
+        { "turn": 7, "message": "1" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "II1",
+          "principle": "P7",
+          "check": "Initial Greenpoint picks are served with venue and price info",
+          "anti_pattern": "No events or error"
+        },
+        {
+          "after_turn": 3,
+          "id": "II2",
+          "principle": "P7",
+          "check": "Each 'more' returns fresh picks — no repeats from earlier turns",
+          "anti_pattern": "Same events reappear"
+        },
+        {
+          "after_turn": 6,
+          "id": "II3",
+          "principle": "P6",
+          "check": "When cached events are exhausted, Pulse either (a) serves fresh web-sourced picks, (b) serves perennial/permanent spots, or (c) honestly says events are exhausted and suggests a nearby neighborhood. Does NOT silently fail or repeat old picks.",
+          "anti_pattern": "Repeats earlier picks, or generic error with no guidance"
+        },
+        {
+          "after_turn": 6,
+          "id": "II4",
+          "principle": "P8",
+          "check": "If Tavily fallback fires and returns web-sourced events, they are not presented with the same confidence as curated picks. Framing like 'also found' or 'spotted online' or venue-style framing is acceptable. Must not claim these are editorial picks.",
+          "anti_pattern": "Web search results presented identically to curated picks with no provenance signal"
+        },
+        {
+          "after_turn": 7,
+          "id": "II5",
+          "principle": "P7",
+          "check": "Pick #1 detail works correctly — maps to the most recent pick list regardless of whether it came from cache or Tavily fallback",
+          "anti_pattern": "Detail maps to a pick from an earlier turn, or errors out"
+        }
+      ]
+    },
+    {
+      "name": "Extended: re-visiting exhausted neighborhood triggers Tavily fallback",
+      "category": "edge_case",
+      "tests_principles": ["P6", "P7", "P8", "P1"],
+      "user_turns": [
+        { "turn": 1, "message": "greenpoint" },
+        { "turn": 2, "message": "more" },
+        { "turn": 3, "message": "more" },
+        { "turn": 4, "message": "lets try williamsburg" },
+        { "turn": 5, "message": "back to greenpoint" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 4,
+          "id": "JJ1",
+          "principle": "P7",
+          "check": "Williamsburg picks are served — neighborhood switch works",
+          "anti_pattern": "Still showing Greenpoint events"
+        },
+        {
+          "after_turn": 5,
+          "id": "JJ2",
+          "principle": "P6",
+          "check": "Returning to Greenpoint after seeing multiple batches, Pulse either (a) finds unseen cached events, (b) uses Tavily fallback for fresh results, or (c) honestly says events are thin and suggests alternatives. Does NOT repeat the same picks from turns 1-3.",
+          "anti_pattern": "Exact same picks from turn 1 reappear, or silent failure"
+        },
+        {
+          "after_turn": 5,
+          "id": "JJ3",
+          "principle": "P8",
+          "check": "If web-sourced events are served, provenance is signaled — not presented as if they were from curated editorial sources",
+          "anti_pattern": "Web results presented identically to curated picks"
+        }
+      ]
+    },
+    {
+      "name": "Extended: filtered exhaustion triggers Tavily with filter-aware query",
+      "category": "edge_case",
+      "tests_principles": ["P6", "P1", "P3", "P8"],
+      "user_turns": [
+        { "turn": 1, "message": "east village" },
+        { "turn": 2, "message": "jazz" },
+        { "turn": 3, "message": "more" },
+        { "turn": 4, "message": "more" },
+        { "turn": 5, "message": "more" },
+        { "turn": 6, "message": "more" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 2,
+          "id": "KK1",
+          "principle": "P3",
+          "check": "Jazz filter applied — picks are jazz or live music events in East Village",
+          "anti_pattern": "Non-jazz events served"
+        },
+        {
+          "after_turn": 4,
+          "id": "KK2",
+          "principle": "P1",
+          "check": "Jazz filter persists through multiple 'more' requests — all picks are still jazz/live music",
+          "anti_pattern": "Filter dropped, generic EV picks returned"
+        },
+        {
+          "after_turn": 6,
+          "id": "KK3",
+          "principle": "P6",
+          "check": "When jazz events are exhausted, Pulse either (a) serves fresh jazz picks from Tavily/web search, (b) honestly says jazz is exhausted and offers to show other genres or jazz in nearby neighborhoods, or (c) suggests expanding to live music more broadly. Does NOT silently drop the jazz filter.",
+          "anti_pattern": "Returns non-jazz events without acknowledging the filter gap, or generic 'nothing found'"
+        },
+        {
+          "after_turn": 6,
+          "id": "KK4",
+          "principle": "P3",
+          "check": "If Tavily fallback fires, the results should still be jazz-related — the search query should incorporate the active filter, not just the neighborhood",
+          "anti_pattern": "Web search returns random non-jazz events"
+        },
+        {
+          "after_turn": 6,
+          "id": "KK5",
+          "principle": "P8",
+          "check": "If web-sourced results are served, provenance is signaled appropriately",
+          "anti_pattern": "Web results presented as curated editorial picks"
+        }
+      ]
     }
   ]
 }

@@ -323,14 +323,18 @@ async function tryTavilyFallback(hood, filters, excludeIds, trace) {
   try {
     const query = buildTavilyQuery(hood, filters);
     const start = Date.now();
-    const results = await searchTavilyEvents(hood, { query });
+    const results = await searchTavilyEvents(hood, { query, minCompleteness: 0.3 });
     const latency = Date.now() - start;
     const excludeSet = new Set(excludeIds || []);
     const fresh = results.filter(e => !excludeSet.has(e.id));
     if (trace) {
       trace.tavily_fallback = { triggered: true, query, latency_ms: latency, raw_count: results.length, fresh_count: fresh.length };
     }
-    if (fresh.length === 0) return null;
+    if (fresh.length === 0) {
+      console.log(`Tavily fallback: 0 fresh results for "${query}" (${results.length} raw, ${latency}ms)`);
+      return null;
+    }
+    console.log(`Tavily fallback: ${fresh.length} fresh results for "${query}" (${latency}ms)`);
     // Late require to avoid circular dep (events.js → pipeline.js)
     require('./events').injectEvents(fresh);
     return { events: fresh };
