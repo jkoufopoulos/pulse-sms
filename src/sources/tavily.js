@@ -28,11 +28,17 @@ async function searchTavilyEvents(neighborhood, { query: customQuery } = {}) {
     });
 
     if (!res.ok) {
-      console.error(`Tavily search failed: ${res.status}`);
+      const body = await res.json().catch(() => ({}));
+      const reason = body?.detail?.error || body?.detail || body?.error || `HTTP ${res.status}`;
+      console.error(`[TAVILY] search failed: ${reason}`);
       return [];
     }
 
     const data = await res.json();
+    if (data.detail?.error) {
+      console.error(`[TAVILY] API error: ${data.detail.error}`);
+      return [];
+    }
     const results = data.results || [];
 
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -98,7 +104,20 @@ async function fetchTavilyFreeEvents() {
             include_answer: false,
           }),
           signal: AbortSignal.timeout(10000),
-        }).then(r => r.ok ? r.json() : { results: [] })
+        }).then(async r => {
+          if (!r.ok) {
+            const body = await r.json().catch(() => ({}));
+            const reason = body?.detail?.error || body?.detail || body?.error || `HTTP ${r.status}`;
+            console.error(`[TAVILY] daily scrape failed: ${reason}`);
+            return { results: [] };
+          }
+          const data = await r.json();
+          if (data.detail?.error) {
+            console.error(`[TAVILY] daily scrape API error: ${data.detail.error}`);
+            return { results: [] };
+          }
+          return data;
+        })
       )
     );
 
