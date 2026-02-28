@@ -11,7 +11,7 @@ function getClient() {
   return client;
 }
 
-const MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-sonnet-4-5-20250929';
+const MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-haiku-4-5-20251001';
 
 /**
  * Judge: Does the SMS sound like a friend texting, not a bot?

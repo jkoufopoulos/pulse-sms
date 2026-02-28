@@ -35,7 +35,7 @@ const BASE = args.find(a => a.startsWith('--url='))?.split('=')[1]
 const CONCURRENCY = parseInt(args.find(a => a.startsWith('--concurrency='))?.split('=')[1]
   || (args.includes('--concurrency') ? args[args.indexOf('--concurrency') + 1] : null)
   || '10', 10);
-const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-sonnet-4-5-20250929';
+const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-haiku-4-5-20251001';
 const BUDGET_LIMIT = parseFloat(args.find(a => a.startsWith('--budget='))?.split('=')[1]
   || (args.includes('--budget') ? args[args.indexOf('--budget') + 1] : null)
   || '2.00');

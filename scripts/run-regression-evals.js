@@ -33,7 +33,7 @@ const CONCURRENCY = parseInt(
   args.find(a => a.startsWith('--concurrency='))?.split('=')[1]
   || (args.includes('--concurrency') ? args[args.indexOf('--concurrency') + 1] : null)
   || '5', 10);
-const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-sonnet-4-5-20250929';
+const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-haiku-4-5-20251001';
 
 const client = new Anthropic();
 
