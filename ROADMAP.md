@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-02-25
+> Last updated: 2026-03-01
 
 ---
 
@@ -189,7 +189,7 @@ The filter persists correctly but the neighborhood has 0 events matching the fil
 | 24 | late night Crown Heights | 0 late events |
 | 6 | free in Prospect Heights | 1 event, user says "6" (invalid pick number) |
 
-**Fix needed:** Judge recalibration — pass scenarios where filter is acknowledged even with 0 picks. Separately, source coverage improvements help long-term.
+**Fix needed:** Judge recalibration — pass scenarios where filter is acknowledged even with 0 picks. Separately, source coverage improvements help long-term. **Partial mitigation (2026-03-01):** Tavily live-search fallback now fires when cached events are exhausted, supplementing thin neighborhoods with live web search results.
 
 #### Cause C: Semantic Partial Clearing (5 scenarios) — LLM can't partially modify filters
 
@@ -231,7 +231,7 @@ Conversational prefixes prevent the pre-router from catching intent.
 | 10 | jazz → MORE → hood switch | Exhaustion + hood switch → "no picks loaded" for detail request |
 | 18 | jazz → MORE → non-jazz perennial | Perennial path shows DJ venue for jazz-filtered session |
 
-**Fix needed:** `handleMore`'s perennial fallback at line 196-231 should filter perennials by active category before composing. Pure code fix, P1-compliant, no LLM involvement.
+**Fix needed:** `handleMore`'s perennial fallback at line 196-231 should filter perennials by active category before composing. Pure code fix, P1-compliant, no LLM involvement. **Note (2026-03-01):** Tavily fallback now sits between perennial exhaustion and the final exhaustion message in `handleMore`, providing one more layer of content before dead-ending.
 
 ---
 
@@ -307,6 +307,23 @@ Prompt hardening + judge recalibration alone would move pass rate from ~8% to ~5
 ---
 
 ## Completed Work
+
+### Tavily Live-Search Fallback for Exhausted Neighborhoods (2026-03-01)
+
+When a user exhausts all cached events and perennials in a neighborhood, Tavily now fires as a last-resort live search before showing the dead-end exhaustion message. Three trigger conditions (all must be true): no unseen events in pool, user has already visited the hood, hood is known (not citywide). Adds ~5-13s latency only on exhaustion.
+
+**Changes:**
+- `pipeline.js` — `buildTavilyQuery(hood, filters)` builds filter-aware search strings (e.g. "free comedy events Bushwick NYC tonight"). `tryTavilyFallback(hood, filters, excludeIds, trace)` wraps `searchTavilyEvents`, filters already-shown events, records `trace.tavily_fallback` metadata, injects fresh results into the event cache via `injectEvents()`.
+- `events.js` — `injectEvents(events)` merges live-fetched events into `eventCache` (dedup by ID, no disk persistence). Enriches the cache so subsequent requests also benefit.
+- `handler.js` — Tavily fallback in `resolveUnifiedContext` after events + perennials are merged: if unseen count is 0 and hood is visited, fires `tryTavilyFallback` and merges results into the pool.
+- `intent-handlers.js` — Tavily fallback in `handleMore` after perennial block exhausts: same trigger logic, composes/saves/sends following the perennial pattern.
+- `sources/tavily.js` — Surfaced API errors: both `searchTavilyEvents` and `fetchTavilyFreeEvents` now parse error bodies on non-2xx responses and check for `detail.error` on 200s. Logs specific reason with `[TAVILY]` prefix (previously silent empty returns on usage limit, auth failures).
+
+**Architecture notes:**
+- P1 compliant — Tavily results are tagged `filter_match: false` (code owns state). The LLM composes from whatever pool it receives.
+- P4 compliant — Both insertion points use existing `saveResponseFrame` paths.
+- Circular dep avoided — `pipeline.js → events.js` uses late `require()` inside function body since `events.js` already imports from `pipeline.js`.
+- Tavily daily scrape source was returning 0 events due to exhausted API plan (HTTP 432). Previously silent; now logged. Plan upgraded to paid tier.
 
 ### Filter Drift Fix — 5 Bugs Across 4 Files (2026-02-24)
 
@@ -469,10 +486,16 @@ Phase 6+7 of the eval suite improvement plan — closes the gap between structur
 - Session TTL 2hr, Express body limit 5kb, rate limiter with feedback
 - Legacy flow removed, borough-aware nudges, conversation history threading
 
+### Event Mix Analytics on Health Dashboard (2026-02-28)
+
+- `computeEventMix()` in `events.js` — aggregates event cache into date, category, neighborhood, free/paid, and source distributions. Added to `getHealthStatus()` return as `eventMix` field (available via `/health?json=1`).
+- Health dashboard (`health-ui.html`) — new "Event Mix" section between summary cards and scrape timing. Four panels: date distribution (7 vertical bars, today highlighted), category distribution (horizontal bars, top 12), neighborhood distribution (horizontal bars, top 15), free vs paid (stacked bar with percentages). Pure CSS bars, no external libs, matches dark theme.
+- First deploy shows: 1,625 events across 7 days, 9 categories, 36 neighborhoods, 11% free. Provides visibility into cache composition after expanding to 7-day scraping and 18 sources.
+
 ### Infrastructure
 
 - 18-source scraper registry with cross-source dedup and venue auto-learning
-- Source health dashboard with alerting
+- Source health dashboard with alerting and event mix analytics
 - Deterministic pre-router handling ~15% of messages at zero AI cost
 - Composable prompt skills (12 conditional modules)
 - Request tracing with JSONL + in-memory ring buffer
