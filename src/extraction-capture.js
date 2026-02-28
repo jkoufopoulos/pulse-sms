@@ -7,7 +7,14 @@
 let extractionInputs = {};
 
 function captureExtractionInput(sourceName, rawText, sourceUrl) {
-  extractionInputs[sourceName] = { rawText, sourceUrl, timestamp: new Date().toISOString() };
+  const existing = extractionInputs[sourceName];
+  if (existing) {
+    // Append — sources like Nonsense NYC and Yutori process multiple chunks
+    existing.rawText += '\n---\n' + rawText;
+    existing.timestamp = new Date().toISOString();
+  } else {
+    extractionInputs[sourceName] = { rawText, sourceUrl, timestamp: new Date().toISOString() };
+  }
 }
 
 function getExtractionInputs() {

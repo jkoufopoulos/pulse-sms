@@ -732,19 +732,19 @@ function renderExtractionQuality(audit) {
   const summaryHtml = `
     <div class="summary-row" style="margin-bottom:12px">
       <div class="summary-card">
-        <div class="label">Events Audited</div>
+        <div class="label">Extracted Events</div>
         <div class="value">${audit.summary.total}</div>
-        <div class="sub">${audit.summary.passed} passed</div>
+        <div class="sub">from ${entries.length} Claude-extracted sources</div>
       </div>
       <div class="summary-card">
-        <div class="label">Pass Rate</div>
-        <div class="value">${audit.summary.passRate}</div>
-        <div class="sub">${audit.summary.issues} issues</div>
+        <div class="label">All Checks Pass</div>
+        <div class="value">${audit.summary.passed}/${audit.summary.total}</div>
+        <div class="sub">${audit.summary.issues} with evidence or field gaps</div>
       </div>
       <div class="summary-card">
         <div class="label">Audit Time</div>
         <div class="value" style="font-size:14px">${fmtTime(audit.timestamp)}</div>
-        <div class="sub">${audit.tier || 'deterministic'}</div>
+        <div class="sub">${audit.tier || 'deterministic'} checks</div>
       </div>
     </div>
   `;
@@ -752,9 +752,17 @@ function renderExtractionQuality(audit) {
   const cardsHtml = entries.map(([source, stats]) => {
     const rate = stats.total > 0 ? (stats.passed / stats.total * 100) : 0;
     const rateClass = rate >= 90 ? 'good' : rate >= 70 ? 'warn' : 'bad';
+    const shortNames = {
+      evidence_name_in_source: 'name not in source',
+      evidence_time_in_source: 'time not in source',
+      evidence_location_in_source: 'location not in source',
+      evidence_price_in_source: 'price not in source',
+      required_fields_present: 'missing fields',
+      confidence_calibrated: 'overconfident',
+    };
     const failureEntries = Object.entries(stats.failures || {}).sort((a, b) => b[1] - a[1]);
     const failureHtml = failureEntries.length > 0
-      ? `<div class="audit-failures">${failureEntries.map(([name, count]) => `${name}: ${count}`).join(', ')}</div>`
+      ? `<div class="audit-failures">${failureEntries.map(([name, count]) => `${shortNames[name] || name}: ${count}`).join(', ')}</div>`
       : '';
 
     return `
