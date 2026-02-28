@@ -68,12 +68,18 @@ async function fetchNonsenseNYC() {
   try {
     // Fetch newsletter emails from Gmail (weekly, look back 8 days)
     const emails = await fetchEmails('from:jstark@nonsensenyc.com subject:nonsense newer_than:8d', 3);
+    const cached = loadCachedEvents();
+
     if (emails.length === 0) {
-      console.log('NonsenseNYC: no newsletter emails found');
+      // Gmail auth may have failed or no recent newsletter — fall back to cache
+      if (cached && cached.events.length > 0) {
+        console.log(`NonsenseNYC: no emails found, returning ${cached.events.length} cached events`);
+        return cached.events;
+      }
+      console.log('NonsenseNYC: no newsletter emails found and no cache available');
       return [];
     }
 
-    const cached = loadCachedEvents();
     const latest = emails[0];
 
     // If the latest newsletter is already cached, return cached events
@@ -135,6 +141,11 @@ async function fetchNonsenseNYC() {
     return allEvents;
   } catch (err) {
     console.error('Nonsense NYC error:', err.message);
+    const cached = loadCachedEvents();
+    if (cached && cached.events.length > 0) {
+      console.log(`NonsenseNYC: error recovery, returning ${cached.events.length} cached events`);
+      return cached.events;
+    }
     return [];
   }
 }

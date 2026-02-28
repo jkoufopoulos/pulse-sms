@@ -92,27 +92,25 @@ async function fetchSkintEvents() {
         return;
       }
 
-      if (skipSection) return; // skip events from past-day sections
+      // "thru" events span multiple days — include even from past sections
+      if (skipSection && !/^thru\b/i.test(text)) return;
       if (text.length < 30) return;
       if (text.toLowerCase().startsWith('sponsored')) return;
 
-      // "thru" events span multiple days — always include regardless of section
       if (eventPattern.test(text)) {
         eventParagraphs.push(text);
       }
     });
 
-    // Prepend today's date for context
-    const today = new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    let content = `Published: ${today}\n\n` + eventParagraphs.slice(0, 30).join('\n\n');
-    if (content.length < 50) {
-      content = entry.text().trim().slice(0, 5000);
-    }
-
-    if (content.length < 50) {
-      console.warn('Skint content too short, skipping extraction');
+    // If no upcoming events found, Skint likely hasn't published yet today — bail cleanly
+    if (eventParagraphs.length === 0) {
+      console.warn('Skint: no upcoming events in parsed content (page may not be updated yet)');
       return [];
     }
+
+    // Prepend today's date for context
+    const today = new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const content = `Published: ${today}\n\n` + eventParagraphs.slice(0, 30).join('\n\n');
 
     console.log(`Skint content: ${content.length} chars (${eventParagraphs.length} event paragraphs)`);
     captureExtractionInput('theskint', content, 'https://theskint.com/');
