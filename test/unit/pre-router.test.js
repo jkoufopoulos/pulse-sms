@@ -145,11 +145,16 @@ const filterSession = {
   lastNeighborhood: 'East Village',
   lastFilters: { category: 'comedy', free_only: false, vibe: null, time_after: null },
 };
-check('forget the comedy → clearFilters', preRoute('forget the comedy', filterSession)?.clearFilters === true);
+// Generic clears → pre-router handles deterministically
+check('forget it → clearFilters', preRoute('forget it', filterSession)?.clearFilters === true);
+check('forget that → clearFilters', preRoute('forget that', filterSession)?.clearFilters === true);
 check('show me everything → clearFilters', preRoute('show me everything', filterSession)?.clearFilters === true);
 check('clear filters → clearFilters', preRoute('clear filters', filterSession)?.clearFilters === true);
 check('nvm → clearFilters', preRoute('nvm', filterSession)?.clearFilters === true);
-// Without active filters, these should fall through to LLM
+// Targeted clears → fall through to LLM for filter_intent: modify
+check('forget the comedy → null (LLM targeted)', preRoute('forget the comedy', filterSession) === null);
+check('forget the free thing → null (LLM targeted)', preRoute('forget the free thing', filterSession) === null);
+// Without active filters, clears fall through to LLM
 const noFilterSession = { ...filterSession, lastFilters: null };
 check('nvm without filters → null (LLM)', preRoute('nvm', noFilterSession) === null);
 check('show me everything without filters → null (LLM)', preRoute('show me everything', noFilterSession) === null);

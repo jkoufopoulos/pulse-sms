@@ -643,6 +643,27 @@ Scenario pass rate is low because each scenario requires ALL assertions to pass 
 
 ## Completed Work
 
+### Model router filter interaction signal + targeted filter removal (2026-03-01)
+
+**Problem 1 (model routing blind spot):** Ambiguous filter-interaction messages ("show me whats good", "paid is fine too", "actually i dont care about the genre") scored 5/100 in the complexity router — well below the 40 threshold. They all went to Gemini Flash, which is worse at recognizing `filter_intent: clear_all` or `filter_intent: modify`. The router only boosted score when filter matching was *hard* (zero matches), not when the user was interacting with existing filters.
+
+**Fix:** Added `hasPreDetectedFilters` signal to model-router.js. When the user has active filters but the pre-router didn't detect a specific filter follow-up (category/time/free), the message gets +35 complexity — pushing it to Haiku for semantic understanding. Pre-detected filter follow-ups ("comedy", "free") stay on Flash since the pre-router already knows the intent.
+
+| Message type | Before | After |
+|---|---|---|
+| "show me whats good" (comedy active) | Flash (score 5) | Haiku (score 40) |
+| "paid is fine too" (free active) | Flash (score 5) | Haiku (score 40) |
+| "comedy" (pre-detected) | Flash (score 5) | Flash (score 5) |
+| "williamsburg" (no filters) | Flash (score 5) | Flash (score 5) |
+
+**Problem 2 (greedy pre-router clear regex):** The pre-router regex `forget\s*(?:it|that|the\s+\w+)` matched both "forget it" (generic clear → full wipe) and "forget the free thing" (targeted removal). This bypassed the LLM's `filter_intent: modify` path, wiping all filters when the user wanted to keep some.
+
+**Fix:** Narrowed regex to `forget\s+(?:it|that)` — only generic clears. "Forget the [specific thing]" now falls through to Haiku, which correctly returns `filter_intent: modify` with targeted updates (e.g. `{ free_only: null }`).
+
+**Verified end-to-end:** Comedy + free filter active → "forget the free thing" → Haiku returns `filter_intent: modify, { free_only: false }` → comedy filter kept, free filter dropped → comedy picks served (free + paid).
+
+**Regression eval (2026-03-01):** Code evals 98.9% (6124/6195), up from 98.7%. off_topic_redirect 34→29, neighborhood_expansion_transparency 12→9, day_label_accuracy 2→0, schema_compliance 1→0.
+
 ### Fix time filter persistence + details filter compliance (2026-03-01)
 
 **Problem 1 (Q2 — time gate miss):** Compound first messages like "im at the L bedford stop looking for late night stuff" correctly showed late-night-aware responses on turn 1, but the LLM returned `filter_intent: { action: "none" }`. On turn 2 ("any dj sets"), `mergeFilters({}, { category: 'nightlife' })` lost the time constraint → 2pm events served.
