@@ -49,6 +49,7 @@ check('zero hard + soft matches → +15 base', (() => {
     activeFilters: { category: 'comedy' },
     events: Array(10).fill({}),
     conversationHistory: [], isCitywide: false,
+    hasPreDetectedFilters: true,
   });
   return score >= 15 && score < 30;
 })());

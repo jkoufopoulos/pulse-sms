@@ -6,7 +6,7 @@ const { getAdjacentNeighborhoods } = require('./pre-router');
 const { filterByTimeAfter } = require('./geo');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
 const { validatePerennialActivity } = require('./curation');
-const { resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, executeQuery } = require('./pipeline');
+const { resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, eventMatchesFilters, executeQuery } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
 const { generateReferralCode } = require('./referral');
 const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
@@ -218,6 +218,7 @@ async function handleMore(ctx) {
       const exhaust = isLastBatch ? buildExhaustionMessage(hood, {
         adjacentHoods: getAdjacentNeighborhoods(hood, 3),
         visitedHoods: ctx.session?.visitedHoods || [],
+        filters: activeFilters,
       }) : null;
 
       ctx.trace.events.cache_size = Object.keys(ctx.session.lastEvents).length;
@@ -249,7 +250,7 @@ async function handleMore(ctx) {
         neighborhood: hood,
         filters: activeFilters,
         offeredIds: composeRemaining.map(e => e.id),
-        pending: (isLastBatch && exhaust?.suggestedHood) ? { neighborhood: exhaust.suggestedHood } : null,
+        pending: (isLastBatch && exhaust?.suggestedHood) ? { neighborhood: exhaust.suggestedHood, filters: activeFilters } : null,
       });
       updateProfile(ctx.phone, { neighborhood: hood, filters: activeFilters, responseType: 'more' })
         .catch(err => console.error('profile update failed:', err.message));
@@ -274,7 +275,13 @@ async function handleMore(ctx) {
   const moreNearbyPerennials = validatePerennialActivity(toEventObjects(morePicks.nearby, hood, { isNearby: true }));
   const allMorePerennials = [...moreLocalPerennials, ...moreNearbyPerennials];
   const allShownMoreIds = new Set([...(ctx.session?.allOfferedIds || []), ...(ctx.session?.allPicks || ctx.session?.lastPicks || []).map(p => p.event_id)]);
-  const unshownPerennials = allMorePerennials.filter(e => !allShownMoreIds.has(e.id));
+  let unshownPerennials = allMorePerennials.filter(e => !allShownMoreIds.has(e.id));
+  // Filter perennials by active category to avoid serving off-filter picks (e.g. non-jazz when jazz is active)
+  const hasCategory = activeFilters?.category || activeFilters?.subcategory;
+  if (hasCategory && unshownPerennials.length > 0) {
+    const matching = unshownPerennials.filter(e => eventMatchesFilters(e, activeFilters) !== false);
+    if (matching.length > 0) unshownPerennials = matching;
+  }
 
   if (unshownPerennials.length > 0) {
     const perennialBatch = unshownPerennials.slice(0, 4);
@@ -285,6 +292,7 @@ async function handleMore(ctx) {
     const perennialExhaust = buildExhaustionMessage(hood, {
       adjacentHoods: getAdjacentNeighborhoods(hood, 3),
       visitedHoods: ctx.session?.visitedHoods || [],
+      filters: activeFilters,
     });
     const result = await composeViaExecuteQuery(perennialBatch, ctx, { hood, activeFilters, excludeIds: [...allShownMoreIds], skills: { isLastBatch: true, exhaustionSuggestion: perennialExhaust.message } });
     result.sms_text = stripMoreReferences(result.sms_text);
@@ -296,7 +304,7 @@ async function handleMore(ctx) {
       neighborhood: hood,
       filters: activeFilters,
       offeredIds: perennialBatch.map(e => e.id),
-      pending: perennialExhaust.suggestedHood ? { neighborhood: perennialExhaust.suggestedHood } : null,
+      pending: perennialExhaust.suggestedHood ? { neighborhood: perennialExhaust.suggestedHood, filters: activeFilters } : null,
     });
     updateProfile(ctx.phone, { neighborhood: hood, filters: activeFilters, responseType: 'more' })
       .catch(err => console.error('profile update failed:', err.message));
@@ -310,6 +318,7 @@ async function handleMore(ctx) {
   const finalExhaust = buildExhaustionMessage(hood, {
     adjacentHoods: getAdjacentNeighborhoods(hood, 4),
     visitedHoods: ctx.session?.visitedHoods || [hood],
+    filters: activeFilters,
   });
   const sms = finalExhaust.message;
   saveResponseFrame(ctx.phone, {
@@ -320,7 +329,7 @@ async function handleMore(ctx) {
     neighborhood: hood,
     filters: activeFilters,
     offeredIds: [],
-    pending: finalExhaust.suggestedHood ? { neighborhood: finalExhaust.suggestedHood } : null,
+    pending: finalExhaust.suggestedHood ? { neighborhood: finalExhaust.suggestedHood, filters: activeFilters } : null,
   });
   await sendSMS(ctx.phone, sms);
   ctx.finalizeTrace(sms, 'more');

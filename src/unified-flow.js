@@ -1,0 +1,364 @@
+const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
+const { sendSMS } = require('./twilio');
+const { recordAICost } = require('./traces');
+const { getSession, setSession } = require('./session');
+const { getAdjacentNeighborhoods } = require('./pre-router');
+const { getEvents, getEventsCitywide, getCacheStatus } = require('./events');
+const { filterKidsEvents, validatePerennialActivity } = require('./curation');
+const { getPerennialPicks, toEventObjects } = require('./perennial');
+const { buildEventMap, saveResponseFrame, mergeFilters, normalizeFilterIntent, buildTaggedPool, buildZeroMatchResponse, executeQuery } = require('./pipeline');
+const { updateProfile } = require('./preference-profile');
+const { trackAICost } = require('./request-guard');
+
+const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
+
+/**
+ * Resolve unified context: neighborhood, filters, events, tagged pool.
+ * Pure data preparation — no SMS sending, no LLM call.
+ */
+async function resolveUnifiedContext(message, session, preDetectedFilters, phone, trace) {
+  // If pre-router detected filters (category/time/vibe/free), inject them for event pre-filtering
+  if (preDetectedFilters) {
+    setSession(phone, { pendingFilters: preDetectedFilters });
+    session = getSession(phone);
+  } else {
+    trace.routing.pre_routed = false;
+  }
+
+  // Resolve neighborhood: explicit in message > affirmative nudge response > session fallback
+  const extracted = extractNeighborhood(message);
+  let hood = extracted || null;
+  if (!hood && session?.pendingNearby) {
+    if (/^(yes|yeah|ya|yep|yup|sure|ok|okay|down|bet|absolutely|definitely|why not|i'm down|im down)\b/i.test(message.trim())) {
+      hood = session.pendingNearby;
+    }
+  }
+  // If user provides explicit new neighborhood while having an active session,
+  // clear pending filters to avoid stale pre-filtering (e.g. "try fort greene" after "no free comedy in Park Slope")
+  // But keep pending filters when answering an ask_neighborhood prompt (no lastNeighborhood yet)
+  if (extracted && session?.pendingFilters && session?.lastNeighborhood) {
+    setSession(phone, { pendingFilters: null, pendingMessage: null });
+    session = getSession(phone);
+  }
+  if (!hood) hood = session?.lastNeighborhood || null;
+  if (hood && !NEIGHBORHOOD_NAMES.includes(hood)) {
+    const validated = extractNeighborhood(hood);
+    hood = validated || null;
+  }
+  trace.routing.resolved_neighborhood = hood;
+
+  // Detect if user used an alias (e.g. "ridgewood" -> Bushwick, "lic" -> Long Island City)
+  // so the LLM knows the resolution is correct and doesn't say "not in my system"
+  let userHoodAlias = null;
+  if (extracted && hood && !message.toLowerCase().includes(hood.toLowerCase())) {
+    // Find which alias actually matched
+    const hoodData = NEIGHBORHOODS[hood];
+    if (hoodData) {
+      const msgLower = message.toLowerCase();
+      const matched = hoodData.aliases.find(a => a !== hood.toLowerCase() && msgLower.includes(a));
+      userHoodAlias = matched || message.trim();
+    }
+  }
+
+  // Resolve active filters: merge persisted filters with newly detected ones
+  const activeFilters = mergeFilters(
+    session?.lastFilters,
+    preDetectedFilters || session?.pendingFilters || null
+  );
+  let matchCount = 0;
+  let hardCount = 0;
+  let softCount = 0;
+  let isSparse = false;
+
+  // Fetch events — neighborhood or citywide
+  let events = [];
+  let curated = [];
+  let taggedPerennials = [];
+  let isCitywide = false;
+  if (hood) {
+    const eventsStart = Date.now();
+    const raw = await getEvents(hood, { dateRange: activeFilters.date_range });
+    trace.events.getEvents_ms = Date.now() - eventsStart;
+    trace.events.cache_size = getCacheStatus().cache_size;
+    curated = filterKidsEvents(raw);
+    const taggedResult = buildTaggedPool(curated, activeFilters);
+    trace.events.candidates_count = curated.length;
+    trace.events.candidate_ids = curated.map(e => e.id);
+    events = taggedResult.pool;
+    matchCount = taggedResult.matchCount;
+    hardCount = taggedResult.hardCount;
+    softCount = taggedResult.softCount;
+    isSparse = taggedResult.isSparse;
+    // Merge perennial picks (marked as unmatched) — skip when filters active + matches exist
+    // to avoid sending non-matching material that the LLM might pick from
+    const hasActiveFilter = activeFilters && Object.values(activeFilters).some(Boolean);
+    if (!hasActiveFilter || matchCount === 0) {
+      const perennialPicks = getPerennialPicks(hood);
+      const localPerennials = validatePerennialActivity(toEventObjects(perennialPicks.local, hood));
+      const perennialCap = Math.min(4, 15 - Math.min(events.length, 15));
+      taggedPerennials = localPerennials.slice(0, perennialCap).map(e => ({ ...e, filter_match: false }));
+      events = [...events, ...taggedPerennials];
+    }
+
+  } else {
+    // Citywide flow — serve best events across all neighborhoods
+    isCitywide = true;
+    const eventsStart = Date.now();
+    const raw = await getEventsCitywide({ dateRange: activeFilters.date_range });
+    trace.events.getEvents_ms = Date.now() - eventsStart;
+    trace.events.cache_size = getCacheStatus().cache_size;
+    curated = filterKidsEvents(raw);
+    const taggedResult = buildTaggedPool(curated, activeFilters, { citywide: true });
+    trace.events.candidates_count = curated.length;
+    trace.events.candidate_ids = curated.map(e => e.id);
+    events = taggedResult.pool;
+    matchCount = taggedResult.matchCount;
+    hardCount = taggedResult.hardCount;
+    softCount = taggedResult.softCount;
+    isSparse = taggedResult.isSparse;
+  }
+  const nearbyHoods = hood ? getAdjacentNeighborhoods(hood, 3) : [];
+
+  const now = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+  trace.events.sent_to_claude = events.length;
+  trace.events.sent_ids = events.map(e => e.id);
+  trace.events.sent_pool = events.map(e => ({
+    id: e.id,
+    name: e.name,
+    venue_name: e.venue_name,
+    neighborhood: e.neighborhood,
+    category: e.category,
+    start_time_local: e.start_time_local,
+    date_local: e.date_local,
+    is_free: e.is_free,
+    price_display: e.price_display,
+    source_name: e.source_name,
+    filter_match: e.filter_match,
+    ticket_url: e.ticket_url || null,
+  }));
+  trace.events.pool_meta = { matchCount, hardCount, softCount, isSparse };
+
+  // Derive suggested neighborhood deterministically (P5: code owns state)
+  // Include matchCount===0 so pendingNearby is set for zero-match LLM responses too
+  const suggestedHood = (isSparse || matchCount === 0) && nearbyHoods.length > 0 ? nearbyHoods[0] : null;
+
+  console.log(`Unified flow: hood=${hood}, events=${events.length}, nearby=${nearbyHoods.join(',')}`);
+
+  // Build exclude list from previously shown events
+  const prevPickIds = (session?.allPicks || session?.lastPicks || []).map(p => p.event_id);
+  const prevOfferedIds = session?.allOfferedIds || [];
+  const excludeIds = [...new Set([...prevPickIds, ...prevOfferedIds])];
+
+  return { hood, activeFilters, events, curated, taggedPerennials, matchCount, hardCount, softCount, isSparse, isCitywide, nearbyHoods, suggestedHood, excludeIds, now, userHoodAlias };
+}
+
+/**
+ * Call executeQuery and capture trace/cost data.
+ */
+async function callUnified(message, unifiedCtx, session, history, phone, trace, { model } = {}) {
+  const { hood, events, nearbyHoods, now, activeFilters, isSparse, isCitywide, matchCount, hardCount, softCount, excludeIds, suggestedHood, userHoodAlias } = unifiedCtx;
+
+  const composeStart = Date.now();
+  const result = await executeQuery(message, events, {
+    session,
+    neighborhood: hood,
+    nearbyHoods,
+    conversationHistory: history,
+    currentTime: now,
+    validNeighborhoods: NEIGHBORHOOD_NAMES,
+    activeFilters,
+    isSparse,
+    isCitywide,
+    matchCount,
+    hardCount,
+    softCount,
+    excludeIds,
+    suggestedNeighborhood: suggestedHood,
+    userHoodAlias,
+    model,
+  });
+  trace.routing.latency_ms = Date.now() - composeStart;
+  trace.composition.latency_ms = trace.routing.latency_ms;
+  trace.routing.provider = result._provider || 'anthropic';
+  trace.routing.result = { intent: result.type, neighborhood: hood, confidence: 0.8 };
+  trace.composition.raw_response = result._raw || null;
+  trace.composition.picks = (result.picks || []).map(p => {
+    const evt = events.find(e => e.id === p.event_id);
+    return {
+      ...p,
+      date_local: evt?.date_local || null,
+      event_name: evt?.name || null,
+      venue_name: evt?.venue_name || null,
+      neighborhood: evt?.neighborhood || null,
+      category: evt?.category || null,
+      is_free: evt?.is_free || false,
+      start_time_local: evt?.start_time_local || null,
+    };
+  });
+  trace.composition.active_filters = activeFilters || null;
+  trace.composition.neighborhood_used = hood;
+  // Derive which prompt skills were activated (mirrors buildUnifiedPrompt logic)
+  const activeSkills = ['core', 'sourceTiers'];
+  if (events.some(e => (e.date_local || e.day) === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) || e.day === 'TODAY')) activeSkills.push('tonightPriority');
+  if (hood && !events.some(e => e.neighborhood === hood)) activeSkills.push('neighborhoodMismatch');
+  if (events.some(e => e.source_name === 'perennial')) activeSkills.push('perennialFraming');
+  if (activeFilters?.free_only) activeSkills.push('freeEmphasis');
+  if (history.length > 0) activeSkills.push('conversationAwareness');
+  if (suggestedHood) activeSkills.push('nearbySuggestion');
+  if (matchCount === 1 || (events.length <= 1)) activeSkills.push('singlePick');
+  if (isCitywide && events.length > 0) activeSkills.push('citywide');
+  const uniqueDates = new Set(events.map(e => e.date_local).filter(Boolean));
+  if (uniqueDates.size >= 2) activeSkills.push('multiDay');
+  trace.composition.active_skills = activeSkills;
+  recordAICost(trace, 'unified', result._usage, result._provider);
+  trackAICost(phone, result._usage, result._provider);
+
+  return result;
+}
+
+/**
+ * Handle the unified LLM response: clear_filters check + 3 response type handlers.
+ * All paths are terminal: saveResponseFrame -> updateProfile -> sendSMS -> finalizeTrace.
+ */
+async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, message, finalizeTrace) {
+  let { hood, activeFilters, events, curated, taggedPerennials, suggestedHood } = unifiedCtx;
+
+  // Filter state management after unified call — apply LLM's filter_intent
+  // P1 compliant: LLM reports what user requested (language), handler applies it (state).
+  trace.composition = trace.composition || {};
+  if (result.filter_intent?.action === 'clear_all' || result.clear_filters) {
+    activeFilters = {};
+    trace.composition.filter_intent_action = 'clear_all';
+  } else if (result.filter_intent?.action === 'modify' && result.filter_intent?.updates) {
+    const normalized = normalizeFilterIntent(result.filter_intent.updates);
+    activeFilters = mergeFilters(activeFilters, normalized);
+    trace.composition.filter_intent_action = 'modify';
+    trace.composition.filter_intent_updates = normalized;
+  }
+
+  // Handle response by type
+  if (result.type === 'ask_neighborhood') {
+    saveResponseFrame(phone, {
+      picks: session?.lastPicks || [],
+      eventMap: session?.lastEvents || {},
+      neighborhood: hood,
+      filters: Object.values(activeFilters).some(Boolean) ? activeFilters : null,
+      offeredIds: session?.allOfferedIds || [],
+      visitedHoods: session?.visitedHoods || [],
+      pending: {
+        neighborhood: suggestedHood,
+        filters: activeFilters,
+      },
+      pendingMessage: message,
+    });
+    updateProfile(phone, { neighborhood: hood, filters: activeFilters, responseType: 'ask_neighborhood' })
+      .catch(err => console.error('profile update failed:', err.message));
+    await sendSMS(phone, result.sms_text);
+    finalizeTrace(result.sms_text, 'events');
+    return;
+  }
+
+  const eventMap = buildEventMap([...curated, ...taggedPerennials]);
+  // Merge tagged pool events into eventMap so filter_match is available for validation
+  for (const e of events) eventMap[e.id] = e;
+
+  if (result.type === 'conversational' || !result.picks || result.picks.length === 0) {
+    // Conversational or empty picks — save atomically, preserving existing picks/events for details/more
+    saveResponseFrame(phone, {
+      picks: session?.lastPicks || [],
+      eventMap: Object.keys(eventMap).length > 0 ? eventMap : (session?.lastEvents || {}),
+      neighborhood: hood,
+      filters: Object.values(activeFilters).some(Boolean) ? activeFilters : null,
+      offeredIds: session?.allOfferedIds || [],
+      visitedHoods: session?.visitedHoods || [],
+      pending: suggestedHood ? { neighborhood: suggestedHood, filters: activeFilters } : null,
+    });
+    updateProfile(phone, { neighborhood: hood, filters: activeFilters, responseType: 'conversational' })
+      .catch(err => console.error('profile update failed:', err.message));
+    await sendSMS(phone, result.sms_text);
+    finalizeTrace(result.sms_text, 'conversational');
+    return;
+  }
+
+  // Validate event IDs against pool (P7: catch hallucinated IDs before save)
+  const validPicks = (result.picks || []).filter(p => eventMap[p.event_id]);
+
+  // Filter compliance validation — strip non-matching picks when matches exist
+  let filterCompliantPicks = validPicks;
+  const hasActiveFilter = activeFilters && Object.values(activeFilters).some(Boolean);
+  if (hasActiveFilter) {
+    const poolEvents = Object.values(eventMap);
+    const hasMatches = poolEvents.some(e => e.filter_match === 'hard' || e.filter_match === 'soft');
+    if (hasMatches) {
+      filterCompliantPicks = validPicks.filter(p => {
+        const evt = eventMap[p.event_id];
+        return evt?.filter_match === 'hard' || evt?.filter_match === 'soft';
+      });
+      if (filterCompliantPicks.length < validPicks.length) {
+        console.warn(`Filter compliance: ${validPicks.length - filterCompliantPicks.length} non-matching picks stripped`);
+        trace.composition.filter_violations = validPicks.length - filterCompliantPicks.length;
+      }
+    }
+  }
+
+  // Send SMS first — ensures user always gets a response even if session save fails
+  await sendSMS(phone, result.sms_text);
+  saveResponseFrame(phone, {
+    picks: filterCompliantPicks,
+    eventMap,
+    neighborhood: hood,
+    filters: activeFilters,
+    offeredIds: filterCompliantPicks.map(p => p.event_id),
+    visitedHoods: [...new Set([...(session?.visitedHoods || []), hood].filter(Boolean))],
+    pending: suggestedHood ? {
+      neighborhood: suggestedHood,
+      filters: activeFilters,
+    } : null,
+  });
+  updateProfile(phone, { neighborhood: hood, filters: activeFilters, responseType: 'event_picks' })
+    .catch(err => console.error('profile update failed:', err.message));
+  finalizeTrace(result.sms_text, 'events');
+}
+
+/**
+ * Handle zero-match bypass: when filters match nothing in a neighborhood,
+ * compose a deterministic response and preserve filters in session.
+ * $0 AI cost.
+ */
+async function handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace) {
+  const { hood, activeFilters, nearbyHoods, events, curated, taggedPerennials } = unifiedCtx;
+  const { message, suggestedHood, source } = buildZeroMatchResponse(hood, activeFilters, nearbyHoods);
+
+  trace.routing.latency_ms = 0;
+  trace.composition.latency_ms = 0;
+  trace.composition.zero_match_bypass = true;
+  trace.composition.zero_match_source = source;
+  trace.composition.active_filters = activeFilters || null;
+  trace.composition.neighborhood_used = hood;
+
+  const eventMap = buildEventMap([...curated, ...taggedPerennials]);
+  for (const e of events) eventMap[e.id] = e;
+
+  const pending = suggestedHood
+    ? { neighborhood: suggestedHood, filters: activeFilters }
+    : null;
+
+  saveResponseFrame(phone, {
+    picks: session?.lastPicks || [],
+    eventMap: Object.keys(eventMap).length > 0 ? eventMap : (session?.lastEvents || {}),
+    neighborhood: hood,
+    filters: Object.values(activeFilters).some(Boolean) ? activeFilters : null,
+    offeredIds: session?.allOfferedIds || [],
+    visitedHoods: session?.visitedHoods || [],
+    pending,
+  });
+  updateProfile(phone, { neighborhood: hood, filters: activeFilters, responseType: 'zero_match' })
+    .catch(err => console.error('profile update failed:', err.message));
+  // Flag so consecutive zero-match turns fall through to LLM (allows filter modification)
+  setSession(phone, { lastZeroMatch: true });
+  await sendSMS(phone, message);
+  finalizeTrace(message, 'events');
+}
+
+module.exports = { resolveUnifiedContext, callUnified, handleUnifiedResponse, handleZeroMatch };

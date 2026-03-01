@@ -1,22 +1,18 @@
 const express = require('express');
 const twilio = require('twilio');
-const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
-// ai.js is now accessed via executeQuery in pipeline.js (late require)
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
-const { startTrace, saveTrace, getLatestTraceForPhone, PRICING, recordAICost } = require('./traces');
+const { startTrace, saveTrace, getLatestTraceForPhone, recordAICost } = require('./traces');
 const { getSession, setSession, clearSession, addToHistory, clearSessionInterval } = require('./session');
-const { preRoute, getAdjacentNeighborhoods } = require('./pre-router');
+const { preRoute } = require('./pre-router');
 const { handleHelp, handleConversational, handleDetails, handleMore } = require('./intent-handlers');
 const { sendRuntimeAlert } = require('./alerts');
-const { getEvents, getEventsCitywide, getEventById, scanCityWide, getCacheStatus } = require('./events');
+const { getEventById } = require('./events');
 const { lookupReferralCode, recordAttribution } = require('./referral');
-const { filterKidsEvents, validatePerennialActivity } = require('./curation');
-const { getPerennialPicks, toEventObjects } = require('./perennial');
-const { applyFilters, buildEventMap, saveResponseFrame, mergeFilters, normalizeFilterIntent, buildTaggedPool, buildZeroMatchResponse, executeQuery } = require('./pipeline');
+const { saveResponseFrame } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
 const { routeModel } = require('./model-router');
-
-const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
+const { processedMessages, OPT_OUT_KEYWORDS, isOverBudget, trackAICost, getCostSummary, getBudgetUsedPct, ipRateLimits, IP_RATE_LIMIT, IP_RATE_WINDOW, clearGuardIntervals } = require('./request-guard');
+const { resolveUnifiedContext, callUnified, handleUnifiedResponse, handleZeroMatch } = require('./unified-flow');
 
 const router = express.Router();
 
@@ -26,86 +22,10 @@ if (twilioAuthToken) {
   router.use('/incoming', twilio.webhook({ validate: true }));
 }
 
-// --- Twilio retry deduplication ---
-// Twilio sends the same MessageSid on retries. Track recent ones to avoid duplicate processing.
-const processedMessages = new Map(); // MessageSid → timestamp
-const DEDUP_TTL = 5 * 60 * 1000; // 5 minutes
-
-// Clean stale dedup entries every 5 minutes
-const dedupInterval = setInterval(() => {
-  try {
-    const cutoff = Date.now() - DEDUP_TTL;
-    for (const [sid, ts] of processedMessages) {
-      if (ts < cutoff) processedMessages.delete(sid);
-    }
-  } catch (e) { console.error('Dedup cleanup error:', e); }
-}, 5 * 60 * 1000);
-
-// --- Cost-based daily AI budget per user ---
-const aiBudgets = new Map(); // phone → { cost_usd, date }
-const DAILY_BUDGET_USD = 0.10;
-function getNycDate() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-}
-
-function isOverBudget(phone) {
-  const today = getNycDate();
-  const entry = aiBudgets.get(phone);
-  if (!entry || entry.date !== today) return false;
-  return entry.cost_usd >= DAILY_BUDGET_USD;
-}
-
-function trackAICost(phone, usage, provider = 'anthropic') {
-  if (!usage) return;
-  const pricing = PRICING[provider] || PRICING.anthropic;
-  const inputTokens = usage.input_tokens || 0;
-  const outputTokens = usage.output_tokens || 0;
-  const cost = inputTokens * pricing.input + outputTokens * pricing.output;
-
-  const today = getNycDate();
-  const entry = aiBudgets.get(phone);
-  if (!entry || entry.date !== today) {
-    aiBudgets.set(phone, { cost_usd: cost, date: today });
-  } else {
-    entry.cost_usd += cost;
-  }
-}
-
-function getCostSummary() {
-  const today = getNycDate();
-  let activeUsers = 0, totalSpend = 0;
-  for (const [, entry] of aiBudgets) {
-    if (entry.date === today) {
-      activeUsers++;
-      totalSpend += entry.cost_usd;
-    }
-  }
-  return { active_users: activeUsers, total_spend_usd: totalSpend, daily_limit_usd: DAILY_BUDGET_USD };
-}
-
-// Clean stale budget + IP rate limit entries every 10 minutes
-const rateLimitInterval = setInterval(() => {
-  try {
-    const today = getNycDate();
-    for (const [phone, entry] of aiBudgets) {
-      if (entry.date !== today) aiBudgets.delete(phone);
-    }
-    const now = Date.now();
-    for (const [ip, entry] of ipRateLimits) {
-      if (now >= entry.resetTime) ipRateLimits.delete(ip);
-    }
-  } catch (e) { console.error('Budget cleanup error:', e); }
-}, 10 * 60 * 1000);
-
 // =======================================================
 // Test endpoint — runs full pipeline, returns response over HTTP
 // Gated behind PULSE_TEST_MODE=true env var
 // =======================================================
-
-// --- IP-based rate limit for test endpoint (30 messages per IP per hour) ---
-const ipRateLimits = new Map(); // ip → { count, resetTime }
-const IP_RATE_LIMIT = 30;
-const IP_RATE_WINDOW = 60 * 60 * 1000; // 1 hour
 
 const CORS_ORIGIN = 'https://jkoufopoulos.github.io';
 
@@ -210,9 +130,6 @@ router.post('/incoming', (req, res) => {
 // Async message handler
 // =======================================================
 
-// --- TCPA opt-out keywords — must not respond to these ---
-const OPT_OUT_KEYWORDS = /^\s*(stop|unsubscribe|cancel|quit)\s*$/i;
-
 async function handleMessage(phone, message) {
   const masked = maskPhone(phone);
   console.log(`SMS from ${masked}: ${message.slice(0, 80)}`);
@@ -293,355 +210,6 @@ async function dispatchPreRouterIntent(route, ctx) {
   }
 }
 
-/**
- * Resolve unified context: neighborhood, filters, events, tagged pool.
- * Pure data preparation — no SMS sending, no LLM call.
- */
-async function resolveUnifiedContext(message, session, preDetectedFilters, phone, trace) {
-  // If pre-router detected filters (category/time/vibe/free), inject them for event pre-filtering
-  if (preDetectedFilters) {
-    setSession(phone, { pendingFilters: preDetectedFilters });
-    session = getSession(phone);
-  } else {
-    trace.routing.pre_routed = false;
-  }
-
-  // Resolve neighborhood: explicit in message > affirmative nudge response > session fallback
-  const extracted = extractNeighborhood(message);
-  let hood = extracted || null;
-  if (!hood && session?.pendingNearby) {
-    if (/^(yes|yeah|ya|yep|yup|sure|ok|okay|down|bet|absolutely|definitely|why not|i'm down|im down)\b/i.test(message.trim())) {
-      hood = session.pendingNearby;
-    }
-  }
-  // If user provides explicit new neighborhood while having an active session,
-  // clear pending filters to avoid stale pre-filtering (e.g. "try fort greene" after "no free comedy in Park Slope")
-  // But keep pending filters when answering an ask_neighborhood prompt (no lastNeighborhood yet)
-  if (extracted && session?.pendingFilters && session?.lastNeighborhood) {
-    setSession(phone, { pendingFilters: null, pendingMessage: null });
-    session = getSession(phone);
-  }
-  if (!hood) hood = session?.lastNeighborhood || null;
-  if (hood && !NEIGHBORHOOD_NAMES.includes(hood)) {
-    const validated = extractNeighborhood(hood);
-    hood = validated || null;
-  }
-  trace.routing.resolved_neighborhood = hood;
-
-  // Detect if user used an alias (e.g. "ridgewood" → Bushwick, "lic" → Long Island City)
-  // so the LLM knows the resolution is correct and doesn't say "not in my system"
-  let userHoodAlias = null;
-  if (extracted && hood && !message.toLowerCase().includes(hood.toLowerCase())) {
-    // Find which alias actually matched
-    const hoodData = NEIGHBORHOODS[hood];
-    if (hoodData) {
-      const msgLower = message.toLowerCase();
-      const matched = hoodData.aliases.find(a => a !== hood.toLowerCase() && msgLower.includes(a));
-      userHoodAlias = matched || message.trim();
-    }
-  }
-
-  // Resolve active filters: merge persisted filters with newly detected ones
-  const activeFilters = mergeFilters(
-    session?.lastFilters,
-    preDetectedFilters || session?.pendingFilters || null
-  );
-  let matchCount = 0;
-  let hardCount = 0;
-  let softCount = 0;
-  let isSparse = false;
-
-  // Fetch events — neighborhood or citywide
-  let events = [];
-  let curated = [];
-  let taggedPerennials = [];
-  let isCitywide = false;
-  if (hood) {
-    const eventsStart = Date.now();
-    const raw = await getEvents(hood, { dateRange: activeFilters.date_range });
-    trace.events.getEvents_ms = Date.now() - eventsStart;
-    trace.events.cache_size = getCacheStatus().cache_size;
-    curated = filterKidsEvents(raw);
-    const taggedResult = buildTaggedPool(curated, activeFilters);
-    trace.events.candidates_count = curated.length;
-    trace.events.candidate_ids = curated.map(e => e.id);
-    events = taggedResult.pool;
-    matchCount = taggedResult.matchCount;
-    hardCount = taggedResult.hardCount;
-    softCount = taggedResult.softCount;
-    isSparse = taggedResult.isSparse;
-    // Merge perennial picks (marked as unmatched) — skip when filters active + matches exist
-    // to avoid sending non-matching material that the LLM might pick from
-    const hasActiveFilter = activeFilters && Object.values(activeFilters).some(Boolean);
-    if (!hasActiveFilter || matchCount === 0) {
-      const perennialPicks = getPerennialPicks(hood);
-      const localPerennials = validatePerennialActivity(toEventObjects(perennialPicks.local, hood));
-      const perennialCap = Math.min(4, 15 - Math.min(events.length, 15));
-      taggedPerennials = localPerennials.slice(0, perennialCap).map(e => ({ ...e, filter_match: false }));
-      events = [...events, ...taggedPerennials];
-    }
-
-  } else {
-    // Citywide flow — serve best events across all neighborhoods
-    isCitywide = true;
-    const eventsStart = Date.now();
-    const raw = await getEventsCitywide({ dateRange: activeFilters.date_range });
-    trace.events.getEvents_ms = Date.now() - eventsStart;
-    trace.events.cache_size = getCacheStatus().cache_size;
-    curated = filterKidsEvents(raw);
-    const taggedResult = buildTaggedPool(curated, activeFilters, { citywide: true });
-    trace.events.candidates_count = curated.length;
-    trace.events.candidate_ids = curated.map(e => e.id);
-    events = taggedResult.pool;
-    matchCount = taggedResult.matchCount;
-    hardCount = taggedResult.hardCount;
-    softCount = taggedResult.softCount;
-    isSparse = taggedResult.isSparse;
-  }
-  const nearbyHoods = hood ? getAdjacentNeighborhoods(hood, 3) : [];
-
-  const now = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-
-  trace.events.sent_to_claude = events.length;
-  trace.events.sent_ids = events.map(e => e.id);
-  trace.events.sent_pool = events.map(e => ({
-    id: e.id,
-    name: e.name,
-    venue_name: e.venue_name,
-    neighborhood: e.neighborhood,
-    category: e.category,
-    start_time_local: e.start_time_local,
-    date_local: e.date_local,
-    is_free: e.is_free,
-    price_display: e.price_display,
-    source_name: e.source_name,
-    filter_match: e.filter_match,
-    ticket_url: e.ticket_url || null,
-  }));
-  trace.events.pool_meta = { matchCount, hardCount, softCount, isSparse };
-
-  // Derive suggested neighborhood deterministically (P5: code owns state)
-  // Include matchCount===0 so pendingNearby is set for zero-match LLM responses too
-  const suggestedHood = (isSparse || matchCount === 0) && nearbyHoods.length > 0 ? nearbyHoods[0] : null;
-
-  console.log(`Unified flow: hood=${hood}, events=${events.length}, nearby=${nearbyHoods.join(',')}`);
-
-  // Build exclude list from previously shown events
-  const prevPickIds = (session?.allPicks || session?.lastPicks || []).map(p => p.event_id);
-  const prevOfferedIds = session?.allOfferedIds || [];
-  const excludeIds = [...new Set([...prevPickIds, ...prevOfferedIds])];
-
-  return { hood, activeFilters, events, curated, taggedPerennials, matchCount, hardCount, softCount, isSparse, isCitywide, nearbyHoods, suggestedHood, excludeIds, now, userHoodAlias };
-}
-
-/**
- * Call executeQuery and capture trace/cost data.
- */
-async function callUnified(message, unifiedCtx, session, history, phone, trace, { model } = {}) {
-  const { hood, events, nearbyHoods, now, activeFilters, isSparse, isCitywide, matchCount, hardCount, softCount, excludeIds, suggestedHood, userHoodAlias } = unifiedCtx;
-
-  const composeStart = Date.now();
-  const result = await executeQuery(message, events, {
-    session,
-    neighborhood: hood,
-    nearbyHoods,
-    conversationHistory: history,
-    currentTime: now,
-    validNeighborhoods: NEIGHBORHOOD_NAMES,
-    activeFilters,
-    isSparse,
-    isCitywide,
-    matchCount,
-    hardCount,
-    softCount,
-    excludeIds,
-    suggestedNeighborhood: suggestedHood,
-    userHoodAlias,
-    model,
-  });
-  trace.routing.latency_ms = Date.now() - composeStart;
-  trace.composition.latency_ms = trace.routing.latency_ms;
-  trace.routing.provider = result._provider || 'anthropic';
-  trace.routing.result = { intent: result.type, neighborhood: hood, confidence: 0.8 };
-  trace.composition.raw_response = result._raw || null;
-  trace.composition.picks = (result.picks || []).map(p => {
-    const evt = events.find(e => e.id === p.event_id);
-    return {
-      ...p,
-      date_local: evt?.date_local || null,
-      event_name: evt?.name || null,
-      venue_name: evt?.venue_name || null,
-      neighborhood: evt?.neighborhood || null,
-      category: evt?.category || null,
-      is_free: evt?.is_free || false,
-      start_time_local: evt?.start_time_local || null,
-    };
-  });
-  trace.composition.active_filters = activeFilters || null;
-  trace.composition.neighborhood_used = hood;
-  // Derive which prompt skills were activated (mirrors buildUnifiedPrompt logic)
-  const activeSkills = ['core', 'sourceTiers'];
-  if (events.some(e => (e.date_local || e.day) === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) || e.day === 'TODAY')) activeSkills.push('tonightPriority');
-  if (hood && !events.some(e => e.neighborhood === hood)) activeSkills.push('neighborhoodMismatch');
-  if (events.some(e => e.source_name === 'perennial')) activeSkills.push('perennialFraming');
-  if (activeFilters?.free_only) activeSkills.push('freeEmphasis');
-  if (history.length > 0) activeSkills.push('conversationAwareness');
-  if (suggestedHood) activeSkills.push('nearbySuggestion');
-  if (matchCount === 1 || (events.length <= 1)) activeSkills.push('singlePick');
-  if (isCitywide && events.length > 0) activeSkills.push('citywide');
-  const uniqueDates = new Set(events.map(e => e.date_local).filter(Boolean));
-  if (uniqueDates.size >= 2) activeSkills.push('multiDay');
-  trace.composition.active_skills = activeSkills;
-  recordAICost(trace, 'unified', result._usage, result._provider);
-  trackAICost(phone, result._usage, result._provider);
-
-  return result;
-}
-
-/**
- * Handle the unified LLM response: clear_filters check + 3 response type handlers.
- * All paths are terminal: saveResponseFrame → updateProfile → sendSMS → finalizeTrace.
- */
-async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, message, finalizeTrace) {
-  let { hood, activeFilters, events, curated, taggedPerennials, suggestedHood } = unifiedCtx;
-
-  // Filter state management after unified call — apply LLM's filter_intent
-  // P1 compliant: LLM reports what user requested (language), handler applies it (state).
-  trace.composition = trace.composition || {};
-  if (result.filter_intent?.action === 'clear_all' || result.clear_filters) {
-    activeFilters = {};
-    trace.composition.filter_intent_action = 'clear_all';
-  } else if (result.filter_intent?.action === 'modify' && result.filter_intent?.updates) {
-    const normalized = normalizeFilterIntent(result.filter_intent.updates);
-    activeFilters = mergeFilters(activeFilters, normalized);
-    trace.composition.filter_intent_action = 'modify';
-    trace.composition.filter_intent_updates = normalized;
-  }
-
-  // Handle response by type
-  if (result.type === 'ask_neighborhood') {
-    saveResponseFrame(phone, {
-      picks: session?.lastPicks || [],
-      eventMap: session?.lastEvents || {},
-      neighborhood: hood,
-      filters: Object.values(activeFilters).some(Boolean) ? activeFilters : null,
-      offeredIds: session?.allOfferedIds || [],
-      visitedHoods: session?.visitedHoods || [],
-      pending: {
-        neighborhood: suggestedHood,
-        filters: activeFilters,
-      },
-      pendingMessage: message,
-    });
-    updateProfile(phone, { neighborhood: hood, filters: activeFilters, responseType: 'ask_neighborhood' })
-      .catch(err => console.error('profile update failed:', err.message));
-    await sendSMS(phone, result.sms_text);
-    finalizeTrace(result.sms_text, 'events');
-    return;
-  }
-
-  const eventMap = buildEventMap([...curated, ...taggedPerennials]);
-  // Merge tagged pool events into eventMap so filter_match is available for validation
-  for (const e of events) eventMap[e.id] = e;
-
-  if (result.type === 'conversational' || !result.picks || result.picks.length === 0) {
-    // Conversational or empty picks — save atomically, preserving existing picks/events for details/more
-    saveResponseFrame(phone, {
-      picks: session?.lastPicks || [],
-      eventMap: Object.keys(eventMap).length > 0 ? eventMap : (session?.lastEvents || {}),
-      neighborhood: hood,
-      filters: Object.values(activeFilters).some(Boolean) ? activeFilters : null,
-      offeredIds: session?.allOfferedIds || [],
-      visitedHoods: session?.visitedHoods || [],
-      pending: suggestedHood ? { neighborhood: suggestedHood, filters: activeFilters } : null,
-    });
-    updateProfile(phone, { neighborhood: hood, filters: activeFilters, responseType: 'conversational' })
-      .catch(err => console.error('profile update failed:', err.message));
-    await sendSMS(phone, result.sms_text);
-    finalizeTrace(result.sms_text, 'conversational');
-    return;
-  }
-
-  // Validate event IDs against pool (P7: catch hallucinated IDs before save)
-  const validPicks = (result.picks || []).filter(p => eventMap[p.event_id]);
-
-  // Filter compliance validation — strip non-matching picks when matches exist
-  let filterCompliantPicks = validPicks;
-  const hasActiveFilter = activeFilters && Object.values(activeFilters).some(Boolean);
-  if (hasActiveFilter) {
-    const poolEvents = Object.values(eventMap);
-    const hasMatches = poolEvents.some(e => e.filter_match === 'hard' || e.filter_match === 'soft');
-    if (hasMatches) {
-      filterCompliantPicks = validPicks.filter(p => {
-        const evt = eventMap[p.event_id];
-        return evt?.filter_match === 'hard' || evt?.filter_match === 'soft';
-      });
-      if (filterCompliantPicks.length < validPicks.length) {
-        console.warn(`Filter compliance: ${validPicks.length - filterCompliantPicks.length} non-matching picks stripped`);
-        trace.composition.filter_violations = validPicks.length - filterCompliantPicks.length;
-      }
-    }
-  }
-
-  // Send SMS first — ensures user always gets a response even if session save fails
-  await sendSMS(phone, result.sms_text);
-  saveResponseFrame(phone, {
-    picks: filterCompliantPicks,
-    eventMap,
-    neighborhood: hood,
-    filters: activeFilters,
-    offeredIds: filterCompliantPicks.map(p => p.event_id),
-    visitedHoods: [...new Set([...(session?.visitedHoods || []), hood].filter(Boolean))],
-    pending: suggestedHood ? {
-      neighborhood: suggestedHood,
-      filters: activeFilters,
-    } : null,
-  });
-  updateProfile(phone, { neighborhood: hood, filters: activeFilters, responseType: 'event_picks' })
-    .catch(err => console.error('profile update failed:', err.message));
-  finalizeTrace(result.sms_text, 'events');
-}
-
-/**
- * Handle zero-match bypass: when filters match nothing in a neighborhood,
- * compose a deterministic response and preserve filters in session.
- * $0 AI cost.
- */
-async function handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace) {
-  const { hood, activeFilters, nearbyHoods, events, curated, taggedPerennials } = unifiedCtx;
-  const { message, suggestedHood, source } = buildZeroMatchResponse(hood, activeFilters, nearbyHoods);
-
-  trace.routing.latency_ms = 0;
-  trace.composition.latency_ms = 0;
-  trace.composition.zero_match_bypass = true;
-  trace.composition.zero_match_source = source;
-  trace.composition.active_filters = activeFilters || null;
-  trace.composition.neighborhood_used = hood;
-
-  const eventMap = buildEventMap([...curated, ...taggedPerennials]);
-  for (const e of events) eventMap[e.id] = e;
-
-  const pending = suggestedHood
-    ? { neighborhood: suggestedHood, filters: activeFilters }
-    : null;
-
-  saveResponseFrame(phone, {
-    picks: session?.lastPicks || [],
-    eventMap: Object.keys(eventMap).length > 0 ? eventMap : (session?.lastEvents || {}),
-    neighborhood: hood,
-    filters: Object.values(activeFilters).some(Boolean) ? activeFilters : null,
-    offeredIds: session?.allOfferedIds || [],
-    visitedHoods: session?.visitedHoods || [],
-    pending,
-  });
-  updateProfile(phone, { neighborhood: hood, filters: activeFilters, responseType: 'zero_match' })
-    .catch(err => console.error('profile update failed:', err.message));
-  // Flag so consecutive zero-match turns fall through to LLM (allows filter modification)
-  setSession(phone, { lastZeroMatch: true });
-  await sendSMS(phone, message);
-  finalizeTrace(message, 'events');
-}
-
 async function handleMessageAI(phone, message) {
   const traceStart = Date.now();
   const masked = maskPhone(phone);
@@ -696,15 +264,26 @@ async function handleMessageAI(phone, message) {
   // Pre-router filter follow-ups: inject detected filters into session for unified branch
   let preDetectedFilters = null;
   if (preRouted && preRouted.intent === 'events') {
-    // Deterministic filter detection (category/time/vibe/free) — use unified branch for composition
-    preDetectedFilters = preRouted.filters;
-    trace.routing.pre_routed = true;
-    trace.routing.result = { intent: preRouted.intent, neighborhood: preRouted.neighborhood, confidence: preRouted.confidence };
-    trace.routing.latency_ms = 0;
-    console.log(`Pre route (pre): intent=${preRouted.intent}, neighborhood=${preRouted.neighborhood} → unified with filters`);
+    if (preRouted.clearFilters) {
+      // Deterministic filter clear (P6) — wipe session filters before unified call
+      setSession(phone, { lastFilters: null, pendingFilters: null });
+      session = getSession(phone);
+      trace.routing.pre_routed = true;
+      trace.routing.result = { intent: 'events', neighborhood: preRouted.neighborhood, confidence: 1.0 };
+      trace.routing.latency_ms = 0;
+      trace.routing.clear_filters = true;
+      console.log(`Pre route (pre): clear_filters detected → unified with no filters`);
+    } else {
+      // Deterministic filter detection (category/time/vibe/free) — use unified branch for composition
+      preDetectedFilters = preRouted.filters;
+      trace.routing.pre_routed = true;
+      trace.routing.result = { intent: preRouted.intent, neighborhood: preRouted.neighborhood, confidence: preRouted.confidence };
+      trace.routing.latency_ms = 0;
+      console.log(`Pre route (pre): intent=${preRouted.intent}, neighborhood=${preRouted.neighborhood} → unified with filters`);
+    }
   }
 
-  if (preRouted && !preDetectedFilters) {
+  if (preRouted && !preDetectedFilters && !preRouted.clearFilters) {
     // Pre-router matched — mechanical shortcuts
     const route = preRouted;
     trace.routing.pre_routed = true;
@@ -735,9 +314,7 @@ async function handleMessageAI(phone, message) {
   }
 
   // Compute model routing based on complexity signals
-  const budgetEntry = aiBudgets.get(phone);
-  const budgetUsedPct = (budgetEntry?.date === getNycDate())
-    ? budgetEntry.cost_usd / DAILY_BUDGET_USD : 0;
+  const budgetUsedPct = getBudgetUsedPct(phone);
 
   const routing = routeModel({
     message,
@@ -751,6 +328,7 @@ async function handleMessageAI(phone, message) {
     events: unifiedCtx.events,
     conversationHistory: history,
     isCitywide: unifiedCtx.isCitywide,
+    hasPreDetectedFilters: !!preDetectedFilters,
     budgetUsedPct,
   });
   trace.routing.model_routing = routing;
@@ -763,8 +341,7 @@ async function handleMessageAI(phone, message) {
 
 // Cleanup intervals (for graceful shutdown)
 function clearSmsIntervals() {
-  clearInterval(dedupInterval);
-  clearInterval(rateLimitInterval);
+  clearGuardIntervals();
   clearSessionInterval();
 }
 

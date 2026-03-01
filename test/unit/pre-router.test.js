@@ -137,19 +137,23 @@ check('comedy (no hood session) → events', preRoute('comedy', noHoodSession)?.
 check('comedy (no hood session) → neighborhood null', preRoute('comedy', noHoodSession)?.neighborhood === null);
 check('free (no hood session) → events+free', preRoute('free', noHoodSession)?.filters?.free_only === true);
 
-// --- Filter clearing and compound extraction → now handled by unified LLM ---
-// These messages all fall through to null since pre-router no longer handles them
-console.log('\npreRoute filter clearing/compound → null (LLM handles):');
+// --- Filter clearing: deterministic (P6) when active filters exist ---
+console.log('\npreRoute filter clearing (deterministic P6):');
 const filterSession = {
   lastPicks: [{ event_id: 'e1' }],
   lastEvents: { e1: { name: 'Jazz Night' } },
   lastNeighborhood: 'East Village',
   lastFilters: { category: 'comedy', free_only: false, vibe: null, time_after: null },
 };
-check('forget the comedy → null (LLM)', preRoute('forget the comedy', filterSession) === null);
-check('show me everything → null (LLM)', preRoute('show me everything', filterSession) === null);
-check('clear filters → null (LLM)', preRoute('clear filters', filterSession) === null);
-check('nvm → null (LLM)', preRoute('nvm', filterSession) === null);
+check('forget the comedy → clearFilters', preRoute('forget the comedy', filterSession)?.clearFilters === true);
+check('show me everything → clearFilters', preRoute('show me everything', filterSession)?.clearFilters === true);
+check('clear filters → clearFilters', preRoute('clear filters', filterSession)?.clearFilters === true);
+check('nvm → clearFilters', preRoute('nvm', filterSession)?.clearFilters === true);
+// Without active filters, these should fall through to LLM
+const noFilterSession = { ...filterSession, lastFilters: null };
+check('nvm without filters → null (LLM)', preRoute('nvm', noFilterSession) === null);
+check('show me everything without filters → null (LLM)', preRoute('show me everything', noFilterSession) === null);
+// Compound messages still go to LLM
 check('free comedy → null (LLM)', preRoute('free comedy', followUpSession) === null);
 check('comedy in bushwick → null (LLM)', preRoute('comedy in bushwick', null) === null);
 check('free late jazz → null (LLM)', preRoute('free late jazz', followUpSession) === null);

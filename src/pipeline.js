@@ -81,12 +81,15 @@ function saveResponseFrame(phone, { mode = 'fresh', picks = [], prevSession,
 /**
  * Build a consistent exhaustion message with nearby neighborhood suggestion.
  */
-function buildExhaustionMessage(hood, { adjacentHoods = [], visitedHoods = [] } = {}) {
+function buildExhaustionMessage(hood, { adjacentHoods = [], visitedHoods = [], filters } = {}) {
   const unvisited = adjacentHoods.filter(n => !visitedHoods.includes(n));
   const suggestion = unvisited[0] || null;
+  const label = describeFilters(filters);
+  const hasFilter = label !== 'events';
+  const what = hasFilter ? `all the ${label}` : 'everything';
   const message = suggestion
-    ? `That's everything I've got in ${hood}! ${suggestion} is right nearby — want picks from there?`
-    : `That's everything I've got in ${hood}! Try a different neighborhood for more.`;
+    ? `That's ${what} I've got in ${hood}! ${suggestion} is right nearby — want ${hasFilter ? label : 'picks'} from there?`
+    : `That's ${what} I've got in ${hood}! Try a different neighborhood for more.`;
   return { message, suggestedHood: suggestion };
 }
 

@@ -1,0 +1,231 @@
+const fs = require('fs');
+const path = require('path');
+const { SOURCE_LABELS, ENDPOINT_URLS } = require('./source-registry');
+const { sendHealthAlert } = require('./alerts');
+const { getNycDateString } = require('./geo');
+
+const HEALTH_WARN_THRESHOLD = 3;
+const HISTORY_MAX = 7;
+
+// --- Source health tracking (expanded) ---
+function makeHealthEntry() {
+  return {
+    consecutiveZeros: 0,
+    lastCount: 0,
+    lastStatus: null,       // 'ok' | 'error' | 'timeout' | 'empty'
+    lastError: null,        // error message string (null on success)
+    lastHttpStatus: null,   // HTTP status code from endpoint check
+    lastDurationMs: null,   // how long this source took to scrape
+    lastScrapeAt: null,     // ISO timestamp of last scrape attempt
+    totalScrapes: 0,        // lifetime scrape count
+    totalSuccesses: 0,      // lifetime success count (events > 0)
+    history: [],            // last 7 entries: { timestamp, count, durationMs, status }
+  };
+}
+
+const sourceHealth = {};
+for (const label of SOURCE_LABELS) {
+  sourceHealth[label] = makeHealthEntry();
+}
+
+// --- Scrape-level metrics ---
+let lastScrapeStats = {
+  startedAt: null,
+  completedAt: null,
+  totalDurationMs: null,
+  totalEvents: 0,
+  dedupedEvents: 0,
+  sourcesOk: 0,
+  sourcesFailed: 0,
+  sourcesEmpty: 0,
+};
+
+// --- Persist health data across deploys ---
+const HEALTH_FILE = path.join(__dirname, '../data/health-cache.json');
+
+function saveHealthData() {
+  try {
+    fs.writeFileSync(HEALTH_FILE, JSON.stringify({ sourceHealth, lastScrapeStats }));
+  } catch (err) { console.error('Failed to persist health data:', err.message); }
+}
+
+// Load persisted health data on boot
+try {
+  const cached = JSON.parse(fs.readFileSync(HEALTH_FILE, 'utf8'));
+  if (cached.sourceHealth) {
+    for (const [label, data] of Object.entries(cached.sourceHealth)) {
+      if (sourceHealth[label]) Object.assign(sourceHealth[label], data);
+    }
+  }
+  if (cached.lastScrapeStats) Object.assign(lastScrapeStats, cached.lastScrapeStats);
+  console.log(`Loaded persisted health data (last scrape: ${lastScrapeStats.completedAt || 'none'})`);
+} catch { /* file doesn't exist yet */ }
+
+// ============================================================
+// Health update helpers — called by events.js during refresh
+// ============================================================
+
+function updateSourceHealth(label, { events, durationMs, status, error }) {
+  const health = sourceHealth[label];
+  if (!health) return;
+
+  const now = new Date().toISOString();
+  health.lastCount = events.length;
+  health.lastStatus = status;
+  health.lastError = error;
+  health.lastDurationMs = durationMs;
+  health.lastScrapeAt = now;
+  health.totalScrapes++;
+  if (events.length > 0) {
+    health.totalSuccesses++;
+    health.consecutiveZeros = 0;
+  } else {
+    health.consecutiveZeros++;
+    if (health.consecutiveZeros >= HEALTH_WARN_THRESHOLD) {
+      console.warn(`[HEALTH] ${label} has returned 0 events for ${health.consecutiveZeros} consecutive refreshes`);
+    }
+  }
+
+  // Push to history (capped at HISTORY_MAX)
+  health.history.push({ timestamp: now, count: events.length, durationMs, status });
+  if (health.history.length > HISTORY_MAX) {
+    health.history.shift();
+  }
+}
+
+function updateEndpointStatus(label, httpStatus) {
+  if (sourceHealth[label]) {
+    sourceHealth[label].lastHttpStatus = httpStatus;
+  }
+}
+
+function updateScrapeStats(stats) {
+  lastScrapeStats = stats;
+}
+
+function alertOnFailingSources() {
+  const alertable = Object.entries(sourceHealth)
+    .filter(([_, h]) => h.consecutiveZeros >= HEALTH_WARN_THRESHOLD)
+    .map(([label, h]) => ({ label, consecutiveZeros: h.consecutiveZeros, lastError: h.lastError, lastStatus: h.lastStatus }));
+  if (alertable.length > 0) {
+    sendHealthAlert(alertable, lastScrapeStats).catch(err =>
+      console.error('[ALERT] Failed:', err.message)
+    );
+  }
+}
+
+// ============================================================
+// Proactive endpoint checks — HEAD requests during scrape
+// ============================================================
+
+async function checkEndpoints() {
+  const results = {};
+  const checks = Object.entries(ENDPOINT_URLS).map(async ([label, url]) => {
+    const start = Date.now();
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch(url, {
+        method: 'HEAD',
+        signal: controller.signal,
+        headers: { 'User-Agent': 'BestieSMS/1.0 HealthCheck' },
+        redirect: 'follow',
+      });
+      clearTimeout(timeout);
+      results[label] = { httpStatus: res.status, durationMs: Date.now() - start };
+    } catch (err) {
+      results[label] = { httpStatus: null, durationMs: Date.now() - start, error: err.message };
+    }
+  });
+  await Promise.allSettled(checks);
+  return results;
+}
+
+// ============================================================
+// Event mix computation — takes cache as parameter
+// ============================================================
+
+function computeEventMix(eventCache) {
+  if (!eventCache.length) return null;
+
+  const dateCounts = {};
+  for (let i = 0; i < 7; i++) {
+    dateCounts[getNycDateString(i)] = 0;
+  }
+  const categoryCounts = {};
+  const hoodCounts = {};
+  let freeCount = 0;
+  const sourceCounts = {};
+
+  for (const e of eventCache) {
+    if (e.date_local && dateCounts.hasOwnProperty(e.date_local)) dateCounts[e.date_local]++;
+    const cat = e.category || 'other';
+    categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+    if (e.neighborhood) hoodCounts[e.neighborhood] = (hoodCounts[e.neighborhood] || 0) + 1;
+    if (e.is_free) freeCount++;
+    if (e.source_name) sourceCounts[e.source_name] = (sourceCounts[e.source_name] || 0) + 1;
+  }
+
+  return {
+    total: eventCache.length,
+    dateDistribution: dateCounts,
+    categoryDistribution: categoryCounts,
+    neighborhoodDistribution: hoodCounts,
+    freePaid: { free: freeCount, paid: eventCache.length - freeCount },
+    sourceDistribution: sourceCounts,
+  };
+}
+
+// ============================================================
+// Health status — takes cache info as parameter
+// ============================================================
+
+function getHealthStatus(cacheInfo) {
+  const { size, timestamp } = cacheInfo;
+  const sources = {};
+  for (const [label, h] of Object.entries(sourceHealth)) {
+    sources[label] = {
+      status: h.lastStatus,
+      last_count: h.lastCount,
+      consecutive_zeros: h.consecutiveZeros,
+      duration_ms: h.lastDurationMs,
+      http_status: h.lastHttpStatus,
+      last_error: h.lastError,
+      last_scrape: h.lastScrapeAt,
+      success_rate: h.totalScrapes > 0
+        ? Math.round((h.totalSuccesses / h.totalScrapes) * 100) + '%'
+        : null,
+      history: h.history,
+    };
+  }
+
+  const anyFailed = Object.values(sourceHealth).some(h => h.lastStatus === 'error' || h.lastStatus === 'timeout');
+  const allFailed = Object.values(sourceHealth).every(h => h.lastStatus === 'error' || h.lastStatus === 'timeout');
+
+  return {
+    status: allFailed && lastScrapeStats.startedAt ? 'critical' : anyFailed ? 'degraded' : 'ok',
+    cache: {
+      size,
+      age_minutes: timestamp ? Math.round((Date.now() - timestamp) / 60000) : null,
+      fresh: size > 0,
+      last_refresh: timestamp ? new Date(timestamp).toISOString() : null,
+    },
+    scrape: { ...lastScrapeStats },
+    sources,
+    eventMix: computeEventMix._eventCache || null, // set by wrapper in events.js
+  };
+}
+
+module.exports = {
+  sourceHealth,
+  makeHealthEntry,
+  saveHealthData,
+  updateSourceHealth,
+  updateEndpointStatus,
+  updateScrapeStats,
+  alertOnFailingSources,
+  checkEndpoints,
+  computeEventMix,
+  getHealthStatus,
+  HEALTH_WARN_THRESHOLD,
+};

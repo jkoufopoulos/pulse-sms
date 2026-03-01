@@ -32,6 +32,7 @@ const MODELS = {
  * @param {Array}   ctx.events - event pool sent to LLM
  * @param {Array}   ctx.conversationHistory - prior turns
  * @param {boolean} ctx.isCitywide - citywide request
+ * @param {boolean} ctx.hasPreDetectedFilters - pre-router detected a filter follow-up
  * @param {number}  ctx.budgetUsedPct - fraction of daily budget consumed (0-1)
  * @returns {number} complexity score 0-100
  */
@@ -49,6 +50,7 @@ function scoreComplexity(ctx) {
     events = [],
     conversationHistory = [],
     isCitywide = false,
+    hasPreDetectedFilters = false,
   } = ctx;
 
   const hasActiveFilter = activeFilters && Object.values(activeFilters).some(Boolean);
@@ -70,6 +72,14 @@ function scoreComplexity(ctx) {
 
   if (events.length === 0) {
     score += 25; // must deflect gracefully
+  }
+
+  // --- Filter interaction ambiguity ---
+  // When the user has active filters but the pre-router didn't detect a specific
+  // filter follow-up, the message likely involves filter intent (clear, modify, or
+  // implicit preference). These need semantic understanding — route to Haiku.
+  if (hasActiveFilter && !hasPreDetectedFilters) {
+    score += 35; // ambiguous filter interaction needs semantic parsing
   }
 
   // --- Filter complexity ---

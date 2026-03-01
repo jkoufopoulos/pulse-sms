@@ -1,37 +1,15 @@
 const fs = require('fs');
 const path = require('path');
-const { fetchSkintEvents, fetchSkintOngoingEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchDoNYCEvents, fetchBAMEvents, fetchSmallsLiveEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents, fetchTicketmasterEvents, fetchYutoriEvents } = require('./sources');
+const { SOURCES, SOURCE_TIERS, SOURCE_LABELS, ENDPOINT_URLS, MERGE_ORDER } = require('./source-registry');
+const { sourceHealth, saveHealthData, updateSourceHealth, updateEndpointStatus, updateScrapeStats, alertOnFailingSources, checkEndpoints, computeEventMix, getHealthStatus: _getHealthStatus } = require('./source-health');
 const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate } = require('./geo');
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues } = require('./venues');
-const { sendHealthAlert } = require('./alerts');
 const { filterIncomplete, filterKidsEvents } = require('./curation');
 const { eventMatchesFilters, failsTimeGate } = require('./pipeline');
 const { computeCompleteness, backfillEvidence, backfillDateTimes } = require('./sources/shared');
 const { runExtractionAudit } = require('./evals/extraction-audit');
 const { checkSourceCompleteness } = require('./evals/source-completeness');
 const { captureExtractionInput, getExtractionInputs, clearExtractionInputs } = require('./extraction-capture');
-
-// Source tier classification for compose prompt
-const SOURCE_TIERS = {
-  Skint: 'unstructured',
-  SkintOngoing: 'unstructured',
-  NonsenseNYC: 'unstructured',
-  OhMyRockness: 'unstructured',
-  Yutori: 'unstructured',
-  RA: 'primary',
-  Dice: 'primary',
-  BrooklynVegan: 'primary',
-  BAM: 'primary',
-  SmallsLIVE: 'primary',
-  NYCParks: 'secondary',
-  DoNYC: 'secondary',
-  Songkick: 'secondary',
-  Ticketmaster: 'secondary',
-  Eventbrite: 'secondary',
-  NYPL: 'secondary',
-  EventbriteComedy: 'secondary',
-  EventbriteArts: 'secondary',
-};
 
 // Load persisted learned venues on boot
 try {
@@ -86,114 +64,6 @@ if (eventCache.length === 0) {
   } catch { /* file doesn't exist yet — first deploy */ }
 }
 
-// --- Source health tracking (expanded) ---
-function makeHealthEntry() {
-  return {
-    consecutiveZeros: 0,
-    lastCount: 0,
-    lastStatus: null,       // 'ok' | 'error' | 'timeout' | 'empty'
-    lastError: null,        // error message string (null on success)
-    lastHttpStatus: null,   // HTTP status code from endpoint check
-    lastDurationMs: null,   // how long this source took to scrape
-    lastScrapeAt: null,     // ISO timestamp of last scrape attempt
-    totalScrapes: 0,        // lifetime scrape count
-    totalSuccesses: 0,      // lifetime success count (events > 0)
-    history: [],            // last 7 entries: { timestamp, count, durationMs, status }
-  };
-}
-
-// ============================================================
-// Single source registry — everything derives from this array
-// ============================================================
-
-const SOURCES = [
-  { label: 'Skint',            fetch: fetchSkintEvents,         weight: 0.9,  mergeRank: 0, endpoint: 'https://theskint.com' },
-  { label: 'SkintOngoing',     fetch: fetchSkintOngoingEvents,  weight: 0.9,  mergeRank: 1, endpoint: 'https://theskint.com/ongoing-events/' },
-  { label: 'NonsenseNYC',      fetch: fetchNonsenseNYC,         weight: 0.9,  mergeRank: 1, endpoint: 'https://nonsensenyc.com' },
-  { label: 'RA',               fetch: fetchRAEvents,            weight: 0.85, mergeRank: 0, endpoint: 'https://ra.co' },
-  { label: 'OhMyRockness',     fetch: fetchOhMyRockness,        weight: 0.85, mergeRank: 1, endpoint: 'https://www.ohmyrockness.com/shows' },
-  { label: 'Dice',             fetch: fetchDiceEvents,          weight: 0.8,  mergeRank: 0, endpoint: 'https://dice.fm/browse/new-york' },
-  { label: 'BrooklynVegan',    fetch: fetchBrooklynVeganEvents, weight: 0.8,  mergeRank: 1, endpoint: 'https://www.brooklynvegan.com' },
-  { label: 'BAM',              fetch: fetchBAMEvents,           weight: 0.8,  mergeRank: 2, endpoint: 'https://www.bam.org/api/BAMApi/GetCalendarEventsByDayWithOnGoing' },
-  { label: 'SmallsLIVE',       fetch: fetchSmallsLiveEvents,    weight: 0.8,  mergeRank: 3, endpoint: 'https://www.smallslive.com/events/today' },
-  { label: 'Yutori',            fetch: fetchYutoriEvents,        weight: 0.8,  mergeRank: 4, endpoint: null },
-  { label: 'NYCParks',         fetch: fetchNYCParksEvents,      weight: 0.75, mergeRank: 0, endpoint: 'https://www.nycgovparks.org/events' },
-  { label: 'DoNYC',            fetch: fetchDoNYCEvents,         weight: 0.75, mergeRank: 1, endpoint: 'https://donyc.com/events/today' },
-  { label: 'Songkick',         fetch: fetchSongkickEvents,      weight: 0.75, mergeRank: 2, endpoint: 'https://www.songkick.com/metro-areas/7644-us-new-york/today' },
-  { label: 'Ticketmaster',     fetch: fetchTicketmasterEvents,  weight: 0.75, mergeRank: 3, endpoint: 'https://app.ticketmaster.com' },
-  { label: 'Eventbrite',       fetch: fetchEventbriteEvents,    weight: 0.7,  mergeRank: 0, endpoint: 'https://www.eventbrite.com/d/ny--new-york/events--today/' },
-  { label: 'NYPL',             fetch: fetchNYPLEvents,          weight: 0.7,  mergeRank: 1, endpoint: 'https://www.eventbrite.com/o/new-york-public-library-for-the-performing-arts-5993389089' },
-  { label: 'EventbriteComedy', fetch: fetchEventbriteComedy,    weight: 0.7,  mergeRank: 2, endpoint: null },
-  { label: 'EventbriteArts',   fetch: fetchEventbriteArts,      weight: 0.7,  mergeRank: 3, endpoint: null },
-  // Tavily removed entirely — daily scrape returns 0 events, hot-path fallback added 9-15s
-  // latency per request with 58% waste rate. All event data comes from the 18 scrapers above.
-];
-
-// Boot-time validation — fail fast on config errors
-function validateSources(sources) {
-  const labels = new Set();
-  for (const s of sources) {
-    if (!s.label) throw new Error('Source missing label');
-    if (labels.has(s.label)) throw new Error(`Duplicate source label: ${s.label}`);
-    labels.add(s.label);
-    if (typeof s.fetch !== 'function') throw new Error(`${s.label}: fetch must be a function`);
-    if (typeof s.weight !== 'number' || s.weight < 0 || s.weight > 1) throw new Error(`${s.label}: weight must be 0-1`);
-  }
-}
-validateSources(SOURCES);
-
-// Derived — no manual sync needed
-const SOURCE_LABELS = SOURCES.map(s => s.label);
-
-const ENDPOINT_URLS = Object.fromEntries(
-  SOURCES.filter(s => s.endpoint).map(s => [s.label, s.endpoint])
-);
-
-const MERGE_ORDER = [...SOURCES]
-  .sort((a, b) => (b.weight - a.weight) || (a.mergeRank - b.mergeRank) || a.label.localeCompare(b.label))
-  .map(s => s.label);
-
-const sourceHealth = {};
-for (const label of SOURCE_LABELS) {
-  sourceHealth[label] = makeHealthEntry();
-}
-
-const HEALTH_WARN_THRESHOLD = 3;
-const HISTORY_MAX = 7;
-
-// --- Scrape-level metrics ---
-let lastScrapeStats = {
-  startedAt: null,
-  completedAt: null,
-  totalDurationMs: null,
-  totalEvents: 0,
-  dedupedEvents: 0,
-  sourcesOk: 0,
-  sourcesFailed: 0,
-  sourcesEmpty: 0,
-};
-
-// --- Persist health data across deploys ---
-const HEALTH_FILE = path.join(__dirname, '../data/health-cache.json');
-
-function saveHealthData() {
-  try {
-    fs.writeFileSync(HEALTH_FILE, JSON.stringify({ sourceHealth, lastScrapeStats }));
-  } catch (err) { console.error('Failed to persist health data:', err.message); }
-}
-
-// Load persisted health data on boot
-try {
-  const cached = JSON.parse(fs.readFileSync(HEALTH_FILE, 'utf8'));
-  if (cached.sourceHealth) {
-    for (const [label, data] of Object.entries(cached.sourceHealth)) {
-      if (sourceHealth[label]) Object.assign(sourceHealth[label], data);
-    }
-  }
-  if (cached.lastScrapeStats) Object.assign(lastScrapeStats, cached.lastScrapeStats);
-  console.log(`Loaded persisted health data (last scrape: ${lastScrapeStats.completedAt || 'none'})`);
-} catch { /* file doesn't exist yet */ }
-
 // ============================================================
 // Timed fetch wrapper — captures duration + status per source
 // ============================================================
@@ -219,33 +89,6 @@ async function timedFetch(fetchFn, label, weight) {
 }
 
 // ============================================================
-// Proactive endpoint checks — HEAD requests during scrape
-// ============================================================
-
-async function checkEndpoints() {
-  const results = {};
-  const checks = Object.entries(ENDPOINT_URLS).map(async ([label, url]) => {
-    const start = Date.now();
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
-      const res = await fetch(url, {
-        method: 'HEAD',
-        signal: controller.signal,
-        headers: { 'User-Agent': 'BestieSMS/1.0 HealthCheck' },
-        redirect: 'follow',
-      });
-      clearTimeout(timeout);
-      results[label] = { httpStatus: res.status, durationMs: Date.now() - start };
-    } catch (err) {
-      results[label] = { httpStatus: null, durationMs: Date.now() - start, error: err.message };
-    }
-  });
-  await Promise.allSettled(checks);
-  return results;
-}
-
-// ============================================================
 // Cache refresh — fetches all sources in parallel
 // ============================================================
 
@@ -254,7 +97,6 @@ async function refreshCache() {
 
   refreshPromise = (async () => {
     const scrapeStart = new Date();
-    lastScrapeStats.startedAt = scrapeStart.toISOString();
     clearExtractionInputs(); // Clear for this scrape cycle
     console.log('Refreshing event cache (all sources)...');
 
@@ -268,9 +110,7 @@ async function refreshCache() {
     // Store endpoint check results
     const endpoints = endpointResults.status === 'fulfilled' ? endpointResults.value : {};
     for (const [label, data] of Object.entries(endpoints)) {
-      if (sourceHealth[label]) {
-        sourceHealth[label].lastHttpStatus = data.httpStatus;
-      }
+      updateEndpointStatus(label, data.httpStatus);
     }
 
     const allEvents = [];
@@ -287,7 +127,6 @@ async function refreshCache() {
 
     let sourcesOk = 0, sourcesFailed = 0, sourcesEmpty = 0;
     let totalRaw = 0;
-    const now = new Date().toISOString();
 
     // Merge in priority order (highest weight first, then mergeRank)
     for (const label of MERGE_ORDER) {
@@ -305,31 +144,7 @@ async function refreshCache() {
         console.error(`${label} failed:`, error);
       }
 
-      // Update health tracking
-      const health = sourceHealth[label];
-      if (health) {
-        health.lastCount = events.length;
-        health.lastStatus = status;
-        health.lastError = error;
-        health.lastDurationMs = durationMs;
-        health.lastScrapeAt = now;
-        health.totalScrapes++;
-        if (events.length > 0) {
-          health.totalSuccesses++;
-          health.consecutiveZeros = 0;
-        } else {
-          health.consecutiveZeros++;
-          if (health.consecutiveZeros >= HEALTH_WARN_THRESHOLD) {
-            console.warn(`[HEALTH] ${label} has returned 0 events for ${health.consecutiveZeros} consecutive refreshes`);
-          }
-        }
-
-        // Push to history (capped at HISTORY_MAX)
-        health.history.push({ timestamp: now, count: events.length, durationMs, status });
-        if (health.history.length > HISTORY_MAX) {
-          health.history.shift();
-        }
-      }
+      updateSourceHealth(label, { events, durationMs, status, error });
 
       if (status === 'ok') sourcesOk++;
       else if (status === 'empty') sourcesEmpty++;
@@ -407,7 +222,7 @@ async function refreshCache() {
 
     // Update scrape-level stats
     const scrapeEnd = new Date();
-    lastScrapeStats = {
+    updateScrapeStats({
       startedAt: scrapeStart.toISOString(),
       completedAt: scrapeEnd.toISOString(),
       totalDurationMs: scrapeEnd - scrapeStart,
@@ -416,17 +231,10 @@ async function refreshCache() {
       sourcesOk,
       sourcesFailed,
       sourcesEmpty,
-    };
+    });
 
     // Alert on sources that have been failing for 3+ consecutive scrapes
-    const alertable = Object.entries(sourceHealth)
-      .filter(([_, h]) => h.consecutiveZeros >= HEALTH_WARN_THRESHOLD)
-      .map(([label, h]) => ({ label, consecutiveZeros: h.consecutiveZeros, lastError: h.lastError, lastStatus: h.lastStatus }));
-    if (alertable.length > 0) {
-      sendHealthAlert(alertable, lastScrapeStats).catch(err =>
-        console.error('[ALERT] Failed:', err.message)
-      );
-    }
+    alertOnFailingSources();
 
     // Run extraction audit (deterministic tier only — fast, free)
     try {
@@ -473,7 +281,6 @@ async function refreshSources(sourceNames, { reprocess = false } = {}) {
   }
 
   console.log(`Refreshing ${targets.length} source(s): ${targets.map(s => s.label).join(', ')}`);
-  const targetLabels = new Set(targets.map(s => s.label));
 
   // Fetch only the targeted sources — pass reprocess to Yutori if requested
   const results = await Promise.allSettled(
@@ -498,22 +305,7 @@ async function refreshSources(sourceNames, { reprocess = false } = {}) {
       ? settled.value
       : { events: [], durationMs: 0, status: 'error', error: settled.reason?.message };
 
-    // Update health tracking
-    const health = sourceHealth[label];
-    if (health) {
-      health.lastCount = events.length;
-      health.lastStatus = status;
-      health.lastError = error;
-      health.lastDurationMs = durationMs;
-      health.lastScrapeAt = new Date().toISOString();
-      health.totalScrapes++;
-      if (events.length > 0) {
-        health.totalSuccesses++;
-        health.consecutiveZeros = 0;
-      } else {
-        health.consecutiveZeros++;
-      }
-    }
+    updateSourceHealth(label, { events, durationMs, status, error });
 
     for (const e of events) {
       if (!seen.has(e.id)) {
@@ -640,7 +432,7 @@ async function getEventsCitywide({ dateRange } = {}) {
     return d >= rangeStart && d <= rangeEnd;
   });
 
-  // Rank by: date proximity (today first) × source tier quality
+  // Rank by: date proximity (today first) x source tier quality
   const tierOrder = { unstructured: 0, primary: 1, secondary: 2 };
   const sorted = dateFiltered.sort((a, b) => {
     const dateA = getEventDate(a) || rangeEnd;
@@ -721,70 +513,11 @@ function getCacheStatus() {
   };
 }
 
-function computeEventMix() {
-  if (!eventCache.length) return null;
-
-  const dateCounts = {};
-  for (let i = 0; i < 7; i++) {
-    dateCounts[getNycDateString(i)] = 0;
-  }
-  const categoryCounts = {};
-  const hoodCounts = {};
-  let freeCount = 0;
-  const sourceCounts = {};
-
-  for (const e of eventCache) {
-    if (e.date_local && dateCounts.hasOwnProperty(e.date_local)) dateCounts[e.date_local]++;
-    const cat = e.category || 'other';
-    categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
-    if (e.neighborhood) hoodCounts[e.neighborhood] = (hoodCounts[e.neighborhood] || 0) + 1;
-    if (e.is_free) freeCount++;
-    if (e.source_name) sourceCounts[e.source_name] = (sourceCounts[e.source_name] || 0) + 1;
-  }
-
-  return {
-    total: eventCache.length,
-    dateDistribution: dateCounts,
-    categoryDistribution: categoryCounts,
-    neighborhoodDistribution: hoodCounts,
-    freePaid: { free: freeCount, paid: eventCache.length - freeCount },
-    sourceDistribution: sourceCounts,
-  };
-}
-
 function getHealthStatus() {
-  const sources = {};
-  for (const [label, h] of Object.entries(sourceHealth)) {
-    sources[label] = {
-      status: h.lastStatus,
-      last_count: h.lastCount,
-      consecutive_zeros: h.consecutiveZeros,
-      duration_ms: h.lastDurationMs,
-      http_status: h.lastHttpStatus,
-      last_error: h.lastError,
-      last_scrape: h.lastScrapeAt,
-      success_rate: h.totalScrapes > 0
-        ? Math.round((h.totalSuccesses / h.totalScrapes) * 100) + '%'
-        : null,
-      history: h.history,
-    };
-  }
-
-  const anyFailed = Object.values(sourceHealth).some(h => h.lastStatus === 'error' || h.lastStatus === 'timeout');
-  const allFailed = Object.values(sourceHealth).every(h => h.lastStatus === 'error' || h.lastStatus === 'timeout');
-
-  return {
-    status: allFailed && lastScrapeStats.startedAt ? 'critical' : anyFailed ? 'degraded' : 'ok',
-    cache: {
-      size: eventCache.length,
-      age_minutes: cacheTimestamp ? Math.round((Date.now() - cacheTimestamp) / 60000) : null,
-      fresh: eventCache.length > 0,
-      last_refresh: cacheTimestamp ? new Date(cacheTimestamp).toISOString() : null,
-    },
-    scrape: { ...lastScrapeStats },
-    sources,
-    eventMix: computeEventMix(),
-  };
+  const result = _getHealthStatus({ size: eventCache.length, timestamp: cacheTimestamp });
+  // Attach eventMix computed from live cache
+  result.eventMix = computeEventMix(eventCache);
+  return result;
 }
 
 function getRawCache() {
