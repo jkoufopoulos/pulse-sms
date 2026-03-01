@@ -243,7 +243,7 @@ function preRoute(message, session) {
   if (hasActiveFilters && (session?.lastNeighborhood || session?.lastPicks?.length > 0)) {
     // Note: "forget the [specific]" (e.g. "forget the free thing") falls through to LLM
     // for targeted filter removal via filter_intent: modify. Only generic clears here.
-    if (/^(?:nvm|nevermind|never\s*mind|forget\s+(?:it|that)|drop\s+(?:the\s+)?filter|no\s+(?:more\s+)?filter|start\s*(?:fresh|over)|show\s*(?:me\s+)?(?:everything|whatever|whats?\s*good)|just\s+show\s+me\s+(?:everything|whatever|whats?\s*good)|(?:i(?:'?m| am)\s+)?open\s+to\s+(?:anything|whatever)|(?:anything|whatever)\s+works|(?:just\s+)?surprise\s+me|clear\s+filter)s?$/i.test(msg)) {
+    if (/^(?:actually\s+)?(?:nvm|nevermind|never\s*mind|forget\s+(?:it|that)|drop\s+(?:the\s+)?filter|no\s+(?:more\s+)?filter|start\s*(?:fresh|over)|show\s*(?:me\s+)?(?:everything|whatever|whats?\s*good)|just\s+show\s+me\s+(?:everything|whatever|whats?\s*good)|(?:i(?:'?m| am)\s+)?open\s+to\s+(?:anything|whatever|anytime)|(?:anything|whatever|anytime)\s+(?:works|is fine|is good|is ok|is cool)|(?:just\s+)?surprise\s+me|clear\s+filter)s?$/i.test(msg)) {
       return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, clearFilters: true };
     }
   }
