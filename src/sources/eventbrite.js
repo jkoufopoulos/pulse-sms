@@ -64,7 +64,7 @@ function parseEventbriteServerData(html) {
     const nameAndDesc = ((e.name || '') + ' ' + (e.summary || '')).toLowerCase();
     const tags = (e.tags || []).map(t => (t.display_name || t.tag || '').toLowerCase());
     const hasFreeTag = tags.some(t => t === 'free' || t === 'free_entry');
-    const isFree = hasFreeTag || nameAndDesc.includes('free admission') || nameAndDesc.includes('free entry') || nameAndDesc.includes('free event');
+    const isFree = hasFreeTag || /\bfree\b/i.test(nameAndDesc);
     const category = inferCategory(nameAndDesc);
 
     let priceDisplay = null;
