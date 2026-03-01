@@ -28,7 +28,6 @@ const SOURCE_MINIMUMS = {
   DoNYC: 5,
   Ticketmaster: 5,
   NonsenseNYC: 3,
-  OhMyRockness: 3,
   BrooklynVegan: 3,
   SmallsLIVE: 3,
   Songkick: 3,
