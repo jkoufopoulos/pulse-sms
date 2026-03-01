@@ -104,7 +104,12 @@ function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
     map_url: null,
     map_hint: e.map_hint || null,
     series_end: e.series_end || null,
-    evidence: e.evidence || null,
+    evidence: e.evidence || {
+      name_quote: e.name ? e.name.toLowerCase() : null,
+      time_quote: e.start_time_local || null,
+      location_quote: e.venue_name && e.venue_name !== 'TBA' ? e.venue_name.toLowerCase() : null,
+      price_quote: e.price_display ? e.price_display.toLowerCase() : (e.is_free === true ? 'free' : null),
+    },
     // Carry raw recurrence fields for downstream pattern detection (transient, not persisted to DB)
     ...((e.is_recurring || e.recurrence_day || e.recurrence_time) ? {
       _raw: {
