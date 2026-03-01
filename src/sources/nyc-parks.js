@@ -51,6 +51,7 @@ async function fetchNYCParksEvents() {
         if (!title) return;
 
         const venueCoords = lookupVenue(venueName);
+        if (venueCoords) console.log(`[NYC Parks] Venue hit: "${venueName}" → ${venueCoords.lat},${venueCoords.lng}`);
         const neighborhood = venueCoords
           ? resolveNeighborhood(null, venueCoords.lat, venueCoords.lng)
           : resolveNeighborhood(borough, null, null);
