@@ -304,8 +304,7 @@ function buildTaggedPool(events, activeFilters, { citywide = false } = {}) {
 
   const hardSlice = applyDiversity(hard, 10);
   const softSlice = applyDiversity(soft, Math.max(0, 10 - hardSlice.length));
-  const unmatchedSlice = applyDiversity(unmatched, Math.max(0, 15 - hardSlice.length - softSlice.length));
-  const pool = [...hardSlice, ...softSlice, ...unmatchedSlice];
+  const pool = [...hardSlice, ...softSlice];
 
   const totalMatched = hard.length + soft.length;
   return {

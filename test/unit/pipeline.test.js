@@ -176,10 +176,10 @@ const comedyResult = buildTaggedPool(mixed, { category: 'comedy' });
 check('comedy filter: matchCount 8', comedyResult.matchCount === 8);
 check('comedy filter: hardCount 8', comedyResult.hardCount === 8);
 check('comedy filter: softCount 0', comedyResult.softCount === 0);
-check('comedy filter: pool size 15', comedyResult.pool.length === 15);
+check('comedy filter: pool size 8 (matched only)', comedyResult.pool.length === 8);
 check('comedy filter: isSparse false (8 >= 3)', comedyResult.isSparse === false);
-check('comedy filter: first 8 hard', comedyResult.pool.slice(0, 8).every(e => e.filter_match === 'hard'));
-check('comedy filter: last 7 unmatched', comedyResult.pool.slice(8).every(e => e.filter_match === false));
+check('comedy filter: all hard', comedyResult.pool.every(e => e.filter_match === 'hard'));
+check('comedy filter: no unmatched in pool', comedyResult.pool.every(e => e.filter_match !== false));
 
 // Sparse: 2 comedy + 20 nightlife
 const sparseEvents = [
@@ -189,25 +189,24 @@ const sparseEvents = [
 const sparseResult = buildTaggedPool(sparseEvents, { category: 'comedy' });
 check('sparse: matchCount 2', sparseResult.matchCount === 2);
 check('sparse: isSparse true', sparseResult.isSparse === true);
-check('sparse: pool size 15', sparseResult.pool.length === 15);
-check('sparse: first 2 hard', sparseResult.pool.slice(0, 2).every(e => e.filter_match === 'hard'));
-check('sparse: rest unmatched', sparseResult.pool.slice(2).every(e => e.filter_match === false));
+check('sparse: pool size 2 (matched only)', sparseResult.pool.length === 2);
+check('sparse: all hard', sparseResult.pool.every(e => e.filter_match === 'hard'));
+check('sparse: no unmatched in pool', sparseResult.pool.every(e => e.filter_match !== false));
 
 // Zero matches → matchCount 0, isSparse false (0 is not sparse, it's empty)
 const zeroResult = buildTaggedPool(makeEvents(20, { category: 'nightlife' }), { category: 'comedy' });
 check('zero matches: matchCount 0', zeroResult.matchCount === 0);
 check('zero matches: isSparse false', zeroResult.isSparse === false);
-check('zero matches: pool size 15', zeroResult.pool.length === 15);
-check('zero matches: all unmatched', zeroResult.pool.every(e => e.filter_match === false));
+check('zero matches: pool size 0 (no matches, no padding)', zeroResult.pool.length === 0);
 
 // Hard matched > 10 → cap at 10 hard
 const manyMatched = makeEvents(14, { category: 'comedy' });
 const manyResult = buildTaggedPool([...manyMatched, ...makeEvents(6, { category: 'nightlife' })], { category: 'comedy' });
 check('many matches: matchCount 14', manyResult.matchCount === 14);
 check('many matches: hardCount 14', manyResult.hardCount === 14);
-check('many matches: pool size 15', manyResult.pool.length === 15);
-check('many matches: 10 hard in pool', manyResult.pool.filter(e => e.filter_match === 'hard').length === 10);
-check('many matches: 5 unmatched padding', manyResult.pool.filter(e => e.filter_match === false).length === 5);
+check('many matches: pool size 10 (hard cap, no padding)', manyResult.pool.length === 10);
+check('many matches: all hard', manyResult.pool.every(e => e.filter_match === 'hard'));
+check('many matches: no unmatched in pool', manyResult.pool.every(e => e.filter_match !== false));
 
 // Small event list → pool smaller than 15
 const smallResult = buildTaggedPool(makeEvents(5, { category: 'comedy' }), { category: 'comedy' });
@@ -257,8 +256,9 @@ check('soft: hardCount 0', softResult.hardCount === 0);
 check('soft: softCount 3', softResult.softCount === 3);
 check('soft: matchCount 3', softResult.matchCount === 3);
 check('soft: isSparse false', softResult.isSparse === false);
-check('soft: first 3 soft', softResult.pool.slice(0, 3).every(e => e.filter_match === 'soft'));
-check('soft: rest unmatched', softResult.pool.slice(3).every(e => e.filter_match === false));
+check('soft: all soft', softResult.pool.every(e => e.filter_match === 'soft'));
+check('soft: pool size 3 (matched only)', softResult.pool.length === 3);
+check('soft: no unmatched in pool', softResult.pool.every(e => e.filter_match !== false));
 
 // Three-tier: mixed hard + soft (free=hard constraint, jazz=soft)
 const mixedTierEvents = [
@@ -281,8 +281,8 @@ const orderEvents = [
 ];
 // free_only filter (no subcategory): comedy + live_music free = hard, nightlife paid = unmatched
 const orderResult = buildTaggedPool(orderEvents, { free_only: true });
-check('order: first 2 hard', orderResult.pool.slice(0, 2).every(e => e.filter_match === 'hard'));
-check('order: last unmatched', orderResult.pool[2].filter_match === false);
+check('order: both hard', orderResult.pool.every(e => e.filter_match === 'hard'));
+check('order: pool size 2 (no unmatched padding)', orderResult.pool.length === 2);
 
 
 // ---- normalizeFilters ----
@@ -426,8 +426,9 @@ const timeCatResult = buildTaggedPool(timeCatEvents, { category: 'comedy', time_
 check('time+cat: early comedy excluded', timeCatResult.pool.every(e => e.id !== 'tc1'));
 check('time+cat: early music excluded', timeCatResult.pool.every(e => e.id !== 'tc4'));
 check('time+cat: late comedy is hard match', timeCatResult.pool.find(e => e.id === 'tc2')?.filter_match === 'hard');
-check('time+cat: late music is unmatched', timeCatResult.pool.find(e => e.id === 'tc3')?.filter_match === false);
+check('time+cat: late music not in pool', !timeCatResult.pool.some(e => e.id === 'tc3'));
 check('time+cat: matchCount 1', timeCatResult.matchCount === 1);
+check('time+cat: pool size 1 (matched only)', timeCatResult.pool.length === 1);
 
 // After-midnight filter: 00:00 — excludes 22:00 but includes 01:00
 const midnightEvents = [
