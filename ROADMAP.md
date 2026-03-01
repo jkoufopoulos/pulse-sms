@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-01 (Skint ongoing events scraper, Friday/Saturday newsletter event loss fix, systemic failure fixes, handler.js events bug, Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
+> Last updated: 2026-03-01 (eval trajectory & trends, Skint ongoing events scraper, Friday/Saturday newsletter event loss fix, systemic failure fixes, handler.js events bug, Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
 
 ---
 
@@ -234,6 +234,8 @@ Gaps 2 and 3 are the primary blockers for filter drift improvement beyond the cu
 
 **Conclusion:** Gemini Flash is production-ready as-is. The 13 both-fail scenarios are the real quality gap — fixing those lifts both models. The 7 Gemini-only failures are worth addressing but not blockers.
 
+**Model Strategy (pending):** The Haiku vs Gemini comparison above was pre-systemic-fixes (before handler.js events bug, alias additions, sign-off detection, borough narrowing, prompt hardening). Those fixes addressed the 13 both-fail scenarios. A fresh post-fix comparison is needed to finalize the model decision. See eval trajectory section for run plan.
+
 **What's done (ai.js only):**
 - `unifiedWithGemini()` — temp=0.5, topP=0.9, maxOutputTokens=4096, `responseSchema` enforcing `{type, sms_text, picks[], clear_filters}`
 - `composeWithGemini()` — temp=0.5, topP=0.9, maxOutputTokens=8192 (already existed, params tuned)
@@ -443,6 +445,57 @@ Fixing A+B+C+E (done) should address ~90% of failures. Root Cause D (nudge-accep
 | No horizontal scalability | Single-process fine at current traffic |
 | No structured logging or correlation IDs | Operational improvement for scale |
 | No integration tests or mocking | Important eventually, not blocking |
+
+---
+
+## Eval Trajectory & Trends (as of 2026-03-01)
+
+### Pass Rate Timeline
+
+| Date | Scenarios | Pass Rate | Regression (scenarios) | What Changed |
+|------|-----------|-----------|------------------------|--------------|
+| Feb 22 (AM) | 51 | 66.7% | — | First eval run, 51-scenario suite |
+| Feb 22 (PM) | 51 | 76.5% | 35.0% (7/20) | Hard time gate, compound pre-router, initial regression suite (20 scenarios) |
+| Feb 23 | 71 | 54.9% | — | Suite expanded to 71 scenarios (new edge cases, poor_experience added) |
+| Feb 24 | 130 | 35.4% | — | Suite expanded to 130 (added 26 filter_drift scenarios), Haiku judge (stricter) |
+| Feb 25 | 130 | 54.6% | 36.4% (16/44) | Sonnet judge restored, regression suite expanded to 44, systemic fixes landed |
+| Feb 28 | 130 | 48.5% | 31.8% (14/44) | Session persistence, test endpoint timeout, prompt hardening, Gemini Flash switch |
+
+**Note on judge variance:** The Feb 24 drop (35.4%) was primarily caused by switching to Haiku as judge — Haiku is significantly stricter than Sonnet. Feb 25 restored Sonnet judge and added systemic fixes, producing the peak. The Feb 28 run uses the same judge (Sonnet) but a different event cache (daily cache changes alter which scenarios have matching events).
+
+### Category-Level Trends
+
+| Category | Feb 22 (51) | Feb 25 (130) | Feb 28 (130) | Trend |
+|----------|-------------|--------------|--------------|-------|
+| happy_path | 73.3% (11/15) | 75.0% (36/48) | 79.2% (38/48) | Steady improvement |
+| edge_case | 93.3% (14/15) | 64.5% (20/31) | 51.6% (16/31) | Declining — more scenarios exposed gaps |
+| filter_drift | — | 15.4% (4/26) | 0.0% (0/26) | Stuck — structural, not prompt-fixable |
+| poor_experience | 60.0% (9/15) | 30.0% (6/20) | 25.0% (5/20) | Declining — cache-dependent scenarios |
+| abuse_off_topic | 83.3% (5/6) | 100.0% (5/5) | 80.0% (4/5) | Stable (small N, high variance) |
+
+### Key Patterns
+
+- **Eval non-determinism (~25% scenario variance):** Identical code on different days produces 5-15% overall swings due to daily event cache changes. Scenarios that depend on specific events in specific neighborhoods (outer-borough, thin categories) flip pass/fail based on what was scraped that morning. This makes it hard to attribute pass rate changes to code vs cache.
+
+- **Pool padding is the structural enabler of filter drift (Gap 3):** `buildTaggedPool` pads to 15 events with unmatched events. When filters match 0 events, the LLM sees 15 unmatched events and recommends from them, which judges score as "filter dropped." Prompt hardening ("lead with 'No [filter] in [hood]'") is a mitigation, not a fix. The structural fix is reducing or eliminating unmatched padding when matches are zero.
+
+- **Regression eval decline (35% → 28%) needs investigation:** The regression suite has declined despite code fixes that should have improved it. Possible causes: (1) the Mar 1 run used Haiku as judge (stricter than Sonnet used in earlier runs), (2) suite expanded from 20 → 44 → 47 scenarios (new scenarios may have lower baseline pass rates), (3) assertion-level pass rate is relatively stable (70-76%), suggesting scenarios are partially passing but failing on 1-2 assertions.
+
+- **Outer-borough scenarios are cache-dependent, not code-dependent:** Scenarios for thin neighborhoods (Washington Heights, Red Hook, Sunset Park) fail when the daily cache has few/no events there. These aren't code bugs — they're coverage gaps. The Tavily live-search fallback (landed 2026-03-01) may improve these, but the eval doesn't account for fallback latency.
+
+### Extraction Audit Blind Spots
+
+The extraction audit shows 82-100% pass rates on most days, but this is misleading. The audit only checks events that have raw text capture (`extraction-capture.js`), and most sources skip capture. Typical runs check 2-25 events out of 200+ in the cache. The Feb 24 drop (21.4%, 3/14) was a real signal — extraction confidence thresholds were too permissive for Skint events with ambiguous dates.
+
+### What Moves the Needle
+
+| Action | Expected Impact | Effort | Status |
+|--------|----------------|--------|--------|
+| Reduce pool padding for zero-match filters (Gap 3) | +10-15% filter_drift (structural fix) | Medium | Planned |
+| Stabilize eval judge (pin Sonnet, add deterministic assertions) | Reduces noise, enables real A/B | Low | Planned |
+| Tavily fallback for thin neighborhoods | +5-10% happy_path, poor_experience | Done (2026-03-01) | Verify in next run |
+| Nudge-accept flow (`pendingNearby` + pre-router) | +5% filter_drift (Root Cause D) | Medium | Open |
+| Reasoning/rendering split (Step 4) | Unknown — needs A/B eval | High | Planned |
 
 ---
 
