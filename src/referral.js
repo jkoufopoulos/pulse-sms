@@ -98,7 +98,7 @@ function scheduleDiskWrite() {
       for (const [phone, entry] of attributions) {
         data.attributions[hashPhone(phone)] = {
           referralCode: entry.referralCode,
-          referringPhoneHashed: entry.referringPhoneHashed || hashPhone(entry.referringPhone),
+          referringPhoneHashed: entry.referringPhoneHashed || (entry.referringPhone ? hashPhone(entry.referringPhone) : 'unknown'),
           eventId: entry.eventId,
           attributedAt: entry.attributedAt,
         };
