@@ -12,7 +12,7 @@ const { getEvents, getEventsCitywide, getEventById, scanCityWide, getCacheStatus
 const { lookupReferralCode, recordAttribution } = require('./referral');
 const { filterKidsEvents, validatePerennialActivity } = require('./curation');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
-const { applyFilters, buildEventMap, saveResponseFrame, mergeFilters, buildTaggedPool, buildZeroMatchResponse, tryTavilyFallback } = require('./pipeline');
+const { applyFilters, buildEventMap, saveResponseFrame, mergeFilters, buildTaggedPool, buildZeroMatchResponse, tryTavilyFallback, executeQuery } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
 
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);

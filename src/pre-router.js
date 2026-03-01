@@ -352,7 +352,7 @@ function preRoute(message, session) {
   const hasEarly = /\b(?:early|earlier)\b/i.test(lower);
   if (/\b(?:after\s+midnight|midnight)\b/i.test(lower)) {
     compoundTime = '00:00';
-  } else if (!hasEarly && /\b(?:tonight|later?|late\s*night)\b/i.test(lower)) {
+  } else if (!hasEarly && /\b(?:later?|late\s*night)\b/i.test(lower)) {
     compoundTime = '22:00';
   } else {
     compoundTime = parseTimeExpr(lower);
@@ -372,8 +372,10 @@ function preRoute(message, session) {
   // Date range in compound context: "free comedy this weekend", "jazz friday night"
   const compoundDateRange = parseDateRange(lower);
 
+  // "tonight" is an event-context signal (not a time filter) — counts toward compound threshold
+  const hasTonight = /\btonight\b/i.test(lower) && !compoundTime;
   const filterDims = [hasFree, compoundTime, detectedCat, compoundDateRange].filter(Boolean).length;
-  if (filterDims >= 2 || (filterDims >= 1 && detectedHood)) {
+  if (filterDims >= 2 || (filterDims >= 1 && (detectedHood || hasTonight))) {
     const hood = detectedHood || session?.lastNeighborhood || null;
     // Only include detected keys — undetected keys fall back to session via mergeFilters
     const filters = {};
