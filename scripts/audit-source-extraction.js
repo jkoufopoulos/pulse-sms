@@ -135,7 +135,7 @@ async function auditNonsense() {
   }
 
   // Step 2: Strip HTML
-  const { stripHtml } = require('../src/sources/yutori');
+  const { stripHtml } = require('../src/sources/shared');
   const text = stripHtml(newsletter.body);
   console.log(`Newsletter text length: ${text.length} chars`);
 

@@ -4,7 +4,7 @@ const { extractEvents } = require('../ai');
 const { fetchEmails } = require('../gmail');
 const { normalizeExtractedEvent, backfillEvidence } = require('./shared');
 const { captureExtractionInput } = require('../extraction-capture');
-const { stripHtml } = require('./yutori');
+const { stripHtml } = require('./shared');
 
 const NONSENSE_DIR = path.join(__dirname, '../../data/nonsense');
 const CACHE_FILE = path.join(NONSENSE_DIR, 'cached-events.json');
