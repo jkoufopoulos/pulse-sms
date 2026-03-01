@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-01 (eval trajectory & trends, Skint ongoing events scraper, Friday/Saturday newsletter event loss fix, systemic failure fixes, handler.js events bug, Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
+> Last updated: 2026-03-01 (Yutori junk event filter, eval trajectory & trends, Skint ongoing events scraper, Friday/Saturday newsletter event loss fix, systemic failure fixes, handler.js events bug, Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
 
 ---
 
@@ -500,6 +500,18 @@ The extraction audit shows 82-100% pass rates on most days, but this is misleadi
 ---
 
 ## Completed Work
+
+### Filter Junk Personal-Advice Events from Yutori (2026-03-01)
+
+Yutori was extracting ~50 prose bullets from non-event scout categories (self-help, tax advice, relationship tips, career coaching) that passed quality gates with conf=0.7-0.8 and comp=0.50-0.70. Three complementary fixes in `src/sources/yutori.js`:
+
+1. **Expanded `NON_EVENT_CATEGORIES`** — Added 13 patterns for personal development, psychology, relationships, career, tax/legal, and coaching. Blocks non-event emails before extraction via `isEventEmail()`.
+2. **Expanded `NON_EVENT_FILENAMES`** — Added 12 filename slug patterns (`friendship`, `self-help`, `career-`, `tax-`, etc.) to catch the same categories by subject line.
+3. **Post-extraction content filter** — After LLM extraction, drops events with zero structural signals (no `start_time_local`, no `venue_name` besides TBA, no `ticket_url`/`source_url`, no `date_local`). Real events always have at least one; prose advice bullets have none. Only applies to LLM-extracted events — deterministic-parsed ones already have structural validation.
+
+**Principle alignment:** P6 (deterministic extraction covers common cases) — pattern-matching blocks junk before it reaches the LLM, and a structural invariant catches anything that slips through.
+
+**Tests:** 77 passing.
 
 ### Skint Ongoing Events Scraper (2026-03-01)
 
