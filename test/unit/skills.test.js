@@ -18,7 +18,6 @@ const coreOnly = buildUnifiedPrompt([], {});
 check('core-only includes role tag', coreOnly.includes('<role>'));
 check('core-only includes output_format', coreOnly.includes('<output_format>'));
 check('core-only does NOT include tonight-priority', !coreOnly.includes('TONIGHT PRIORITY'));
-check('core-only does NOT include perennial-framing', !coreOnly.includes('PERENNIAL PICKS'));
 check('core-only does NOT include last-batch', !coreOnly.includes('LAST batch'));
 check('core-only does NOT include free-emphasis', !coreOnly.includes('asked for free'));
 
@@ -27,11 +26,6 @@ const todayEvents = [{ date_local: null, day: 'TODAY', source_name: 'dice' }];
 const withToday = buildUnifiedPrompt(todayEvents, {});
 check('today events includes tonight-priority', withToday.includes('TONIGHT PRIORITY'));
 check('today events includes source tiers', withToday.includes('SOURCE TIERS'));
-
-// With perennial events
-const perennialEvents = [{ source_name: 'perennial', short_detail: 'Live jazz' }];
-const withPerennial = buildUnifiedPrompt(perennialEvents, {});
-check('perennial events includes perennial-framing', withPerennial.includes('PERENNIAL PICKS'));
 
 // With isLastBatch
 const withLastBatch = buildUnifiedPrompt([], { isLastBatch: true });

@@ -4,9 +4,7 @@ const { setSession } = require('./session');
 const { formatEventDetails, smartTruncate } = require('./formatters');
 const { getAdjacentNeighborhoods } = require('./pre-router');
 const { filterByTimeAfter } = require('./geo');
-const { getPerennialPicks, toEventObjects } = require('./perennial');
-const { validatePerennialActivity } = require('./curation');
-const { resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, eventMatchesFilters, executeQuery } = require('./pipeline');
+const { resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, executeQuery } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
 const { generateReferralCode } = require('./referral');
 const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
@@ -269,52 +267,7 @@ async function handleMore(ctx) {
     return;
   }
 
-  // All scraped events exhausted — check for unshown perennial picks
-  const morePicks = getPerennialPicks(hood);
-  const moreLocalPerennials = validatePerennialActivity(toEventObjects(morePicks.local, hood));
-  const moreNearbyPerennials = validatePerennialActivity(toEventObjects(morePicks.nearby, hood, { isNearby: true }));
-  const allMorePerennials = [...moreLocalPerennials, ...moreNearbyPerennials];
-  const allShownMoreIds = new Set([...(ctx.session?.allOfferedIds || []), ...(ctx.session?.allPicks || ctx.session?.lastPicks || []).map(p => p.event_id)]);
-  let unshownPerennials = allMorePerennials.filter(e => !allShownMoreIds.has(e.id));
-  // Filter perennials by active category to avoid serving off-filter picks (e.g. non-jazz when jazz is active)
-  const hasCategory = activeFilters?.category || activeFilters?.subcategory;
-  if (hasCategory && unshownPerennials.length > 0) {
-    const matching = unshownPerennials.filter(e => eventMatchesFilters(e, activeFilters) !== false);
-    if (matching.length > 0) unshownPerennials = matching;
-  }
-
-  if (unshownPerennials.length > 0) {
-    const perennialBatch = unshownPerennials.slice(0, 4);
-    const eventMap = { ...ctx.session.lastEvents, ...buildEventMap(perennialBatch) };
-    ctx.trace.events.cache_size = 0;
-    ctx.trace.events.candidates_count = perennialBatch.length;
-    ctx.trace.events.candidate_ids = perennialBatch.map(e => e.id);
-    const perennialExhaust = buildExhaustionMessage(hood, {
-      adjacentHoods: getAdjacentNeighborhoods(hood, 3),
-      visitedHoods: ctx.session?.visitedHoods || [],
-      filters: activeFilters,
-    });
-    const result = await composeViaExecuteQuery(perennialBatch, ctx, { hood, activeFilters, excludeIds: [...allShownMoreIds], skills: { isLastBatch: true, exhaustionSuggestion: perennialExhaust.message } });
-    result.sms_text = stripMoreReferences(result.sms_text);
-    saveResponseFrame(ctx.phone, {
-      mode: 'more',
-      picks: result.picks || [],
-      prevSession: ctx.session,
-      eventMap,
-      neighborhood: hood,
-      filters: activeFilters,
-      offeredIds: perennialBatch.map(e => e.id),
-      pending: perennialExhaust.suggestedHood ? { neighborhood: perennialExhaust.suggestedHood, filters: activeFilters } : null,
-    });
-    updateProfile(ctx.phone, { neighborhood: hood, filters: activeFilters, responseType: 'more' })
-      .catch(err => console.error('profile update failed:', err.message));
-    await sendComposeWithLinks(ctx.phone, result, eventMap);
-    console.log(`Perennial picks sent to ${ctx.masked} after events exhausted in ${hood}`);
-    ctx.finalizeTrace(result.sms_text, 'more');
-    return;
-  }
-
-  // All events and perennials exhausted — suggest specific nearby neighborhood
+  // All scraped events exhausted — suggest specific nearby neighborhood
   const finalExhaust = buildExhaustionMessage(hood, {
     adjacentHoods: getAdjacentNeighborhoods(hood, 4),
     visitedHoods: ctx.session?.visitedHoods || [hood],

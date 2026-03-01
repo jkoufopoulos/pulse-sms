@@ -90,18 +90,6 @@ const neighborhoodMismatch = {
 NEIGHBORHOOD MISMATCH: NONE of the events are in the requested neighborhood. You MUST acknowledge this upfront by naming the user's REQUESTED neighborhood (from the "Neighborhood:" field) — e.g. "Not much tonight in [requested neighborhood], but nearby:" or "Slim pickings in [requested neighborhood] — here's what's close by:". NEVER substitute a different neighborhood name. Never silently show events from a different neighborhood.`,
 };
 
-const perennialFraming = {
-  id: 'perennial-framing',
-  text: `
-PERENNIAL PICKS: Items with source_name "perennial" are bars/venues always worth visiting. Their short_detail describes what's happening.
-- Lead with the activity: "Black Rabbit has great trivia tonight at 8" not "Black Rabbit is a solid bar."
-- LATE NIGHT (current time after 10pm): Bars become stronger options — but late-night events still win if they're good.
-- THIN EVENTS (1-3 scraped events): Lead with the event, then add a perennial — highlight what's happening there tonight.
-- RICH EVENTS (4+ scraped events): Perennials are optional. Skip or mention one only if it has something specific and great happening.
-- Frame as personal recs — "always a good time" — never "if nothing else works."
-- No start time unless one is mentioned in the description.`,
-};
-
 const venueFraming = {
   id: 'venue-framing',
   text: `
@@ -192,6 +180,6 @@ Events in this pool span multiple days. State the day for each pick — "tomorro
 If all picks happen to fall on the same day, mention it once in the intro instead of repeating.`,
 };
 
-const ALL_SKILLS = { core, tonightPriority, sourceTiers, neighborhoodMismatch, perennialFraming, venueFraming, lastBatch, freeEmphasis, pendingIntent, activityAdherence, conversationAwareness, nearbySuggestion, singlePick, cityScan, citywide, multiDay };
+const ALL_SKILLS = { core, tonightPriority, sourceTiers, neighborhoodMismatch, venueFraming, lastBatch, freeEmphasis, pendingIntent, activityAdherence, conversationAwareness, nearbySuggestion, singlePick, cityScan, citywide, multiDay };
 
 module.exports = ALL_SKILLS;

@@ -11,7 +11,6 @@ require('./unit/formatters.test');
 const venues = require('./unit/venues.test');
 require('./unit/pipeline.test');
 require('./unit/pre-router.test');
-require('./unit/perennials.test');
 require('./unit/ai.test');
 require('./unit/curation.test');
 require('./unit/model-router.test');

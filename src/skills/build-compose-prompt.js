@@ -43,11 +43,6 @@ function buildUnifiedPrompt(events, options = {}) {
     }
   }
 
-  // Perennial framing
-  if (events && events.some(e => e.source_name === 'perennial')) {
-    parts.push(skills.perennialFraming.text);
-  }
-
   // Last batch
   if (options.isLastBatch) {
     let lastBatchText = skills.lastBatch.text;

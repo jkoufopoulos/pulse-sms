@@ -4,8 +4,7 @@ const { recordAICost } = require('./traces');
 const { getSession, setSession } = require('./session');
 const { getAdjacentNeighborhoods } = require('./pre-router');
 const { getEvents, getEventsCitywide, getCacheStatus } = require('./events');
-const { filterKidsEvents, validatePerennialActivity } = require('./curation');
-const { getPerennialPicks, toEventObjects } = require('./perennial');
+const { filterKidsEvents } = require('./curation');
 const { buildEventMap, saveResponseFrame, mergeFilters, normalizeFilterIntent, buildTaggedPool, buildZeroMatchResponse, executeQuery } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
 const { trackAICost } = require('./request-guard');
@@ -73,7 +72,6 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
   // Fetch events — neighborhood or citywide
   let events = [];
   let curated = [];
-  let taggedPerennials = [];
   let isCitywide = false;
   if (hood) {
     const eventsStart = Date.now();
@@ -89,16 +87,6 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
     hardCount = taggedResult.hardCount;
     softCount = taggedResult.softCount;
     isSparse = taggedResult.isSparse;
-    // Merge perennial picks (marked as unmatched) — skip when filters active + matches exist
-    // to avoid sending non-matching material that the LLM might pick from
-    const hasActiveFilter = activeFilters && Object.values(activeFilters).some(Boolean);
-    if (!hasActiveFilter || matchCount === 0) {
-      const perennialPicks = getPerennialPicks(hood);
-      const localPerennials = validatePerennialActivity(toEventObjects(perennialPicks.local, hood));
-      const perennialCap = Math.min(4, 15 - Math.min(events.length, 15));
-      taggedPerennials = localPerennials.slice(0, perennialCap).map(e => ({ ...e, filter_match: false }));
-      events = [...events, ...taggedPerennials];
-    }
 
   } else {
     // Citywide flow — serve best events across all neighborhoods
@@ -150,7 +138,7 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
   const prevOfferedIds = session?.allOfferedIds || [];
   const excludeIds = [...new Set([...prevPickIds, ...prevOfferedIds])];
 
-  return { hood, activeFilters, events, curated, taggedPerennials, matchCount, hardCount, softCount, isSparse, isCitywide, nearbyHoods, suggestedHood, excludeIds, now, userHoodAlias };
+  return { hood, activeFilters, events, curated, matchCount, hardCount, softCount, isSparse, isCitywide, nearbyHoods, suggestedHood, excludeIds, now, userHoodAlias };
 }
 
 /**
@@ -202,7 +190,6 @@ async function callUnified(message, unifiedCtx, session, history, phone, trace, 
   const activeSkills = ['core', 'sourceTiers'];
   if (events.some(e => (e.date_local || e.day) === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) || e.day === 'TODAY')) activeSkills.push('tonightPriority');
   if (hood && !events.some(e => e.neighborhood === hood)) activeSkills.push('neighborhoodMismatch');
-  if (events.some(e => e.source_name === 'perennial')) activeSkills.push('perennialFraming');
   if (activeFilters?.free_only) activeSkills.push('freeEmphasis');
   if (history.length > 0) activeSkills.push('conversationAwareness');
   if (suggestedHood) activeSkills.push('nearbySuggestion');
@@ -222,7 +209,7 @@ async function callUnified(message, unifiedCtx, session, history, phone, trace, 
  * All paths are terminal: saveResponseFrame -> updateProfile -> sendSMS -> finalizeTrace.
  */
 async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, message, finalizeTrace) {
-  let { hood, activeFilters, events, curated, taggedPerennials, suggestedHood } = unifiedCtx;
+  let { hood, activeFilters, events, curated, suggestedHood } = unifiedCtx;
 
   // Filter state management after unified call — apply LLM's filter_intent
   // P1 compliant: LLM reports what user requested (language), handler applies it (state).
@@ -259,7 +246,7 @@ async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, 
     return;
   }
 
-  const eventMap = buildEventMap([...curated, ...taggedPerennials]);
+  const eventMap = buildEventMap(curated);
   // Merge tagged pool events into eventMap so filter_match is available for validation
   for (const e of events) eventMap[e.id] = e;
 
@@ -327,7 +314,7 @@ async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, 
  * $0 AI cost.
  */
 async function handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace) {
-  const { hood, activeFilters, nearbyHoods, events, curated, taggedPerennials } = unifiedCtx;
+  const { hood, activeFilters, nearbyHoods, events, curated } = unifiedCtx;
   const { message, suggestedHood, source } = buildZeroMatchResponse(hood, activeFilters, nearbyHoods);
 
   trace.routing.latency_ms = 0;
@@ -337,7 +324,7 @@ async function handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace)
   trace.composition.active_filters = activeFilters || null;
   trace.composition.neighborhood_used = hood;
 
-  const eventMap = buildEventMap([...curated, ...taggedPerennials]);
+  const eventMap = buildEventMap(curated);
   for (const e of events) eventMap[e.id] = e;
 
   const pending = suggestedHood
