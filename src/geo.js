@@ -1,4 +1,10 @@
-const { NEIGHBORHOODS } = require('./neighborhoods');
+const { NEIGHBORHOODS, BOROUGHS } = require('./neighborhoods');
+
+// Build reverse map: neighborhood → borough for cross-borough penalty
+const HOOD_TO_BOROUGH = {};
+for (const [borough, hoods] of Object.entries(BOROUGHS)) {
+  for (const h of hoods) HOOD_TO_BOROUGH[h] = borough;
+}
 
 // Borough-level fallback map (L8: moved to module scope)
 const BOROUGH_FALLBACK_MAP = {
@@ -88,21 +94,35 @@ function rankEventsByProximity(events, targetNeighborhood, { refTimeMs } = {}) {
   const todayNyc = getNycDateString(0, now);
   const tomorrowNyc = getNycDateString(1, now);
 
+  const targetBoro = HOOD_TO_BOROUGH[targetNeighborhood] || null;
+
   const scored = events.map(e => {
-    // Distance
     const hood = e.neighborhood;
-    let dist = 4.0;
+    let rawDist = 4.0;
+    let resolvedHood = null;
     if (hood) {
       const hoodData = NEIGHBORHOODS[hood];
       if (hoodData) {
-        dist = haversine(targetData.lat, targetData.lng, hoodData.lat, hoodData.lng);
+        rawDist = haversine(targetData.lat, targetData.lng, hoodData.lat, hoodData.lng);
+        resolvedHood = hood;
       } else {
         for (const [name, data] of Object.entries(NEIGHBORHOODS)) {
           if (data.aliases.includes(hood.toLowerCase()) || name.toLowerCase() === hood.toLowerCase()) {
-            dist = haversine(targetData.lat, targetData.lng, data.lat, data.lng);
+            rawDist = haversine(targetData.lat, targetData.lng, data.lat, data.lng);
+            resolvedHood = name;
             break;
           }
         }
+      }
+    }
+    // Cross-borough penalty for sort order only — deprioritize events across
+    // borough lines so same-borough results rank higher, but don't exclude
+    // genuinely nearby cross-river hoods (e.g. East Village ↔ Williamsburg)
+    let sortDist = rawDist;
+    if (resolvedHood && targetBoro) {
+      const eventBoro = HOOD_TO_BOROUGH[resolvedHood] || null;
+      if (eventBoro && eventBoro !== targetBoro) {
+        sortDist *= 1.5;
       }
     }
 
@@ -115,14 +135,14 @@ function rankEventsByProximity(events, targetNeighborhood, { refTimeMs } = {}) {
       dateTier = Math.min(7, Math.round((eventMs - todayMs) / (24 * 60 * 60 * 1000)));
     }
 
-    return { event: e, dist, dateTier };
+    return { event: e, rawDist, sortDist, dateTier };
   });
 
   return scored
-    .filter(s => s.dist <= 3)
+    .filter(s => s.rawDist <= 3)
     .sort((a, b) => {
       if (a.dateTier !== b.dateTier) return a.dateTier - b.dateTier;
-      return a.dist - b.dist;
+      return a.sortDist - b.sortDist;
     })
     .map(s => s.event);
 }

@@ -115,6 +115,102 @@ const ongoingParagraphs = parseSkintParagraphs(
 check('ongoing events preserved despite past-day sections', ongoingParagraphs.some(p => /museum/i.test(p)));
 
 
+// ---- Skint: deterministic parser ----
+console.log('\nSkint deterministic parser:');
+
+const { parseSkintParagraph } = require('../../src/sources/skint');
+
+// Standard event with venue + neighborhood + price
+const std = parseSkintParagraph(
+  'fri 7pm: tale storytelling show: harmon leon hosts an evening of performances by some of the city\'s best storytellers. the red room at kgb bar (east village), save $8 online with promo code. >>',
+  '2026-02-27'
+);
+check('std: parses name', std && std.name === 'tale storytelling show');
+check('std: parses venue', std && std.venue_name === 'the red room at kgb bar');
+check('std: parses neighborhood', std && std.neighborhood === 'East Village');
+check('std: parses time', std && std.start_time_local === '19:00');
+check('std: parses date', std && std.date_local === '2026-02-27');
+check('std: has price', std && std.price_display && std.price_display.includes('$8'));
+check('std: not free', std && std.is_free === false);
+check('std: has description', std && std.description_short && std.description_short.includes('storytellers'));
+check('std: category comedy/storytelling', std && std.category === 'comedy');
+
+// Free event with free admission
+const free1 = parseSkintParagraph(
+  'mon 7pm (monthly): biology on tap: bio and beer blend at the speaker series. pete\'s candy store (williamsburg), free admission ($5 suggested donation). >>',
+  '2026-03-03'
+);
+check('free: parses name', free1 && free1.name === 'biology on tap');
+check('free: parses venue', free1 && free1.venue_name === "pete's candy store");
+check('free: parses neighborhood', free1 && free1.neighborhood === 'Williamsburg');
+check('free: is free', free1 && free1.is_free === true);
+check('free: has price display', free1 && free1.price_display && /free admission/i.test(free1.price_display));
+check('free: modifier stripped', free1 && free1.start_time_local === '19:00');
+
+// Time range
+const range = parseSkintParagraph(
+  'sat 12-6pm: brooklyn flea winter market: vintage goods and local food vendors. atlantic center (fort greene), free. >>',
+  '2026-03-01'
+);
+check('range: start time', range && range.start_time_local === '12:00');
+check('range: end time', range && range.end_time_local === '18:00');
+check('range: is free', range && range.is_free === true);
+check('range: category market', range && range.category === 'market');
+
+// Event with no neighborhood (falls back to no venue extraction)
+const nohood = parseSkintParagraph(
+  "sat 1pm: brooklyn's black trailblazers: cemetery trolley tour: visit the memorials of prominent black brooklynites. $15. >>",
+  '2026-02-28'
+);
+check('nohood: parses name', nohood && nohood.name === "brooklyn's black trailblazers");
+check('nohood: price extracted', nohood && nohood.price_display === '$15');
+check('nohood: no venue', nohood && nohood.venue_name === null);
+check('nohood: category tours', nohood && nohood.category === 'tours');
+
+// Thru event (no time)
+const thru = parseSkintParagraph(
+  'thru sun: film series at bam: a week of screenings. bam (fort greene), $15. >>',
+  '2026-02-27'
+);
+check('thru: parses name', thru && thru.name === 'film series at bam');
+check('thru: no time', thru && thru.start_time_local === null);
+check('thru: has date', thru && thru.date_local === '2026-02-27');
+check('thru: category film', thru && thru.category === 'film');
+
+// Daily event
+const daily = parseSkintParagraph(
+  'daily 10am: free museum admission: explore the galleries at no cost. brooklyn museum (prospect heights), free. >>',
+  '2026-02-28'
+);
+check('daily: parses time', daily && daily.start_time_local === '10:00');
+check('daily: is free', daily && daily.is_free === true);
+check('daily: has neighborhood', daily && daily.neighborhood === 'Prospect Heights');
+
+// Returns null for non-matching text
+const bad = parseSkintParagraph('just some random text that is not an event', '2026-02-28');
+check('non-event returns null', bad === null);
+
+// Confidence scoring
+check('std: high confidence (all fields)', std && std.extraction_confidence >= 0.9);
+check('nohood: lower confidence (missing venue+hood)', nohood && nohood.extraction_confidence <= 0.8);
+
+// Price patterns: "$10 adv, $15 door"
+const advDoor = parseSkintParagraph(
+  'fri 8pm: comedy show: a night of laughs. friends and lovers (crown heights), $10 adv, $15 door. >>',
+  '2026-02-27'
+);
+check('adv/door: price captured', advDoor && advDoor.price_display && advDoor.price_display.includes('$10'));
+check('adv/door: not free', advDoor && advDoor.is_free === false);
+
+// Tonight prefix
+const tonight = parseSkintParagraph(
+  'tonight 9pm: late night jazz: smooth sounds all night. blue note (greenwich village), $25. >>',
+  '2026-02-27'
+);
+check('tonight: parses time', tonight && tonight.start_time_local === '21:00');
+check('tonight: parses name', tonight && tonight.name === 'late night jazz');
+
+
 // ---- Nonsense NYC: cache fallback ----
 console.log('\nNonsense NYC cache fallback:');
 

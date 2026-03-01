@@ -1,5 +1,5 @@
 const Anthropic = require('@anthropic-ai/sdk');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
 const { getEventDate, getNycDateString } = require('./geo');
 const { EXTRACTION_PROMPT, ROUTE_SYSTEM, COMPOSE_SYSTEM, DETAILS_SYSTEM } = require('./prompts');
 const { buildComposePrompt, buildUnifiedPrompt } = require('./skills/build-compose-prompt');
@@ -36,6 +36,14 @@ const MODELS = {
   compose: process.env.PULSE_MODEL_COMPOSE || 'gemini-2.5-flash',
   extract: process.env.PULSE_MODEL_EXTRACT || 'gemini-2.5-flash',
 };
+
+// Safety settings for all Gemini calls — block dangerous content but allow normal event text
+const GEMINI_SAFETY = [
+  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+];
 
 /**
  * Build the routing prompt parts (shared by both providers).
@@ -108,6 +116,7 @@ async function routeWithGemini(systemPrompt, userPrompt) {
   const model = genAI.getGenerativeModel({
     model: MODELS.routeGemini,
     systemInstruction: systemPrompt,
+    safetySettings: GEMINI_SAFETY,
     generationConfig: { maxOutputTokens: 256, temperature: 0, responseMimeType: 'application/json' },
   });
 
@@ -131,6 +140,7 @@ async function composeWithGemini(systemPrompt, userPrompt, model) {
   const gemModel = genAI.getGenerativeModel({
     model: model || MODELS.routeGemini,
     systemInstruction: systemPrompt,
+    safetySettings: GEMINI_SAFETY,
     generationConfig: { maxOutputTokens: 8192, temperature: 0.5, topP: 0.9, responseMimeType: 'application/json' },
   });
 
@@ -154,6 +164,7 @@ async function unifiedWithGemini(systemPrompt, userPrompt) {
   const gemModel = genAI.getGenerativeModel({
     model: MODELS.compose,
     systemInstruction: systemPrompt,
+    safetySettings: GEMINI_SAFETY,
     generationConfig: {
       maxOutputTokens: 4096,
       temperature: 0.5,
@@ -204,6 +215,7 @@ async function extractWithGemini(systemPrompt, userPrompt) {
   const gemModel = genAI.getGenerativeModel({
     model: MODELS.extract,
     systemInstruction: systemPrompt,
+    safetySettings: GEMINI_SAFETY,
     generationConfig: { maxOutputTokens: 4096, temperature: 0, responseMimeType: 'application/json' },
   });
 
@@ -227,6 +239,7 @@ async function detailsWithGemini(systemPrompt, userPrompt) {
   const gemModel = genAI.getGenerativeModel({
     model: MODELS.compose,
     systemInstruction: systemPrompt,
+    safetySettings: GEMINI_SAFETY,
     generationConfig: { maxOutputTokens: 1024, temperature: 0.8 },
   });
 

@@ -86,9 +86,11 @@ check('weather → null (unified)', preRoute('whats the weather like tonight', n
 check('east village → null (unified)', preRoute('east village', null) === null);
 check('williamsburg → null (unified)', preRoute('williamsburg', null) === null);
 
-// Boroughs → now handled by unified LLM
-check('brooklyn → null (unified)', preRoute('brooklyn', null) === null);
-check('bk → null (unified)', preRoute('bk', null) === null);
+// Boroughs → pre-router asks user to narrow to a neighborhood
+check('brooklyn → conversational', preRoute('brooklyn', null)?.intent === 'conversational');
+check('brooklyn → asks to narrow', preRoute('brooklyn', null)?.reply?.includes('neighborhood'));
+check('bk → conversational', preRoute('bk', null)?.intent === 'conversational');
+check('bk → asks to narrow', preRoute('bk', null)?.reply?.includes('neighborhood'));
 
 // Unsupported areas → now handled by unified LLM
 check('bay ridge → null (unified)', preRoute('bay ridge', null) === null);

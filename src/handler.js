@@ -503,7 +503,7 @@ async function callUnified(message, unifiedCtx, session, history, phone, trace) 
  * All paths are terminal: saveResponseFrame → updateProfile → sendSMS → finalizeTrace.
  */
 async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, message, finalizeTrace) {
-  let { hood, activeFilters, curated, taggedPerennials, suggestedHood } = unifiedCtx;
+  let { hood, activeFilters, events, curated, taggedPerennials, suggestedHood } = unifiedCtx;
 
   // Filter state management after unified call
   // Only trust LLM's clear_filters when user message contains clear-intent language.

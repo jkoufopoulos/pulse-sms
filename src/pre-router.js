@@ -1,4 +1,4 @@
-const { NEIGHBORHOODS, BOROUGHS, extractNeighborhood } = require('./neighborhoods');
+const { NEIGHBORHOODS, BOROUGHS, extractNeighborhood, detectBorough } = require('./neighborhoods');
 const { getNycDateString } = require('./geo');
 
 // Build reverse map: neighborhood → borough
@@ -174,9 +174,16 @@ function preRoute(message, session) {
     return { ...base, intent: 'conversational', neighborhood: null, reply: "Later! Hit me up whenever." };
   }
 
+  // Satisfied-exit signals — user is done, warm sign-off (zero AI cost)
+  if (/^(cool|perfect|sick|dope|nice|sweet|awesome|amazing|fire|love it|sounds good|sounds great)(\s+thanks?)?$/i.test(msg)) {
+    if (session?.lastPicks?.length > 0) {
+      return { ...base, intent: 'conversational', neighborhood: null, reply: "Have fun tonight! Hit me up whenever you want more picks." };
+    }
+  }
+
   // Casual acknowledgments (session-aware — only when picks are loaded)
   // Skip when pendingNearby is set — "bet"/"ok" are nudge accepts, let unified handle them
-  if (/^(k|ok|cool|bet|word|aight|ight|gotcha|copy)$/i.test(msg) && !session?.pendingNearby) {
+  if (/^(k|ok|bet|word|aight|ight|gotcha|copy)$/i.test(msg) && !session?.pendingNearby) {
     if (session?.lastPicks?.length > 0) {
       return { ...base, intent: 'conversational', neighborhood: null, reply: `Your ${session.lastNeighborhood || ''} picks are above — reply a number for details, MORE for extra picks, or try a different neighborhood.` };
     }
@@ -189,6 +196,13 @@ function preRoute(message, session) {
       return { ...base, intent: 'conversational', neighborhood: null, reply: `Sorry for the wait! Your ${session.lastNeighborhood || 'picks'} should be above — reply MORE for extra picks or try a different neighborhood.` };
     }
     return { ...base, intent: 'conversational', neighborhood: null, reply: "Hey! Tell me what you're looking for — comedy, jazz, something weird — or a neighborhood." };
+  }
+
+  // Borough detection — ask user to narrow to a neighborhood
+  const boroughResult = detectBorough(msg);
+  if (boroughResult && !extractNeighborhood(msg)) {
+    const topHoods = boroughResult.neighborhoods.slice(0, 4).join(', ');
+    return { ...base, intent: 'conversational', neighborhood: null, reply: `${boroughResult.borough.charAt(0).toUpperCase() + boroughResult.borough.slice(1)} is a big place! Which neighborhood? I can check ${topHoods}...` };
   }
 
   // Category map — shared between filter clearing, session-aware checks, and compound extraction
@@ -335,9 +349,10 @@ function preRoute(message, session) {
   const hasFree = /\bfree\b/i.test(lower);
 
   let compoundTime = null;
+  const hasEarly = /\b(?:early|earlier)\b/i.test(lower);
   if (/\b(?:after\s+midnight|midnight)\b/i.test(lower)) {
     compoundTime = '00:00';
-  } else if (/\b(?:tonight|later?|late\s*night)\b/i.test(lower)) {
+  } else if (!hasEarly && /\b(?:tonight|later?|late\s*night)\b/i.test(lower)) {
     compoundTime = '22:00';
   } else {
     compoundTime = parseTimeExpr(lower);

@@ -151,16 +151,8 @@ const NEIGHBORHOODS = {
     aliases: ['bed-stuy', 'bed stuy', 'bedford stuyvesant', 'bedstuy', 'bedford-stuyvesant']
   },
   'Cobble Hill': {
-    lat: 40.6860, lng: -73.9957, radius_km: 0.5,
-    aliases: ['cobble hill']
-  },
-  'Boerum Hill': {
-    lat: 40.6848, lng: -73.9839, radius_km: 0.5,
-    aliases: ['boerum hill']
-  },
-  'Carroll Gardens': {
-    lat: 40.6795, lng: -73.9991, radius_km: 0.6,
-    aliases: ['carroll gardens']
+    lat: 40.6860, lng: -73.9957, radius_km: 0.7,
+    aliases: ['cobble hill', 'boerum hill', 'carroll gardens']
   },
   'Gowanus': {
     lat: 40.6734, lng: -73.9880, radius_km: 0.8,
@@ -330,7 +322,7 @@ const BOROUGHS = {
     'Williamsburg', 'Bushwick', 'Greenpoint', 'Park Slope', 'South Slope',
     'Downtown Brooklyn', 'DUMBO', 'Fort Greene', 'Clinton Hill',
     'Prospect Heights', 'Crown Heights', 'Bed-Stuy', 'Cobble Hill',
-    'Boerum Hill', 'Carroll Gardens', 'Gowanus', 'Red Hook',
+    'Gowanus', 'Red Hook',
     'Brooklyn Heights', 'Sunset Park', 'Windsor Terrace',
     'Prospect Lefferts Gardens', 'Flatbush', 'Ditmas Park', 'Kensington',
     'Bay Ridge', 'Borough Park', 'Bensonhurst', 'Midwood',

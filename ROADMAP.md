@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-02-28 (Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
+> Last updated: 2026-03-01 (systemic failure fixes, handler.js events bug, Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
 
 ---
 
@@ -447,6 +447,23 @@ Fixing A+B+C+E (done) should address ~90% of failures. Root Cause D (nudge-accep
 ---
 
 ## Completed Work
+
+### Systemic Failure Fixes — 8 changes across 5 files (2026-03-01)
+
+Targeted the 13 both-fail (systemic) scenarios from the Haiku baseline. 8 code changes:
+
+1. **handler.js: Fix `events` destructuring bug** — `handleUnifiedResponse` referenced `events` without destructuring it from `unifiedCtx`. This crashed every unified flow request with `events is not defined`. Pre-existing bug on main.
+2. **neighborhoods.js: Merge Boerum Hill + Carroll Gardens → Cobble Hill aliases** — Expanded Cobble Hill radius 0.5→0.7km, removed standalone entries and BOROUGHS list entries.
+3. **pre-router.js: Borough detection** — "bk", "brooklyn", "queens" etc. now return a conversational response asking user to narrow to a neighborhood, instead of falling through to the LLM.
+4. **pre-router.js: Satisfied-exit sign-offs** — "cool", "perfect", "sick", "dope", "love it", "sounds good" (with optional "thanks") now return a warm sign-off at zero AI cost, instead of re-engaging.
+5. **pre-router.js: "early" negates "tonight" time filter** — "soho tonight early" no longer maps to time_after=22:00. The `hasEarly` check prevents the "tonight" regex from firing.
+6. **prompts.js: Strengthen zero-match rules in UNIFIED_SYSTEM** — "THIS IS CRITICAL" prefix, explicit wrong-behavior examples (DJ is NOT live music, comedy is NOT theater).
+7. **prompts.js: Add FILTER-AWARE SELECTION to COMPOSE_SYSTEM** — The handleMore path now has the same zero-match rules as the unified path.
+8. **geo.js: Cross-borough sort penalty** — 1.5x sort distance for events in a different borough (sort order only, not filtering). Deprioritizes cross-borough results while keeping genuinely nearby cross-river hoods accessible (e.g. East Village ↔ Williamsburg).
+
+**Eval results (2 runs, Haiku):** 25/48 and 23/48 (52%/48%). High variance — 12 of 48 scenarios differ between identical back-to-back runs, indicating ~25% LLM non-determinism in eval scores. Of the original 13 systemic failures: 2 reliably fixed (BK borough, LIC browse), 3 partially fixed (Tribeca, Bed-Stuy, time filter), 8 still failing (mostly thin coverage + complex multi-turn). The handler.js `events` bug fix was critical — without it, 0/48 unified flow requests succeeded.
+
+**Tests:** 727 unit + 77 eval passing. Updated pre-router tests to expect borough detection behavior.
 
 ### Deterministic Yutori Non-Trivia Parser (2026-02-28)
 
