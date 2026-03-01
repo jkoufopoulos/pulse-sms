@@ -276,10 +276,10 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 | 5 | **handleMore path** — No dedicated MORE eval. Dedup across 3+ cycles, filter persistence through MOREs, compose-only prompt path untested. | Medium | **Done** — 3 multi-turn + 3 regression scenarios added |
 | 6 | **Tavily scenarios vestigial** — 3 regression scenarios tested Tavily fallback (removed from hot path). | Medium | **Done** — updated to test deterministic exhaustion behavior, removed P8 references |
 | 7 | **TCPA/opt-out** — Zero scenarios for STOP/UNSUBSCRIBE compliance. Deterministic but legally required. | Low | **Done** — 2 regression scenarios (4 keywords + 3 non-match edge cases) |
-| 8 | **Neighborhood skew** — EV 13x, Bushwick 7x, Wburg 5x. Many outer-borough neighborhoods absent. Failures are cache-dependent, not code-dependent. | Low | Planned |
-| 9 | Trace fetch race condition — could grab wrong trace under concurrent load | Low | Planned |
+| 8 | **Neighborhood skew** — EV 13x, Bushwick 7x, Wburg 5x. Many outer-borough neighborhoods absent. Failures are cache-dependent, not code-dependent. | Low | **Done** — 8 multi-turn + 4 regression scenarios added (Mott Haven, Fordham, Staten Island, Jackson Heights, Flushing, Bay Ridge, Washington Heights, Ridgewood) |
+| 9 | Trace fetch race condition — could grab wrong trace under concurrent load | Low | **Done** — `handleMessageAI` returns `trace.id`, test endpoint uses `getTraceById` |
 
-**Distribution assessment:** happy_path 35.2%, edge_case 25.6%, filter_drift 19.3%, poor_experience 14.8%, abuse_off_topic 5.1%. All categories in healthy range.
+**Distribution assessment:** happy_path 35.9%, edge_case 26.6%, filter_drift 18.5%, poor_experience 14.1%, abuse_off_topic 4.9%. All categories in healthy range. 184 multi-turn + 85 regression = **269 total** golden scenarios.
 
 ---
 
@@ -391,6 +391,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 | Mar 1 | Skint Ongoing events scraper | 31 series events (exhibitions, festivals) via deterministic parser; weight 0.9 |
 | Mar 1 | Friday/Saturday newsletter event loss fix | Yesterday included in scrape filter + 6pm evening scrape added |
 | Mar 1 | Systemic failure fixes (8 changes) | handler.js events bug, borough detection, sign-off handling, early/tonight conflict, zero-match prompt hardening |
+| Mar 1 | Fix eval gaps #8 + #9 | Neighborhood skew: 8 multi-turn + 4 regression scenarios for outer boroughs. Trace race: `getTraceById` replaces phone-based lookup in test endpoint |
 | Mar 1 | Fix 4 open bugs | Multi-word categories, false positives (#8), graceful shutdown (#12), conversational-with-pool guardrail |
 | Mar 1 | Luma event scraper | JSON API, ~330 events/week; fills community/food/art/social gap; NYC bounding box filter |
 | Mar 1 | Fragility audit bulk fix (9 issues) | Issues #5-7, #9-11, #13-15 fixed in one commit; visitedHoods, scraper timeout, max_tokens, atomicWriteSync |

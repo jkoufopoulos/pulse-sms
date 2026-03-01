@@ -2,8 +2,8 @@ const express = require('express');
 const twilio = require('twilio');
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
 const { formatTime, smartTruncate } = require('./formatters');
-const { startTrace, saveTrace, getLatestTraceForPhone, recordAICost } = require('./traces');
-const { getSession, setSession, clearSession, addToHistory, clearSessionInterval } = require('./session');
+const { startTrace, saveTrace, getLatestTraceForPhone, getTraceById, recordAICost } = require('./traces');
+const { getSession, setSession, clearSession, addToHistory, clearSessionInterval, acquireLock } = require('./session');
 const { preRoute } = require('./pre-router');
 const { handleHelp, handleConversational, handleDetails, handleMore } = require('./intent-handlers');
 const { sendRuntimeAlert } = require('./alerts');
@@ -73,12 +73,12 @@ if (process.env.PULSE_TEST_MODE === 'true') {
     enableTestCapture(testPhone);
     const TEST_TIMEOUT_MS = 25000; // 25s — return before Railway's 30s proxy timeout
     try {
-      await Promise.race([
+      const traceId = await Promise.race([
         handleMessage(testPhone, message.trim()),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out (25s)')), TEST_TIMEOUT_MS)),
       ]);
       const captured = disableTestCapture(testPhone);
-      const trace = getLatestTraceForPhone(maskPhone(testPhone));
+      const trace = traceId ? getTraceById(traceId) : getLatestTraceForPhone(maskPhone(testPhone));
       const trace_summary = trace ? {
         id: trace.id,
         intent: trace.output_intent,
@@ -138,30 +138,35 @@ router.post('/incoming', (req, res) => {
 // =======================================================
 
 async function handleMessage(phone, message) {
-  const masked = maskPhone(phone);
-  console.log(`SMS from ${masked}: ${message.slice(0, 80)}`);
-
-  // TCPA compliance: never respond to opt-out keywords
-  if (OPT_OUT_KEYWORDS.test(message.trim())) {
-    console.log(`Opt-out keyword from ${masked}, not responding`);
-    return;
-  }
-
-  if (!process.env.PULSE_TEST_MODE && isOverBudget(phone)) {
-    console.warn(`Over daily AI budget: ${masked}`);
-    await sendSMS(phone, "You've hit your daily limit — check back tomorrow for more picks!");
-    return;
-  }
-
+  const unlock = await acquireLock(phone);
   try {
-    await handleMessageAI(phone, message);
-  } catch (err) {
-    console.error('AI flow error:', err.message);
-    try {
-      await sendSMS(phone, "Bestie hit a snag — try again in a sec!");
-    } catch (smsErr) {
-      console.error(`[CRITICAL] Double failure for ${masked}: AI error="${err.message}", SMS error="${smsErr.message}" — user received nothing`);
+    const masked = maskPhone(phone);
+    console.log(`SMS from ${masked}: ${message.slice(0, 80)}`);
+
+    // TCPA compliance: never respond to opt-out keywords
+    if (OPT_OUT_KEYWORDS.test(message.trim())) {
+      console.log(`Opt-out keyword from ${masked}, not responding`);
+      return;
     }
+
+    if (!process.env.PULSE_TEST_MODE && isOverBudget(phone)) {
+      console.warn(`Over daily AI budget: ${masked}`);
+      await sendSMS(phone, "You've hit your daily limit — check back tomorrow for more picks!");
+      return;
+    }
+
+    try {
+      return await handleMessageAI(phone, message);
+    } catch (err) {
+      console.error('AI flow error:', err.message);
+      try {
+        await sendSMS(phone, "Bestie hit a snag — try again in a sec!");
+      } catch (smsErr) {
+        console.error(`[CRITICAL] Double failure for ${masked}: AI error="${err.message}", SMS error="${smsErr.message}" — user received nothing`);
+      }
+    }
+  } finally {
+    unlock();
   }
 }
 
@@ -305,7 +310,8 @@ async function handleMessageAI(phone, message) {
       setSession(phone, { pendingNearby: null, pendingFilters: null, pendingMessage: null });
     }
 
-    return dispatchPreRouterIntent(route, ctx);
+    await dispatchPreRouterIntent(route, ctx);
+    return trace.id;
   }
 
   // Unified LLM call — handles semantic messages + pre-detected filter follow-ups
@@ -317,7 +323,8 @@ async function handleMessageAI(phone, message) {
   // The flag auto-clears after one LLM turn via setResponseState.
   if (Object.values(unifiedCtx.activeFilters || {}).some(Boolean) &&
       unifiedCtx.matchCount === 0 && !session?.lastZeroMatch) {
-    return handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace);
+    await handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace);
+    return trace.id;
   }
 
   // Compute model routing based on complexity signals
@@ -349,6 +356,7 @@ async function handleMessageAI(phone, message) {
     console.error('LLM failed, degraded fallback:', llmErr.message);
     await handleDegradedFallback(unifiedCtx, phone, session, trace, finalizeTrace, llmErr);
   }
+  return trace.id;
 }
 
 /**
@@ -396,7 +404,7 @@ async function handleDegradedFallback(unifiedCtx, phone, session, trace, finaliz
     neighborhood: hood,
     filters: activeFilters,
     offeredIds: top.map(e => e.id),
-    visitedHoods: [...new Set([...(session?.visitedHoods || []), hood].filter(Boolean))],
+    visitedHoods: [...new Set([...(session?.visitedHoods || []), hood || 'citywide'])],
   });
 
   trace.routing.latency_ms = trace.routing.latency_ms || 0;
