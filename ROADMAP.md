@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-01 (3-model comparison eval, Yutori junk event filter, eval trajectory & trends, Skint ongoing events scraper, Friday/Saturday newsletter event loss fix, systemic failure fixes, handler.js events bug, Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
+> Last updated: 2026-03-01 (Gap 3 pool padding fix, 3-model comparison eval, Yutori junk event filter, eval trajectory & trends, Skint ongoing events scraper, Friday/Saturday newsletter event loss fix, systemic failure fixes, handler.js events bug, Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
 
 ---
 
@@ -176,13 +176,11 @@ The architecture principles (P1-P7) and migration steps address the core design.
 
 **Related:** P2 principle, Migration Step 4, Theme A (category filter drift), Root Cause C (zero-match fallback).
 
-### Gap 3: Pool Padding Gives LLM Material to Violate Filter Intent
+### Gap 3: Pool Padding Gives LLM Material to Violate Filter Intent — **Fixed (2026-03-01)**
 
-**What:** `buildTaggedPool` includes up to 5 unmatched events as padding when filter matches are thin. These events are visible to the LLM with no `[MATCH]` tag, intended as context. But the LLM can and does pick from them — especially Gemini Flash, which is less disciplined about respecting `[MATCH]` boundaries.
+**What:** `buildTaggedPool` included up to 5 unmatched events as padding when filter matches were thin. These events were visible to the LLM with no `[MATCH]` tag, intended as context. But the LLM picked from them — especially Gemini Flash, which was less disciplined about respecting `[MATCH]` boundaries.
 
-**Impact:** This is the structural enabler of filter drift. The deterministic filter machinery works correctly — `mergeFilters` compounds filters, `eventMatchesFilters` classifies correctly, matched events are tagged `[MATCH]`. But then the pool hands the LLM 5+ tempting alternatives with no tag, and the LLM writes copy recommending them. Theme A (6 failures), Root Cause C (25% of filter drift), and Theme F (thin coverage) all trace back to this: the LLM has access to events it shouldn't recommend.
-
-**Fix direction:** Three options, not mutually exclusive: (1) Reduce or eliminate unmatched padding — if filters match 3 events, send 3, not 15. This is the simplest and most P1-aligned fix. (2) Add an explicit `[NO_PICK]` tag to unmatched events so the prompt constraint is reinforced structurally. (3) Complete Gap 2 / Step 4 (reasoning/rendering split) so code validates picks against filter matches before rendering.
+**Fix (2026-03-01):** Eliminated unmatched padding entirely when filters are active. `buildTaggedPool` now returns only hard + soft matched events (no `unmatchedSlice`). Perennial picks (also `filter_match: false`) are skipped when filters have matches. The no-filter path (15 diverse events) is unchanged. The zero-match bypass (`handleZeroMatch`, $0 AI cost) handles matchCount=0. The LLM now only sees events that match the user's filter intent.
 
 **Related:** Theme A (category filter drift), Root Cause C (zero-match fallback), Theme F (thin coverage).
 
@@ -202,10 +200,10 @@ The architecture principles (P1-P7) and migration steps address the core design.
 |-----|-------------------|-------------|------------|
 | 1: `clear_filters` bridge | P1 (code owns state) | Filter wipe on non-clearing turns; semantic clearing misses | Medium — expand pre-router regex, remove LLM field |
 | 2: Reasoning/rendering coupling | P2 (separate concerns) | Category drift, zero-match fallback (Theme A + Root Cause C) | High — Step 4 A/B eval required |
-| 3: Pool padding | P1 (code owns state) | Structural enabler of filter drift (Theme A, C, F) | Low-Medium — reduce padding or add `[NO_PICK]` tag |
+| 3: Pool padding | P1 (code owns state) | Structural enabler of filter drift (Theme A, C, F) | **Done (2026-03-01)** — eliminated unmatched padding |
 | 4: No degraded-mode recovery | (No principle yet) | 35% of eval failures cascade from single LLM failure | Medium — deterministic fallback formatter |
 
-Gaps 2 and 3 are the primary blockers for filter drift improvement beyond the current plateau. Gap 1 is the last P1 violation. Gap 4 is the biggest operational risk.
+Gap 3 is now fixed. Gap 2 is the remaining blocker for filter drift improvement. Gap 1 is the last P1 violation. Gap 4 is the biggest operational risk.
 
 ---
 
@@ -262,7 +260,7 @@ When `[MATCH]` events are sparse, Gemini fills with unmatched events without ack
 
 Scenarios: progressive filter refinement (comedy drops on hood switch), time range + comedy + free stacking (comedy silently dropped), Astoria live music (karaoke/DJ returned for "live music"), Sunset Park live music (karaoke returned), Hell's Kitchen theater (MORE returns comedy/orchestra), Washington Heights music (MORE drops music filter).
 
-**Fix:** Prompt-level hardening is a mitigation. The structural fix is Gap 3 (reduce pool padding) + Gap 2 (reasoning/rendering split with pick validation). See Resilience Gaps section.
+**Fix:** Gap 3 (pool padding) is now fixed (2026-03-01) — unmatched events are no longer sent to the LLM when filters are active. Remaining mitigation: Gap 2 (reasoning/rendering split with pick validation). See Resilience Gaps section.
 
 #### Theme B: Neighborhood expansion not transparent (5 failures)
 
@@ -353,7 +351,7 @@ Same pattern in: free+comedy stacking (compound applied, nothing matched, LLM sh
 
 **Design question, not a code bug.** When filters match zero events, should Pulse: (a) show nothing and say "nothing matches" (strict, frustrating UX), (b) show alternatives with explanation (current behavior, scored as filter failure), or (c) distinguish in the eval between "filter dropped" vs "filter applied, no results"?
 
-**Partial fix (2026-02-28):** Prompt hardening in `UNIFIED_SYSTEM` — zero-match instruction now says: "You MUST lead with 'No [filter] in [neighborhood] tonight'. Do NOT show numbered picks from unmatched events." This is a prompt-level mitigation. The structural cause is Gap 3 (pool padding gives the LLM unmatched events to recommend). See Resilience Gaps section.
+**Partial fix (2026-02-28):** Prompt hardening in `UNIFIED_SYSTEM` — zero-match instruction now says: "You MUST lead with 'No [filter] in [neighborhood] tonight'. Do NOT show numbered picks from unmatched events." This was a prompt-level mitigation. **Structural fix (2026-03-01):** Gap 3 resolved — `buildTaggedPool` no longer sends unmatched events when filters are active. The LLM can't pick from what it doesn't see.
 
 #### Root Cause D: Nudge-accept ambiguity — "ok"/"sure" resets context (~10% of failures)
 
@@ -475,7 +473,7 @@ All five root causes (A-E) are now fixed. Remaining filter_drift failures are li
 
 - **Eval non-determinism (~25% scenario variance):** Identical code on different days produces 5-15% overall swings due to daily event cache changes. Scenarios that depend on specific events in specific neighborhoods (outer-borough, thin categories) flip pass/fail based on what was scraped that morning. This makes it hard to attribute pass rate changes to code vs cache.
 
-- **Pool padding is the structural enabler of filter drift (Gap 3):** `buildTaggedPool` pads to 15 events with unmatched events. When filters match 0 events, the LLM sees 15 unmatched events and recommends from them, which judges score as "filter dropped." Prompt hardening ("lead with 'No [filter] in [hood]'") is a mitigation, not a fix. The structural fix is reducing or eliminating unmatched padding when matches are zero.
+- **Pool padding was the structural enabler of filter drift (Gap 3 — fixed 2026-03-01):** `buildTaggedPool` used to pad to 15 events with unmatched events. When filters matched few/no events, the LLM saw unmatched events and recommended from them. Fixed by eliminating unmatched padding when filters are active — the LLM now only sees matched events. Perennial padding also skipped when filters have matches. Expected to resolve the remaining ~10-15% filter_drift failures. Needs eval verification.
 
 - **Regression eval decline (35% → 28%) needs investigation:** The regression suite has declined despite code fixes that should have improved it. Possible causes: (1) the Mar 1 run used Haiku as judge (stricter than Sonnet used in earlier runs), (2) suite expanded from 20 → 44 → 47 scenarios (new scenarios may have lower baseline pass rates), (3) assertion-level pass rate is relatively stable (70-76%), suggesting scenarios are partially passing but failing on 1-2 assertions.
 
@@ -489,7 +487,7 @@ The extraction audit shows 82-100% pass rates on most days, but this is misleadi
 
 | Action | Expected Impact | Effort | Status |
 |--------|----------------|--------|--------|
-| Reduce pool padding for zero-match filters (Gap 3) | +10-15% filter_drift (structural fix) | Medium | Planned |
+| Reduce pool padding for zero-match filters (Gap 3) | +10-15% filter_drift (structural fix) | Medium | **Done (2026-03-01)** |
 | Stabilize eval judge (pin Sonnet, add deterministic assertions) | Reduces noise, enables real A/B | Low | Planned |
 | Tavily fallback for thin neighborhoods | +5-10% happy_path, poor_experience | Done (2026-03-01) | Verify in next run |
 | Nudge-accept flow (`pendingNearby` + pre-router) | +5% filter_drift (Root Cause D) | Low | **Done (2026-03-01)** |
@@ -498,6 +496,14 @@ The extraction audit shows 82-100% pass rates on most days, but this is misleadi
 ---
 
 ## Completed Work
+
+### Gap 3 Fix: Remove Unmatched Pool Padding When Filters Active (2026-03-01)
+
+Eliminated unmatched event padding from `buildTaggedPool` when filters are active. Previously, the pool was padded to 15 events with unmatched events, giving the LLM material to violate filter intent (the structural root cause of remaining filter_drift failures). Now the LLM only sees hard + soft matched events. Perennial picks (also unmatched) are skipped when filters have matches.
+
+**Changes:** `buildTaggedPool` in pipeline.js (removed `unmatchedSlice` line), `resolveUnifiedContext` in handler.js (conditional perennial padding), 8 test assertions updated in pipeline.test.js. No-filter path unchanged (still 15 diverse events). Zero-match bypass (`handleZeroMatch`) unchanged.
+
+**Expected impact:** +10-15% filter_drift pass rate. Needs eval verification.
 
 ### Step 7: executeQuery Pipeline — Single Prompt Path (2026-03-01)
 
