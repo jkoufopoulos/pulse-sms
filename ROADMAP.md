@@ -522,15 +522,60 @@ All five root causes (A-E) are now fixed. Gap 3 (pool padding) and handleZeroMat
 
 The extraction audit shows 82-100% pass rates on most days, but this is misleading. The audit only checks events that have raw text capture (`extraction-capture.js`), and most sources skip capture. Typical runs check 2-25 events out of 200+ in the cache. The Feb 24 drop (21.4%, 3/14) was a real signal — extraction confidence thresholds were too permissive for Skint events with ambiguous dates.
 
+### Full Regression Baseline (2026-03-01)
+
+**47 scenarios, 283 assertions, judged.** Report: `data/reports/regression-eval-2026-03-01T10-01-45.json`
+
+| Metric | Value |
+|--------|-------|
+| Scenarios passed | 13/47 (27.7%) |
+| Assertions passed | 202/283 (71.4%) |
+| Code evals | 5441/5565 (97.8%) |
+
+Scenario pass rate is low because each scenario requires ALL assertions to pass — most fail by 1-2 out of 6-10. Assertion rate (71.4%) is the better signal.
+
+**By principle:**
+
+| Principle | Pass Rate | Notes |
+|-----------|-----------|-------|
+| P11, P8 | 100% | Stable |
+| P12, P9, P2 | 86-91% | Stable |
+| P6, P4 | 83-84% | Stable |
+| P7 | 84/113 (74%) | Session context — bulk of failures, mostly downstream of other issues |
+| P3 | 16/26 (62%) | Category fidelity |
+| P1 | 22/42 (52%) | Filter persistence — see triage below |
+| P10 | 5/12 (42%) | Filter clearing — improved from 33%, prompt fix landed |
+| P5 | 1/5 (20%) | Time filter stacking — see triage below |
+
+#### P1 failure triage (20 failures)
+
+| Category | Count | IDs | Actionable? |
+|----------|-------|-----|-------------|
+| 502/timeout | 4 | D7, D9, M4, M6 | Infrastructure — not code-fixable |
+| Data scarcity | 7 | U4, V6, W6, X3, AO4, AT2, GG1 | Zero events match filter combo. Test expectations exceed cache reality |
+| Hood abandon on zero-match | 4 | I7, Q6, AL6, AM6 | Bestie suggests other hood on zero-match, user follows up → hood changes. Semi-intentional behavior |
+| Filter not persisting | 2 | N7, Q5 | N7: 6 consecutive 502s corrupted session. Q5: DJ filter persistence ambiguous |
+| Free filter violation | 3 | AG6, AQ6, BB3 | **AG6: real bug** — $18 event served with `free_only: true` active |
+
+#### P5 failure triage (4 failures)
+
+| Category | Count | IDs | Actionable? |
+|----------|-------|-----|-------------|
+| Time gate miss | 1 | Q2 | **Real bug** — 2pm/3pm events served for "late night stuff". Time gate not filtering |
+| Hood pivot on zero-match | 2 | I5, K9 | Zero late-night matches → Bestie abandons hood. Same pattern as P1 hood abandon |
+| False positive | 1 | BA2 | Turn 1 was before time filter applied — not a real failure |
+
 ### What Moves the Needle
 
 | Action | Expected Impact | Effort | Status |
 |--------|----------------|--------|--------|
-| Replace regex routing with LLM filter_intent | +27% filter_drift (7 of 15 failures) | Medium | **Done (2026-03-01)** — supersedes regex expansion |
-| Fix filter-active dismissal prompt ambiguity | +17% P10 (12/18 → 15/18) | Small | **Done (2026-03-01)** — examples fixed Haiku consistency |
-| Add "live music" to pre-router category detection | +8% filter_drift (2 scenarios) | Small | **Next priority** |
-| Fix 502 timeouts (Tavily circuit breaker) | +27% filter_drift (7 scenarios untestable) | Medium | Planned |
-| Investigate conversational-with-pool | +12% filter_drift (3 scenarios) | Medium | Planned |
+| Fix time gate miss (Q2) | +1 P5, likely helps P1 compound filter scenarios | Small | **Next** |
+| Fix free filter violation (AG6) | +1-3 P1 (AG6 + possibly AQ6, BB3) | Small | **Next** |
+| Replace regex routing with LLM filter_intent | +27% filter_drift (7 of 15 failures) | Medium | **Done (2026-03-01)** |
+| Fix filter-active dismissal prompt ambiguity | +17% P10 (12/18 → 15/18) | Small | **Done (2026-03-01)** |
+| Add "live music" to pre-router category detection | +8% filter_drift (2 scenarios) | Small | Planned |
+| Fix 502 timeouts (Tavily circuit breaker) | +4 P1 (untestable scenarios) | Medium | Planned |
+| Hood abandon on zero-match | +4-6 P1+P5 (I7, Q6, AL6, AM6, I5, K9) | Medium | Needs design — tension between honesty and filter persistence |
 | Wire up `handleZeroMatch` bypass + cascade fixes | +42% filter_drift (was 0/26, now 11/26) | Low | **Done (2026-03-01)** |
 | Fix eval runner session contamination | Cleaner eval signal | Low | **Done (2026-03-01)** |
 | Reduce pool padding for zero-match filters (Gap 3) | Structural fix | Medium | **Done (2026-03-01)** |
