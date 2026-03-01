@@ -81,10 +81,12 @@ check('yes with pendingNearby → null (unified)', preRoute('yes', nudgeSession)
 check('yeah → null (unified)', preRoute('yeah', nudgeSession) === null);
 check('bet → null (unified)', preRoute('bet', nudgeSession) === null);
 
-// Free → now handled by unified LLM
+// Free without session: bare "free" falls through, "free stuff/events" detected
 check('free → null (unified)', preRoute('free', null) === null);
-check('free stuff → null (unified)', preRoute('free stuff', null) === null);
-check('free events → null (unified)', preRoute('free events', null) === null);
+const freeStuffFirst = preRoute('free stuff', null);
+check('free stuff (no session) → events+free', freeStuffFirst?.intent === 'events' && freeStuffFirst?.filters?.free_only === true);
+const freeEventsFirst = preRoute('free events', null);
+check('free events (no session) → events+free', freeEventsFirst?.intent === 'events' && freeEventsFirst?.filters?.free_only === true);
 
 // Off-topic → now handled by unified LLM
 check('sports → null (unified)', preRoute('whats the score of the knicks game', null) === null);
@@ -167,11 +169,26 @@ check('forget the free thing → null (LLM targeted)', preRoute('forget the free
 const noFilterSession = { ...filterSession, lastFilters: null };
 check('nvm without filters → null (LLM)', preRoute('nvm', noFilterSession) === null);
 check('show me everything without filters → null (LLM)', preRoute('show me everything', noFilterSession) === null);
-// Compound messages still go to LLM
-check('free comedy → null (LLM)', preRoute('free comedy', followUpSession) === null);
-check('comedy in bushwick → null (LLM)', preRoute('comedy in bushwick', null) === null);
-check('free late jazz → null (LLM)', preRoute('free late jazz', followUpSession) === null);
-check('underground techno in bushwick → null (LLM)', preRoute('underground techno in bushwick', null) === null);
+// Compound messages now detected deterministically by pre-router
+const freeComedy = preRoute('free comedy', followUpSession);
+check('free comedy → events', freeComedy?.intent === 'events');
+check('free comedy → free_only', freeComedy?.filters?.free_only === true);
+check('free comedy → comedy', freeComedy?.filters?.category === 'comedy');
+
+const comedyInBushwick = preRoute('comedy in bushwick', null);
+check('comedy in bushwick → events', comedyInBushwick?.intent === 'events');
+check('comedy in bushwick → Bushwick', comedyInBushwick?.neighborhood === 'Bushwick');
+check('comedy in bushwick → comedy', comedyInBushwick?.filters?.category === 'comedy');
+
+const freeLateJazz = preRoute('free late jazz', followUpSession);
+check('free late jazz → events', freeLateJazz?.intent === 'events');
+check('free late jazz → free_only', freeLateJazz?.filters?.free_only === true);
+check('free late jazz → live_music', freeLateJazz?.filters?.category === 'live_music');
+
+const technoInBushwick = preRoute('underground techno in bushwick', null);
+check('underground techno in bushwick → events', technoInBushwick?.intent === 'events');
+check('underground techno in bushwick → nightlife', technoInBushwick?.filters?.category === 'nightlife');
+check('underground techno in bushwick → Bushwick', technoInBushwick?.neighborhood === 'Bushwick');
 
 // Bare category with session → captured by bare category detection
 console.log('\npreRoute bare category detection:');
@@ -199,11 +216,25 @@ const bareComedyShows = preRoute('comedy shows', bareCatSession);
 check('bare comedy shows (session) → events', bareComedyShows?.intent === 'events');
 check('bare comedy shows (session) → comedy', bareComedyShows?.filters?.category === 'comedy');
 
-// Bare category/time without session → now handled by unified LLM (no first-message detection)
-check('bare jazz (no session) → null (LLM)', preRoute('jazz', null) === null);
+// Bare category without session → first-message compound detection
+const bareJazzNoSession = preRoute('jazz', null);
+check('bare jazz (no session) → events', bareJazzNoSession?.intent === 'events');
+check('bare jazz (no session) → live_music', bareJazzNoSession?.filters?.category === 'live_music');
+check('bare jazz (no session) → subcategory jazz', bareJazzNoSession?.filters?.subcategory === 'jazz');
+
+const bareComedyNoSession = preRoute('comedy', null);
+check('bare comedy (no session) → events', bareComedyNoSession?.intent === 'events');
+check('bare comedy (no session) → comedy', bareComedyNoSession?.filters?.category === 'comedy');
+
+// Bare "free" without qualifier still falls through to LLM (no "stuff/events/shows" noun)
 check('bare free (no session) → null', preRoute('free', null) === null);
+// "free stuff" on first message → detected
+const freeStuffNoSession = preRoute('free stuff', null);
+check('free stuff (no session) → events', freeStuffNoSession?.intent === 'events');
+check('free stuff (no session) → free_only', freeStuffNoSession?.filters?.free_only === true);
+
+// Bare tonight without category → still falls through (no category word)
 check('bare tonight (no session) → null (LLM)', preRoute('tonight', null) === null);
-check('bare comedy (no session) → null (LLM)', preRoute('comedy', null) === null);
 
 // Specific time follow-ups (single-dimension, session-aware)
 console.log('\npreRoute specific time follow-ups:');
@@ -219,10 +250,23 @@ check('around 9:30pm → time_after 21:30', around930pm?.filters?.time_after ===
 const anythingAfter10pm = preRoute('anything after 10pm', followUpSession);
 check('anything after 10pm → time_after 22:00', anythingAfter10pm?.filters?.time_after === '22:00');
 
-// Compound time+category → now handled by unified LLM (no compound extraction)
-check('jazz after 11pm → null (LLM)', preRoute('jazz after 11pm', followUpSession) === null);
-check('comedy after 9pm → null (LLM)', preRoute('comedy after 9pm', followUpSession) === null);
-check('free after 8pm bushwick → null (LLM)', preRoute('free stuff after 8pm in bushwick', null) === null);
+// Compound time+category → now detected deterministically by pre-router
+const jazzAfter11 = preRoute('jazz after 11pm', followUpSession);
+check('jazz after 11pm → events', jazzAfter11?.intent === 'events');
+check('jazz after 11pm → live_music', jazzAfter11?.filters?.category === 'live_music');
+check('jazz after 11pm → subcategory jazz', jazzAfter11?.filters?.subcategory === 'jazz');
+check('jazz after 11pm → time_after 23:00', jazzAfter11?.filters?.time_after === '23:00');
+
+const comedyAfter9 = preRoute('comedy after 9pm', followUpSession);
+check('comedy after 9pm → events', comedyAfter9?.intent === 'events');
+check('comedy after 9pm → comedy', comedyAfter9?.filters?.category === 'comedy');
+check('comedy after 9pm → time_after 21:00', comedyAfter9?.filters?.time_after === '21:00');
+
+const freeAfter8Bushwick = preRoute('free stuff after 8pm in bushwick', null);
+check('free after 8pm bushwick → events', freeAfter8Bushwick?.intent === 'events');
+check('free after 8pm bushwick → free_only', freeAfter8Bushwick?.filters?.free_only === true);
+check('free after 8pm bushwick → time_after 20:00', freeAfter8Bushwick?.filters?.time_after === '20:00');
+check('free after 8pm bushwick → Bushwick', freeAfter8Bushwick?.neighborhood === 'Bushwick');
 
 // Existing fuzzy patterns still work (single-dimension, session-aware)
 const laterTonight = preRoute('later tonight', followUpSession);

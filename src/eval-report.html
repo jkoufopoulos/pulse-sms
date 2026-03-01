@@ -1133,7 +1133,9 @@ async function init() {
     return;
   }
   populateSelects();
-  await loadReport(allReports[0].filename);
+  // Default to most recent scenario eval (primary use case), fall back to first report
+  var defaultReport = allReports.find(function(r) { return (r.type || detectReportType(r.filename)) === 'scenario'; }) || allReports[0];
+  await loadReport(defaultReport.filename);
   setupEventListeners();
 }
 
@@ -1436,7 +1438,6 @@ function renderRegressionReport() {
   html += '</div>';
 
   c.innerHTML = html;
-  setupEventListeners();
 }
 
 function toggleRegressionScenario(i) {
@@ -1493,7 +1494,6 @@ function renderExtractionReport() {
   }
 
   c.innerHTML = html;
-  setupEventListeners();
 }
 
 function renderScrapeReport() {
@@ -1613,7 +1613,6 @@ function renderScrapeReport() {
   }
 
   c.innerHTML = html;
-  setupEventListeners();
 }
 
 function toggleScrapeSource(i) {
@@ -1622,11 +1621,14 @@ function toggleScrapeSource(i) {
 }
 
 function renderToolbar() {
+  var currentFilename = currentReport ? currentReport._filename : '';
+  var currentType = currentFilename ? detectReportType(currentFilename) : 'scenario';
+  var isScenario = currentType === 'scenario';
+
   var html = '<div class="toolbar">';
 
-  // Report selector — grouped by type
+  // Report selector — grouped by type, selected matches loaded report
   html += '<select id="report-select">';
-  var isFirstOpt = true;
   REPORT_TYPES.forEach(function(t) {
     var group = allReports.filter(function(r) { return (r.type || detectReportType(r.filename)) === t.key; });
     if (group.length === 0) return;
@@ -1635,39 +1637,36 @@ function renderToolbar() {
       var rate = r.total > 0 ? Math.round(100 * r.passed / r.total) : 0;
       var ts = formatTimestamp(r.timestamp);
       var label = ts + ' \u2014 ' + rate + '% (' + r.passed + '/' + r.total + ')';
-      var sel = isFirstOpt ? ' selected' : '';
-      isFirstOpt = false;
+      var sel = r.filename === currentFilename ? ' selected' : '';
       html += '<option value="' + escAttr(r.filename) + '"' + sel + '>' + escHtml(label) + '</option>';
     });
     html += '</optgroup>';
   });
   html += '</select>';
 
-  // Compare toggle
-  html += '<button class="toolbar-vs' + (compareVisible ? ' active' : '') + '" id="compare-btn" title="Compare two reports side by side">Compare</button>';
-  html += '<div class="compare-wrap' + (compareVisible ? ' visible' : '') + '" id="compare-wrap">';
-  html += '<select id="compare-select"><option value="">-- compare to --</option>';
-  REPORT_TYPES.forEach(function(t) {
-    var group = allReports.filter(function(r) { return (r.type || detectReportType(r.filename)) === t.key; });
-    if (group.length === 0) return;
-    html += '<optgroup label="' + escAttr(t.label) + '">';
-    group.forEach(function(r) {
-      var rate = r.total > 0 ? Math.round(100 * r.passed / r.total) : 0;
-      var ts = formatTimestamp(r.timestamp);
-      var label = ts + ' \u2014 ' + rate + '% (' + r.passed + '/' + r.total + ')';
-      html += '<option value="' + escAttr(r.filename) + '">' + escHtml(label) + '</option>';
+  // Scenario-only controls: Compare, Search, Count
+  if (isScenario) {
+    html += '<button class="toolbar-vs' + (compareVisible ? ' active' : '') + '" id="compare-btn" title="Compare two reports side by side">Compare</button>';
+    html += '<div class="compare-wrap' + (compareVisible ? ' visible' : '') + '" id="compare-wrap">';
+    html += '<select id="compare-select"><option value="">-- compare to --</option>';
+    REPORT_TYPES.forEach(function(t) {
+      var group = allReports.filter(function(r) { return (r.type || detectReportType(r.filename)) === t.key; });
+      if (group.length === 0) return;
+      html += '<optgroup label="' + escAttr(t.label) + '">';
+      group.forEach(function(r) {
+        var rate = r.total > 0 ? Math.round(100 * r.passed / r.total) : 0;
+        var ts = formatTimestamp(r.timestamp);
+        var label = ts + ' \u2014 ' + rate + '% (' + r.passed + '/' + r.total + ')';
+        html += '<option value="' + escAttr(r.filename) + '">' + escHtml(label) + '</option>';
+      });
+      html += '</optgroup>';
     });
-    html += '</optgroup>';
-  });
-  html += '</select></div>';
+    html += '</select></div>';
 
-  html += '<div class="toolbar-sep"></div>';
-
-  // Search
-  html += '<input type="text" class="search-input" id="search-input" placeholder="Search scenarios..." value="' + escAttr(searchQuery) + '">';
-
-  // Count
-  html += '<span class="toolbar-count" id="toolbar-count"></span>';
+    html += '<div class="toolbar-sep"></div>';
+    html += '<input type="text" class="search-input" id="search-input" placeholder="Search scenarios..." value="' + escAttr(searchQuery) + '">';
+    html += '<span class="toolbar-count" id="toolbar-count"></span>';
+  }
 
   html += '</div>';
   return html;

@@ -1,6 +1,7 @@
 const { setResponseState } = require('./session');
 const { filterByTimeAfter, parseAsNycTime, getEventDate } = require('./geo');
 const { recordAICost } = require('./traces');
+const { VALID_CATEGORIES } = require('./evals/scrape-audit');
 
 /**
  * Apply event filters (free, category, time).
@@ -56,7 +57,7 @@ function buildEventMap(events) {
  * Every field is explicitly set to prevent stale state from persisting.
  */
 function saveResponseFrame(phone, { mode = 'fresh', picks = [], prevSession,
-    eventMap = {}, neighborhood, filters, offeredIds = [], visitedHoods, pending, pendingMessage } = {}) {
+    eventMap = {}, neighborhood, filters, offeredIds = [], visitedHoods, pending, pendingMessage, lastResponseHadPicks } = {}) {
   const isMore = mode === 'more';
   setResponseState(phone, {
     picks,
@@ -75,6 +76,7 @@ function saveResponseFrame(phone, { mode = 'fresh', picks = [], prevSession,
     pendingNearbyEvents: pending?.nearbyEvents || null,
     pendingFilters: pending?.filters || null,
     pendingMessage: pendingMessage || null,
+    lastResponseHadPicks: lastResponseHadPicks ?? (picks.length > 0),
   });
 }
 
@@ -142,6 +144,24 @@ function buildZeroMatchResponse(hood, activeFilters, adjacentHoods) {
   // Late require to avoid circular dep (events.js → pipeline.js)
   const { scanCityWide } = require('./events');
   const cityMatches = scanCityWide(activeFilters);
+
+  // Citywide (no neighborhood) — skip adjacent check, just find any match
+  if (!hood) {
+    const cityMatch = cityMatches[0];
+    if (cityMatch) {
+      return {
+        message: `No ${label} tonight — I've got ${label} in ${cityMatch.neighborhood} though. Want picks from there?`,
+        suggestedHood: cityMatch.neighborhood,
+        source: 'citywide',
+      };
+    }
+    return {
+      message: `No ${label} tonight — tell me a neighborhood and I'll show you what's happening!`,
+      suggestedHood: null,
+      source: 'none',
+    };
+  }
+
   // Check adjacent neighborhoods first
   const adjSet = new Set(adjacentHoods || []);
   const adjacentMatch = cityMatches.find(m => adjSet.has(m.neighborhood));
@@ -352,6 +372,12 @@ function normalizeFilters(filters) {
     if (CATEGORY_NORMALIZE[key] && key !== canonical) {
       result.subcategory = key;
     }
+    // Reject unknown categories (P1: only valid categories reach session state)
+    if (!VALID_CATEGORIES.has(result.category)) {
+      console.warn(`normalizeFilters: rejected invalid category "${result.category}"`);
+      delete result.category;
+      delete result.subcategory;
+    }
   }
   if (filters.subcategory) {
     result.subcategory = String(filters.subcategory).toLowerCase().trim();
@@ -394,6 +420,12 @@ function normalizeFilterIntent(updates) {
         result.subcategory = key;
       } else {
         result.subcategory = null;
+      }
+      // Reject unknown categories (P1: only valid categories reach session state)
+      if (!VALID_CATEGORIES.has(result.category)) {
+        console.warn(`normalizeFilterIntent: rejected invalid category "${result.category}"`);
+        delete result.category;
+        delete result.subcategory;
       }
     }
   }

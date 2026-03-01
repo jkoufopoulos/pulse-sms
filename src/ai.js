@@ -526,8 +526,8 @@ Respond now.`;
     poolSize: events?.length || 0,
     isFree: activeFilters?.free_only,
     hasActiveCategory: !!activeFilters?.category,
-    isLastBatch: options.isLastBatch,
-    exhaustionSuggestion: options.exhaustionSuggestion,
+    isLastBatch,
+    exhaustionSuggestion,
   };
   const systemPrompt = buildUnifiedPrompt(events || [], skillOptions);
 

@@ -3551,12 +3551,11 @@
       ]
     },
     {
-      "name": "Extended: exhaustion triggers Tavily fallback via MORE",
+      "name": "Extended: exhaustion via repeated MORE in thin neighborhood",
       "category": "edge_case",
       "tests_principles": [
         "P6",
-        "P7",
-        "P8"
+        "P7"
       ],
       "user_turns": [
         {
@@ -3607,33 +3606,24 @@
           "after_turn": 6,
           "id": "II3",
           "principle": "P6",
-          "check": "When cached events are exhausted, Pulse either (a) serves fresh web-sourced picks, (b) serves perennial/permanent spots, or (c) honestly says events are exhausted and suggests a nearby neighborhood. Does NOT silently fail or repeat old picks.",
-          "anti_pattern": "Repeats earlier picks, or generic error with no guidance"
-        },
-        {
-          "after_turn": 6,
-          "id": "II4",
-          "principle": "P8",
-          "check": "If Tavily fallback fires and returns web-sourced events, they are not presented with the same confidence as curated picks. Framing like 'also found' or 'spotted online' or venue-style framing is acceptable. Must not claim these are editorial picks.",
-          "anti_pattern": "Web search results presented identically to curated picks with no provenance signal"
+          "check": "When cached events are exhausted, Pulse either (a) honestly says events are exhausted and suggests a nearby neighborhood (Williamsburg, Bushwick), or (b) serves remaining unseen picks. Does NOT silently fail or repeat old picks.",
+          "anti_pattern": "Repeats earlier picks, generic error with no guidance, or silent failure"
         },
         {
           "after_turn": 7,
           "id": "II5",
           "principle": "P7",
-          "check": "Pick #1 detail works correctly — maps to the most recent pick list regardless of whether it came from cache or Tavily fallback",
+          "check": "Pick #1 detail works correctly — maps to the most recent pick list.",
           "anti_pattern": "Detail maps to a pick from an earlier turn, or errors out"
         }
       ]
     },
     {
-      "name": "Extended: re-visiting exhausted neighborhood triggers Tavily fallback",
+      "name": "Extended: re-visiting exhausted neighborhood after switch",
       "category": "edge_case",
       "tests_principles": [
         "P6",
-        "P7",
-        "P8",
-        "P1"
+        "P7"
       ],
       "user_turns": [
         {
@@ -3669,26 +3659,18 @@
           "after_turn": 5,
           "id": "JJ2",
           "principle": "P6",
-          "check": "Returning to Greenpoint after seeing multiple batches, Pulse either (a) finds unseen cached events, (b) uses Tavily fallback for fresh results, or (c) honestly says events are thin and suggests alternatives. Does NOT repeat the same picks from turns 1-3.",
+          "check": "Returning to Greenpoint after seeing multiple batches, Pulse either (a) finds unseen cached events, or (b) honestly says events are thin and suggests alternatives. Does NOT repeat the same picks from turns 1-3.",
           "anti_pattern": "Exact same picks from turn 1 reappear, or silent failure"
-        },
-        {
-          "after_turn": 5,
-          "id": "JJ3",
-          "principle": "P8",
-          "check": "If web-sourced events are served, provenance is signaled — not presented as if they were from curated editorial sources",
-          "anti_pattern": "Web results presented identically to curated picks"
         }
       ]
     },
     {
-      "name": "Extended: filtered exhaustion triggers Tavily with filter-aware query",
+      "name": "Extended: filtered exhaustion with jazz in East Village",
       "category": "edge_case",
       "tests_principles": [
         "P6",
         "P1",
-        "P3",
-        "P8"
+        "P3"
       ],
       "user_turns": [
         {
@@ -3735,22 +3717,8 @@
           "after_turn": 6,
           "id": "KK3",
           "principle": "P6",
-          "check": "When jazz events are exhausted, Pulse either (a) serves fresh jazz picks from Tavily/web search, (b) honestly says jazz is exhausted and offers to show other genres or jazz in nearby neighborhoods, or (c) suggests expanding to live music more broadly. Does NOT silently drop the jazz filter.",
+          "check": "When jazz events are exhausted, Pulse honestly says jazz is thin and either (a) offers jazz in nearby neighborhoods, (b) suggests expanding to live music more broadly, or (c) offers to show other genres. Does NOT silently drop the jazz filter.",
           "anti_pattern": "Returns non-jazz events without acknowledging the filter gap, or generic 'nothing found'"
-        },
-        {
-          "after_turn": 6,
-          "id": "KK4",
-          "principle": "P3",
-          "check": "If Tavily fallback fires, the results should still be jazz-related — the search query should incorporate the active filter, not just the neighborhood",
-          "anti_pattern": "Web search returns random non-jazz events"
-        },
-        {
-          "after_turn": 6,
-          "id": "KK5",
-          "principle": "P8",
-          "check": "If web-sourced results are served, provenance is signaled appropriately",
-          "anti_pattern": "Web results presented as curated editorial picks"
         }
       ]
     },
@@ -4545,6 +4513,630 @@
           "principle": "P7",
           "check": "East Village picks served — session transitions from citywide to EV. Comedy context may carry via conversation history.",
           "anti_pattern": "Still showing citywide picks, error on neighborhood transition, or session broken by prior detail lookup"
+        }
+      ]
+    },
+    {
+      "name": "Temporal: explicit clock time persists through MORE and hood switch",
+      "category": "happy_path",
+      "tests_principles": ["P5", "P1", "P7"],
+      "user_turns": [
+        { "turn": 1, "message": "bushwick" },
+        { "turn": 2, "message": "after 10pm" },
+        { "turn": 3, "message": "more" },
+        { "turn": 4, "message": "try williamsburg" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "T1",
+          "principle": "P7",
+          "check": "Bushwick picks served with mixed times — events both before and after 10pm are acceptable since no time filter yet.",
+          "anti_pattern": "No events returned or error"
+        },
+        {
+          "after_turn": 2,
+          "id": "T2",
+          "principle": "P5",
+          "check": "Only events starting at or after 10pm shown. Events starting at 8pm or 9pm are excluded by the time filter.",
+          "anti_pattern": "Events before 10pm still shown, or time filter not applied"
+        },
+        {
+          "after_turn": 3,
+          "id": "T3",
+          "principle": "P1",
+          "check": "MORE respects the 10pm time filter — all new picks start at or after 10pm.",
+          "anti_pattern": "Time filter lost on MORE, earlier events appear"
+        },
+        {
+          "after_turn": 4,
+          "id": "T4",
+          "principle": "P1",
+          "check": "Time filter persists through neighborhood switch — Williamsburg picks are all after 10pm.",
+          "anti_pattern": "Time filter dropped on hood switch, early events shown in Williamsburg"
+        }
+      ]
+    },
+    {
+      "name": "Temporal: jazz after 11pm compound persists",
+      "category": "edge_case",
+      "tests_principles": ["P5", "P1", "P3"],
+      "user_turns": [
+        { "turn": 1, "message": "east village" },
+        { "turn": 2, "message": "jazz after 11pm" },
+        { "turn": 3, "message": "try williamsburg" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 2,
+          "id": "T5",
+          "principle": "P5",
+          "check": "Only jazz events starting at or after 11pm shown. Both category and time filter applied simultaneously.",
+          "anti_pattern": "Non-jazz events shown, or events before 11pm included"
+        },
+        {
+          "after_turn": 2,
+          "id": "T6",
+          "principle": "P3",
+          "check": "Events are jazz or live_music category — the jazz subcategory filter is respected.",
+          "anti_pattern": "Comedy, nightlife, or other non-jazz events returned"
+        },
+        {
+          "after_turn": 3,
+          "id": "T7",
+          "principle": "P1",
+          "check": "Both jazz category AND 11pm time filter persist through neighborhood switch to Williamsburg.",
+          "anti_pattern": "Either filter lost — generic Williamsburg events or early jazz events shown"
+        }
+      ]
+    },
+    {
+      "name": "Temporal: after-midnight wrapping (after 1am)",
+      "category": "edge_case",
+      "tests_principles": ["P5", "P7"],
+      "user_turns": [
+        { "turn": 1, "message": "bushwick" },
+        { "turn": 2, "message": "anything after 1am" },
+        { "turn": 3, "message": "1" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 2,
+          "id": "T8",
+          "principle": "P5",
+          "check": "Only events starting after 1am shown (if any exist). Events at 10pm, 11pm, midnight are excluded — only true after-hours events (2am+) qualify. If no events after 1am, graceful degradation.",
+          "anti_pattern": "Events before 1am (like 10pm or midnight) shown after the filter is set"
+        },
+        {
+          "after_turn": 3,
+          "id": "T9",
+          "principle": "P7",
+          "check": "Detail request works correctly on whatever was shown in turn 2.",
+          "anti_pattern": "Detail lookup fails or returns wrong event"
+        }
+      ]
+    },
+    {
+      "name": "Temporal: anytime clears time filter",
+      "category": "edge_case",
+      "tests_principles": ["P5", "P10", "P7"],
+      "user_turns": [
+        { "turn": 1, "message": "east village" },
+        { "turn": 2, "message": "after 10pm" },
+        { "turn": 3, "message": "actually anytime works" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 2,
+          "id": "T10",
+          "principle": "P5",
+          "check": "Only events after 10pm shown — time filter applied.",
+          "anti_pattern": "Events before 10pm still shown"
+        },
+        {
+          "after_turn": 3,
+          "id": "T11",
+          "principle": "P10",
+          "check": "Time filter cleared — events at all times shown again, including ones before 10pm that were previously excluded.",
+          "anti_pattern": "Time filter persists after 'anytime works', only late events still shown"
+        }
+      ]
+    },
+    {
+      "name": "Temporal: comedy after 9pm triple compound first message",
+      "category": "edge_case",
+      "tests_principles": ["P5", "P3", "P1"],
+      "user_turns": [
+        { "turn": 1, "message": "comedy after 9pm in williamsburg" },
+        { "turn": 2, "message": "more" },
+        { "turn": 3, "message": "try bushwick" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "T12",
+          "principle": "P3",
+          "check": "Comedy events in Williamsburg after 9pm. All three dimensions (category, time, neighborhood) detected on first message.",
+          "anti_pattern": "Non-comedy events, events before 9pm, or wrong neighborhood"
+        },
+        {
+          "after_turn": 2,
+          "id": "T13",
+          "principle": "P1",
+          "check": "MORE respects all three filters — comedy, after 9pm, Williamsburg.",
+          "anti_pattern": "Any filter lost on MORE"
+        },
+        {
+          "after_turn": 3,
+          "id": "T14",
+          "principle": "P1",
+          "check": "Comedy + after 9pm persist through neighborhood switch to Bushwick. Neighborhood changes but filters compound.",
+          "anti_pattern": "Category or time filter lost on hood switch"
+        }
+      ]
+    },
+    {
+      "name": "First-message compound: free jazz citywide then neighborhood",
+      "category": "happy_path",
+      "tests_principles": ["P1", "P3", "P7"],
+      "user_turns": [
+        { "turn": 1, "message": "free jazz tonight" },
+        { "turn": 2, "message": "how about east village" },
+        { "turn": 3, "message": "1" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "FM1",
+          "principle": "P3",
+          "check": "Citywide free jazz picks — both free_only and jazz/live_music category applied on first message with no prior session.",
+          "anti_pattern": "Non-jazz events, paid events, or asks for a neighborhood before serving picks"
+        },
+        {
+          "after_turn": 2,
+          "id": "FM2",
+          "principle": "P1",
+          "check": "Free + jazz compound persists through neighborhood specification — East Village free jazz events served.",
+          "anti_pattern": "Free or jazz filter lost when user specifies neighborhood"
+        },
+        {
+          "after_turn": 3,
+          "id": "FM3",
+          "principle": "P7",
+          "check": "Detail request works for pick from the East Village free jazz list.",
+          "anti_pattern": "Detail fails or returns wrong event"
+        }
+      ]
+    },
+    {
+      "name": "First-message compound: comedy in bushwick with MORE",
+      "category": "happy_path",
+      "tests_principles": ["P1", "P3", "P7"],
+      "user_turns": [
+        { "turn": 1, "message": "comedy in bushwick" },
+        { "turn": 2, "message": "more" },
+        { "turn": 3, "message": "1" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "FM4",
+          "principle": "P3",
+          "check": "Comedy events in Bushwick — both category and neighborhood detected on first message with no session.",
+          "anti_pattern": "Non-comedy events, wrong neighborhood, or asks for more info instead of serving picks"
+        },
+        {
+          "after_turn": 2,
+          "id": "FM5",
+          "principle": "P1",
+          "check": "MORE respects comedy filter in Bushwick — fresh comedy picks, no repeats from turn 1.",
+          "anti_pattern": "Comedy filter lost on MORE, or events from turn 1 repeated"
+        },
+        {
+          "after_turn": 3,
+          "id": "FM6",
+          "principle": "P7",
+          "check": "Detail request works correctly.",
+          "anti_pattern": "Detail fails or returns wrong event"
+        }
+      ]
+    },
+    {
+      "name": "First-message compound: free stuff opener compounds with category",
+      "category": "edge_case",
+      "tests_principles": ["P1", "P3"],
+      "user_turns": [
+        { "turn": 1, "message": "free stuff" },
+        { "turn": 2, "message": "how about comedy" },
+        { "turn": 3, "message": "try east village" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "FM7",
+          "principle": "P1",
+          "check": "Citywide free events served on first message. Pre-router detects 'free stuff' as free_only filter.",
+          "anti_pattern": "Paid events shown, or asks for neighborhood before serving anything"
+        },
+        {
+          "after_turn": 2,
+          "id": "FM8",
+          "principle": "P1",
+          "check": "Free + comedy compound — comedy stacks on top of existing free filter. Only free comedy events shown.",
+          "anti_pattern": "Free filter dropped when comedy added, or non-comedy events shown"
+        },
+        {
+          "after_turn": 3,
+          "id": "FM9",
+          "principle": "P1",
+          "check": "Free + comedy compound persists through neighborhood specification to East Village.",
+          "anti_pattern": "Either filter lost on neighborhood switch"
+        }
+      ]
+    },
+    {
+      "name": "First-message compound: jazz after 10pm citywide",
+      "category": "edge_case",
+      "tests_principles": ["P5", "P1", "P3"],
+      "user_turns": [
+        { "turn": 1, "message": "jazz after 10pm" },
+        { "turn": 2, "message": "more" },
+        { "turn": 3, "message": "try harlem" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "FM10",
+          "principle": "P5",
+          "check": "Citywide jazz after 10pm — both category and time filter detected on first message. Only jazz events starting after 10pm shown.",
+          "anti_pattern": "Non-jazz events, events before 10pm, or asks for neighborhood"
+        },
+        {
+          "after_turn": 2,
+          "id": "FM11",
+          "principle": "P1",
+          "check": "MORE respects jazz + 10pm compound — fresh picks, same filters.",
+          "anti_pattern": "Either filter lost on MORE"
+        },
+        {
+          "after_turn": 3,
+          "id": "FM12",
+          "principle": "P1",
+          "check": "Jazz + 10pm compound persists through neighborhood switch to Harlem.",
+          "anti_pattern": "Either filter lost on neighborhood switch"
+        }
+      ]
+    },
+    {
+      "name": "MORE: filter persistence through 3+ cycles",
+      "category": "edge_case",
+      "tests_principles": ["P1", "P3", "P7"],
+      "user_turns": [
+        { "turn": 1, "message": "bushwick" },
+        { "turn": 2, "message": "free" },
+        { "turn": 3, "message": "more" },
+        { "turn": 4, "message": "more" },
+        { "turn": 5, "message": "more" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 2,
+          "id": "MR1",
+          "principle": "P1",
+          "check": "Free filter applied — all picks are free events in Bushwick.",
+          "anti_pattern": "Paid events served"
+        },
+        {
+          "after_turn": 3,
+          "id": "MR2",
+          "principle": "P1",
+          "check": "First MORE: free filter persists. All picks are still free. No repeats from turn 2.",
+          "anti_pattern": "Paid events, or repeated events from turn 2"
+        },
+        {
+          "after_turn": 4,
+          "id": "MR3",
+          "principle": "P1",
+          "check": "Second MORE: free filter still persists. Fresh picks, all free.",
+          "anti_pattern": "Filter drift — paid events appear, or events repeat from earlier turns"
+        },
+        {
+          "after_turn": 5,
+          "id": "MR4",
+          "principle": "P6",
+          "check": "Third MORE: either (a) more free events served, or (b) graceful exhaustion acknowledging the free constraint with suggestion to broaden or try nearby. Does NOT silently drop the free filter.",
+          "anti_pattern": "Paid events without acknowledgment, silent filter drop, or crashes"
+        }
+      ]
+    },
+    {
+      "name": "MORE: dedup verification — no event repeats across batches",
+      "category": "edge_case",
+      "tests_principles": ["P7"],
+      "user_turns": [
+        { "turn": 1, "message": "lower east side" },
+        { "turn": 2, "message": "more" },
+        { "turn": 3, "message": "more" },
+        { "turn": 4, "message": "1" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 2,
+          "id": "MR5",
+          "principle": "P7",
+          "check": "MORE returns fresh events — zero overlap with turn 1 picks (no same event names or venues).",
+          "anti_pattern": "Any event from turn 1 reappears"
+        },
+        {
+          "after_turn": 3,
+          "id": "MR6",
+          "principle": "P7",
+          "check": "Second MORE returns fresh events — zero overlap with turns 1 or 2. Each batch is distinct.",
+          "anti_pattern": "Any event from turns 1 or 2 reappears"
+        },
+        {
+          "after_turn": 4,
+          "id": "MR7",
+          "principle": "P7",
+          "check": "Pick #1 maps to an event from the most recent MORE batch (turn 3), NOT from an earlier batch.",
+          "anti_pattern": "Detail shows an event from turn 1 or 2 instead of turn 3"
+        }
+      ]
+    },
+    {
+      "name": "MORE: exhaustion suggests nearby and preserves filters on accept",
+      "category": "poor_experience",
+      "tests_principles": ["P6", "P1", "P2"],
+      "user_turns": [
+        { "turn": 1, "message": "greenpoint" },
+        { "turn": 2, "message": "jazz" },
+        { "turn": 3, "message": "more" },
+        { "turn": 4, "message": "more" },
+        { "turn": 5, "message": "yeah" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 2,
+          "id": "MR8",
+          "principle": "P3",
+          "check": "Jazz filter applied in Greenpoint.",
+          "anti_pattern": "Non-jazz events"
+        },
+        {
+          "after_turn": 4,
+          "id": "MR9",
+          "principle": "P6",
+          "check": "When jazz is exhausted in Greenpoint, Pulse gracefully suggests nearby neighborhoods (Williamsburg, Bushwick) rather than repeating old picks or giving a generic error.",
+          "anti_pattern": "Repeated events, generic error, or silent failure"
+        },
+        {
+          "after_turn": 5,
+          "id": "MR10",
+          "principle": "P1",
+          "check": "Accepting the nearby suggestion: jazz filter persists into the new neighborhood. Picks should still be jazz/live music.",
+          "anti_pattern": "Jazz filter dropped on neighborhood switch via nudge accept"
+        },
+        {
+          "after_turn": 5,
+          "id": "MR11",
+          "principle": "P2",
+          "check": "Events come from the suggested nearby neighborhood, not the original Greenpoint.",
+          "anti_pattern": "Still showing Greenpoint events"
+        }
+      ]
+    },
+    {
+      "name": "Abuse: hostility does not break session recovery",
+      "category": "abuse_off_topic",
+      "tests_principles": ["P9", "P11"],
+      "user_turns": [
+        { "turn": 1, "message": "this sucks give me something better" },
+        { "turn": 2, "message": "your recommendations are terrible" },
+        { "turn": 3, "message": "fine, les" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "AB1",
+          "principle": "P9",
+          "check": "Pulse deflects hostility warmly — does not mirror aggression, does not refuse service, stays in character.",
+          "anti_pattern": "Defensive, rude, or robotic response"
+        },
+        {
+          "after_turn": 2,
+          "id": "AB2",
+          "principle": "P11",
+          "check": "Repeated hostility does not crash or lock out the user. Pulse continues offering value.",
+          "anti_pattern": "Error, silence, or 'I can't help you'"
+        },
+        {
+          "after_turn": 3,
+          "id": "AB3",
+          "principle": "P9",
+          "check": "When user re-engages with a neighborhood, Pulse serves events normally. Hostility does not corrupt session.",
+          "anti_pattern": "No events returned, or session in broken state"
+        }
+      ]
+    },
+    {
+      "name": "Abuse: identity questions stay in character",
+      "category": "abuse_off_topic",
+      "tests_principles": ["P9"],
+      "user_turns": [
+        { "turn": 1, "message": "who are you" },
+        { "turn": 2, "message": "are you chatgpt" },
+        { "turn": 3, "message": "williamsburg" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "AB4",
+          "principle": "P9",
+          "check": "Pulse introduces itself as Bestie / event finder. Does not give a long AI disclosure or break character.",
+          "anti_pattern": "Detailed AI explanation, mentions Claude/Anthropic/OpenAI, or breaks character"
+        },
+        {
+          "after_turn": 2,
+          "id": "AB5",
+          "principle": "P9",
+          "check": "Pulse deflects the ChatGPT comparison without confirming or denying. Redirects to events.",
+          "anti_pattern": "Confirms being ChatGPT, gives technical explanation, or gets stuck"
+        },
+        {
+          "after_turn": 3,
+          "id": "AB6",
+          "principle": "P7",
+          "check": "After meta questions, Pulse serves Williamsburg events normally. No session corruption.",
+          "anti_pattern": "No events, error, or session in bad state"
+        }
+      ]
+    },
+    {
+      "name": "Abuse: other-city request redirects to NYC",
+      "category": "abuse_off_topic",
+      "tests_principles": ["P9"],
+      "user_turns": [
+        { "turn": 1, "message": "events in chicago tonight" },
+        { "turn": 2, "message": "ok how about brooklyn" },
+        { "turn": 3, "message": "bushwick" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "AB7",
+          "principle": "P9",
+          "check": "Pulse does NOT serve Chicago events. Communicates NYC-only scope and redirects to NYC neighborhoods.",
+          "anti_pattern": "Attempts to find Chicago events, or interprets 'chicago' as a NYC venue"
+        },
+        {
+          "after_turn": 2,
+          "id": "AB8",
+          "principle": "P9",
+          "check": "Pulse recognizes 'brooklyn' as a borough and asks to narrow to a specific neighborhood.",
+          "anti_pattern": "Returns generic Brooklyn events without neighborhood specificity"
+        },
+        {
+          "after_turn": 3,
+          "id": "AB9",
+          "principle": "P7",
+          "check": "Bushwick events are served normally. Previous off-topic turns don't corrupt session.",
+          "anti_pattern": "No events, or session carries non-NYC context"
+        }
+      ]
+    },
+    {
+      "name": "Abuse: off-topic mid-session preserves picks and filters",
+      "category": "abuse_off_topic",
+      "tests_principles": ["P9", "P7", "P1"],
+      "user_turns": [
+        { "turn": 1, "message": "east village" },
+        { "turn": 2, "message": "comedy" },
+        { "turn": 3, "message": "whats the meaning of life" },
+        { "turn": 4, "message": "2" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 2,
+          "id": "AB10",
+          "principle": "P3",
+          "check": "Comedy filter applied — picks are comedy events in East Village.",
+          "anti_pattern": "Non-comedy events served"
+        },
+        {
+          "after_turn": 3,
+          "id": "AB11",
+          "principle": "P9",
+          "check": "Off-topic question deflected warmly. Does not attempt to answer philosophy. Redirects to events or offers more picks.",
+          "anti_pattern": "Attempts to answer the question, or crashes"
+        },
+        {
+          "after_turn": 4,
+          "id": "AB12",
+          "principle": "P7",
+          "check": "Pick #2 still maps to the comedy pick list from turn 2. Session context (picks, neighborhood, comedy filter) survived the off-topic interruption.",
+          "anti_pattern": "Pick reference broken, session reset, or comedy filter lost"
+        }
+      ]
+    },
+    {
+      "name": "TCPA: opt-out keywords get silent drop",
+      "category": "edge_case",
+      "tests_principles": ["P7"],
+      "user_turns": [
+        { "turn": 1, "message": "STOP" },
+        { "turn": 2, "message": "unsubscribe" },
+        { "turn": 3, "message": "Cancel" },
+        { "turn": 4, "message": "QUIT" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "TC1",
+          "principle": "P7",
+          "type": "exact",
+          "expected": "[NO RESPONSE]",
+          "check": "STOP triggers silent opt-out — no response sent.",
+          "anti_pattern": "Any response text sent back to user"
+        },
+        {
+          "after_turn": 2,
+          "id": "TC2",
+          "principle": "P7",
+          "type": "exact",
+          "expected": "[NO RESPONSE]",
+          "check": "UNSUBSCRIBE triggers silent opt-out — no response sent.",
+          "anti_pattern": "Any response text sent back to user"
+        },
+        {
+          "after_turn": 3,
+          "id": "TC3",
+          "principle": "P7",
+          "type": "exact",
+          "expected": "[NO RESPONSE]",
+          "check": "CANCEL triggers silent opt-out — no response sent.",
+          "anti_pattern": "Any response text sent back to user"
+        },
+        {
+          "after_turn": 4,
+          "id": "TC4",
+          "principle": "P7",
+          "type": "exact",
+          "expected": "[NO RESPONSE]",
+          "check": "QUIT triggers silent opt-out — no response sent.",
+          "anti_pattern": "Any response text sent back to user"
+        }
+      ]
+    },
+    {
+      "name": "TCPA: partial opt-out words are NOT silenced",
+      "category": "edge_case",
+      "tests_principles": ["P7"],
+      "user_turns": [
+        { "turn": 1, "message": "bushwick" },
+        { "turn": 2, "message": "stop by later" },
+        { "turn": 3, "message": "can I cancel my filter" }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "TC5",
+          "principle": "P7",
+          "check": "Bushwick events served normally.",
+          "anti_pattern": "No events or silent drop"
+        },
+        {
+          "after_turn": 2,
+          "id": "TC6",
+          "principle": "P7",
+          "check": "Pulse responds normally — 'stop by later' is NOT an opt-out keyword. Session context preserved.",
+          "anti_pattern": "Silent drop or no response"
+        },
+        {
+          "after_turn": 3,
+          "id": "TC7",
+          "principle": "P7",
+          "check": "Pulse responds normally — 'can I cancel my filter' is NOT an opt-out keyword. Treated as filter clearing or conversational message.",
+          "anti_pattern": "Silent drop or no response"
         }
       ]
     }

@@ -39,6 +39,7 @@ async function handleHelp(ctx) {
   const reply = ctx.route.reply || "Hey! I'm Bestie — tell me what you're in the mood for and I'll find it across NYC.\n\nTry: \"live jazz tonight\", \"something weird\", \"free comedy\", \"this weekend\", or a neighborhood like \"Williamsburg\".\n\nReply a number for details, or \"more\" for more options.";
   const sms = smartTruncate(reply);
   await sendSMS(ctx.phone, sms);
+  setSession(ctx.phone, { lastResponseHadPicks: false });
   console.log(`Help sent to ${ctx.masked}`);
   ctx.finalizeTrace(sms, 'help');
 }
@@ -54,6 +55,7 @@ async function handleConversational(ctx) {
   }
   const sms = smartTruncate(reply);
   await sendSMS(ctx.phone, sms);
+  setSession(ctx.phone, { lastResponseHadPicks: false });
   console.log(`Conversational reply sent to ${ctx.masked}`);
   ctx.finalizeTrace(sms, 'conversational');
 }
@@ -61,6 +63,17 @@ async function handleConversational(ctx) {
 // --- Details ---
 async function handleDetails(ctx) {
   const picks = ctx.session?.lastPicks;
+  // Guard: if the last response didn't show a numbered pick list, the user is
+  // referencing a list they can't see (stale picks from an earlier turn).
+  if (ctx.session && picks?.length > 0 && ctx.session.lastResponseHadPicks === false) {
+    const hood = ctx.session.lastNeighborhood;
+    const sms = hood
+      ? `I don't have a pick list up right now — say MORE for more ${hood} picks, or tell me what you're looking for!`
+      : "I don't have a pick list up right now — tell me what you're looking for!";
+    await sendSMS(ctx.phone, sms);
+    ctx.finalizeTrace(sms, 'details');
+    return;
+  }
   if (ctx.session && picks?.length > 0) {
     const ref = parseInt(ctx.route.event_reference, 10);
 

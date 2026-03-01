@@ -6911,6 +6911,364 @@
         "Comedy context lost when narrowing to EV"
       ],
       "difficulty": "should_pass"
+    },
+    {
+      "name": "Temporal: explicit clock time after 10pm",
+      "category": "filter_drift",
+      "turns": [
+        { "sender": "user", "message": "east village" },
+        { "sender": "pulse", "message": "Tonight in East Village:\n\n1) Jazz at Smalls — 9:30pm, $20\n2) DJ Honeypot at Mood Ring — free, goes til 2am\n\nReply 1-2 for details, MORE for extra picks" },
+        { "sender": "user", "message": "anything after 10pm" },
+        { "sender": "pulse", "message": "Late-night East Village (after 10pm):\n\n1) DJ Honeypot at Mood Ring — free, goes til 2am\n\nReply 1 for details, MORE for extra picks" },
+        { "sender": "user", "message": "more" },
+        { "sender": "pulse", "message": "Still looking after 10pm in East Village — let me check nearby.\n\nReply MORE for extra picks or try a different neighborhood" }
+      ],
+      "testing": "Explicit clock-time filter '10pm' — events before 10pm excluded. Time filter persists through MORE.",
+      "expected_behavior": "Turn 2: only events starting at/after 10pm. Turn 3: MORE respects same time filter.",
+      "failure_modes": [
+        "Events before 10pm included",
+        "Time filter lost on MORE",
+        "Clock time not parsed correctly"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Temporal: jazz after 11pm compound",
+      "category": "filter_drift",
+      "turns": [
+        { "sender": "user", "message": "east village" },
+        { "sender": "pulse", "message": "Tonight in East Village:\n\n1) Jazz at Smalls — 9:30pm, $20\n2) DJ Honeypot at Mood Ring — free, goes til 2am\n\nReply 1-2 for details, MORE for extra picks" },
+        { "sender": "user", "message": "jazz after 11pm" },
+        { "sender": "pulse", "message": "Late jazz in East Village after 11pm:\n\n1) Late set at Smalls — midnight, $20\n\nReply 1 for details, MORE for extra picks" },
+        { "sender": "user", "message": "try williamsburg" },
+        { "sender": "pulse", "message": "Late jazz in Williamsburg after 11pm — slim pickings but checking nearby.\n\nReply MORE or try a different neighborhood" }
+      ],
+      "testing": "Compound time+category filter: 'jazz after 11pm'. Both filters persist through neighborhood switch.",
+      "expected_behavior": "Turn 2: only jazz events after 11pm. Turn 3: jazz+late compound persists to Williamsburg.",
+      "failure_modes": [
+        "Non-jazz events shown",
+        "Events before 11pm included",
+        "Category or time filter lost on neighborhood switch"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Temporal: comedy after 9pm in williamsburg triple compound",
+      "category": "filter_drift",
+      "turns": [
+        { "sender": "user", "message": "comedy after 9pm in williamsburg" },
+        { "sender": "pulse", "message": "Comedy in Williamsburg after 9pm:\n\n1) Stand-up at Knitting Factory — 10pm, $15\n\nReply 1 for details, MORE for extra picks" },
+        { "sender": "user", "message": "1" },
+        { "sender": "pulse", "message": "Knitting Factory on Metropolitan Ave — fun room for comedy. Tonight at 10, $15 cover. https://knittingfactory.com" },
+        { "sender": "user", "message": "more" },
+        { "sender": "pulse", "message": "That's the comedy I've got in Williamsburg after 9pm! Bushwick is right nearby — want comedy from there?" }
+      ],
+      "testing": "Triple compound first message: category + time + neighborhood. All three persist through detail and MORE.",
+      "expected_behavior": "Turn 1: comedy events after 9pm in Williamsburg. Turn 2: detail correct. Turn 3: compound persists, exhaustion nudges nearby.",
+      "failure_modes": [
+        "Non-comedy events shown",
+        "Events before 9pm included",
+        "Wrong neighborhood",
+        "Any filter lost on MORE"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Temporal: time persists through MORE and neighborhood switch",
+      "category": "filter_drift",
+      "turns": [
+        { "sender": "user", "message": "bushwick" },
+        { "sender": "pulse", "message": "Tonight in Bushwick:\n\n1) DJ set at Elsewhere — 10pm, $15\n2) Comedy at Pine Box — 8pm, free\n\nReply 1-2 for details, MORE for extra picks" },
+        { "sender": "user", "message": "after 10pm" },
+        { "sender": "pulse", "message": "Bushwick after 10pm:\n\n1) DJ set at Elsewhere — 10pm, $15\n2) Late show at House of Yes — 11pm, $20\n\nReply 1-2 for details, MORE for extra picks" },
+        { "sender": "user", "message": "more" },
+        { "sender": "pulse", "message": "More late-night Bushwick picks after 10pm:\n\n1) Warehouse party at Knockdown Center — midnight, $10\n\nReply 1 for details or try a different neighborhood" },
+        { "sender": "user", "message": "try williamsburg" },
+        { "sender": "pulse", "message": "Williamsburg after 10pm:\n\n1) DJ night at Output — 11pm, $20\n2) Live music at Baby's — 10:30pm, $15\n\nReply 1-2 for details, MORE for extra picks" }
+      ],
+      "testing": "Time filter set mid-session persists through MORE and neighborhood switch.",
+      "expected_behavior": "Turn 2: only after-10pm events. Turn 3: MORE still after 10pm. Turn 4: Williamsburg still after 10pm.",
+      "failure_modes": [
+        "Events before 10pm shown after filter set",
+        "Time filter lost on MORE",
+        "Time filter lost on neighborhood switch"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Temporal: anytime clears time filter",
+      "category": "filter_drift",
+      "turns": [
+        { "sender": "user", "message": "east village" },
+        { "sender": "pulse", "message": "Tonight in East Village:\n\n1) Jazz at Smalls — 9:30pm, $20\n2) Art show at KGB — 7pm, free\n\nReply 1-2 for details, MORE for extra picks" },
+        { "sender": "user", "message": "after 10pm" },
+        { "sender": "pulse", "message": "East Village after 10pm:\n\n1) Late jazz at Smalls — midnight, $20\n\nReply 1 for details, MORE for extra picks" },
+        { "sender": "user", "message": "actually anytime works" },
+        { "sender": "pulse", "message": "East Village tonight:\n\n1) Jazz at Smalls — 9:30pm, $20\n2) Art show at KGB — 7pm, free\n\nReply 1-2 for details, MORE for extra picks" }
+      ],
+      "testing": "Semantic time filter clearing: 'anytime works' removes time_after filter. Earlier events reappear.",
+      "expected_behavior": "Turn 2: only late events. Turn 3: time filter cleared, full range returns.",
+      "failure_modes": [
+        "Time filter persists after 'anytime'",
+        "Only late events still shown",
+        "Session breaks on clearing"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Temporal: after 1am midnight wrapping",
+      "category": "edge_case",
+      "turns": [
+        { "sender": "user", "message": "bushwick" },
+        { "sender": "pulse", "message": "Tonight in Bushwick:\n\n1) DJ set at Elsewhere — 10pm, $15\n2) Comedy at Pine Box — 8pm, free\n\nReply 1-2 for details, MORE for extra picks" },
+        { "sender": "user", "message": "anything after 1am" },
+        { "sender": "pulse", "message": "Bushwick after 1am — late late night:\n\n1) After-hours at Bossa Nova — 2am, $10\n\nReply 1 for details, MORE for extra picks" },
+        { "sender": "user", "message": "1" },
+        { "sender": "pulse", "message": "Bossa Nova on Broadway — classic Bushwick after-hours spot. Tonight starting at 2am, $10. https://bossanovaclub.com" }
+      ],
+      "testing": "After-midnight time filter ('after 1am') — tests the 6am wrapping boundary in failsTimeGate.",
+      "expected_behavior": "Turn 2: only events starting after 1am (after-midnight). 10pm and 8pm events excluded. Detail works.",
+      "failure_modes": [
+        "10pm event shown (before 1am)",
+        "Time parsing fails for 1am",
+        "After-midnight wrapping bug"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "First-message compound: comedy in bushwick",
+      "category": "happy_path",
+      "turns": [
+        { "sender": "user", "message": "comedy in bushwick" },
+        { "sender": "pulse", "message": "Comedy in Bushwick tonight:\n\n1) Stand-up at Pine Box — 8pm, free\n2) Improv at Vital Joint — 9pm, $10\n\nReply 1-2 for details, MORE for extra picks" },
+        { "sender": "user", "message": "more" },
+        { "sender": "pulse", "message": "More comedy in Bushwick:\n\n1) Open mic at Heavy Woods — 10pm, free\n\nReply 1 for details or try a different neighborhood" },
+        { "sender": "user", "message": "2" },
+        { "sender": "pulse", "message": "for more", "assert": "contains" }
+      ],
+      "testing": "First-message compound: category + neighborhood with no session. Pre-router detects both deterministically. Comedy filter persists through MORE.",
+      "expected_behavior": "Turn 1: comedy events in Bushwick. Turn 2: MORE shows more comedy in Bushwick. Turn 3: detail or fallback.",
+      "failure_modes": [
+        "Non-comedy events shown",
+        "Wrong neighborhood",
+        "Category filter lost on MORE",
+        "Pre-router misses compound"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "First-message compound: free jazz tonight with neighborhood switch",
+      "category": "filter_drift",
+      "turns": [
+        { "sender": "user", "message": "free jazz tonight" },
+        { "sender": "pulse", "message": "Free jazz tonight:\n\n1) Jazz at Smalls — free late set, midnight\n\nReply 1 for details, MORE for extra picks" },
+        { "sender": "user", "message": "how about williamsburg" },
+        { "sender": "pulse", "message": "Free jazz in Williamsburg tonight:\n\n1) Jazz trio at Skinny Dennis — 10pm, free\n\nReply 1 for details, MORE for extra picks" },
+        { "sender": "user", "message": "1" },
+        { "sender": "pulse", "message": "Skinny Dennis on Metropolitan — great low-key spot for jazz. Free show tonight at 10pm. https://skinnydennis.com" }
+      ],
+      "testing": "First-message compound: free + category (citywide). Both filters persist through neighborhood switch. Pre-router detects compound on first message without session.",
+      "expected_behavior": "Turn 1: citywide free jazz. Turn 2: free jazz in Williamsburg. Turn 3: detail works.",
+      "failure_modes": [
+        "Non-jazz events shown",
+        "Paid events shown",
+        "Free or jazz filter lost on neighborhood switch",
+        "Citywide fails on first message"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "First-message compound: jazz after 10pm as opener",
+      "category": "filter_drift",
+      "turns": [
+        { "sender": "user", "message": "jazz after 10pm" },
+        { "sender": "pulse", "message": "Late jazz tonight (after 10pm):\n\n1) Late set at Smalls — midnight, $20, West Village\n2) Jazz at Nublu — 11pm, $15, East Village\n\nReply 1-2 for details, MORE for extra picks" },
+        { "sender": "user", "message": "more" },
+        { "sender": "pulse", "message": "More late jazz after 10pm:\n\n1) Jazz at Mezzrow — 11:30pm, $20, West Village\n\nReply 1 for details or try a different neighborhood" },
+        { "sender": "user", "message": "try harlem" },
+        { "sender": "pulse", "message": "Late jazz in Harlem after 10pm:\n\n1) Set at Minton's — 11pm, $15\n\nReply 1 for details, MORE for extra picks" }
+      ],
+      "testing": "First-message triple compound: category + time (citywide). Both persist through MORE and neighborhood switch.",
+      "expected_behavior": "Turn 1: citywide jazz after 10pm. Turn 2: MORE same filters. Turn 3: Harlem jazz after 10pm.",
+      "failure_modes": [
+        "Non-jazz events shown",
+        "Events before 10pm shown",
+        "Jazz or time filter lost on MORE or switch"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "First-message compound: free stuff with category follow-up",
+      "category": "filter_drift",
+      "turns": [
+        { "sender": "user", "message": "free stuff" },
+        { "sender": "pulse", "message": "Free tonight:\n\n1) DJ Honeypot at Mood Ring — Bushwick, 10pm\n2) Open mic at Nuyorican — East Village, 8pm\n\nReply 1-2 for details, MORE for extra picks" },
+        { "sender": "user", "message": "how about comedy" },
+        { "sender": "pulse", "message": "Free comedy tonight:\n\n1) Open mic at The Stand — Gramercy, 7pm\n\nReply 1 for details, MORE for extra picks" },
+        { "sender": "user", "message": "try east village" },
+        { "sender": "pulse", "message": "Free comedy in East Village:\n\n1) Comedy show at KGB — 9pm, free\n\nReply 1 for details, MORE for extra picks" }
+      ],
+      "testing": "First-message 'free stuff' opener detected by pre-router. Category follow-up compounds with free. Both persist through neighborhood.",
+      "expected_behavior": "Turn 1: citywide free events. Turn 2: free + comedy compound. Turn 3: free + comedy in East Village.",
+      "failure_modes": [
+        "Free filter lost on category add",
+        "Paid events after 'free stuff'",
+        "Comedy filter lost on neighborhood switch",
+        "Free filter lost on neighborhood switch"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "MORE: filter persistence through 3 cycles",
+      "category": "edge_case",
+      "turns": [
+        { "sender": "user", "message": "east village" },
+        { "sender": "pulse", "message": "Tonight in East Village:\n\n1) Jazz at Smalls — 9:30pm, $20\n2) DJ set at Mood Ring — free, 10pm\n\nReply 1-2 for details, MORE for extra picks" },
+        { "sender": "user", "message": "how about comedy" },
+        { "sender": "pulse", "message": "Comedy in East Village:\n\n1) Open mic at Nuyorican — 8pm, $10\n\nReply 1 for details, MORE for extra picks" },
+        { "sender": "user", "message": "more" },
+        { "sender": "pulse", "message": "More comedy in East Village:\n\n1) Stand-up at The Stand — 9pm, $15\n\nReply 1 for details, MORE for extra picks" },
+        { "sender": "user", "message": "more" },
+        { "sender": "pulse", "message": "More comedy near East Village:\n\n1) Comedy showcase at UCB — 10pm, $12\n\nReply 1 for details, MORE for extra picks" },
+        { "sender": "user", "message": "more" },
+        { "sender": "pulse", "message": "Running low on comedy near EV! Want to try another neighborhood or a different vibe?" }
+      ],
+      "testing": "Comedy filter persists through 3 consecutive MORE cycles. No category drift. Graceful exhaustion.",
+      "expected_behavior": "Each MORE returns comedy events only (no non-comedy leaking through). When exhausted, Pulse acknowledges the constraint and offers alternatives.",
+      "failure_modes": [
+        "Non-comedy events in any MORE batch",
+        "Comedy filter dropped silently",
+        "Same events repeated across MOREs",
+        "Ungraceful exhaustion (error or generic 'nothing found')"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "MORE: dedup across multiple batches",
+      "category": "edge_case",
+      "turns": [
+        { "sender": "user", "message": "williamsburg" },
+        { "sender": "pulse", "message": "Tonight in Williamsburg:\n\n1) Indie show at Baby's All Right — $15\n2) DJ set at Good Room — 11pm, $10\n\nReply 1-2 for details, MORE for extra picks" },
+        { "sender": "user", "message": "more" },
+        { "sender": "pulse", "message": "More in Williamsburg:\n\n1) Rock show at Music Hall — $25\n2) Free party at Bossa Nova Civic Club — 11pm\n\nReply 1-2 for details, MORE for extra picks" },
+        { "sender": "user", "message": "more" },
+        { "sender": "pulse", "message": "More in Williamsburg:\n\n1) DJ night at Output — $20\n\nReply 1 for details, MORE for extra picks" }
+      ],
+      "testing": "Each MORE batch returns completely fresh events — no repeats from earlier batches. Pick numbers reset each batch.",
+      "expected_behavior": "Zero event name or venue overlap across 3 batches. Each batch has distinct events.",
+      "failure_modes": [
+        "Same event appears in multiple batches",
+        "Same venue repeated with different event",
+        "Pick numbers reference events from earlier batch"
+      ],
+      "difficulty": "must_pass"
+    },
+    {
+      "name": "MORE: exhaustion suggests nearby neighborhoods",
+      "category": "poor_experience",
+      "turns": [
+        { "sender": "user", "message": "greenpoint" },
+        { "sender": "pulse", "message": "Tonight in Greenpoint:\n\n1) Live jazz at Troost — 9pm, free\n2) Art show at The Spring — 7pm\n\nReply 1-2 for details, MORE for extra picks" },
+        { "sender": "user", "message": "more" },
+        { "sender": "pulse", "message": "More in Greenpoint:\n\n1) DJ set at Silo — 10pm, $5\n\nReply 1 for details, MORE for extra picks" },
+        { "sender": "user", "message": "more" },
+        { "sender": "pulse", "message": "That's all I've got in Greenpoint tonight. Williamsburg is right next door — want picks from there?" },
+        { "sender": "user", "message": "yeah" },
+        { "sender": "pulse", "message": "Tonight in Williamsburg:\n\n1) Indie show at Baby's All Right — $15\n2) DJ set at Good Room — 11pm\n\nReply 1-2 for details, MORE for extra picks" }
+      ],
+      "testing": "When events are exhausted, Pulse suggests a nearby neighborhood. User accepts nudge and gets fresh picks from the suggested hood.",
+      "expected_behavior": "Graceful exhaustion message, nearby neighborhood suggestion, seamless transition when accepted.",
+      "failure_modes": [
+        "Repeats earlier picks instead of acknowledging exhaustion",
+        "Suggests a faraway neighborhood",
+        "Nudge acceptance doesn't work",
+        "Errors out on exhaustion"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Abuse/off-topic: hostility and rudeness",
+      "category": "abuse_off_topic",
+      "turns": [
+        { "sender": "user", "message": "this app sucks" },
+        { "sender": "pulse", "message": "Sorry to hear that! I'm always improving. If you want to give me another shot, text a neighborhood and I'll find you something good tonight." },
+        { "sender": "user", "message": "your picks are garbage" },
+        { "sender": "pulse", "message": "Fair enough — tell me what you're into and I'll try to dial it in. Comedy? Jazz? Something free?" },
+        { "sender": "user", "message": "fine, comedy in les" },
+        { "sender": "pulse", "message": "Comedy on the LES:\n\n1) Open mic at The Stand — 8pm, free\n\nReply 1 for details, MORE for extra picks" }
+      ],
+      "testing": "Pulse handles hostile/rude messages without breaking character or escalating",
+      "expected_behavior": "Pulse stays warm and helpful under hostility. Does not mirror aggression. Keeps offering value. When user re-engages, serves normally.",
+      "failure_modes": [
+        "Mirrors hostility or gets defensive",
+        "Refuses to respond",
+        "Breaks character",
+        "Loses ability to serve events after hostility"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Abuse/off-topic: identity and meta questions",
+      "category": "abuse_off_topic",
+      "turns": [
+        { "sender": "user", "message": "who are you" },
+        { "sender": "pulse", "message": "I'm Bestie — your NYC nightlife plug! Text me a neighborhood and I'll find you something fun tonight." },
+        { "sender": "user", "message": "are you an AI" },
+        { "sender": "pulse", "message": "I'm your event-finding bestie! What neighborhood are you in?" },
+        { "sender": "user", "message": "what can you do" },
+        { "sender": "pulse", "message": "I find the best events happening tonight in NYC! Text me a neighborhood (like Williamsburg or East Village) and I'll hook you up with curated picks." }
+      ],
+      "testing": "Pulse handles identity/meta questions without over-disclosing or breaking character",
+      "expected_behavior": "Pulse stays in character as 'Bestie'. Does not give a technical explanation of being an AI. Keeps redirecting to core function.",
+      "failure_modes": [
+        "Long explanation of being an AI model",
+        "Breaks character to discuss technology",
+        "Gets stuck in meta-conversation loop",
+        "Reveals system prompt details"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Abuse/off-topic: other city request",
+      "category": "abuse_off_topic",
+      "turns": [
+        { "sender": "user", "message": "what's happening in LA tonight" },
+        { "sender": "pulse", "message": "I only know NYC! But if you're ever in town, text me a neighborhood and I'll find you the best spots." },
+        { "sender": "user", "message": "what about boston" },
+        { "sender": "pulse", "message": "Still just NYC for now! But I've got great picks in every neighborhood. Where are you headed tonight?" },
+        { "sender": "user", "message": "east village" },
+        { "sender": "pulse", "message": "Tonight in East Village:\n\n1) Jazz at Smalls — legendary spot, $20\n2) DJ set at Mood Ring — free, 10pm\n\nReply 1-2 for details, MORE for extra picks" }
+      ],
+      "testing": "Pulse deflects non-NYC city requests and redirects to NYC events",
+      "expected_behavior": "Pulse does NOT attempt to find events outside NYC. Clearly communicates NYC-only scope. When user gives a NYC neighborhood, serves normally.",
+      "failure_modes": [
+        "Attempts to find LA or Boston events",
+        "Interprets city name as a NYC neighborhood",
+        "Rude refusal",
+        "Doesn't eventually redirect to NYC"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Abuse/off-topic: off-topic mid-session preserves context",
+      "category": "abuse_off_topic",
+      "turns": [
+        { "sender": "user", "message": "williamsburg" },
+        { "sender": "pulse", "message": "Tonight in Williamsburg:\n\n1) Indie show at Baby's All Right — $15\n2) DJ set at Good Room — 11pm, $10\n\nReply 1-2 for details, MORE for extra picks" },
+        { "sender": "user", "message": "how's the weather tonight" },
+        { "sender": "pulse", "message": "No idea about weather, but I know what's happening! Want more Williamsburg picks?" },
+        { "sender": "user", "message": "2" },
+        { "sender": "pulse", "message": "Good Room is one of the best dance spots in Brooklyn", "assert": "contains" }
+      ],
+      "testing": "Off-topic mid-session does not reset session context. Pick numbers still map correctly after off-topic interruption.",
+      "expected_behavior": "After off-topic message, session context (neighborhood, picks, filters) survives. User can still reference pick numbers from the last list.",
+      "failure_modes": [
+        "Session context wiped by off-topic message",
+        "Pick #2 maps to wrong event",
+        "Asks for neighborhood again",
+        "Events change after off-topic"
+      ],
+      "difficulty": "should_pass"
     }
   ]
 }

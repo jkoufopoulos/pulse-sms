@@ -66,6 +66,7 @@ function setResponseState(phone, frame) {
     pendingNearbyEvents: frame.pendingNearbyEvents ?? null,
     pendingFilters: frame.pendingFilters ?? null,
     pendingMessage: frame.pendingMessage ?? null,
+    lastResponseHadPicks: frame.lastResponseHadPicks ?? false,
     timestamp: Date.now(),
   });
   scheduleDiskWrite();

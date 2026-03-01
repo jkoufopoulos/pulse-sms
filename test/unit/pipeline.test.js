@@ -334,9 +334,10 @@ check('Jazz → live_music', normalizeFilters({ category: 'Jazz' }).category ===
 check('Jazz → subcategory jazz', normalizeFilters({ category: 'Jazz' }).subcategory === 'jazz');
 check('TECHNO → nightlife', normalizeFilters({ category: 'TECHNO' }).category === 'nightlife');
 
-// Unknown category passes through
-check('unknown → passthrough', normalizeFilters({ category: 'wellness' }).category === 'wellness');
-check('unknown: no subcategory', normalizeFilters({ category: 'wellness' }).subcategory === undefined);
+// Unknown category rejected (P1: only valid categories reach session state)
+check('unknown → rejected', normalizeFilters({ category: 'wellness' }) === null);
+check('unknown with free → free only', normalizeFilters({ category: 'wellness', free_only: true })?.free_only === true);
+check('unknown with free → no category', normalizeFilters({ category: 'wellness', free_only: true })?.category === undefined);
 
 // Explicit subcategory field preserved
 check('explicit subcategory preserved', normalizeFilters({ subcategory: 'jazz' }).subcategory === 'jazz');

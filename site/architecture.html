@@ -637,7 +637,7 @@
   "clear_filters": false
 }</div>
         <p>The output contract is minimal: <code>type</code>, <code>sms_text</code>, <code>picks</code>, and <code>clear_filters</code>. All other state (neighborhood, filters, pending context) is derived deterministically by the handler &mdash; the LLM never reports state, only text and event selections.</p>
-        <p>Cost: ~$0.001 (Haiku, single call). Latency: ~800ms. This is cheaper than the old two-call flow (route + compose) because everything happens in one pass.</p>
+        <p>Cost: ~$0.001 (Haiku, single call). Latency: ~800ms.</p>
       </div>
     </details>
 
@@ -977,7 +977,7 @@
           <tr>
             <td class="source-name">conversationHistory</td>
             <td>array</td>
-            <td>Last 6 turns (300 chars each) &mdash; sent to router and compose</td>
+            <td>Last 6 turns (300 chars each) &mdash; sent to unified LLM call</td>
           </tr>
           <tr>
             <td class="source-name">allPicks</td>

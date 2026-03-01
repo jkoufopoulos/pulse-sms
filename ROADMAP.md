@@ -275,7 +275,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 | 4 | **Abuse/off-topic** — 5 scenarios (3%). Missing: hostility, identity questions, other-city requests, persistent off-topic. Target: 8-10%. | Medium | **Done** — 4 multi-turn + 4 regression scenarios added (now 5.1%) |
 | 5 | **handleMore path** — No dedicated MORE eval. Dedup across 3+ cycles, filter persistence through MOREs, compose-only prompt path untested. | Medium | **Done** — 3 multi-turn + 3 regression scenarios added |
 | 6 | **Tavily scenarios vestigial** — 3 regression scenarios tested Tavily fallback (removed from hot path). | Medium | **Done** — updated to test deterministic exhaustion behavior, removed P8 references |
-| 7 | **TCPA/opt-out** — Zero scenarios for STOP/UNSUBSCRIBE compliance. Deterministic but legally required. | Low | Planned |
+| 7 | **TCPA/opt-out** — Zero scenarios for STOP/UNSUBSCRIBE compliance. Deterministic but legally required. | Low | **Done** — 2 regression scenarios (4 keywords + 3 non-match edge cases) |
 | 8 | **Neighborhood skew** — EV 13x, Bushwick 7x, Wburg 5x. Many outer-borough neighborhoods absent. Failures are cache-dependent, not code-dependent. | Low | Planned |
 | 9 | Trace fetch race condition — could grab wrong trace under concurrent load | Low | Planned |
 
@@ -362,8 +362,8 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 | Price data gap (21% unknown) | Low | Down from 71.6% after scraper improvements; remaining is structurally unavailable |
 | No horizontal scalability | Low | Single-process, in-memory sessions |
 | Preference learning not yet active | Low | Profiles captured but not injected into prompts |
-| `cityScan` skill activation mismatch | Low | Skill defined but handler uses `cityScanResults` — verify or remove |
-| `architecture.html` references deleted flow | Low | Still references `routeMessage`/`composeResponse` |
+| ~~`cityScan` skill activation mismatch~~ | ~~Low~~ | **Removed** — dead code (`cityScan` + `venueFraming`), never activated |
+| ~~`architecture.html` references deleted flow~~ | ~~Low~~ | **Fixed** — removed two-call flow refs, updated session field description |
 
 ---
 
@@ -371,6 +371,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 
 | Date | What | Key Impact |
 |------|------|------------|
+| Mar 1 | Quick wins: dead skill cleanup, stale docs, TCPA evals | Removed `cityScan` + `venueFraming` dead skills, fixed architecture.html stale two-call refs, added 2 TCPA regression scenarios (7 assertions) |
 | Mar 1 | Neighborhood resolution gap fix (#19) | 171 → ~80 missing neighborhoods (53% reduction). +40 venues in map, NYC bbox filter on 4 scrapers, Rockaway + St. George neighborhoods added, Staten Island borough support |
 | Mar 1 | Structural filter drift fix (Step 2b) | Gated `filter_intent` when pre-router set filters (P1), expanded compound detection (first-message + time+category + free+category), VALID_CATEGORIES validation (P3) |
 | Mar 1 | Degraded-mode LLM fallback + MORE dedup hardening | Gap 4 fixed — deterministic picks from tagged pool on LLM failure |

@@ -226,8 +226,8 @@ const evals = {
     if (picks.length === 1) {
       return { name: 'pick_count_accuracy', pass: true, detail: 'single pick (prose)' };
     }
-    // Count numbered items (e.g. "1)", "2)", "3)")
-    const numbered = sms.match(/\d\)/g) || [];
+    // Count numbered items (e.g. "1)", "2)", "3)" or "1.", "2.", "3.")
+    const numbered = sms.match(/^\d[.)]/gm) || [];
     const smsCount = numbered.length;
     const match = smsCount === picks.length;
     return {
@@ -600,6 +600,48 @@ const evals = {
       pass: total > 0,
       detail: `$${total.toFixed(5)} (${costs.length} call${costs.length > 1 ? 's' : ''}: ${callTypes})`,
     };
+  },
+
+  /**
+   * Filter intent gating: when pre-router set filters, LLM filter_intent modify
+   * should be ignored (P1: code owns state). Verifies the gate fires correctly.
+   */
+  filter_intent_gating(trace) {
+    const filterState = trace.composition?.filter_state;
+    // Skip if no filter_state recorded (pre-routed mechanical shortcuts, older traces)
+    if (!filterState) {
+      return { name: 'filter_intent_gating', pass: true, detail: 'no filter_state in trace (skip)' };
+    }
+    const hadPreDetected = filterState.had_pre_detected;
+    const llmIntent = filterState.llm_filter_intent;
+    const decision = filterState.decision;
+    // When pre-router set filters AND LLM tried to modify, the gate must fire
+    if (hadPreDetected && llmIntent?.action === 'modify') {
+      const pass = decision === 'modify_ignored_pre_router';
+      return {
+        name: 'filter_intent_gating',
+        pass,
+        detail: pass
+          ? 'LLM modify correctly ignored (pre-router had filters)'
+          : `LLM modify was NOT ignored when pre-router had filters (decision: ${decision})`,
+      };
+    }
+    // When pre-router did NOT set filters and LLM modified, trust should apply
+    if (!hadPreDetected && llmIntent?.action === 'modify') {
+      const pass = decision === 'modify_trusted';
+      return {
+        name: 'filter_intent_gating',
+        pass,
+        detail: pass
+          ? 'LLM modify correctly trusted (no pre-router filters)'
+          : `LLM modify was NOT trusted when it should have been (decision: ${decision})`,
+      };
+    }
+    // clear_all is always trusted regardless of pre-router
+    if (llmIntent?.action === 'clear_all' || decision === 'clear_all_trusted') {
+      return { name: 'filter_intent_gating', pass: true, detail: 'clear_all always trusted' };
+    }
+    return { name: 'filter_intent_gating', pass: true, detail: `no gating scenario (pre_detected=${hadPreDetected}, action=${llmIntent?.action || 'none'})` };
   },
 
   /**

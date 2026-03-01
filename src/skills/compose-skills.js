@@ -91,13 +91,6 @@ const neighborhoodMismatch = {
 NEIGHBORHOOD MISMATCH: NONE of the events are in the requested neighborhood. You MUST acknowledge this upfront by naming the user's REQUESTED neighborhood (from the "Neighborhood:" field) — e.g. "Not much tonight in [requested neighborhood], but nearby:" or "Slim pickings in [requested neighborhood] — here's what's close by:". NEVER substitute a different neighborhood name. Never silently show events from a different neighborhood.`,
 };
 
-const venueFraming = {
-  id: 'venue-framing',
-  text: `
-VENUE ITEMS: Search-sourced items (source_name "tavily") may include permanent venues like bars or game spots with no specific date/time. Frame these as "solid spots to check out" — not "tonight at 9pm".
-- Example: "The Last Resort is a solid low-key bar in EV if you want a chill hang."`,
-};
-
 const lastBatch = {
   id: 'last-batch',
   text: `
@@ -150,18 +143,6 @@ There is only one matching event. Override the normal numbered format:
 - Keep the same voice and character limit (480 chars).`,
 };
 
-const cityScan = {
-  id: 'city-scan',
-  text: `
-CITY SCAN MODE:
-The user asked for events without specifying a neighborhood. You have scan results showing which neighborhoods have matching events.
-- Present the top neighborhoods naturally: "I've got [category] tonight in [hood1], [hood2], and [hood3] — which one?"
-- Include match counts only if useful (e.g. "East Village has the most with 4 options")
-- If zero neighborhoods matched, suggest broadening: "No [category] tonight — want to try [alternative category] or a different night?"
-- Do NOT show individual events. Just tell them WHERE to look.
-- Keep under 480 chars. Stay conversational.`,
-};
-
 const citywide = {
   id: 'citywide',
   text: `
@@ -181,6 +162,6 @@ Events in this pool span multiple days. State the day for each pick — "tomorro
 If all picks happen to fall on the same day, mention it once in the intro instead of repeating.`,
 };
 
-const ALL_SKILLS = { core, tonightPriority, sourceTiers, neighborhoodMismatch, venueFraming, lastBatch, freeEmphasis, pendingIntent, activityAdherence, conversationAwareness, nearbySuggestion, singlePick, cityScan, citywide, multiDay };
+const ALL_SKILLS = { core, tonightPriority, sourceTiers, neighborhoodMismatch, lastBatch, freeEmphasis, pendingIntent, activityAdherence, conversationAwareness, nearbySuggestion, singlePick, citywide, multiDay };
 
 module.exports = ALL_SKILLS;
