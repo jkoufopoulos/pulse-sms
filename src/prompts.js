@@ -364,6 +364,7 @@ Rules:
 - "paid is fine" / "not just comedy" / "anytime works" → "modify" with the relevant key cleared.
 - "forget the comedy" → "modify" with { "category": null } (targeted clear, not clear_all).
 - "show me everything" / "drop all filters" → "clear_all".
+- INITIAL TIME/FILTER PREFERENCES: When the user's FIRST message includes time constraints ("late night stuff", "after 10pm", "something late"), report filter_intent "modify" with time_after so the preference persists across follow-up messages. Same for category in compound openers ("comedy in the EV" → modify with category). Without this, follow-up messages lose the constraint.
 </output_format>
 
 <examples>
@@ -384,6 +385,12 @@ USER: "surprise me" (no session, citywide events provided)
 
 USER: "underground techno in bushwick" (events provided)
 → type: "event_picks" with picks from event list, filtering for nightlife/DJ events
+
+USER: "im at the L bedford stop looking for late night stuff" (events provided)
+→ type: "event_picks", filter_intent: { "action": "modify", "updates": { "time_after": "22:00" } }, compose picks preferring later events
+
+USER: "comedy in the east village" (events provided, first message)
+→ type: "event_picks", filter_intent: { "action": "modify", "updates": { "category": "comedy" } }, compose comedy picks
 
 USER: "any more free comedy stuff" (session active in LES, events provided)
 → type: "event_picks" with free comedy picks from event list

@@ -6,7 +6,7 @@ const { getAdjacentNeighborhoods } = require('./pre-router');
 const { filterByTimeAfter } = require('./geo');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
 const { validatePerennialActivity } = require('./curation');
-const { resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, tryTavilyFallback, executeQuery } = require('./pipeline');
+const { resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, tryTavilyFallback, executeQuery, eventMatchesFilters } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
 const { generateReferralCode } = require('./referral');
 const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
@@ -90,6 +90,18 @@ async function handleDetails(ctx) {
     const pickIndex = Math.max(0, ref - 1);
     const pick = picks[pickIndex];
     const event = ctx.session.lastEvents[pick.event_id];
+    // Filter compliance: if active filters exist and the picked event doesn't match,
+    // the picks are stale (from before the filter was applied). Reject the detail.
+    const activeFilters = ctx.session.lastFilters;
+    if (event && activeFilters && Object.values(activeFilters).some(Boolean)) {
+      const match = eventMatchesFilters(event, activeFilters);
+      if (match === false) {
+        const sms = smartTruncate("That pick doesn't match your current filter — text a neighborhood or say MORE for fresh picks!");
+        await sendSMS(ctx.phone, sms);
+        ctx.finalizeTrace(sms, 'details');
+        return;
+      }
+    }
     if (event) {
       // Generate referral code and Bestie URL for shareable details
       const refCode = generateReferralCode(ctx.phone, event.id);

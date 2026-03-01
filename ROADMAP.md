@@ -569,8 +569,8 @@ Scenario pass rate is low because each scenario requires ALL assertions to pass 
 
 | Action | Expected Impact | Effort | Status |
 |--------|----------------|--------|--------|
-| Fix time gate miss (Q2) | +1 P5, likely helps P1 compound filter scenarios | Small | **Next** |
-| Fix free filter violation (AG6) | +1-3 P1 (AG6 + possibly AQ6, BB3) | Small | **Next** |
+| Fix time gate miss (Q2) — prompt: initial time constraints report filter_intent | +1 P5 (Q2 now passes), +1 Q scenario assertion | Small | **Done (2026-03-01)** |
+| Fix free filter violation (AG6) — details handler filter compliance check | Prevents stale pick serving, AG6 anti-pattern blocked (remaining failure is data scarcity) | Small | **Done (2026-03-01)** |
 | Replace regex routing with LLM filter_intent | +27% filter_drift (7 of 15 failures) | Medium | **Done (2026-03-01)** |
 | Fix filter-active dismissal prompt ambiguity | +17% P10 (12/18 → 15/18) | Small | **Done (2026-03-01)** |
 | Add "live music" to pre-router category detection | +8% filter_drift (2 scenarios) | Small | Planned |
@@ -585,6 +585,18 @@ Scenario pass rate is low because each scenario requires ALL assertions to pass 
 ---
 
 ## Completed Work
+
+### Fix time filter persistence + details filter compliance (2026-03-01)
+
+**Problem 1 (Q2 — time gate miss):** Compound first messages like "im at the L bedford stop looking for late night stuff" correctly showed late-night-aware responses on turn 1, but the LLM returned `filter_intent: { action: "none" }`. On turn 2 ("any dj sets"), `mergeFilters({}, { category: 'nightlife' })` lost the time constraint → 2pm events served.
+
+**Fix:** Added prompt rule (INITIAL TIME/FILTER PREFERENCES) + concrete examples telling the LLM to report `filter_intent: { action: "modify", updates: { time_after: "22:00" } }` even on first/compound messages. Result: Q2 (P5 temporal accuracy) now passes.
+
+**Problem 2 (AG6 — stale pick filter violation):** User said "free" (turn 5) → filter applied, but response was conversational (1 match) → stale `lastPicks` from pre-free turn persisted (included $18 event). User said "2" (turn 6) → details handler served $18 St. Marks Comedy despite free_only being active.
+
+**Fix:** Added filter compliance validation in `handleDetails` (intent-handlers.js). When active filters exist and the requested pick's event doesn't match via `eventMatchesFilters`, the detail is rejected. Prevents stale picks from violating active filters. Remaining AG6 failure is data scarcity (no free comedy in EV).
+
+**Regression eval (2026-03-01):** 24/59 scenarios (40.7%), 239/326 assertions (73.3%), code evals 98.2%. P5 temporal: 4/7 (57%, up from 50%). P12 vibe: 18/18 (100%). P2 redirect: 15/15 (100%).
 
 ### Fix filter-active dismissal prompt ambiguity (2026-03-01)
 
