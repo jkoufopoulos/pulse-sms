@@ -230,7 +230,7 @@ app.get('/evals', (req, res) => {
 
 // Events browser (read-only, always available)
 app.get('/events', (req, res) => {
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' https://*.basemaps.cartocdn.com");
   res.sendFile(require('path').join(__dirname, 'events-ui.html'));
 });
 app.get('/api/events', (req, res) => {
