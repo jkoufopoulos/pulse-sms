@@ -453,7 +453,7 @@ async function refreshCache() {
 // Selective source refresh — re-scrape specific sources only
 // ============================================================
 
-async function refreshSources(sourceNames) {
+async function refreshSources(sourceNames, { reprocess = false } = {}) {
   // Match flexibly: strip non-alpha so "nyc_parks", "nyc-parks", "nycparks" all match "NYCParks"
   const normalize = s => s.toLowerCase().replace(/[^a-z]/g, '');
   const normalizedInputs = sourceNames.map(normalize);
@@ -466,9 +466,12 @@ async function refreshSources(sourceNames) {
   console.log(`Refreshing ${targets.length} source(s): ${targets.map(s => s.label).join(', ')}`);
   const targetLabels = new Set(targets.map(s => s.label));
 
-  // Fetch only the targeted sources
+  // Fetch only the targeted sources — pass reprocess to Yutori if requested
   const results = await Promise.allSettled(
-    targets.map(s => timedFetch(s.fetch, s.label, s.weight))
+    targets.map(s => {
+      const fetchFn = (reprocess && s.label === 'Yutori') ? () => s.fetch({ reprocess }) : s.fetch;
+      return timedFetch(fetchFn, s.label, s.weight);
+    })
   );
 
   // Remove old events from targeted sources, keep everything else

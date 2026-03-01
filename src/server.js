@@ -357,13 +357,14 @@ if (process.env.PULSE_TEST_MODE === 'true') {
     }
   });
 
-  // API: force scrape — all sources or selective (?sources=skint,yutori)
+  // API: force scrape — all sources or selective (?sources=skint,yutori&reprocess=1)
   app.post('/api/scrape', async (req, res) => {
     try {
       const { refreshCache, refreshSources, getRawCache } = require('./events');
       const sourceFilter = req.query.sources?.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+      const reprocess = req.query.reprocess === '1';
       if (sourceFilter?.length > 0) {
-        await refreshSources(sourceFilter);
+        await refreshSources(sourceFilter, { reprocess });
       } else {
         await refreshCache();
       }
