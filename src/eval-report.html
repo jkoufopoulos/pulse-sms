@@ -1109,11 +1109,13 @@ var REPORT_TYPES = [
   { key: 'scenario', label: 'Scenario Evals' },
   { key: 'regression', label: 'Regression Evals' },
   { key: 'extraction', label: 'Extraction Audits' },
+  { key: 'scrape', label: 'Scrape Audits' },
 ];
 function detectReportType(filename) {
   if (filename.startsWith('scenario-eval-')) return 'scenario';
   if (filename.startsWith('regression-eval-')) return 'regression';
   if (filename.startsWith('extraction-audit-')) return 'extraction';
+  if (filename.startsWith('scrape-audit-')) return 'scrape';
   return 'unknown';
 }
 
@@ -1266,6 +1268,7 @@ function render() {
   var type = detectReportType(currentReport._filename);
   if (type === 'regression') { renderRegressionReport(); return; }
   if (type === 'extraction') { renderExtractionReport(); return; }
+  if (type === 'scrape') { renderScrapeReport(); return; }
   var c = document.getElementById('content');
   var scenarios = currentReport.scenarios || [];
   var sorted = sortScenarios(scenarios);
@@ -1491,6 +1494,131 @@ function renderExtractionReport() {
 
   c.innerHTML = html;
   setupEventListeners();
+}
+
+function renderScrapeReport() {
+  var c = document.getElementById('content');
+  var r = currentReport;
+  var html = '';
+  html += renderToolbar();
+
+  // Summary
+  html += '<div class="summary-section">';
+  html += '<div class="summary-big">';
+  html += '<div class="label">Scrape Audit Pass Rate</div>';
+  if (r.summary) {
+    var rate = parseFloat(r.summary.passRate) || 0;
+    html += '<div class="value ' + passRateColor(rate) + '">' + r.summary.passRate + '</div>';
+    html += '<div class="sub">' + r.summary.passed + ' of ' + r.summary.total + ' events</div>';
+  } else {
+    html += '<div class="value neutral">N/A</div>';
+  }
+  html += '</div>';
+  html += '<div class="summary-stats">';
+  if (r.summary) {
+    html += statRow('Total', r.summary.total, '');
+    html += statRow('Passed', r.summary.passed, 'green');
+    html += statRow('Issues', r.summary.issues || 0, (r.summary.issues || 0) > 0 ? 'red' : '');
+    html += statRow('Sources', r.summary.sourceCount || 0, '');
+    html += statRow('Below Min', r.summary.sourcesBelow || 0, (r.summary.sourcesBelow || 0) > 0 ? 'red' : '');
+  }
+  html += '</div></div>';
+
+  // Per-source grid
+  if (r.sourceStats) {
+    html += '<div class="section-header">By Source</div>';
+    html += '<div class="section-explainer">Per-event data quality checks — date/time format, venue quality, price coverage, category validity, URLs.</div>';
+    html += '<div class="principle-grid">';
+    var shortNames = {
+      date_format_valid: 'bad date', time_format_valid: 'bad time', time_present: 'no time',
+      venue_quality: 'TBA venue', price_coverage: 'no price', category_valid: 'bad category', has_url: 'no URL'
+    };
+    Object.keys(r.sourceStats).sort().forEach(function(source) {
+      var stats = r.sourceStats[source];
+      var rate = stats.total > 0 ? Math.round(100 * stats.passed / stats.total) : 0;
+      var rateClass = rate >= 90 ? 'good' : rate >= 70 ? 'warn' : 'bad';
+      html += '<div class="principle-card">';
+      html += '<div class="principle-card-header">';
+      html += '<span class="principle-id">' + escHtml(source) + '</span>';
+      html += '<span class="principle-rate ' + rateClass + '">' + rate + '%</span>';
+      html += '</div>';
+      html += '<div class="principle-bar-track"><div class="principle-bar-fill ' + rateClass + '" style="width:' + rate + '%"></div></div>';
+      html += '<div class="principle-detail">' + stats.passed + '/' + stats.total + ' events</div>';
+      var failureEntries = Object.entries(stats.failures || {}).sort(function(a, b) { return b[1] - a[1]; });
+      if (failureEntries.length > 0) {
+        html += '<div class="principle-detail" style="color:#f87171;margin-top:4px">';
+        html += failureEntries.map(function(e) { return (shortNames[e[0]] || e[0]) + ': ' + e[1]; }).join(', ');
+        html += '</div>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  // Source count checks
+  if (r.sourceCountChecks) {
+    html += '<div class="section-header">Source Count Checks</div>';
+    html += '<div class="section-explainer">Minimum event counts per source — catches silent parser breakage.</div>';
+    html += '<table style="width:100%;border-collapse:collapse;margin-bottom:24px">';
+    html += '<thead><tr><th style="text-align:left;padding:6px 12px;color:#888;font-size:12px;border-bottom:1px solid #333">Source</th>';
+    html += '<th style="text-align:right;padding:6px 12px;color:#888;font-size:12px;border-bottom:1px solid #333">Count</th>';
+    html += '<th style="text-align:right;padding:6px 12px;color:#888;font-size:12px;border-bottom:1px solid #333">Minimum</th>';
+    html += '<th style="text-align:center;padding:6px 12px;color:#888;font-size:12px;border-bottom:1px solid #333">Status</th></tr></thead><tbody>';
+    Object.keys(r.sourceCountChecks).sort().forEach(function(label) {
+      var check = r.sourceCountChecks[label];
+      var rowColor = check.pass ? '' : ' style="background:#3b1111"';
+      html += '<tr' + rowColor + '>';
+      html += '<td style="padding:6px 12px;color:#ccc">' + escHtml(label) + '</td>';
+      html += '<td style="padding:6px 12px;color:#ccc;text-align:right">' + check.count + '</td>';
+      html += '<td style="padding:6px 12px;color:#888;text-align:right">' + check.minimum + '</td>';
+      html += '<td style="padding:6px 12px;text-align:center">';
+      html += check.pass
+        ? '<span style="color:#4ade80;font-size:12px">PASS</span>'
+        : '<span style="color:#f87171;font-size:12px;font-weight:600">FAIL</span>';
+      html += '</td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+
+  // Failing events
+  if (r.events && r.events.length > 0) {
+    html += '<div class="section-header">Failing Events</div>';
+    html += '<div class="section-explainer">Events with at least one check failure (capped at 10 per source).</div>';
+    var bySource = {};
+    r.events.forEach(function(evt) {
+      var src = evt.source || 'unknown';
+      if (!bySource[src]) bySource[src] = [];
+      bySource[src].push(evt);
+    });
+    Object.keys(bySource).sort().forEach(function(src, si) {
+      var evts = bySource[src];
+      html += '<div class="scenario-card">';
+      html += '<div class="scenario-header" onclick="toggleScrapeSource(' + si + ')">';
+      html += '<span class="scenario-name">' + escHtml(src) + '</span>';
+      html += '<span class="scenario-badge fail">' + evts.length + ' failing</span>';
+      html += '</div>';
+      html += '<div class="scenario-body" id="scrape-src-' + si + '" style="display:none">';
+      evts.forEach(function(evt) {
+        html += '<div style="padding:8px 0;border-bottom:1px solid #333">';
+        html += '<div style="color:#ccc;font-weight:500">' + escHtml(evt.event_name || evt.event_id) + '</div>';
+        if (evt.failures) {
+          evt.failures.forEach(function(f) {
+            html += '<div style="color:#f87171;font-size:12px;margin-top:2px">' + escHtml(f.name) + ': ' + escHtml(f.detail) + '</div>';
+          });
+        }
+        html += '</div>';
+      });
+      html += '</div></div>';
+    });
+  }
+
+  c.innerHTML = html;
+  setupEventListeners();
+}
+
+function toggleScrapeSource(i) {
+  var body = document.getElementById('scrape-src-' + i);
+  if (body) body.style.display = body.style.display === 'none' ? '' : 'none';
 }
 
 function renderToolbar() {

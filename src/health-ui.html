@@ -546,6 +546,13 @@
   </div>
 </div>
 
+<div class="timing-section">
+  <h2>Data Quality <span style="font-size:11px;font-weight:400;color:#666">— format, completeness, and count checks across all sources</span></h2>
+  <div id="scrape-quality">
+    <div class="no-data">Loading scrape audit data...</div>
+  </div>
+</div>
+
 <h2 style="font-size:16px;font-weight:600;color:#aaa;margin-bottom:12px;">Sources</h2>
 <div class="source-grid" id="source-grid"></div>
 
@@ -780,6 +787,83 @@ async function refreshAudit() {
   }
 }
 
+function renderScrapeQuality(data) {
+  const container = $('scrape-quality');
+  if (!data || data.error || !data.sourceStats) {
+    container.innerHTML = '<div class="timing-bar-container"><div class="no-data">No scrape audit data yet — run a scrape first</div></div>';
+    return;
+  }
+
+  const entries = Object.entries(data.sourceStats);
+  if (entries.length === 0) {
+    container.innerHTML = '<div class="timing-bar-container"><div class="no-data">No events in cache</div></div>';
+    return;
+  }
+
+  const sourcesBelow = data.summary.sourcesBelow || 0;
+
+  const summaryHtml = `
+    <div class="summary-row" style="margin-bottom:12px">
+      <div class="summary-card">
+        <div class="label">All Events</div>
+        <div class="value">${data.summary.total}</div>
+        <div class="sub">from ${entries.length} sources</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">All Checks Pass</div>
+        <div class="value">${data.summary.passed}/${data.summary.total}</div>
+        <div class="sub">${data.summary.issues} with issues</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Sources Below Min</div>
+        <div class="value" style="${sourcesBelow > 0 ? 'color:#f87171' : ''}">${sourcesBelow}</div>
+        <div class="sub">${sourcesBelow === 0 ? 'all above threshold' : 'count check failures'}</div>
+      </div>
+    </div>
+  `;
+
+  const shortNames = {
+    date_format_valid: 'bad date', time_format_valid: 'bad time', time_present: 'no time',
+    venue_quality: 'TBA venue', price_coverage: 'no price', category_valid: 'bad category', has_url: 'no URL'
+  };
+
+  const cardsHtml = entries.map(([source, stats]) => {
+    const rate = stats.total > 0 ? (stats.passed / stats.total * 100) : 0;
+    const rateClass = rate >= 90 ? 'good' : rate >= 70 ? 'warn' : 'bad';
+    const failureEntries = Object.entries(stats.failures || {}).sort((a, b) => b[1] - a[1]);
+    const failureHtml = failureEntries.length > 0
+      ? `<div class="audit-failures">${failureEntries.map(([name, count]) => `${shortNames[name] || name}: ${count}`).join(', ')}</div>`
+      : '';
+
+    return `
+      <div class="audit-card">
+        <div class="audit-card-header">
+          <div class="audit-card-name">${source}</div>
+          <div class="audit-card-rate ${rateClass}">${rate.toFixed(0)}%</div>
+        </div>
+        <div class="audit-card-detail">${stats.passed}/${stats.total} events pass</div>
+        ${failureHtml}
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = summaryHtml + `<div class="audit-grid">${cardsHtml}</div>`;
+}
+
+async function refreshScrapeAudit() {
+  try {
+    const res = await fetch('/api/eval/scrape-audit');
+    if (res.ok) {
+      const data = await res.json();
+      renderScrapeQuality(data);
+    } else {
+      renderScrapeQuality(null);
+    }
+  } catch {
+    renderScrapeQuality(null);
+  }
+}
+
 function renderEventMix(mix) {
   const container = $('event-mix-summary');
   if (!mix) { container.style.display = 'none'; return; }
@@ -976,10 +1060,12 @@ async function refreshAlerts() {
 refresh();
 refreshCosts();
 refreshAudit();
+refreshScrapeAudit();
 refreshAlerts();
 setInterval(refresh, 60000);
 setInterval(refreshCosts, 60000);
 setInterval(refreshAudit, 60000);
+setInterval(refreshScrapeAudit, 60000);
 setInterval(refreshAlerts, 60000);
 </script>
 </body>

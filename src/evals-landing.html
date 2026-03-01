@@ -298,6 +298,31 @@
     </div>
   </div>
 
+  <!-- Scrape Audit -->
+  <div class="eval-card">
+    <div class="eval-card-header">
+      <div class="eval-card-title">Scrape Audit</div>
+      <div class="eval-card-badges">
+        <span class="cost-badge free">Free</span>
+      </div>
+    </div>
+    <div class="eval-card-desc">
+      7 data quality checks across all sources &mdash; date/time format, venue quality, price coverage,
+      category validity, URLs. Runs on every scrape.
+    </div>
+    <div class="eval-card-stat">
+      <span class="stat-label">Pass rate</span>
+      <span class="stat-value loading" id="scrape-audit-stat">loading...</span>
+    </div>
+    <div class="eval-card-actions">
+      <a href="/eval-report" class="card-link primary">Reports</a>
+      <div class="cli-cmd" onclick="copyCmd(this)" title="Click to copy">
+        <code>curl localhost:3000/api/eval/scrape-audit | jq .summary</code>
+        <span class="copy-icon">copy</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Pipeline Evals -->
   <div class="eval-card">
     <div class="eval-card-header">
@@ -467,6 +492,26 @@ async function loadStats() {
   } catch (e) {
     document.getElementById('audit-stat').textContent = '--';
     document.getElementById('audit-stat').className = 'stat-value neutral';
+  }
+
+  // Scrape audit
+  try {
+    var res = await fetch('/api/eval/scrape-audit');
+    if (res.ok) {
+      var data = await res.json();
+      var el = document.getElementById('scrape-audit-stat');
+      if (data.summary && data.summary.passRate) {
+        var rate = parseFloat(data.summary.passRate);
+        el.textContent = data.summary.passRate;
+        el.className = 'stat-value ' + rateColor(rate);
+      } else {
+        el.textContent = 'no data';
+        el.className = 'stat-value neutral';
+      }
+    }
+  } catch (e) {
+    document.getElementById('scrape-audit-stat').textContent = '--';
+    document.getElementById('scrape-audit-stat').className = 'stat-value neutral';
   }
 
   // Traces count
