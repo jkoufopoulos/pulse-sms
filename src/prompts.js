@@ -234,14 +234,16 @@ Examples: "where should I go" (no session, no events, no filters)
 CONVERSATIONAL: True social niceties, off-topic questions, declines, or messages that aren't about finding events.
 Examples: "thanks", "nah im good", "what time is it", "who won the game", "lol"
 
-DECLINE HANDLING: Messages like "nah", "no thanks", "im good", "pass" after a suggestion — respond gracefully, don't send an error.
+DECLINE HANDLING: Messages like "nah im good", "no thanks", "im good", "pass" after a suggestion with NO active filter — respond gracefully, don't send an error.
+IMPORTANT: "nvm", "nevermind", "forget it" are NOT declines when ACTIVE_FILTER is set — see SESSION AWARENESS below.
 
 OFF-TOPIC WITH PERSONALITY: If the user asks something unrelated (trivia, time, jokes) — give a playful one-liner, then redirect to events.
 
 SESSION AWARENESS:
 - When user has an active session (neighborhood + picks), vague event-seeking messages should return more events, not a confused response.
 - Filter-modification follow-ups with an active session are event requests with updated filters — "how about theater", "any comedy", "later tonight".
-- "nah" / "no thanks" / "im good" after a suggestion = graceful close, NOT an error.
+- FILTER-ACTIVE DISMISSALS: When ACTIVE_FILTER is set and the user says "nvm", "nevermind", "forget it", or similar dismissals, they mean DROP THE FILTER and re-serve unfiltered picks for the same neighborhood. Return type "event_picks" with filter_intent "clear_all". This is NOT a conversation-ending decline.
+- TRUE DECLINES (no active filter, or explicit "nah im good" / "no thanks" / "im not going out"): graceful close, NOT an error.
 
 FILTER-AWARE SELECTION:
 - [MATCH] events are verified matches for the user's filter. Strongly prefer these.
@@ -347,7 +349,7 @@ FOR ASK NEIGHBORHOOD (user wants events but no neighborhood known):
 
 FILTER_INTENT — report what the user is requesting about filters:
 - { "action": "none" } — default. User is NOT changing filters. Use for normal requests, neighborhood queries, conversational messages.
-- { "action": "clear_all" } — user explicitly asks to remove ALL filters. Examples: "forget the comedy", "just show me everything", "drop the filter", "show me whatever", "start fresh".
+- { "action": "clear_all" } — user wants to remove ALL filters. Examples: "forget the comedy", "just show me everything", "drop the filter", "show me whatever", "start fresh", "nvm", "nevermind", "forget it" (when ACTIVE_FILTER is set).
 - { "action": "modify", "updates": { ... } } — user wants to change specific filters. Only include keys being changed:
   - "free_only": true/false — "paid is fine too" → false, "only free stuff" → true
   - "category": "comedy" — "how about comedy instead" → set category
@@ -385,6 +387,15 @@ USER: "underground techno in bushwick" (events provided)
 
 USER: "any more free comedy stuff" (session active in LES, events provided)
 → type: "event_picks" with free comedy picks from event list
+
+USER: "nvm" (ACTIVE_FILTER: free_only=true, session in Williamsburg)
+→ type: "event_picks", filter_intent: { "action": "clear_all" }, re-serve unfiltered Williamsburg picks
+
+USER: "forget it" (ACTIVE_FILTER: category=comedy, session in East Village)
+→ type: "event_picks", filter_intent: { "action": "clear_all" }, re-serve unfiltered East Village picks
+
+USER: "nah im good" (no active filter, after being shown picks)
+→ type: "conversational", sms_text: "No worries! Hit me up whenever."
 </examples>`;
 
 module.exports = { EXTRACTION_PROMPT, DETAILS_SYSTEM, UNIFIED_SYSTEM };
