@@ -480,7 +480,16 @@ const evals = {
     }
     // Check if any picked events have actionable price data (actual amount or explicit free)
     // is_free=false with no price_display only tells Claude "not free" — no price to display
-    const picksWithPrice = picks.filter(p => p.is_free === true || p.price_display);
+    // Vague strings like "Ticketed" or "Cover charge" don't give Claude a concrete value to display
+    const isActionablePrice = (p) => {
+      if (p.is_free === true) return true;
+      if (!p.price_display) return false;
+      const pd = p.price_display.toLowerCase();
+      if (/\$\d/.test(pd)) return true;        // has a dollar amount
+      if (/\bfree\b/.test(pd)) return true;     // explicitly free
+      return false;                              // "Ticketed", "Cover charge", etc. — not actionable
+    };
+    const picksWithPrice = picks.filter(isActionablePrice);
     if (picksWithPrice.length === 0) {
       return { name: 'price_transparency', pass: true, detail: 'no actionable price data on picked events (source gap)' };
     }
