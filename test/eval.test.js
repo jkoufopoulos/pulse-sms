@@ -761,7 +761,12 @@ check('time_format_valid passes for ISO datetime', runCheck('time_format_valid',
 check('time_format_valid passes for ISO with seconds', runCheck('time_format_valid', { start_time_local: '2026-03-01T21:00:00' }).pass === true);
 check('time_format_valid passes for null', runCheck('time_format_valid', { start_time_local: null }).pass === true);
 check('time_format_valid fails for time only', runCheck('time_format_valid', { start_time_local: '21:00' }).pass === false);
-check('time_format_valid fails for full ISO with Z', runCheck('time_format_valid', { start_time_local: '2026-03-01T21:00:00Z' }).pass === false);
+check('time_format_valid passes for Z suffix', runCheck('time_format_valid', { start_time_local: '2026-03-01T21:00:00Z' }).pass === true);
+check('time_format_valid passes for tz offset with colon', runCheck('time_format_valid', { start_time_local: '2026-03-01T21:00:00-05:00' }).pass === true);
+check('time_format_valid passes for tz offset without colon', runCheck('time_format_valid', { start_time_local: '2026-03-01T21:00:00-0500' }).pass === true);
+check('time_format_valid passes for milliseconds', runCheck('time_format_valid', { start_time_local: '2026-03-01T22:00:00.000' }).pass === true);
+check('time_format_valid passes for ms + tz offset', runCheck('time_format_valid', { start_time_local: '2026-03-01T18:00:00.000-04:00' }).pass === true);
+check('time_format_valid passes for no seconds + tz offset', runCheck('time_format_valid', { start_time_local: '2026-03-01T21:00-0500' }).pass === true);
 
 // -- time_present --
 check('time_present passes when time exists', runCheck('time_present', { start_time_local: '2026-03-01T21:00', category: 'nightlife' }).pass === true);

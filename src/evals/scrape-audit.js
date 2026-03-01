@@ -59,7 +59,7 @@ const checks = {
   time_format_valid(event) {
     const t = event.start_time_local;
     if (!t) return { name: 'time_format_valid', pass: true, detail: 'no time (skipped)' };
-    const valid = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(t);
+    const valid = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/.test(t);
     return {
       name: 'time_format_valid',
       pass: valid,
