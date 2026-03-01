@@ -244,6 +244,12 @@ function parseSkintParagraph(text, dateLocal) {
     category,
     extraction_confidence: confidence,
     source_url: null,
+    evidence: {
+      name_quote: eventName ? eventName.toLowerCase() : null,
+      time_quote: timeStr || null,
+      location_quote: venue ? venue.toLowerCase() : null,
+      price_quote: priceDisplay ? priceDisplay.toLowerCase() : null,
+    },
   };
 }
 

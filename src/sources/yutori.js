@@ -574,6 +574,12 @@ function parseTriviaEvents(text, filename) {
       is_recurring: true,
       recurrence_day: dayName,
       recurrence_time: event.start_time_local,
+      evidence: {
+        name_quote: event.name ? event.name.toLowerCase() : null,
+        time_quote: event.start_time_local || null,
+        location_quote: event.venue_name ? event.venue_name.toLowerCase() : null,
+        price_quote: event.priceText || (isFree ? 'free' : null),
+      },
     });
   }
 
@@ -885,6 +891,12 @@ function parseGeneralEventLine(line, fallbackDate) {
     extraction_confidence: confidence,
     source_url: ticketUrl,
     description_short: description,
+    evidence: {
+      name_quote: name ? name.toLowerCase() : null,
+      time_quote: startTime || null,
+      location_quote: venueName ? venueName.toLowerCase() : null,
+      price_quote: price ? price.toLowerCase() : null,
+    },
   };
 }
 
