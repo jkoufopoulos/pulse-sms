@@ -31,7 +31,7 @@ app.use(express.urlencoded({ extended: false, limit: '5kb' }));
 app.use(express.json({ limit: '5mb' }));
 
 // Public health check — no internal details (L10 fix)
-const BUILD_SHA = require('child_process').execSync('git rev-parse --short HEAD 2>/dev/null || echo unknown').toString().trim();
+const BUILD_SHA = '3c5bcc0';
 app.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'bestie', build: BUILD_SHA });
 });
