@@ -180,7 +180,10 @@ const evals = {
     const tonightNegated = /\b(no|nothing|not much|slim|none)\b.{0,30}\btonight\b/i.test(sms);
     const saysTonight = /\btonight\b|\btoday\b/.test(sms) && !tonightNegated;
     const tomorrowNegated = /\b(no|nothing|not much|slim|none)\b.{0,30}\btomorrow\b/i.test(sms);
-    const saysTomorrow = /\btomorrow\b/.test(sms) && !tomorrowNegated;
+    // "tomorrow" in a CTA/sign-off context isn't labeling picks — it's suggesting future action
+    // e.g. "MORE for tomorrow picks", "hit me up tomorrow"
+    const tomorrowCTA = /\b(more for|hit me up|check back|come back|try again|text me)\b.{0,20}\btomorrow\b/i.test(sms);
+    const saysTomorrow = /\btomorrow\b/.test(sms) && !tomorrowNegated && !tomorrowCTA;
 
     // Categorize picks by date
     const todayPicks = picks.filter(p => p.date_local === todayStr);
