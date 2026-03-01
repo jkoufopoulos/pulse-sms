@@ -6,7 +6,6 @@
 <title>Bestie Events</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -1113,16 +1112,51 @@ const HOOD_COORDS = {
 };
 
 let leafletMap = null;
-let heatLayer = null;
-let mapLabels = [];
+let geoLayer = null;
+let geoJsonData = null;
 
-function renderBoroughMap(container, boroughDist) {
+// Name mapping: our neighborhood names -> GeoJSON feature names
+const GEO_NAME_MAP = {
+  'Flatiron': 'Flatiron District',
+  'Bed-Stuy': 'Bedford-Stuyvesant',
+  'Midtown East': 'Midtown',
+};
+
+function geoNameFor(ourName) { return GEO_NAME_MAP[ourName] || ourName; }
+function ourNameFor(geoName) {
+  for (const [ours, geo] of Object.entries(GEO_NAME_MAP)) {
+    if (geo === geoName) return ours;
+  }
+  return geoName;
+}
+
+function densityColor(count, maxCount) {
+  if (count === 0) return '#1a1a1a';
+  const t = count / maxCount;
+  // Dark blue -> orange -> bright white-orange
+  if (t < 0.15) return '#1b263b';
+  if (t < 0.3) return '#2d4a6f';
+  if (t < 0.5) return '#c05d1a';
+  if (t < 0.7) return '#e07a1b';
+  if (t < 0.85) return '#FF6B35';
+  return '#ffb088';
+}
+
+async function loadGeoJson() {
+  if (geoJsonData) return geoJsonData;
+  const res = await fetch('/api/geo/neighborhoods');
+  geoJsonData = await res.json();
+  return geoJsonData;
+}
+
+async function renderBoroughMap(container, boroughDist) {
   const hoodCounts = {};
   const events = filteredEvents.length < allEvents.length ? filteredEvents : allEvents;
   for (const e of events) {
     const h = e.neighborhood || 'unknown';
     hoodCounts[h] = (hoodCounts[h] || 0) + 1;
   }
+  const maxCount = Math.max(...Object.values(hoodCounts), 1);
 
   // Initialize map once
   if (!leafletMap) {
@@ -1135,47 +1169,51 @@ function renderBoroughMap(container, boroughDist) {
       maxZoom: 16, minZoom: 10,
     }).addTo(leafletMap);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
-      maxZoom: 16, minZoom: 10, pane: 'overlayPane',
-    }).addTo(leafletMap);
-
     L.control.zoom({ position: 'topright' }).addTo(leafletMap);
     setTimeout(() => leafletMap.invalidateSize(), 100);
   }
 
-  // Remove old layers
-  if (heatLayer) leafletMap.removeLayer(heatLayer);
-  for (const l of mapLabels) leafletMap.removeLayer(l);
-  mapLabels = [];
+  const geo = await loadGeoJson();
 
-  // Build heat data: [lat, lng, intensity]
-  const heatPoints = [];
-  for (const [hood, coords] of Object.entries(HOOD_COORDS)) {
-    const count = hoodCounts[hood] || 0;
-    if (count === 0) continue;
-    heatPoints.push([coords[0], coords[1], count]);
-  }
+  // Remove old layer
+  if (geoLayer) leafletMap.removeLayer(geoLayer);
 
-  heatLayer = L.heatLayer(heatPoints, {
-    radius: 35, blur: 25, maxZoom: 14,
-    gradient: { 0.2: '#0d1b2a', 0.4: '#1b263b', 0.5: '#415a77', 0.65: '#e07a1b', 0.8: '#FF6B35', 1.0: '#fff3e0' },
+  geoLayer = L.geoJSON(geo, {
+    style: function(feature) {
+      const geoName = feature.properties.neighborhood;
+      const ourName = ourNameFor(geoName);
+      const count = hoodCounts[ourName] || hoodCounts[geoName] || 0;
+      return {
+        fillColor: densityColor(count, maxCount),
+        fillOpacity: count > 0 ? 0.75 : 0.15,
+        color: '#333', weight: 1, opacity: 0.6,
+      };
+    },
+    onEachFeature: function(feature, layer) {
+      const geoName = feature.properties.neighborhood;
+      const ourName = ourNameFor(geoName);
+      const count = hoodCounts[ourName] || hoodCounts[geoName] || 0;
+      const pct = events.length > 0 ? ((count / events.length) * 100).toFixed(1) : '0';
+      layer.bindTooltip(
+        `<b>${ourName}</b><br>${count} events (${pct}%)`,
+        { className: 'hood-tooltip', sticky: true }
+      );
+      layer.on('click', () => {
+        const sel = document.getElementById('f-neighborhood');
+        if (sel.value === ourName) { sel.value = ''; } else { sel.value = ourName; }
+        applyFilters();
+      });
+      layer.on('mouseover', function() { this.setStyle({ weight: 2, color: '#888' }); });
+      layer.on('mouseout', function() { geoLayer.resetStyle(this); });
+    }
   }).addTo(leafletMap);
 
-  // Add small label markers for neighborhoods with events
-  for (const [hood, coords] of Object.entries(HOOD_COORDS)) {
-    const count = hoodCounts[hood] || 0;
-    if (count === 0) continue;
-    const pct = ((count / events.length) * 100).toFixed(1);
-    const label = L.circleMarker(coords, {
-      radius: 3, fillColor: '#fff', fillOpacity: 0.6,
-      color: '#fff', weight: 0.5, opacity: 0.4,
+  // Add labels layer on top
+  if (!leafletMap._labelsAdded) {
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+      maxZoom: 16, minZoom: 10, pane: 'overlayPane',
     }).addTo(leafletMap);
-    label.bindTooltip(`<b>${hood}</b><br>${count} events (${pct}%)`, { className: 'hood-tooltip' });
-    label.on('click', () => {
-      document.getElementById('f-neighborhood').value = hood;
-      applyFilters();
-    });
-    mapLabels.push(label);
+    leafletMap._labelsAdded = true;
   }
 }
 

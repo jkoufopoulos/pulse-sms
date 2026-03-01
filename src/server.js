@@ -237,6 +237,10 @@ app.get('/api/events', (req, res) => {
   const { getRawCache } = require('./events');
   res.json(getRawCache());
 });
+app.get('/api/geo/neighborhoods', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.sendFile(require('path').join(__dirname, 'public', 'nyc-neighborhoods.geojson'));
+});
 
 // Event card page — shareable Bestie URLs with OG meta tags
 app.get('/e/:eventId', (req, res) => {
