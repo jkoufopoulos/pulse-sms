@@ -331,13 +331,15 @@ async function refreshCache() {
     }
 
     // Filter out stale/far-future events and kids events at scrape time
-    // 30-day window for SQLite storage; 7-day window applied at serving time
+    // Include yesterday so Friday newsletter events survive Saturday's scrape;
+    // serving-time filterUpcomingEvents handles actual expiry (end_time + 2hr grace)
+    const yesterday = getNycDateString(-1);
     const today = getNycDateString(0);
     const monthOut = getNycDateString(30);
     const dateFiltered = allEvents.filter(e => {
       const d = getEventDate(e);
       if (!d) return true; // keep undated events (perennials, venues)
-      return d >= today && d <= monthOut;
+      return d >= yesterday && d <= monthOut;
     });
     const validEvents = filterKidsEvents(dateFiltered);
     const staleCount = allEvents.length - dateFiltered.length;
@@ -384,7 +386,7 @@ async function refreshCache() {
       const weekFiltered = validEvents.filter(e => {
         const d = getEventDate(e);
         if (!d) return true;
-        return d >= today && d <= weekOut;
+        return d >= yesterday && d <= weekOut;
       });
       eventCache = weekFiltered;
       cacheTimestamp = Date.now();
@@ -521,12 +523,14 @@ async function refreshSources(sourceNames, { reprocess = false } = {}) {
   }
 
   // Apply 30-day date filter + kids filter to new events
+  // Include yesterday so newsletter events survive next-day scrape
+  const yesterday = getNycDateString(-1);
   const today = getNycDateString(0);
   const monthOut = getNycDateString(30);
   const dateFiltered = newEvents.filter(e => {
     const d = getEventDate(e);
     if (!d) return true;
-    return d >= today && d <= monthOut;
+    return d >= yesterday && d <= monthOut;
   });
   const validNew = filterKidsEvents(dateFiltered);
 
@@ -655,7 +659,7 @@ async function getEventsCitywide({ dateRange } = {}) {
 // Daily scheduler — runs scrape at target hour in NYC timezone
 // ============================================================
 
-const SCRAPE_HOUR = 10; // 10am ET
+const SCRAPE_HOURS = [10, 18]; // 10am ET + 6pm ET (catches same-day newsletters)
 
 function msUntilNextScrape() {
   const now = new Date();
@@ -665,20 +669,30 @@ function msUntilNextScrape() {
   const [month, day, year] = datePart.split('/').map(Number);
   const [hour, minute, second] = timePart.split(':').map(Number);
 
-  // Calculate ms until next SCRAPE_HOUR
-  let hoursUntil = SCRAPE_HOUR - hour;
-  if (hoursUntil < 0) hoursUntil += 24; // already past today, schedule for tomorrow
+  const nowSeconds = hour * 3600 + minute * 60 + second;
 
-  const msUntil = (hoursUntil * 3600 - minute * 60 - second) * 1000;
-  return msUntil;
+  // Find next scrape hour that's still in the future
+  let bestMs = Infinity;
+  let bestHour = SCRAPE_HOURS[0];
+  for (const h of SCRAPE_HOURS) {
+    let diffSeconds = h * 3600 - nowSeconds;
+    if (diffSeconds <= 0) diffSeconds += 24 * 3600; // wrap to tomorrow
+    const ms = diffSeconds * 1000;
+    if (ms < bestMs) {
+      bestMs = ms;
+      bestHour = h;
+    }
+  }
+
+  return { ms: bestMs, hour: bestHour };
 }
 
 let dailyTimer = null;
 
 function scheduleDailyScrape() {
-  const ms = msUntilNextScrape();
+  const { ms, hour } = msUntilNextScrape();
   const hours = (ms / 3600000).toFixed(1);
-  console.log(`Next scrape scheduled in ${hours} hours (${SCRAPE_HOUR}:00 ET)`);
+  console.log(`Next scrape scheduled in ${hours} hours (${hour}:00 ET)`);
 
   dailyTimer = setTimeout(async () => {
     try {
