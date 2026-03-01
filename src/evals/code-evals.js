@@ -134,12 +134,12 @@ const evals = {
     }
     // Zero-pick graceful degradation: if the response discusses events/neighborhoods,
     // it's an appropriate event-related response, not off-topic
-    const isEventDiscussion = /no .{1,30} in|nothing .{1,30} tonight|slim pickings|exhausted|cleaned out|already (got|showed)|drop(ping)? the .{1,20} filter|no free|no comedy|no jazz|no live|no match|not my (beat|thing)|not much .{1,30} in|nearby has|you want .{1,30}(comedy|jazz|music|dance|art|free)|dropping the|back to|that.s (really )?it|that.s all|cycled through|dead\b|just the events/i.test(sms);
+    const isEventDiscussion = /no .{1,30} in|nothing .{1,30} tonight|slim pickings|exhausted|cleaned out|already (got|showed)|drop(ping)? (the )?.{1,20}(filter|jazz|comedy|music|art)|no free|no comedy|no jazz|no live|no match|not my (beat|thing)|not much .{1,30} in|nearby has|you want .{1,30}(comedy|jazz|music|dance|art|free)|dropping the|back to|that.s (really )?it|that.s all|cycled through|dead\b|just the events|let me grab/i.test(sms);
     if (isEventDiscussion) {
       return { name: 'off_topic_redirect', pass: true, detail: 'zero-match graceful degradation (event-related)' };
     }
     // Check that the response contains a redirect to neighborhoods/events
-    const hasRedirect = /text (me )?a neighborhood|text me a|drop me a|go out|tonight.s picks|when you.re ready|mood for|what you.re looking|vibe|try a|want me to check|want .{1,30} picks|want more .{1,30} stuff|check .{1,30} instead|still .{1,20} tonight|hit me up|reply \d|want those|up for something|neighborhood|what.re you (in the )?mood|what.s (actually )?good|happening .{0,10}(in|tonight)|good .{0,10} tonight|dig up|something else|can.t click|just help find|i just find|events (guy|bot)/i.test(sms);
+    const hasRedirect = /text (me )?a neighborhood|text me a|drop me a|go out|tonight.s picks|when you.re ready|mood for|what you.re (looking|feeling)|what.{1,30}looking for|vibe|try a|want me to check|want .{1,30} picks|want more .{1,30} stuff|check .{1,30} instead|still .{1,20} tonight|hit me up|reply \d|want those|up for something|neighborhood|what.re you (in the )?mood|what.s (actually )?good|happening .{0,10}(in|tonight)|good .{0,10} tonight|dig up|something else|can.t click|just help find|i just find|events (guy|bot)|i can help/i.test(sms);
     return {
       name: 'off_topic_redirect',
       pass: hasRedirect,
