@@ -59,8 +59,6 @@ async function fetchLumaEvents() {
   try {
     const today = getNycDateString(0);
     const endDate = getNycDateString(7);
-    const todayDate = new Date(`${today}T00:00:00-05:00`);
-    const endDateObj = new Date(`${endDate}T23:59:59-05:00`);
 
     const allEntries = [];
     let cursor = null;
@@ -113,14 +111,14 @@ async function fetchLumaEvents() {
         if (cLat < 40.49 || cLat > 40.92 || cLng < -74.26 || cLng > -73.70) continue;
       }
 
-      // Date filter: only keep events within 7-day window
-      const startAt = ev.start_at ? new Date(ev.start_at) : null;
-      if (!startAt || isNaN(startAt.getTime())) continue;
-      if (startAt < todayDate || startAt > endDateObj) continue;
+      // Extract date in NYC timezone
+      if (!ev.start_at) continue;
+      const startAt = new Date(ev.start_at);
+      if (isNaN(startAt.getTime())) continue;
+      const dateLocal = startAt.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); // YYYY-MM-DD
 
-      // Extract date and time in NYC timezone
-      const nycStart = new Date(startAt.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-      const dateLocal = nycStart.toLocaleDateString('en-CA'); // YYYY-MM-DD
+      // Date filter: only keep events within 7-day window
+      if (dateLocal < today || dateLocal > endDate) continue;
       const startTimeLocal = ev.start_at; // already ISO 8601
 
       let endTimeLocal = null;
