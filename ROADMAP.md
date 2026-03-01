@@ -650,6 +650,23 @@ Scenario pass rate is low because each scenario requires ALL assertions to pass 
 
 ## Completed Work
 
+### Scrape audit dashboards + data quality fixes (2026-03-01)
+
+**Problem:** The scrape audit module (`src/evals/scrape-audit.js`) was generating reports but the data wasn't visible in any dashboard. Additionally, the `time_format_valid` check rejected valid ISO 8601 variants (timezone suffixes, milliseconds) used by 12 of 15 structured sources, inflating the failure rate.
+
+**Dashboard changes (3 files):**
+1. **eval-report.html** — Added `scrape` report type with full rendering: summary card, per-source grid with failure type breakdown, source count checks table, expandable failing events grouped by source.
+2. **evals-landing.html** — Added "Scrape Audit" card with live pass rate fetched from `/api/eval/scrape-audit`.
+3. **health-ui.html** — Added "Data Quality" section after "Extraction Quality" with summary row (total events, all-checks-pass, sources below minimum) and per-source audit cards. Auto-refreshes every 60s alongside existing sections.
+
+**Data quality fixes:**
+- **time_format_valid** (911 failures → 5): Regex now accepts `.000` milliseconds, `Z` suffix, `±HH:MM` and `±HHMM` timezone offsets. These are valid ISO 8601 variants used by RA, Dice, BAM, Songkick, DoNYC, etc.
+- **Price coverage improvements** (4 sources): BAM now detects free/price from description text (was hardcoded null). DoNYC handles price ranges (`$20-30`). BrooklynVegan detects "free" in ticket_info. Eventbrite JSON-LD path broadened free detection to `/\bfree\b/i`.
+
+**Results:** Pass rate **30.5% → 73.7%**. Remaining 397 failures are genuine data gaps (363 price_coverage where source APIs don't provide pricing, 26 missing URLs, 20 TBA venues).
+
+**Changes:** `src/eval-report.html`, `src/evals-landing.html`, `src/health-ui.html`, `src/evals/scrape-audit.js`, `src/sources/bam.js`, `src/sources/donyc.js`, `src/sources/brooklynvegan.js`, `src/sources/eventbrite.js`, `test/eval.test.js`.
+
 ### Code eval accuracy overhaul — reduce false positives + price prompt (2026-03-01)
 
 **Problem:** 38 code eval failures at 99.5% pass rate. Analysis showed most were eval false positives, not product bugs:
