@@ -12,7 +12,7 @@ const { getEvents, getEventsCitywide, getEventById, scanCityWide, getCacheStatus
 const { lookupReferralCode, recordAttribution } = require('./referral');
 const { filterKidsEvents, validatePerennialActivity } = require('./curation');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
-const { applyFilters, buildEventMap, saveResponseFrame, mergeFilters, normalizeFilterIntent, buildTaggedPool, buildZeroMatchResponse, tryTavilyFallback, executeQuery } = require('./pipeline');
+const { applyFilters, buildEventMap, saveResponseFrame, mergeFilters, normalizeFilterIntent, buildTaggedPool, buildZeroMatchResponse, executeQuery } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
 const { routeModel } = require('./model-router');
 
@@ -381,18 +381,6 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
       events = [...events, ...taggedPerennials];
     }
 
-    // Tavily live-search fallback: fire when pool is exhausted and user already visited this hood
-    const earlyExcludePicks = (session?.allPicks || session?.lastPicks || []).map(p => p.event_id);
-    const earlyExcludeOffered = session?.allOfferedIds || [];
-    const earlyExcludeSet = new Set([...earlyExcludePicks, ...earlyExcludeOffered]);
-    const unseenEvents = events.filter(e => !earlyExcludeSet.has(e.id));
-    if (unseenEvents.length === 0 && (session?.visitedHoods || []).includes(hood)) {
-      const tavilyResult = await tryTavilyFallback(hood, activeFilters, [...earlyExcludeSet], trace);
-      if (tavilyResult) {
-        const tavilyTagged = tavilyResult.events.map(e => ({ ...e, filter_match: false }));
-        events = [...events, ...tavilyTagged];
-      }
-    }
   } else {
     // Citywide flow — serve best events across all neighborhoods
     isCitywide = true;
@@ -496,7 +484,6 @@ async function callUnified(message, unifiedCtx, session, history, phone, trace, 
   if (events.some(e => (e.date_local || e.day) === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) || e.day === 'TODAY')) activeSkills.push('tonightPriority');
   if (hood && !events.some(e => e.neighborhood === hood)) activeSkills.push('neighborhoodMismatch');
   if (events.some(e => e.source_name === 'perennial')) activeSkills.push('perennialFraming');
-  if (events.some(e => e.source_name === 'tavily')) activeSkills.push('venueFraming');
   if (activeFilters?.free_only) activeSkills.push('freeEmphasis');
   if (history.length > 0) activeSkills.push('conversationAwareness');
   if (suggestedHood) activeSkills.push('nearbySuggestion');
@@ -770,6 +757,8 @@ async function handleMessageAI(phone, message) {
 
   const result = await callUnified(message, unifiedCtx, session, history, phone, trace, { model: routing.model });
   await handleUnifiedResponse(result, unifiedCtx, phone, session, trace, message, finalizeTrace);
+  // Clear lastZeroMatch after LLM turn so zero-match bypass can fire on the next turn
+  if (session?.lastZeroMatch) setSession(phone, { lastZeroMatch: false });
 }
 
 // Cleanup intervals (for graceful shutdown)

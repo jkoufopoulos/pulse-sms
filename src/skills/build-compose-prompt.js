@@ -48,11 +48,6 @@ function buildUnifiedPrompt(events, options = {}) {
     parts.push(skills.perennialFraming.text);
   }
 
-  // Venue framing
-  if (events && events.some(e => e.source_name === 'tavily')) {
-    parts.push(skills.venueFraming.text);
-  }
-
   // Last batch
   if (options.isLastBatch) {
     let lastBatchText = skills.lastBatch.text;

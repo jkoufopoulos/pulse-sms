@@ -33,11 +33,6 @@ const perennialEvents = [{ source_name: 'perennial', short_detail: 'Live jazz' }
 const withPerennial = buildUnifiedPrompt(perennialEvents, {});
 check('perennial events includes perennial-framing', withPerennial.includes('PERENNIAL PICKS'));
 
-// With tavily venue items
-const tavilyEvents = [{ source_name: 'tavily', name: 'Cool Bar' }];
-const withTavily = buildUnifiedPrompt(tavilyEvents, {});
-check('tavily events includes venue-framing', withTavily.includes('VENUE ITEMS'));
-
 // With isLastBatch
 const withLastBatch = buildUnifiedPrompt([], { isLastBatch: true });
 check('isLastBatch includes last-batch text', withLastBatch.includes('LAST batch'));

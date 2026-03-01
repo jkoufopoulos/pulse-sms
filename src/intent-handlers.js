@@ -6,7 +6,7 @@ const { getAdjacentNeighborhoods } = require('./pre-router');
 const { filterByTimeAfter } = require('./geo');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
 const { validatePerennialActivity } = require('./curation');
-const { resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, tryTavilyFallback, executeQuery, eventMatchesFilters } = require('./pipeline');
+const { resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, executeQuery, eventMatchesFilters } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
 const { generateReferralCode } = require('./referral');
 const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
@@ -306,38 +306,6 @@ async function handleMore(ctx) {
     console.log(`Perennial picks sent to ${ctx.masked} after events exhausted in ${hood}`);
     ctx.finalizeTrace(result.sms_text, 'more');
     return;
-  }
-
-  // Tavily live-search fallback: try once per hood, skip if already attempted
-  const tavilyAttemptedKey = `tavily_attempted_${hood}`;
-  if (hood && !ctx.session?.[tavilyAttemptedKey]) {
-    // Mark attempted before the call so we don't retry on failure
-    setSession(ctx.phone, { [tavilyAttemptedKey]: true });
-    const tavilyResult = await tryTavilyFallback(hood, activeFilters, [...allShownMoreIds], ctx.trace);
-    if (tavilyResult) {
-      const tavilyBatch = tavilyResult.events.slice(0, 4);
-      const eventMap = { ...(ctx.session?.lastEvents || {}), ...buildEventMap(tavilyBatch) };
-      ctx.trace.events.cache_size = 0;
-      ctx.trace.events.candidates_count = tavilyBatch.length;
-      ctx.trace.events.candidate_ids = tavilyBatch.map(e => e.id);
-      const result = await composeViaExecuteQuery(tavilyBatch, ctx, { hood, activeFilters, excludeIds: [...allShownMoreIds] });
-      result.sms_text = stripMoreReferences(result.sms_text);
-      saveResponseFrame(ctx.phone, {
-        mode: 'more',
-        picks: result.picks || [],
-        prevSession: ctx.session,
-        eventMap,
-        neighborhood: hood,
-        filters: activeFilters,
-        offeredIds: tavilyBatch.map(e => e.id),
-      });
-      updateProfile(ctx.phone, { neighborhood: hood, filters: activeFilters, responseType: 'more' })
-        .catch(err => console.error('profile update failed:', err.message));
-      await sendComposeWithLinks(ctx.phone, result, eventMap);
-      console.log(`Tavily fallback picks sent to ${ctx.masked} after exhaustion in ${hood}`);
-      ctx.finalizeTrace(result.sms_text, 'more');
-      return;
-    }
   }
 
   // All events and perennials exhausted — suggest specific nearby neighborhood

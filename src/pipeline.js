@@ -1,6 +1,5 @@
 const { setResponseState } = require('./session');
 const { filterByTimeAfter, parseAsNycTime, getEventDate } = require('./geo');
-const { searchTavilyEvents } = require('./sources/tavily');
 const { recordAICost } = require('./traces');
 
 /**
@@ -420,61 +419,6 @@ function normalizeFilterIntent(updates) {
 }
 
 /**
- * Build a filter-aware Tavily search query for a neighborhood.
- */
-function buildTavilyQuery(hood, filters) {
-  const parts = [];
-  if (filters?.free_only) parts.push('free');
-  if (filters?.subcategory) parts.push(filters.subcategory);
-  else if (filters?.category) parts.push(filters.category.replace('_', ' '));
-  parts.push('events');
-  parts.push(hood);
-  parts.push('NYC');
-  if (filters?.time_after) {
-    const [h] = filters.time_after.split(':').map(Number);
-    if (h >= 21) parts.push('late night');
-    else parts.push('tonight');
-  } else {
-    parts.push('tonight');
-  }
-  return parts.join(' ');
-}
-
-/**
- * Last-resort Tavily live search when cached events are exhausted.
- * Returns { events } or null on failure/empty.
- */
-async function tryTavilyFallback(hood, filters, excludeIds, trace) {
-  try {
-    const query = buildTavilyQuery(hood, filters);
-    const start = Date.now();
-    const tavilyResult = await searchTavilyEvents(hood, { query, minCompleteness: 0.3 });
-    const results = tavilyResult.events || tavilyResult;
-    const latency = Date.now() - start;
-    const excludeSet = new Set(excludeIds || []);
-    const fresh = results.filter(e => !excludeSet.has(e.id));
-    const extractCost = (tavilyResult._usage && trace) ? recordAICost(trace, 'tavily_extract', tavilyResult._usage, tavilyResult._provider) : 0;
-    if (trace) {
-      trace.tavily_fallback = { triggered: true, query, latency_ms: latency, raw_count: results.length, fresh_count: fresh.length, cost_usd: extractCost };
-    }
-    if (fresh.length === 0) {
-      console.log(`Tavily fallback: 0 fresh results for "${query}" (${results.length} raw, ${latency}ms)`);
-      return null;
-    }
-    console.log(`Tavily fallback: ${fresh.length} fresh results for "${query}" (${latency}ms)`);
-    // Late require to avoid circular dep (events.js → pipeline.js)
-    require('./events').injectEvents(fresh);
-    return { events: fresh };
-  } catch (err) {
-    console.error('Tavily fallback error:', err.message);
-    if (trace) {
-      trace.tavily_fallback = { triggered: true, error: err.message };
-    }
-    return null;
-  }
-}
-
-/**
  * Execute a unified LLM query: call unifiedRespond with events and options,
  * return the parsed result. Thin wrapper that both the unified branch
  * and handleMore can call.
@@ -508,4 +452,4 @@ async function executeQuery(message, events, options = {}) {
   return result;
 }
 
-module.exports = { applyFilters, resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, describeFilters, buildZeroMatchResponse, mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, normalizeFilterIntent, failsTimeGate, buildTavilyQuery, tryTavilyFallback, executeQuery };
+module.exports = { applyFilters, resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, describeFilters, buildZeroMatchResponse, mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, normalizeFilterIntent, failsTimeGate, executeQuery };
