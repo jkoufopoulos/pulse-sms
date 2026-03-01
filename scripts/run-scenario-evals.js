@@ -13,6 +13,7 @@
  *   node scripts/run-scenario-evals.js --name "quiet"             # Name match
  *   node scripts/run-scenario-evals.js --url http://...           # Custom server
  *   node scripts/run-scenario-evals.js --concurrency 15          # Parallel scenarios (default: 10)
+ *   node scripts/run-scenario-evals.js --judge                   # Enable LLM judge (off by default)
  */
 
 require('dotenv').config();
@@ -39,6 +40,7 @@ const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-haiku-4-5-20251001'
 const BUDGET_LIMIT = parseFloat(args.find(a => a.startsWith('--budget='))?.split('=')[1]
   || (args.includes('--budget') ? args[args.indexOf('--budget') + 1] : null)
   || '2.00');
+const NO_JUDGE = !args.includes('--judge');
 
 const client = new Anthropic();
 
@@ -326,6 +328,8 @@ async function main() {
       let judgment = null;
       if (assertions.allAsserted) {
         judgment = { overall_pass: true, overall_note: 'All assertions passed (deterministic)', turns: [], failure_modes_triggered: [] };
+      } else if (NO_JUDGE) {
+        judgment = { overall_pass: null, overall_note: 'Judge skipped (pass --judge to enable)', turns: [], failure_modes_triggered: [] };
       } else {
         judgment = await judgeSenario(scenario, actualConversation);
         if (!judgment) throw new Error('Judge returned unparseable response');
