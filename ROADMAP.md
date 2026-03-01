@@ -545,6 +545,7 @@ The real gap was that the UNIFIED_SYSTEM prompt only showed `filter_intent` exam
 | Mar 1 | 48 (hp) | **90%** (43/48) | — | Zero-match bypass, cascade fixes, "tonight" regex, sign-off/decline handlers |
 | Mar 1 (PM) | 159 (+29 new) | — | 63 (+16 new) | Non-neighborhood opener scenarios added, CC agent analysis (no LLM judge) |
 | Mar 1 (PM, post-fix) | 39 (new only) | **67%** (26/39) | 16 (new only) | Event name match routing fix, filter_intent prompt expansion for openers |
+| Mar 1 (late) | 159 | **99.8%** code (11650/11676) | 63: **99.8%** code (6915/6930) | Eval accuracy overhaul: CATEGORY_PARENTS sync, filter_match_alignment fix, zero-match exemption, trace enrichment |
 
 **Note on judge variance:** The Feb 24 drop (35.4%) was primarily caused by switching to Haiku as judge — Haiku is significantly stricter than Sonnet. Feb 25 restored Sonnet judge and added systemic fixes, producing the peak. The Feb 28 run uses the same judge (Sonnet) but a different event cache (daily cache changes alter which scenarios have matching events). **Mar 1 note:** 48-scenario happy_path run judged by Claude-as-judge (Sonnet agent reviewing raw conversations), not the standard LLM judge — results are comparable but use a different judging methodology. **Mar 1 PM note:** 29 new multi-turn + 16 new regression scenarios for non-neighborhood openers (greetings, bare categories, vibes, meta questions, venue lookups). Judged by CC agent analysis (3 parallel agents reviewing raw JSON reports) — cheaper than LLM judge (~$0.10 vs ~$1.50), more nuanced. 0 hard failures post-fix (was 8 pre-fix). 13 MIXED verdicts are data sparsity and code eval calibration, not bugs.
 
@@ -704,16 +705,21 @@ Scenario pass rate is low because each scenario requires ALL assertions to pass 
 - `day_label_accuracy` (2): "No jazz tonight" (negation context) + tomorrow picks incorrectly flagged as mislabeling
 - `price_transparency` (16→27 stochastic): Events genuinely lack price data from sources; eval punished Claude for omitting what doesn't exist
 
-**Fixes:**
+**Fixes (round 1):**
 1. **neighborhood_accuracy + expansion_transparency**: Added `next to`, `area`, `closest` to regex. Added named-neighborhood acknowledgment — if the SMS mentions the actual event neighborhood by name, that counts as acknowledging expansion.
 2. **off_topic_redirect**: Added exemptions for price inquiries ("how much"), event-specific questions ("which do you recommend", "top pick"), bot banter ("not a real person"), clarification prompts ("what's up", "one more thing"). Expanded redirect regex with "dig up", "something else", "just help find". Added "not my beat" to event discussion patterns.
 3. **day_label_accuracy**: Detect negation context — "no jazz tonight" with tomorrow picks passes because "tonight" is negated, not affirmative.
 4. **price_transparency**: Skip when picked events have no price data (`is_free` and `price_display` both null) — source gap, not LLM failure. Added `paid` and `price TBD` to eval regex.
 5. **Prompt**: Added explicit price fallback instruction to core skill: "ALWAYS mention price: use price_display if available, 'free' if is_free, or 'ticketed'/'cover' as fallback when unknown."
 
-**Results:** neighborhood_accuracy 6→0, expansion_transparency 6→0, off_topic_redirect 6→2, day_label_accuracy 2→0. Remaining failures are stochastic LLM variation (price_transparency, latency, pick_count).
+**Fixes (round 2 — 3 more eval bugs):**
+6. **CATEGORY_PARENTS sync**: Eval had 9 subcategory→category mappings vs pipeline.js CATEGORY_NORMALIZE's 28. Missing: metal, hip-hop, r&b, soul, funk, rap, music, live music, techno, house, dj, dance, salsa, bachata, swing, stand-up, theatre, trivia, karaoke, drag, burlesque, bingo, open mic, poetry. Caused false category_adherence/compound_filter_accuracy failures.
+7. **filter_match_alignment broken**: Two bugs: (a) read from `trace.composition.pool_meta` but data is at `trace.events.pool_meta` — eval always passed vacuously, (b) lookup by `event_id` but sent_pool uses `id` field — all lookups returned null. Both fixed. Eval now properly validates that LLM picks come from [MATCH]-tagged events.
+8. **Zero-match exemption**: category_adherence and compound_filter_accuracy now exempt when `pool_meta.matchCount === 0` — the LLM can't comply with a category filter when no matching events exist (data scarcity, not LLM fault).
 
-**Changes:** `src/evals/code-evals.js`, `src/skills/compose-skills.js` (price fallback instruction), `test/eval.test.js` (updated price_transparency test fixture).
+**Results:** Regression: 99.8% (6915/6930). Full suite (159 scenarios): 99.8% (11650/11676). category_adherence 4→0, compound_filter_accuracy 2→0, filter_match_alignment 35→1. Remaining 26 failures are stochastic: off_topic_redirect (9), latency (4), day_label (3), schema_compliance (3), pick_count (3), others (4). At irreducible stochastic floor.
+
+**Changes:** `src/evals/code-evals.js`, `src/skills/compose-skills.js` (price fallback instruction), `test/eval.test.js` (updated fixtures).
 
 ### Fix event name match hijacking neighborhood routing + non-neighborhood opener eval expansion (2026-03-01)
 
