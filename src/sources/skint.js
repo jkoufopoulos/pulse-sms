@@ -607,8 +607,8 @@ async function fetchSkintOngoingEvents() {
     const { todayIso } = getNycDayContext();
     const refYear = parseInt(todayIso.slice(0, 4), 10);
 
-    // Listicle detection: skip paragraphs that are "X things to do" style non-events
-    const listiclePattern = /^\d+\s+(old-fashioned|exceptional|best|great|top|amazing|incredible|wonderful|fantastic)/i;
+    // Non-event detection: listicles, CTAs, social media plugs
+    const nonEventPattern = /^(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty)\s+.*(places|things|ways|spots|bars|restaurants|fountains|artworks|murals|stores|shops|bakeries|delis|cafes|gardens|parks)\b|^where\s+to\s+(find|see|get|eat|drink)\b|^(subscribe|sign up|follow|be social|join us)\b/i;
 
     const parsed = [];
 
@@ -616,7 +616,7 @@ async function fetchSkintOngoingEvents() {
       const text = $(el).text().trim();
       if (!text || text.length < 30) return;
       if (text.toLowerCase().startsWith('sponsored')) return;
-      if (listiclePattern.test(text)) return;
+      if (nonEventPattern.test(text)) return;
 
       const event = parseOngoingParagraph(text, todayIso, refYear);
       if (event) parsed.push(event);
