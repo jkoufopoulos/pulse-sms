@@ -90,11 +90,12 @@ async function fetchLumaEvents() {
 
     console.log(`Luma: ${allEntries.length} raw entries fetched`);
 
-    // Debug: log date boundaries for first run
+    // Debug: log date boundaries and coord shape for first run
     if (allEntries.length > 0) {
       const sampleStart = allEntries[0].event?.start_at;
       const sampleDate = sampleStart ? new Date(sampleStart).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) : 'none';
-      console.log(`Luma debug: today=${today} endDate=${endDate} sampleStart=${sampleStart} sampleDate=${sampleDate}`);
+      const sampleCoord = allEntries[0].event?.coordinate;
+      console.log(`Luma debug: today=${today} endDate=${endDate} sampleStart=${sampleStart} sampleDate=${sampleDate} coord=${JSON.stringify(sampleCoord)}`);
     }
 
     const events = [];
@@ -114,8 +115,9 @@ async function fetchLumaEvents() {
       if (geo?.mode === 'obfuscated' && !coord) { skipReasons.obfuscated++; continue; }
 
       // NYC bounding box filter — the API's city param isn't strict
-      if (coord?.latitude && coord?.longitude) {
-        const cLat = coord.latitude, cLng = coord.longitude;
+      const cLat = parseFloat(coord?.latitude);
+      const cLng = parseFloat(coord?.longitude);
+      if (!isNaN(cLat) && !isNaN(cLng)) {
         if (cLat < 40.49 || cLat > 40.92 || cLng < -74.26 || cLng > -73.70) { skipReasons.bbox++; continue; }
       }
 
