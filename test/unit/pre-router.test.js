@@ -190,12 +190,25 @@ check('forget it → clear_filters', preRoute('forget it', filterSession)?.inten
 check('nah forget it → clear_filters', preRoute('nah forget it', filterSession)?.intent === 'clear_filters');
 check('drop it → clear_filters', preRoute('drop it', filterSession)?.intent === 'clear_filters');
 check('start over → clear_filters', preRoute('start over', filterSession)?.intent === 'clear_filters');
-// Prefix messages do NOT match (full-line regex) — fall through to LLM
-check('ok forget the comedy → null (has prefix)', preRoute('ok forget the comedy', filterSession) === null);
-check('actually show me everything → null (has prefix)', preRoute('actually show me everything', filterSession) === null);
-check('yeah nvm → null (has prefix)', preRoute('yeah nvm', filterSession) === null);
-// Compound messages do NOT match — fall through to LLM
-check('forget the comedy, how about jazz → null (compound)', preRoute('forget the comedy, how about jazz', filterSession) === null);
+// Prefix messages now match (optional conversational prefixes)
+const okForgetComedy = preRoute('ok forget the comedy', filterSession);
+check('ok forget the comedy → targeted (events)', okForgetComedy?.intent === 'events');
+check('ok forget the comedy → category null', okForgetComedy?.filters?.category === null);
+check('actually show me everything → clear_filters', preRoute('actually show me everything', filterSession)?.intent === 'clear_filters');
+check('yeah nvm → clear_filters', preRoute('yeah nvm', filterSession)?.intent === 'clear_filters');
+// Compound messages: targeted clear strips trailing clause, remainder falls through to unified
+const forgetComedyJazz = preRoute('forget the comedy, how about jazz', filterSession);
+check('forget the comedy, how about jazz → targeted (events)', forgetComedyJazz?.intent === 'events');
+check('forget the comedy, how about jazz → category null', forgetComedyJazz?.filters?.category === null);
+
+// Compound with neighborhood: targeted clear strips trailing clause
+const forgetFreeJazz = preRoute('forget the free thing, how about jazz in fort greene', filterSessionFree);
+check('forget free + jazz in fort greene → targeted (events)', forgetFreeJazz?.intent === 'events');
+check('forget free + jazz in fort greene → free_only false', forgetFreeJazz?.filters?.free_only === false);
+
+// Additional prefix tests for full clear
+check('just show me everything → clear_filters', preRoute('just show me everything', filterSession)?.intent === 'clear_filters');
+check('sure drop the filter → clear_filters', preRoute('sure drop the filter', filterSession)?.intent === 'clear_filters');
 
 // No active filters → falls through (not clear_filters)
 const noFilterSession = { lastPicks: [{ event_id: 'e1' }], lastEvents: { e1: { name: 'Jazz Night' } }, lastNeighborhood: 'East Village', lastFilters: {} };

@@ -462,9 +462,13 @@ async function unifiedRespond(message, { session, events, neighborhood, nearbyHo
     ? `\nVALID_NEIGHBORHOODS: ${validNeighborhoods.join(', ')}`
     : '';
 
-  const filterContextBlock = hasActiveFilter
-    ? `\nACTIVE_FILTER: ${filterLabel}\nHARD_MATCH: ${hardCount || 0}\nSOFT_MATCH: ${softCount || 0} of ${events?.length || 0} events\nSPARSE: ${isSparse ? 'true — few matches, acknowledge honestly' : 'false'}`
-    : '';
+  let filterContextBlock = '';
+  if (hasActiveFilter) {
+    filterContextBlock = `\nACTIVE_FILTER: ${filterLabel}\nHARD_MATCH: ${hardCount || 0}\nSOFT_MATCH: ${softCount || 0} of ${events?.length || 0} events\nSPARSE: ${isSparse ? 'true — few matches, acknowledge honestly' : 'false'}`;
+    if ((hardCount || 0) === 0 && (softCount || 0) > 0) {
+      filterContextBlock += `\nCAUTION: Zero hard matches. [SOFT] events match the broad category only. You MUST read each event name and description to verify it genuinely matches "${filterLabel}". A DJ night is NOT jazz. A comedy show is NOT theater. If none actually match, treat as zero matches.`;
+    }
+  }
 
   const excludeNote = excludeIds && excludeIds.length > 0
     ? `\nEXCLUDED (already shown to user — do NOT pick these): ${excludeIds.join(', ')}`
@@ -493,7 +497,7 @@ Respond now.`;
     matchCount: matchCount,
     poolSize: events?.length || 0,
     isFree: activeFilters?.free_only,
-    hasActiveCategory: activeFilters?.category && (hardCount > 0 || softCount > 0),
+    hasActiveCategory: !!activeFilters?.category,
   };
   const systemPrompt = buildUnifiedPrompt(events || [], skillOptions);
 

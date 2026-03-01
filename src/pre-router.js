@@ -233,9 +233,10 @@ function preRoute(message, session) {
   if (session?.lastFilters && Object.values(session.lastFilters).some(Boolean)) {
     // Targeted filter clearing — "forget the comedy", "drop the free", "never mind the time"
     // Only emit the key(s) being cleared so other filters compound via mergeFilters.
-    const targetedCatClear = msg.match(/^(?:forget|never mind|drop|lose|ditch)\s+(?:the\s+)?(.+)$/i);
+    const targetedCatClear = msg.match(/^(?:ok |actually |just |yeah |sure )?(?:forget|never mind|drop|lose|ditch)\s+(?:the\s+)?(.+)$/i);
     if (targetedCatClear) {
-      const target = targetedCatClear[1].trim().toLowerCase();
+      // Strip trailing clauses: "free thing, how about jazz" → "free thing"
+      const target = targetedCatClear[1].trim().replace(/[,.].*$/, '').replace(/\s+(?:how about|but|try|what about|and)\s+.*$/i, '').trim().toLowerCase();
       // Check if target matches an active category
       for (const [pattern, catInfo] of Object.entries(catMap)) {
         if (new RegExp(`^(?:${pattern})(?:\\s+(?:filter|stuff))?$`, 'i').test(target)) {
@@ -245,7 +246,7 @@ function preRoute(message, session) {
         }
       }
       // Check for free clear
-      if (/^free(?:\s+(?:filter|stuff|only))?$/i.test(target)) {
+      if (/^free(?:\s+(?:filter|stuff|thing|only))?$/i.test(target)) {
         return { ...base, intent: 'events', neighborhood: session.lastNeighborhood, filters: { free_only: false } };
       }
       // Check for time clear
@@ -255,7 +256,7 @@ function preRoute(message, session) {
     }
 
     // Full filter clearing — generic phrases
-    if (/^(show me everything|all events|no filter|drop the filter|clear filters?|just regular stuff|everything|show all|nvm|forget it|nah forget it|drop it|start over)$/i.test(msg)) {
+    if (/^(?:ok |actually |just |can you |yeah |sure )?(?:show me everything|all events|no filter|drop the filter|clear filters?|just regular stuff|everything|show all|nvm|forget it|nah forget it|drop it|start over)$/i.test(msg)) {
       return { ...base, intent: 'clear_filters', neighborhood: session.lastNeighborhood };
     }
   }
