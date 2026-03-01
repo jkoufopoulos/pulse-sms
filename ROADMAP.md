@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-01 (behavioral eval: 11/26 filter_drift passing — semantic filter clear is dominant gap; handleZeroMatch bypass + cascade protection; NYC Parks neighborhood resolution, price extraction gaps, refreshSources bug fix; Gap 3 pool padding fix, 3-model comparison eval, Yutori junk event filter, eval trajectory & trends, Skint ongoing events scraper, Friday/Saturday newsletter event loss fix, systemic failure fixes, handler.js events bug, Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
+> Last updated: 2026-03-01 (filter_intent migration — replaced CLEAR_SIGNALS + clear_filters boolean + ~100 lines fragile pre-router regex with LLM filter_intent schema; behavioral eval: 11/26 filter_drift passing — semantic filter clear is dominant gap; handleZeroMatch bypass + cascade protection; NYC Parks neighborhood resolution, price extraction gaps, refreshSources bug fix; Gap 3 pool padding fix, 3-model comparison eval, Yutori junk event filter, eval trajectory & trends, Skint ongoing events scraper, Friday/Saturday newsletter event loss fix, systemic failure fixes, handler.js events bug, Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
 
 ---
 
@@ -21,9 +21,9 @@ The LLM is never the system of record for structured data. Session state, filter
 
 If the LLM must both understand intent and write compelling copy, those should be separate operations. The reasoning pass returns a small validated struct. The rendering pass takes well-formed data and returns text.
 
-**Current state:** One unified Haiku call does both. Its output contract has 4 structured fields — `type`, `sms_text`, `picks`, `clear_filters`. Step 3 removed the 4 redundant state-management fields (`filters_used`, `neighborhood_used`, `suggested_neighborhood`, `pending_filters`).
+**Current state:** One unified Haiku call does both. Its output contract has 4 structured fields — `type`, `sms_text`, `picks`, `filter_intent`. Step 3 removed the 4 redundant state-management fields. The `filter_intent` migration (2026-03-01) replaced the `clear_filters` boolean with a granular `{ action, updates }` object.
 
-**Target state:** Reasoning call → `{ type, picks[], clear_filters }` (3 fields, validated via tool_use). Rendering call → `sms_text` (pure copy, lightweight parser). Everything else derived by code.
+**Target state:** Reasoning call → `{ type, picks[], filter_intent }` (3 fields, validated via tool_use). Rendering call → `sms_text` (pure copy, lightweight parser). Everything else derived by code.
 
 **Constraint:** The previous two-call architecture was abandoned because calls disagreed on state. The new split must have code own all state between calls — nothing from reasoning output passes to the rendering call except event data.
 
@@ -45,7 +45,7 @@ Every code path that sends an SMS must end with the same atomic session save fun
 
 Every structured field in the LLM output is a surface for hallucination and drift. Fields the code already knows before calling the LLM should never be in the LLM's output schema.
 
-**Done (step 3, 2026-02-22):** Removed `filters_used`, `neighborhood_used`, `suggested_neighborhood`, `pending_filters` from `unifiedRespond`. Contract reduced from 8 to 4 fields: `type`, `sms_text`, `picks`, `clear_filters`.
+**Done (step 3, 2026-02-22):** Removed `filters_used`, `neighborhood_used`, `suggested_neighborhood`, `pending_filters` from `unifiedRespond`. Contract reduced from 8 to 4 fields: `type`, `sms_text`, `picks`, `clear_filters`. **(2026-03-01):** `clear_filters` boolean replaced with `filter_intent: { action: "none"|"clear_all"|"modify", updates }` — enables granular filter modifications from LLM, not just clear-all.
 
 ### P6. Deterministic Extraction Covers Common Cases
 
@@ -136,12 +136,12 @@ All 4 event-serving handlers migrated from merge-based `setSession` to atomic `s
 - **pipeline.js** — `saveResponseFrame` now accepts and passes through `pendingMessage` to `setResponseState`.
 - **handler.js:497-498** — Added P7 event ID validation: `validPicks = result.picks.filter(p => eventMap[p.event_id])` before session save.
 
-**Remaining `setSession` calls (5, all ephemeral staging):**
+**Remaining `setSession` calls (4, all ephemeral staging):**
 
 | Location | Purpose | Why kept |
 |----------|---------|----------|
 | handler.js:270 | Session init | Creates session before history tracking |
-| handler.js:287 | `clear_filters` pre-route | Wipes filters before unified branch computes `activeFilters` |
+| ~~handler.js:287~~ | ~~`clear_filters` pre-route~~ | **Removed (2026-03-01)** — filter_intent migration, LLM handles directly |
 | handler.js:329 | Clear pending on pre-routed intent | Clears nudge state before help/conversational/details handlers |
 | handler.js:355 | Inject pre-detected filters | Stages filters for unified branch |
 | handler.js:373 | Clear stale pending on new neighborhood | Prevents stale pending from affecting new hood query |
@@ -154,15 +154,13 @@ All 5 are pre-LLM staging — they set up state that the downstream `saveRespons
 
 The architecture principles (P1-P7) and migration steps address the core design. The remaining quality failures cluster at four transition zones — places where deterministic code hands off to the LLM or where the system has no fallback. These gaps explain why eval pass rates plateau even as individual bugs get fixed.
 
-### Gap 1: `clear_filters` — Last P1 Bridge (LLM → Code State)
+### Gap 1: `clear_filters` — Last P1 Bridge (LLM → Code State) — **Superseded (2026-03-01)**
 
-**What:** The LLM returns `clear_filters: true` and the handler uses it to wipe session filter state. This is the only remaining path where LLM output directly mutates code-owned state, violating P1.
+**What:** The LLM returned `clear_filters: true` and the handler used it to wipe session filter state. The `CLEAR_SIGNALS` regex gated the LLM's claim but couldn't cover infinite natural phrasings ("paid is fine", "not just comedy", "show me earlier stuff").
 
-**Current mitigation:** `CLEAR_SIGNALS` regex in `handler.js` gates the LLM's claim — `clear_filters: true` is only honored if the user message matches `/\b(everything|all|fresh|reset|forget|nvm|...)\b/i`. This reduces but doesn't eliminate the surface: any new clear-like phrase the LLM detects but the regex doesn't match gets silently ignored, and any hallucinated `clear_filters: true` on a matching message passes through.
+**Resolution:** Replaced with `filter_intent` schema (`{ action: "none"|"clear_all"|"modify", updates }`). This is P1-compliant: the LLM reports what the user is requesting (language understanding), the handler decides how to apply it (state management via `mergeFilters` + `normalizeFilterIntent`). The `CLEAR_SIGNALS` regex was removed — the LLM's prompt constrains `filter_intent` usage, and `normalizeFilterIntent` validates/normalizes all update keys at the boundary (P3). Also removed ~100 lines of fragile pre-router regex (filter clearing, first-message detection, compound extraction) that the LLM now handles better.
 
-**Impact:** Filter state can be unexpectedly wiped on conversational turns where the user didn't intend to clear. Conversely, semantic clearing ("just show me what's good") only works if the regex happens to cover the phrase. This is a P1 violation with a code-level guardrail — an improvement over raw LLM state writes, but not a principled solution.
-
-**Fix direction:** Move all filter clearing to the pre-router (P6). Expand the clear-intent regex to cover the semantic cases currently delegated to the LLM. Remove `clear_filters` from the LLM output schema entirely, completing P1. This also reduces the output contract from 4 fields to 3 (P5).
+**Changes:** `handler.js` (CLEAR_SIGNALS removed, filter_intent application), `prompts.js` (filter_intent schema), `ai.js` (responseSchema + return shape), `pipeline.js` (normalizeFilterIntent), `pre-router.js` (~100 lines removed). Kept: mechanical shortcuts, session-aware single-dimension detection (for pool tagging before LLM call).
 
 **Related:** Filter Drift Fix #3 (2026-02-24), P1 anti-pattern note.
 
@@ -172,7 +170,7 @@ The architecture principles (P1-P7) and migration steps address the core design.
 
 **Impact:** When the model makes a poor selection (e.g., picks unmatched events despite filter instructions), there's no checkpoint to catch it before the copy is written. The structured output and prose are entangled — you can't validate picks without also paying for rendering, and you can't re-render without also re-reasoning. This coupling is the root cause of Theme A (category filter drift) and Root Cause C (zero-match fallback): the LLM sees unmatched events in the pool, decides to recommend them, and writes persuasive copy about them, all in one pass.
 
-**Fix direction:** Migration Step 4 — split into reasoning call (`type`, `picks`, `clear_filters` via `tool_use`) and rendering call (`sms_text` from validated picks). Code validates picks between calls. Needs A/B eval to confirm no quality regression.
+**Fix direction:** Migration Step 4 — split into reasoning call (`type`, `picks`, `filter_intent` via `tool_use`) and rendering call (`sms_text` from validated picks). Code validates picks between calls. Needs A/B eval to confirm no quality regression.
 
 **Related:** P2 principle, Migration Step 4, Theme A (category filter drift), Root Cause C (zero-match fallback).
 
@@ -198,12 +196,12 @@ The architecture principles (P1-P7) and migration steps address the core design.
 
 | Gap | Principle violated | Eval impact | Fix effort |
 |-----|-------------------|-------------|------------|
-| 1: `clear_filters` bridge | P1 (code owns state) | Filter wipe on non-clearing turns; semantic clearing misses | Medium — expand pre-router regex, remove LLM field |
+| 1: `clear_filters` bridge | P1 (code owns state) | Filter wipe on non-clearing turns; semantic clearing misses | **Superseded (2026-03-01)** — replaced with `filter_intent` schema |
 | 2: Reasoning/rendering coupling | P2 (separate concerns) | Category drift, zero-match fallback (Theme A + Root Cause C) | High — Step 4 A/B eval required |
 | 3: Pool padding | P1 (code owns state) | Structural enabler of filter drift (Theme A, C, F) | **Done (2026-03-01)** — eliminated unmatched padding |
 | 4: No degraded-mode recovery | (No principle yet) | 35% of eval failures cascade from single LLM failure | Medium — deterministic fallback formatter |
 
-Gap 3 is now fixed. Gap 2 is the remaining blocker for filter drift improvement. Gap 1 is the last P1 violation. Gap 4 is the biggest operational risk.
+Gaps 1 and 3 are now fixed. Gap 2 is the remaining blocker for filter drift improvement. Gap 4 is the biggest operational risk.
 
 ---
 
@@ -235,7 +233,7 @@ Gap 3 is now fixed. Gap 2 is the remaining blocker for filter drift improvement.
 **Model Strategy (pending):** The Haiku vs Gemini comparison above was pre-systemic-fixes (before handler.js events bug, alias additions, sign-off detection, borough narrowing, prompt hardening). Those fixes addressed the 13 both-fail scenarios. A fresh post-fix comparison is needed to finalize the model decision. See eval trajectory section for run plan.
 
 **What's done (ai.js only):**
-- `unifiedWithGemini()` — temp=0.5, topP=0.9, maxOutputTokens=4096, `responseSchema` enforcing `{type, sms_text, picks[], clear_filters}`
+- `unifiedWithGemini()` — temp=0.5, topP=0.9, maxOutputTokens=4096, `responseSchema` enforcing `{type, sms_text, picks[], filter_intent}`
 - `composeWithGemini()` — temp=0.5, topP=0.9, maxOutputTokens=8192 (already existed, params tuned)
 - `extractWithGemini()` — temp=0, maxOutputTokens=4096
 - `detailsWithGemini()` — temp=0.8, maxOutputTokens=1024
@@ -338,7 +336,7 @@ Scenarios: Astoria MORE (says "that's everything" with 0 new picks, then detail 
 
 | Fix | Scenarios fixed | Effort |
 |-----|----------------|--------|
-| Expand pre-router clear_filters regex (catch "paid is fine", "not just X", "show me everything/whats good", "drop X", "earlier stuff") | 7 scenarios (#0, 3, 7, 9, 13, 14, 20) | Medium |
+| ~~Expand pre-router clear_filters regex~~ → Replaced with LLM `filter_intent` schema (2026-03-01) | 7 scenarios (#0, 3, 7, 9, 13, 14, 20) | **Done** |
 | Add "live music" to pre-router category detection | 2 scenarios (#12, 21) | Small |
 | Fix 502 timeouts (Tavily circuit breaker or timeout reduction) | 7 scenarios (#2, 17, 19, 22, 24, 25) | Medium |
 | Investigate conversational-with-pool | 3 scenarios (#2, 12, 21) | Medium |
@@ -528,7 +526,7 @@ The extraction audit shows 82-100% pass rates on most days, but this is misleadi
 
 | Action | Expected Impact | Effort | Status |
 |--------|----------------|--------|--------|
-| Expand pre-router clear_filters regex | +27% filter_drift (7 of 15 failures) | Medium | **Next priority** |
+| Replace regex routing with LLM filter_intent | +27% filter_drift (7 of 15 failures) | Medium | **Done (2026-03-01)** — supersedes regex expansion |
 | Add "live music" to pre-router category detection | +8% filter_drift (2 scenarios) | Small | **Next priority** |
 | Fix 502 timeouts (Tavily circuit breaker) | +27% filter_drift (7 scenarios untestable) | Medium | Planned |
 | Investigate conversational-with-pool | +12% filter_drift (3 scenarios) | Medium | Planned |
@@ -541,6 +539,22 @@ The extraction audit shows 82-100% pass rates on most days, but this is misleadi
 ---
 
 ## Completed Work
+
+### Replace Regex Semantic Routing with LLM filter_intent (2026-03-01)
+
+**Problem:** The pre-router had ~130 lines of fragile regex doing semantic work (detecting filter clearing, first-message categories, compound filters). This missed infinite natural phrasings ("paid is fine", "not just comedy", "show me earlier stuff"). The `CLEAR_SIGNALS` regex in handler.js double-validated the LLM's `clear_filters` output, blocking the LLM even when it correctly understood filter-clearing intent. This caused 7 of 15 non-timeout filter_drift failures.
+
+**Key insight:** The pre-router's semantic filter detection didn't save money — those messages still went through the unified LLM call. We were adding 130 lines of fragile regex for zero cost savings.
+
+**Fix (3 phases):**
+
+1. **Removed CLEAR_SIGNALS double-validation** — handler.js now trusts the LLM's filter intent directly instead of gating it against a regex. The prompt already constrains usage; worst case is one turn of unfiltered picks.
+
+2. **Expanded `clear_filters: boolean` to `filter_intent` object** — `{ action: "none"|"clear_all"|"modify", updates: { free_only, category, time_after, vibe } }`. The LLM can now report granular filter modifications ("paid is fine" → `{ action: "modify", updates: { free_only: false } }`), not just clear-all. Handler applies via `normalizeFilterIntent()` + `mergeFilters()`. P1 compliant: LLM reports user intent (language), handler applies state changes (code).
+
+3. **Stripped ~100 lines of fragile pre-router regex** — Removed filter clearing detection, first-message vibe/category/time detection, compound filter extraction, and `parseDateRange()`. Kept mechanical shortcuts (help, 1-5, more, greetings) and session-aware single-dimension detection (for pool tagging before LLM call).
+
+**Changes:** `handler.js` (CLEAR_SIGNALS removed, filter_intent application), `prompts.js` (filter_intent schema + examples), `ai.js` (Gemini responseSchema + return shape), `pipeline.js` (normalizeFilterIntent), `pre-router.js` (~100 lines removed), `test/unit/` (updated pre-router, ai, pipeline tests). Resolves Gap 1 (last P1 bridge).
 
 ### Price Analytics + Scraper Price Improvements (2026-03-01)
 
@@ -818,9 +832,9 @@ Fixed the dominant product bug (filter_drift category at 23% pass rate). Five ro
 
 1. **`mergeFilters` explicit-key semantics** (`pipeline.js`) — Rewrote from OR logic (`next.value || base.value`) to `'key' in next` check. If a key EXISTS in incoming (even `null`/`false`), it overrides. If ABSENT, falls back to existing. Enables: category replacement (`{category:'jazz'}` overrides `{category:'comedy'}`), partial clearing (`{category:null}` clears category only), free clearing (`{free_only:false}` explicitly turns off free filter). Backward-compatible: existing callers only set keys they detect.
 
-2. **Targeted filter clearing** (`pre-router.js`) — Split single `clear_filters` regex into targeted + full branches. "forget the comedy" / "never mind the jazz" → extracts target, matches against `catMap`, returns `intent:'events'` with explicit null filter (feeds into `mergeFilters` for partial clear). "forget the free" → `{free_only:false}`. "forget the late" → `{time_after:null}`. Generic phrases ("nvm", "start over", "show me everything") → `intent:'clear_filters'` as before.
+2. **Targeted filter clearing** (`pre-router.js`) — ~~Split single `clear_filters` regex into targeted + full branches.~~ **Superseded (2026-03-01):** Pre-router filter clearing regex removed. LLM `filter_intent` schema now handles all semantic filter modifications ("forget the comedy" → `{ action: "modify", updates: { category: null } }`).
 
-3. **LLM `clear_filters` guard** (`handler.js`) — `CLEAR_SIGNALS` regex gates the LLM's `clear_filters:true` against user message content. Prevents hallucination on normal conversational turns while preserving semantic clearing ("just show me what's good", "surprise me"). P1 compliant: code validates LLM claim against user input.
+3. **LLM `clear_filters` guard** (`handler.js`) — ~~`CLEAR_SIGNALS` regex gates the LLM's `clear_filters:true` against user message content.~~ **Superseded (2026-03-01):** CLEAR_SIGNALS regex removed. LLM `filter_intent` schema replaces the boolean `clear_filters` field with granular `{ action, updates }`. Handler applies via `normalizeFilterIntent()` + `mergeFilters()`.
 
 4. **handleMore exhaustion `saveResponseFrame`** (`intent-handlers.js`) — Final exhaustion path was sending SMS without calling `saveResponseFrame`, so `pendingNearby` was never set for nudge acceptance. Added `saveResponseFrame` before `sendSMS`.
 
@@ -837,7 +851,7 @@ Phase 6+7 of the eval suite improvement plan — closes the gap between structur
 - **Price transparency eval** — Checks that event pick SMS text contains price/free mention. Catches the "no price info" gap (P4 had 1 regression assertion).
 - **Schema compliance eval** — Checks LLM raw response is valid JSON with `sms_text` field. Detects the "hit a snag" fallback from JSON parse failures.
 - **Source field-completeness eval** (`src/evals/source-completeness.js`) — Per-source field expectations for 13 structured sources. Universal checks (id, name, venue_name, is_free, category) + source-specific required fields (BAM: neighborhood=Fort Greene, SmallsLIVE: subcategory=jazz, etc.) + invariant checks (NYC Parks: is_free=true). Runs automatically after each scrape via `refreshCache`. Logs warnings per source with sample failures.
-- **P10 clear_filters expansion** — Added 6 new regression scenarios (total: 10 P10 scenarios, 12 assertions). Tests pre-router exact patterns ("forget it", "nvm", "drop it"), LLM semantic clearing ("just show me what's good", "I'm open to anything"), and clear-then-reapply flows. Added 8 new pre-router unit tests including negative cases (prefix messages, compound messages).
+- **P10 clear_filters expansion** — Added 6 new regression scenarios (total: 10 P10 scenarios, 12 assertions). Tests pre-router exact patterns ("forget it", "nvm", "drop it"), LLM semantic clearing ("just show me what's good", "I'm open to anything"), and clear-then-reapply flows. Added 8 new pre-router unit tests including negative cases (prefix messages, compound messages). **(2026-03-01):** Pre-router filter clearing patterns superseded by LLM `filter_intent` — pre-router tests updated to expect null (LLM handles).
 - **Pre-router regex fix** — `forget the .+` and `never mind the .+` patterns changed from `.+` to `[a-z ]+` to prevent matching compound messages like "forget the comedy, how about jazz" (which should fall through to the LLM for proper handling).
 
 ### Eval System Fix: Judge Calibration, Golden Fixes, Difficulty Tiers (2026-02-23)
@@ -945,7 +959,7 @@ Phase 6+7 of the eval suite improvement plan — closes the gap between structur
 ### Derive State Fields Deterministically — Step 3 (2026-02-22)
 
 - Removed 4 redundant fields from `unifiedRespond` LLM output contract: `filters_used`, `neighborhood_used`, `suggested_neighborhood`, `pending_filters`
-- Unified output contract now has 4 fields: `type`, `sms_text`, `picks`, `clear_filters`
+- Unified output contract now has 4 fields: `type`, `sms_text`, `picks`, `filter_intent` (was `clear_filters` until 2026-03-01)
 - Handler derives `suggestedHood` deterministically from `isSparse && nearbyHoods[0]`
 - Handler uses resolved `hood` directly instead of reading `neighborhood_used` from LLM
 - `ask_neighborhood` path uses `activeFilters` instead of LLM-reported `pending_filters`
