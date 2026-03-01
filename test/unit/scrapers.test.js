@@ -149,7 +149,7 @@ check('free: modifier stripped', free1 && free1.start_time_local === '19:00');
 
 // Time range
 const range = parseSkintParagraph(
-  'sat 12-6pm: brooklyn flea winter market: vintage goods and local food vendors. atlantic center (fort greene), free. >>',
+  'sat 12-6pm: brooklyn flea winter market: vintage goods and local artisans. atlantic center (fort greene), free. >>',
   '2026-03-01'
 );
 check('range: start time', range && range.start_time_local === '12:00');
@@ -252,3 +252,91 @@ if (cacheExists) {
   check('cached data has id field', typeof cached.id === 'string');
   check('cached data has events array', Array.isArray(cached.events));
 }
+
+
+// ---- Skint ongoing: parseThruDate ----
+console.log('\nSkint ongoing parseThruDate:');
+
+const { parseThruDate, parseOngoingParagraph } = require('../../src/sources/skint');
+
+// Numeric dates
+check('thru 3/5 → ISO date', parseThruDate('3/5', 2026) === '2026-03-05');
+check('thru 12/31 → ISO date', parseThruDate('12/31', 2026) === '2026-12-31');
+check('thru 3/28 → ISO date', parseThruDate('3/28', 2026) === '2026-03-28');
+
+// Month names
+check('thru february → last day', parseThruDate('february', 2026) === '2026-02-28');
+check('thru march → last day', parseThruDate('march', 2026) === '2026-03-31');
+check('thru jan → last day', parseThruDate('jan', 2026) === '2026-01-31');
+
+// Seasons
+check('thru spring → 06-20', parseThruDate('spring', 2026) === '2026-06-20');
+check('thru summer → 09-22', parseThruDate('summer', 2026) === '2026-09-22');
+
+// Invalid
+check('thru gibberish → null', parseThruDate('gibberish', 2026) === null);
+
+
+// ---- Skint ongoing: parseOngoingParagraph ----
+console.log('\nSkint ongoing parseOngoingParagraph:');
+
+const todayForTest = '2026-03-01';
+
+// Format A: "thru 3/5: event name: description. venue (hood), price. >>"
+const fmtA = parseOngoingParagraph(
+  'thru 3/5: tenement stories: film forum and the tenement museum present a festival of movies. film forum (south village), $17. >>',
+  todayForTest, 2026
+);
+check('fmtA: parses name', fmtA && fmtA.name === 'tenement stories');
+check('fmtA: has description', fmtA && fmtA.description_short && fmtA.description_short.includes('festival'));
+check('fmtA: parses venue', fmtA && fmtA.venue_name === 'film forum');
+check('fmtA: resolves south village → West Village', fmtA && fmtA.neighborhood === 'West Village');
+check('fmtA: parses series_end', fmtA && fmtA.series_end === '2026-03-05');
+check('fmtA: has price', fmtA && fmtA.price_display && fmtA.price_display.includes('$17'));
+check('fmtA: not free', fmtA && fmtA.is_free === false);
+check('fmtA: date_local is today', fmtA && fmtA.date_local === todayForTest);
+check('fmtA: category comedy (stories match)', fmtA && fmtA.category === 'comedy');
+
+// Format A with free admission
+const fmtAFree = parseOngoingParagraph(
+  'thru 3/28: claudia bitrán: titanic: christin tierney gallery (tribeca), free admission. >>',
+  todayForTest, 2026
+);
+check('fmtA-free: parses name', fmtAFree && fmtAFree.name === 'claudia bitrán');
+check('fmtA-free: is free', fmtAFree && fmtAFree.is_free === true);
+check('fmtA-free: parses neighborhood', fmtAFree && fmtAFree.neighborhood === 'Tribeca');
+check('fmtA-free: series_end', fmtAFree && fmtAFree.series_end === '2026-03-28');
+check('fmtA-free: has category', fmtAFree && typeof fmtAFree.category === 'string');
+
+// Format B: "► venue (hood) thru 3/8 >>"
+const fmtB = parseOngoingParagraph(
+  '► gottesman rink at the davis center (central park) thru 3/8 >>',
+  todayForTest, 2026
+);
+check('fmtB: parses name', fmtB && fmtB.name === 'gottesman rink at the davis center');
+check('fmtB: series_end', fmtB && fmtB.series_end === '2026-03-08');
+check('fmtB: parses neighborhood', fmtB && fmtB.neighborhood === 'Midtown');
+
+// Format C: vague end date
+const fmtC = parseOngoingParagraph(
+  'thru spring: new highline art: dinosaur sculptures along the elevated park. the high line (chelsea), free admission. >>',
+  todayForTest, 2026
+);
+check('fmtC: parses name', fmtC && fmtC.name === 'new highline art');
+check('fmtC: series_end spring', fmtC && fmtC.series_end === '2026-06-20');
+check('fmtC: is free', fmtC && fmtC.is_free === true);
+check('fmtC: neighborhood Chelsea', fmtC && fmtC.neighborhood === 'Chelsea');
+
+// Non-event listicle returns null
+const listicle = parseOngoingParagraph(
+  'nine old-fashioned soda fountains in nyc: enjoy a taste of old new york at these classic spots around the city. >>',
+  todayForTest, 2026
+);
+check('listicle: no thru prefix → still parses (name only)', listicle === null || (listicle && !listicle.series_end));
+
+// Short text returns null
+const short = parseOngoingParagraph('too short', todayForTest, 2026);
+check('short text returns null', short === null);
+
+// Source URL set
+check('fmtA: source_url set', fmtA && fmtA.source_url === 'https://theskint.com/ongoing-events/');

@@ -6,7 +6,7 @@ const NEIGHBORHOODS = {
   },
   'West Village': {
     lat: 40.7336, lng: -73.9999, radius_km: 0.7,
-    aliases: ['west village', 'wv', 'w village', 'the village']
+    aliases: ['west village', 'wv', 'w village', 'the village', 'south village']
   },
   'Lower East Side': {
     lat: 40.7150, lng: -73.9843, radius_km: 0.8,

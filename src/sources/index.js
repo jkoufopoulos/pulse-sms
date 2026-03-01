@@ -1,5 +1,5 @@
 const { makeEventId, normalizeExtractedEvent, normalizeEventName } = require('./shared');
-const { fetchSkintEvents } = require('./skint');
+const { fetchSkintEvents, fetchSkintOngoingEvents } = require('./skint');
 const { fetchEventbriteEvents, fetchEventbriteComedy, fetchEventbriteArts } = require('./eventbrite');
 const { fetchSongkickEvents } = require('./songkick');
 const { fetchDiceEvents } = require('./dice');
@@ -18,6 +18,7 @@ const { fetchYutoriEvents } = require('./yutori');
 
 module.exports = {
   fetchSkintEvents,
+  fetchSkintOngoingEvents,
   fetchEventbriteEvents,
   fetchSongkickEvents,
   fetchDiceEvents,

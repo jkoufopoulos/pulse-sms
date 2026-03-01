@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { fetchSkintEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchDoNYCEvents, fetchBAMEvents, fetchSmallsLiveEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents, fetchTicketmasterEvents, fetchYutoriEvents } = require('./sources');
+const { fetchSkintEvents, fetchSkintOngoingEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchDoNYCEvents, fetchBAMEvents, fetchSmallsLiveEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents, fetchTicketmasterEvents, fetchYutoriEvents } = require('./sources');
 const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate } = require('./geo');
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues } = require('./venues');
 const { sendHealthAlert } = require('./alerts');
@@ -14,6 +14,7 @@ const { captureExtractionInput, getExtractionInputs, clearExtractionInputs } = r
 // Source tier classification for compose prompt
 const SOURCE_TIERS = {
   Skint: 'unstructured',
+  SkintOngoing: 'unstructured',
   NonsenseNYC: 'unstructured',
   OhMyRockness: 'unstructured',
   Yutori: 'unstructured',
@@ -103,6 +104,7 @@ function makeHealthEntry() {
 
 const SOURCES = [
   { label: 'Skint',            fetch: fetchSkintEvents,         weight: 0.9,  mergeRank: 0, endpoint: 'https://theskint.com' },
+  { label: 'SkintOngoing',     fetch: fetchSkintOngoingEvents,  weight: 0.9,  mergeRank: 1, endpoint: 'https://theskint.com/ongoing-events/' },
   { label: 'NonsenseNYC',      fetch: fetchNonsenseNYC,         weight: 0.9,  mergeRank: 1, endpoint: 'https://nonsensenyc.com' },
   { label: 'RA',               fetch: fetchRAEvents,            weight: 0.85, mergeRank: 0, endpoint: 'https://ra.co' },
   { label: 'OhMyRockness',     fetch: fetchOhMyRockness,        weight: 0.85, mergeRank: 1, endpoint: 'https://www.ohmyrockness.com/shows' },

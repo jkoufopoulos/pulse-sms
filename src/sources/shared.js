@@ -103,6 +103,7 @@ function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
     source_url: e.source_url || null,
     map_url: null,
     map_hint: e.map_hint || null,
+    series_end: e.series_end || null,
     evidence: e.evidence || null,
     // Carry raw recurrence fields for downstream pattern detection (transient, not persisted to DB)
     ...((e.is_recurring || e.recurrence_day || e.recurrence_time) ? {

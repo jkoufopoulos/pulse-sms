@@ -3,6 +3,7 @@ const { extractEvents } = require('../ai');
 const { FETCH_HEADERS, normalizeExtractedEvent } = require('./shared');
 const { captureExtractionInput } = require('../extraction-capture');
 const { resolveNeighborhood } = require('../geo');
+const { extractNeighborhood } = require('../neighborhoods');
 
 /**
  * Get NYC day-of-week index (0=Sun...6=Sat) and a helper to resolve
@@ -112,8 +113,9 @@ function parseSkintParagraph(text, dateLocal) {
 
   // 2. Extract day prefix + optional time + optional modifier
   // Handles: "fri 7pm:", "sat 1pm:", "mon 7pm (monthly):", "thru sun:", "today 7pm:", "daily 10am:"
+  // Time can be single "7pm" or range "12-6pm" / "7pm-2am" (first am/pm optional in ranges)
   const dayTimeMatch = remaining.match(
-    /^(mon|tue|wed|thu|fri|sat|sun|thru\s+\w+|today|tonight|daily)\w*(?:\s*\+\s*\w+)?(?:\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)(?:\s*[-–]\s*\d{1,2}(?::\d{2})?\s*(?:am|pm))?))?(?:\s*\([^)]*\))?\s*:\s*/i
+    /^(mon|tue|wed|thu|fri|sat|sun|thru\s+\w+|today|tonight|daily)\w*(?:\s*\+\s*\w+)?(?:\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?(?:\s*[-–]\s*\d{1,2}(?::\d{2})?)?\s*(?:am|pm)))?(?:\s*\([^)]*\))?\s*:\s*/i
   );
   if (!dayTimeMatch) return null;
 
@@ -353,4 +355,291 @@ async function fetchSkintEvents() {
   }
 }
 
-module.exports = { fetchSkintEvents, parseSkintParagraph };
+// === Ongoing events page scraper ===
+
+/**
+ * Parse a "thru" date string into an ISO date.
+ * Handles: "3/8" → 2026-03-08, "february" → last day of month, "spring" → approximate season end.
+ */
+function parseThruDate(text, refYear) {
+  const trimmed = text.trim().toLowerCase();
+
+  // Numeric: "3/8", "12/31"
+  const numMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (numMatch) {
+    const month = parseInt(numMatch[1], 10);
+    const day = parseInt(numMatch[2], 10);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${refYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+    return null;
+  }
+
+  // Month name: "february", "march", "jan"
+  const months = {
+    jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3,
+    apr: 4, april: 4, may: 5, jun: 6, june: 6,
+    jul: 7, july: 7, aug: 8, august: 8, sep: 9, september: 9,
+    oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12,
+  };
+  if (months[trimmed]) {
+    const m = months[trimmed];
+    // Last day of the month
+    const lastDay = new Date(refYear, m, 0).getDate();
+    return `${refYear}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  }
+
+  // Season: approximate end dates
+  const seasons = {
+    spring: '06-20', summer: '09-22', fall: '12-20', autumn: '12-20', winter: '03-20',
+  };
+  if (seasons[trimmed]) {
+    return `${refYear}-${seasons[trimmed]}`;
+  }
+
+  return null;
+}
+
+/**
+ * Parse a single ongoing event paragraph into structured fields.
+ * Returns null if the paragraph can't be parsed.
+ *
+ * Handles three formats:
+ * A: "thru 3/5: event name: description. venue (hood), price. >>"
+ * B: "► venue name (hood) thru 3/8 >>"
+ * C: "thru spring: event name: description. venue (hood), price. >>"
+ */
+function parseOngoingParagraph(text, todayIso, refYear) {
+  let remaining = text;
+
+  // Strip bullet prefix and trailing >> link text
+  remaining = remaining.replace(/^\s*[►•]\s*/, '');
+  remaining = remaining.replace(/\s*>{1,2}\s*$/, '').replace(/\s*»\s*$/, '').trim();
+
+  if (!remaining || remaining.length < 10) return null;
+
+  let seriesEnd = null;
+
+  // Format A/C: "thru <date>: ..." prefix
+  const thruPrefixMatch = remaining.match(/^thru\s+([^:]+?):\s*/i);
+  if (thruPrefixMatch) {
+    const dateStr = thruPrefixMatch[1].trim();
+    seriesEnd = parseThruDate(dateStr, refYear);
+    remaining = remaining.slice(thruPrefixMatch[0].length);
+  }
+
+  // Format B: inline "thru <date>" at end (no colon prefix)
+  if (!seriesEnd) {
+    const thruSuffixMatch = remaining.match(/\s+thru\s+(\d{1,2}\/\d{1,2})\s*$/i);
+    if (thruSuffixMatch) {
+      seriesEnd = parseThruDate(thruSuffixMatch[1].trim(), refYear);
+      remaining = remaining.slice(0, thruSuffixMatch.index).trim();
+    }
+  }
+
+  // Split name from description on first colon
+  const colonIdx = remaining.indexOf(':');
+  let eventName, body;
+  if (colonIdx > 0 && colonIdx < 120) {
+    eventName = remaining.slice(0, colonIdx).trim();
+    body = remaining.slice(colonIdx + 1).trim();
+  } else {
+    eventName = remaining.trim();
+    body = '';
+  }
+
+  if (!eventName) return null;
+
+  // Format B: no body but name contains (neighborhood) — extract it
+  if (!body) {
+    const nameParenMatch = eventName.match(/\s*\(([^)]+)\)\s*$/);
+    if (nameParenMatch) {
+      const parenContent = nameParenMatch[1].trim();
+      const resolved = resolveNeighborhood(parenContent) || extractNeighborhood(parenContent);
+      if (resolved) {
+        eventName = eventName.slice(0, nameParenMatch.index).trim();
+        return {
+          name: eventName,
+          description_short: null,
+          venue_name: null,
+          venue_address: null,
+          neighborhood: resolved,
+          date_local: todayIso,
+          start_time_local: null,
+          end_time_local: null,
+          is_free: false,
+          price_display: null,
+          category: inferCategory(eventName),
+          extraction_confidence: 0.5 + (eventName ? 0.1 : 0) + 0.1 + (seriesEnd ? 0.1 : 0),
+          source_url: 'https://theskint.com/ongoing-events/',
+          series_end: seriesEnd,
+        };
+      }
+    }
+  }
+
+  // Extract venue + neighborhood from body (reuse daily parser logic)
+  let venue = null;
+  let neighborhood = null;
+  let priceDisplay = null;
+  let isFree = false;
+  let description = body;
+
+  // Find all parenthetical groups in the body
+  const parenMatches = [...(body || '').matchAll(/\(([^)]+)\)/g)];
+
+  // Scan from right to left for a known neighborhood (try extractNeighborhood for landmarks)
+  let hoodParenIdx = -1;
+  let hoodParenEnd = -1;
+  for (let i = parenMatches.length - 1; i >= 0; i--) {
+    const content = parenMatches[i][1].trim();
+    const resolved = resolveNeighborhood(content) || extractNeighborhood(content);
+    if (resolved) {
+      hoodParenIdx = parenMatches[i].index;
+      hoodParenEnd = hoodParenIdx + parenMatches[i][0].length;
+      neighborhood = resolved;
+      break;
+    }
+  }
+
+  if (hoodParenIdx >= 0) {
+    // Price: text after neighborhood paren
+    const afterHood = body.slice(hoodParenEnd).trim();
+    if (afterHood) {
+      const cleaned = afterHood.replace(/\.\s*$/, '').replace(/^,\s*/, '').trim();
+      if (cleaned) {
+        priceDisplay = cleaned.length > 100 ? cleaned.slice(0, 97) + '...' : cleaned;
+        isFree = /^free\b/i.test(priceDisplay) || /\bfree admission\b/i.test(priceDisplay);
+      }
+    }
+
+    // Venue: text between last sentence break and neighborhood paren
+    const beforeHood = body.slice(0, hoodParenIdx).trim();
+    const sentenceBreaks = [...beforeHood.matchAll(/\.\s+/g)];
+    let venueStart = 0;
+    for (let i = sentenceBreaks.length - 1; i >= 0; i--) {
+      const match = sentenceBreaks[i];
+      const rest = beforeHood.slice(match.index + match[0].length).trim();
+      if (rest.length >= 3) {
+        venueStart = match.index + match[0].length;
+        break;
+      }
+    }
+    venue = beforeHood.slice(venueStart).trim().replace(/,\s*$/, '');
+    description = venueStart > 0
+      ? beforeHood.slice(0, venueStart).replace(/\.\s*$/, '').trim()
+      : '';
+  } else {
+    // No neighborhood — try to extract price from end of body
+    const priceMatch = body.match(/[,.]?\s*(\$\d+(?:\.\d{2})?[^.]*)\.\s*$/i);
+    if (priceMatch) {
+      priceDisplay = priceMatch[1].trim();
+      isFree = false;
+      description = body.slice(0, priceMatch.index).trim().replace(/\.\s*$/, '');
+    } else {
+      const freeMatch = body.match(/[,.]?\s*(free(?:\s+(?:admission|entry|rsvp))?[^.]*)\.\s*$/i);
+      if (freeMatch) {
+        priceDisplay = freeMatch[1].trim();
+        isFree = true;
+        description = body.slice(0, freeMatch.index).trim().replace(/\.\s*$/, '');
+      }
+    }
+  }
+
+  // Detect free from body text if not already found
+  if (!priceDisplay && /\bfree\b/i.test(body) && !/free[- ]?(form|range|style|dom|lance|wheeling)/i.test(body)) {
+    isFree = true;
+  }
+
+  const category = inferCategory(eventName + (description ? ' ' + description : ''));
+
+  if (description && description.length > 200) {
+    description = description.slice(0, 197) + '...';
+  }
+
+  // Confidence based on extracted fields
+  let confidence = 0.5;
+  if (eventName) confidence += 0.1;
+  if (venue) confidence += 0.1;
+  if (neighborhood) confidence += 0.1;
+  if (seriesEnd) confidence += 0.1;
+
+  return {
+    name: eventName,
+    description_short: description || null,
+    venue_name: venue || null,
+    venue_address: null,
+    neighborhood: neighborhood || null,
+    date_local: todayIso,
+    start_time_local: null,
+    end_time_local: null,
+    is_free: isFree,
+    price_display: priceDisplay,
+    category,
+    extraction_confidence: confidence,
+    source_url: 'https://theskint.com/ongoing-events/',
+    series_end: seriesEnd,
+  };
+}
+
+async function fetchSkintOngoingEvents() {
+  console.log('Fetching The Skint ongoing events...');
+  try {
+    const res = await fetch('https://theskint.com/ongoing-events/', {
+      headers: FETCH_HEADERS,
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!res.ok) {
+      console.error(`Skint ongoing fetch failed: ${res.status}`);
+      return [];
+    }
+
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    const entry = $('.entry-content').first();
+    if (!entry.length) {
+      console.warn('Skint ongoing: .entry-content not found');
+      return [];
+    }
+
+    const { todayIso } = getNycDayContext();
+    const refYear = parseInt(todayIso.slice(0, 4), 10);
+
+    // Listicle detection: skip paragraphs that are "X things to do" style non-events
+    const listiclePattern = /^\d+\s+(old-fashioned|exceptional|best|great|top|amazing|incredible|wonderful|fantastic)/i;
+
+    const parsed = [];
+
+    entry.find('p').each((i, el) => {
+      const text = $(el).text().trim();
+      if (!text || text.length < 30) return;
+      if (text.toLowerCase().startsWith('sponsored')) return;
+      if (listiclePattern.test(text)) return;
+
+      const event = parseOngoingParagraph(text, todayIso, refYear);
+      if (event) parsed.push(event);
+    });
+
+    // Filter out expired events (series_end < today)
+    const active = parsed.filter(e => {
+      if (!e.series_end) return true; // keep events without end dates
+      return e.series_end >= todayIso;
+    });
+
+    const events = active
+      .map(e => normalizeExtractedEvent(e, 'theskint', 'curated', 0.9))
+      .filter(e => e.name && e.completeness >= 0.5);
+
+    const expired = parsed.length - active.length;
+    console.log(`Skint ongoing: ${events.length} events (${parsed.length} parsed, ${expired} expired)`);
+
+    return events;
+  } catch (err) {
+    console.error('Skint ongoing error:', err.message);
+    return [];
+  }
+}
+
+module.exports = { fetchSkintEvents, fetchSkintOngoingEvents, parseSkintParagraph, parseOngoingParagraph, parseThruDate };
