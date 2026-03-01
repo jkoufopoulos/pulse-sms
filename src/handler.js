@@ -730,14 +730,6 @@ async function handleMessageAI(phone, message) {
   // Unified LLM call — handles semantic messages + pre-detected filter follow-ups
   const unifiedCtx = await resolveUnifiedContext(message, session, preDetectedFilters, phone, trace);
 
-  // Zero-match bypass: skip LLM when filters match nothing ($0 AI cost)
-  const hasActiveFilter = unifiedCtx.activeFilters &&
-    Object.values(unifiedCtx.activeFilters).some(Boolean);
-  if (hasActiveFilter && unifiedCtx.matchCount === 0 &&
-      !unifiedCtx.isCitywide && unifiedCtx.hood) {
-    return handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace);
-  }
-
   const result = await callUnified(message, unifiedCtx, session, history, phone, trace);
   await handleUnifiedResponse(result, unifiedCtx, phone, session, trace, message, finalizeTrace);
 }
