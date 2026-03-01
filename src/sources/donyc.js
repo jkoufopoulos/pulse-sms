@@ -154,6 +154,54 @@ async function fetchCategoryDates(slug, categoryOverride, dates) {
   return events;
 }
 
+const PRICE_BATCH_SIZE = 10;
+
+function extractPriceFromDetailPage(html) {
+  const $ = cheerio.load(html);
+  // 1. Schema.org itemprop="price"
+  const schemaPrice = $('[itemprop="price"]').attr('content') || $('[itemprop="price"]').text().trim();
+  if (schemaPrice) {
+    const m = schemaPrice.match(/\$(\d+(?:\.\d{2})?)/);
+    if (m) return `$${m[1]}`;
+  }
+  // 2. Dollar amount in event detail area
+  const detailText = $('.ds-event-detail, .ds-event-description, .ds-event-details').text();
+  if (/\bfree\b/i.test(detailText)) return 'free';
+  const match = detailText.match(/\$(\d+(?:\.\d{2})?)/);
+  if (match) return `$${match[1]}`;
+  return null;
+}
+
+async function enrichPrices(events) {
+  const needsPrice = events.filter(e => !e.price_display && !e.is_free && e.source_url);
+  if (needsPrice.length === 0) return;
+
+  let enriched = 0;
+  for (let i = 0; i < needsPrice.length; i += PRICE_BATCH_SIZE) {
+    const batch = needsPrice.slice(i, i + PRICE_BATCH_SIZE);
+    const results = await Promise.allSettled(batch.map(async evt => {
+      const res = await fetch(evt.source_url, {
+        headers: FETCH_HEADERS,
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) return null;
+      return { evt, html: await res.text() };
+    }));
+
+    for (const r of results) {
+      if (r.status !== 'fulfilled' || !r.value) continue;
+      const { evt, html } = r.value;
+      const price = extractPriceFromDetailPage(html);
+      if (price) {
+        evt.price_display = price;
+        if (price === 'free') evt.is_free = true;
+        enriched++;
+      }
+    }
+  }
+  if (enriched > 0) console.log(`DoNYC: enriched ${enriched}/${needsPrice.length} events with price from detail pages`);
+}
+
 async function fetchDoNYCEvents() {
   console.log('Fetching DoNYC...');
   try {
@@ -178,6 +226,9 @@ async function fetchDoNYCEvents() {
         events.push(evt);
       }
     }
+
+    // Enrich prices from detail pages for events missing price
+    await enrichPrices(events);
 
     console.log(`DoNYC: ${events.length} events`);
     return events;

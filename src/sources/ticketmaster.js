@@ -135,6 +135,8 @@ async function fetchTicketmasterEvents() {
           price_display = `$${priceMin}`;
         } else if (typeof priceMax === 'number' && priceMax > 0) {
           price_display = `$${priceMax}`;
+        } else {
+          price_display = 'Ticketed';
         }
 
         allEvents.push({
