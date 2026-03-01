@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-01 (Friday/Saturday newsletter event loss fix, systemic failure fixes, handler.js events bug, Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
+> Last updated: 2026-03-01 (Skint ongoing events scraper, Friday/Saturday newsletter event loss fix, systemic failure fixes, handler.js events bug, Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
 
 ---
 
@@ -447,6 +447,28 @@ Fixing A+B+C+E (done) should address ~90% of failures. Root Cause D (nudge-accep
 ---
 
 ## Completed Work
+
+### Skint Ongoing Events Scraper (2026-03-01)
+
+Added a new source (`SkintOngoing`) that scrapes [theskint.com/ongoing-events/](https://theskint.com/ongoing-events/) for ~30-40 time-bounded series — film festivals, art exhibitions, ice skating rinks, theater runs. These are high-value curated picks that deepen thin neighborhood pools.
+
+**New field: `series_end`** — ISO date string on the event model capturing how long a series runs. Added to `normalizeExtractedEvent` in `src/sources/shared.js`. Events with `series_end < today` are filtered at scrape time.
+
+**Three ongoing page formats parsed deterministically (no LLM):**
+- **Format A** (~70%): `thru 3/5: event name: description. venue (hood), price. >>` — prefix thru date
+- **Format B** (~15%): `► venue name (hood) thru 3/8 >>` — bullet with inline suffix thru date
+- **Format C** (~10%): `thru spring: event name: ...` — vague end date (month name or season)
+
+**Key functions in `src/sources/skint.js`:**
+- `parseThruDate(text, refYear)` — handles numeric (`3/8`), month name (`february` → last day), season (`spring` → `06-20`)
+- `parseOngoingParagraph(text, todayIso, refYear)` — builds on daily parser infrastructure; Format B uses `extractNeighborhood` fallback for landmarks (e.g. "central park" → Midtown)
+- `fetchSkintOngoingEvents()` — fetch + Cheerio parse + non-event filter + expired filter + normalize
+
+**Non-event filter:** Catches listicles ("nine old-fashioned soda fountains"), CTAs ("subscribe to the skint"), and social plugs ("be social with us"). Pattern matches number words/digits + plural nouns, "where to find/see", and "subscribe/follow/be social" prefixes.
+
+**Registration:** Weight 0.9, mergeRank 1 (daily Skint wins dedup), unstructured tier. Added `'south village'` alias for West Village in `src/neighborhoods.js`.
+
+**Results:** 31 active events from live page (36 parsed, 5 expired filtered). 28 new unit tests. All 797+ tests passing.
 
 ### Fix Friday/Saturday Event Loss from Newsletter Sources (2026-03-01)
 
