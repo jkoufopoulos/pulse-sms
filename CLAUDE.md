@@ -56,11 +56,11 @@ Daily scrape (10am ET)              Incoming SMS
         │                                │
         ▼                                ▼
    sources/                         handler.js
-   (18 scrapers)                    (TCPA opt-out, dedup,        $0
-        │                            cost budget check)
+   (18 source entries)               (request-guard.js:           $0
+        │                            TCPA, dedup, budget)
         │                                │
         ├─► venues.js              pre-router.js ◄── session.js
-        │   (auto-learn             (mechanical        (12 fields,
+        │   (auto-learn             (mechanical        (14 fields,
         │    coords,                 shortcuts)         2hr TTL)
         │    persist)                    │
         ▼                    ┌──────────┼──────────────┐
@@ -84,7 +84,7 @@ Daily scrape (10am ET)              Incoming SMS
         └──────────►   ai.js/unifiedRespond
                        (Claude Haiku, 1 call)          ~$0.001
                        skills/ + prompts.js
-                       (12 conditional modules)
+                       (15 conditional modules)
                               │
                               ▼
                        handler saves                    $0
@@ -128,10 +128,12 @@ All paths are relative to `src/` unless prefixed with a directory.
 | File | Purpose |
 |------|---------|
 | `server.js` | Express setup, routes, health check, daily schedule, graceful shutdown |
-| `handler.js` | Twilio webhook, TCPA opt-out (STOP/UNSUBSCRIBE/CANCEL/QUIT), dedup, per-user daily cost budget ($0.10/day). Orchestrates the full pipeline: pre-router → filter resolution (`mergeFilters`) → tagged pool (`buildTaggedPool`) → unified LLM call → deterministic session save (`activeFilters` as `lastFilters`). Handles `clear_filters` intent by wiping filter state before unified branch. |
+| `handler.js` | Twilio webhook entry point. Orchestrates the full pipeline: pre-router → filter resolution (`mergeFilters`) → tagged pool (`buildTaggedPool`) → unified LLM call → deterministic session save (`activeFilters` as `lastFilters`). Delegates dedup/TCPA/budget to `request-guard.js`, unified LLM orchestration to `unified-flow.js`. Handles `clear_filters` intent by wiping filter state before unified branch. |
+| `request-guard.js` | Twilio retry dedup (MessageSid tracking), TCPA opt-out (STOP/UNSUBSCRIBE/CANCEL/QUIT), per-user daily AI budget ($0.10/day prod, $10 test), IP rate limiting (30 req/hr for test endpoint). Exports `isOverBudget`, `trackAICost`, `getCostSummary`, `getBudgetUsedPct` |
+| `unified-flow.js` | Core unified LLM orchestration — `resolveUnifiedContext` (neighborhood, filters, events, tagged pool), `callUnified` (executes LLM query, captures trace), `handleUnifiedResponse` (processes LLM output, saves session, sends SMS), `handleZeroMatch` (deterministic $0 response for filter mismatches) |
 | `pre-router.js` | Deterministic intent matching (~15% of messages) — help, numbers 1-5, more, event name match, greetings/thanks/bye. Session-aware filter detection (category/time/vibe/free) returns `intent: 'events'` with detected filters for handler injection. `clear_filters` intent when user explicitly drops filters ("forget the comedy", "show me everything"). Everything else returns `null` → unified LLM. |
 | `intent-handlers.js` | Mechanical intent handlers — `handleHelp`, `handleConversational`, `handleDetails`, `handleMore`. Each receives context and handles response + session writes. Only used for pre-router mechanical shortcuts; all semantic messages go through `unifiedRespond`. |
-| `session.js` | Per-phone session store with 2hr TTL — 12 fields: `lastPicks`, `lastEvents`, `lastNeighborhood`, `lastFilters`, `conversationHistory`, `allPicks`, `allOfferedIds`, `visitedHoods`, `pendingNearby`, `pendingNearbyEvents`, `pendingFilters`, `pendingMessage` |
+| `session.js` | Per-phone session store with 2hr TTL — 14 fields: `lastPicks`, `lastEvents`, `lastNeighborhood`, `lastDateRange`, `lastFilters`, `conversationHistory`, `allPicks`, `allOfferedIds`, `visitedHoods`, `pendingNearby`, `pendingNearbyEvents`, `pendingFilters`, `pendingMessage`, `timestamp` |
 
 **AI & prompts:**
 
@@ -140,13 +142,17 @@ All paths are relative to `src/` unless prefixed with a directory.
 | `ai.js` | AI calls: `unifiedRespond` (Claude Haiku — single call for routing + composition, receives tagged event pool with `[MATCH]` tags, `ACTIVE_FILTER`/`SPARSE` context, returns `clear_filters` boolean), `composeResponse` (Claude Haiku — used by handleMore), `extractEvents` (Claude Haiku — scrape-time extraction), `routeMessage` (legacy, still used by handleMore) |
 | `prompts.js` | System prompts: `UNIFIED_SYSTEM` (primary — understanding + composition + filter-aware selection rules + `clear_filters` schema), `COMPOSE_SYSTEM` (used by handleMore), `ROUTE_SYSTEM`, `EXTRACTION_PROMPT`, `DETAILS_SYSTEM` |
 | `skills/build-compose-prompt.js` | Dynamic prompt assembly — `buildUnifiedPrompt(events, options)` assembles `UNIFIED_SYSTEM` + conditional skill modules, `buildComposePrompt(events, options)` does the same for the compose-only flow |
-| `skills/compose-skills.js` | 11 composable prompt fragments: `core`, `tonightPriority`, `sourceTiers`, `neighborhoodMismatch`, `venueFraming`, `lastBatch`, `freeEmphasis`, `activityAdherence`, `conversationAwareness`, `nearbySuggestion`, `pendingIntent` |
+| `skills/compose-skills.js` | 15 composable prompt fragments: `core`, `tonightPriority`, `sourceTiers`, `neighborhoodMismatch`, `venueFraming`, `lastBatch`, `freeEmphasis`, `activityAdherence`, `conversationAwareness`, `nearbySuggestion`, `pendingIntent`, `singlePick`, `cityScan`, `citywide`, `multiDay` |
 
 **Event data:**
 
 | File | Purpose |
 |------|---------|
-| `events.js` | Daily event cache with disk persistence (`data/events-cache.json`), source health tracking, cross-source dedup, venue persistence, scrape-time date filtering (today through 7 days out) + kids filtering, `getEvents()`, `isCacheFresh()` (skips startup scrape when <20hr old) |
+| `events.js` | Daily event cache with disk persistence (`data/events-cache.json`), cross-source dedup, venue persistence, scrape-time date filtering (today through 7 days out) + kids filtering, `getEvents()`, `isCacheFresh()` (skips startup scrape when <20hr old) |
+| `db.js` | SQLite database layer (better-sqlite3, WAL mode) — event upsert with source-weight-based dedup, recurring pattern storage/generation, `importFromJsonCache`. Parallel persistence alongside JSON cache |
+| `source-registry.js` | Single source of truth for all 18 active source entries — `SOURCES` array (label, fetch fn, weight, mergeRank, endpoint), `SOURCE_TIERS` (unstructured/primary/secondary), `SOURCE_LABELS`, `MERGE_ORDER`, boot-time validation |
+| `source-health.js` | Per-source scrape tracking (status, event count, duration, errors, history sparklines), aggregate scrape metrics, persistence to `data/health-cache.json`, alerts on 3+ consecutive zero-event scrapes. `updateSourceHealth`, `getHealthStatus`, `alertOnFailingSources` |
+| `model-router.js` | Complexity-based model routing — scores requests 0-100 on deterministic signals (complexity tier, citywide, pre-detected filters, budget), routes high-complexity to Claude Haiku (~$0.001), simple to Gemini Flash (~$0.0001). `scoreComplexity`, `routeModel` |
 | `curation.js` | Pre-compose deterministic filters — `filterKidsEvents` (drops children's events from all sources), `filterIncomplete` (below completeness threshold) |
 | `pipeline.js` | Event pipeline — `mergeFilters` (compounds filters: incoming truthy values override, falsy fall back to existing), `buildTaggedPool` (returns `{pool, matchCount, isSparse}` with `[MATCH]`-tagged events first, padded to 15), `eventMatchesFilters` (checks category/free/time with after-midnight wrapping), `applyFilters` (legacy soft-mode filtering), `resolveActiveFilters`, `saveResponseFrame` (atomic session writes), `buildExhaustionMessage` |
 | `venues.js` | Shared venue coord map, auto-learning from sources, Nominatim geocoding fallback, persistence (export/import learned venues) |
@@ -176,32 +182,34 @@ All paths are relative to `src/` unless prefixed with a directory.
 
 | File | Purpose |
 |------|---------|
-| `sources/` | 18 scrapers split into individual modules with barrel `index.js` |
-| `sources/shared.js` | `FETCH_HEADERS`, `makeEventId`, `normalizeExtractedEvent` |
-| `sources/skint.js` | Skint (HTML→Claude extraction, skips past-day sections, resolves day headers to explicit dates) |
+| `sources/` | 18 source entries (defined in `source-registry.js`) across 15 scraper modules with barrel `index.js` |
+| `sources/shared.js` | `FETCH_HEADERS`, `makeEventId`, `normalizeExtractedEvent`, `backfillEvidence` |
+| `sources/skint.js` | Skint + SkintOngoing (HTML→Claude extraction, skips past-day sections, resolves day headers to explicit dates) |
 | `sources/eventbrite.js` | Eventbrite (JSON-LD + __SERVER_DATA__), Comedy, Arts — 5 functions, 2 internal parsers |
 | `sources/songkick.js` | Songkick (JSON-LD) |
-| `sources/dice.js` | Dice (__NEXT_DATA__ JSON) |
+| `sources/dice.js` | Dice (__NEXT_DATA__ JSON, fetches 6 category pages in parallel: music/gig, music/dj, music/party, culture/comedy, culture/theatre, culture/social) |
 | `sources/ra.js` | Resident Advisor (GraphQL) |
 | `sources/nyc-parks.js` | NYC Parks (Schema.org) |
 | `sources/brooklynvegan.js` | BrooklynVegan (DoStuff JSON) |
 | `sources/nonsense.js` | Nonsense NYC (Gmail newsletter→Claude extraction, split by day, caches events alongside newsletter ID for inter-scrape reuse) |
-| `sources/ohmyrockness.js` | Oh My Rockness (HTML→Claude extraction) |
+| `sources/screenslate.js` | Screen Slate (Gmail newsletter→Claude extraction, split by venue headers, venue-scoped prompts, caches alongside email ID) |
 | `sources/donyc.js` | DoNYC (Cheerio HTML scraping — music, comedy, theater) |
 | `sources/bam.js` | BAM (JSON API — film, theater, music, dance) |
 | `sources/smallslive.js` | SmallsLIVE (AJAX HTML — jazz at Smalls + Mezzrow) |
 | `sources/nypl.js` | NYPL (Eventbrite organizer pages — free library events) |
 | `sources/ticketmaster.js` | Ticketmaster Discovery API (indie filter: large-venue blocklist + $100 price cap) |
-| `sources/yutori.js` | Yutori (Gmail API + file-based agent briefings → Claude extraction) |
-| `sources/tavily.js` | Tavily (web search fallback) |
+| `sources/ohmyrockness.js` | Oh My Rockness (HTML→Claude extraction) — **inactive**, removed from SOURCES array (80% loss rate, all duplicates) |
+| `sources/tavily.js` | Tavily (web search) — **inactive**, removed from SOURCES array and hot path |
 | `gmail.js` | Gmail OAuth client — `getGmailService`, `fetchYutoriEmails`, `fetchEmails` (generic sender query) |
 
 **Evals & scripts** (paths from project root):
 
 | File | Purpose |
 |------|---------|
-| `src/evals/code-evals.js` | 9 deterministic trace checks — char limit, valid intent/neighborhood, picked events exist, valid URLs; free and instant |
+| `src/evals/code-evals.js` | 19 deterministic trace checks — char limit, valid intent/neighborhood, picked events exist, valid URLs, off-topic redirect, response not empty, day label accuracy, pick count accuracy, neighborhood accuracy, category/free/compound filter adherence, filter match alignment, time filter accuracy, neighborhood expansion transparency, price transparency, schema compliance, model routing captured; free and instant |
 | `src/evals/extraction-audit.js` | Extraction fidelity — Tier 1 deterministic checks (evidence quotes in source) + Tier 2 LLM judge (optional) |
+| `src/evals/scrape-audit.js` | 7 per-event data quality checks (date/time format, venue quality, price coverage, category validity, has_url, time_present) + source event count minimums. Runs on every scrape, report saved as `scrape-audit-YYYY-MM-DD.json` |
+| `src/evals/source-completeness.js` | Structured source field-completeness regression checks — universal + per-source required fields, invariants. Detects parser breakage. Skips extracted sources and failed fetches |
 | `src/evals/judge-evals.js` | LLM-as-judge trace quality — `judgeTone` (sounds like a friend, not a bot) + `judgePickRelevance` (events match request); binary PASS/FAIL |
 | `src/evals/expectation-evals.js` | Test-case assertion runner — compares trace fields against expected intent, neighborhood, has_events, must_not banned phrases |
 | `scripts/run-evals.js` | Pipeline eval runner (code evals on stored traces, `--judges` flag for LLM judges) |
@@ -209,7 +217,13 @@ All paths are relative to `src/` unless prefixed with a directory.
 | `scripts/run-regression-evals.js` | Behavioral regression tests |
 | `scripts/run-ab-eval.js` | A/B model comparison |
 | `scripts/gen-synthetic.js` | Generate synthetic test scenarios for eval |
+| `scripts/ground-scenarios.js` | Golden data generator — EXPAND mode (fills parenthetical placeholders via Claude) and GENERATE mode (creates N scenarios to rebalance categories). Supports `--dry-run`, `--reground`, `--category`, `--generate N` |
 | `scripts/judge-alignment.js` | Judge alignment checks — validates LLM judge consistency |
+| `scripts/audit-source-extraction.js` | Extraction quality audit for Skint/Nonsense — compares raw vs post-gate counts, shows completeness breakdown |
+| `scripts/audit-yutori.js` | Validates Yutori email preprocessing and extraction pipeline |
+| `scripts/review-conversations.js` | Interactive review of captured test conversations — list, filter by date, save as eval scenarios |
+| `scripts/parse-report.js` | CLI utility to parse eval report JSON — displays pass/fail stats and per-category breakdown |
+| `scripts/import-alert-history.js` | One-off import of historical alert emails from Gmail into `data/alerts.jsonl` |
 | `scripts/gmail-auth.js` | Gmail OAuth token acquisition |
 
 **UI:**
@@ -220,7 +234,10 @@ All paths are relative to `src/` unless prefixed with a directory.
 | `public/test-ui.js` | Client-side JS for the SMS simulator |
 | `health-ui.html` | Source health dashboard — per-source timing, status, history sparklines, extraction quality (served at `/health`) |
 | `eval-ui.html` | Eval results dashboard — trace viewer with eval scores (served at `/evals`) |
+| `evals-landing.html` | Eval guide dashboard — documents all 7 eval layers with pass rates, cost badges, CLI commands (served at `/evals` landing) |
+| `eval-report.html` | Eval report renderer — scenario/regression/extraction/scrape reports with filtering, search, comparison mode, trace debug (served at `/eval-report`) |
 | `events-ui.html` | Event browser/explorer UI (served at `/events`) |
+| `architecture.html` | Architecture explorer — system design documentation (served at `/architecture`) |
 
 **Site** (GitHub Pages, `site/` directory — deployed to `gh-pages` branch):
 
@@ -289,7 +306,7 @@ npm run eval:gen       # generate synthetic test scenarios
 - **Single-call AI flow**: `unifiedRespond` handles both routing and composition in one Claude Haiku call. This replaced the old two-call flow (route + compose) which had filter state disagreements between calls. A/B eval showed Haiku matches or beats Sonnet on compose quality (71% preference, 89% tone pass) at 73% lower cost. The `handleMore` path still uses the legacy `composeResponse` two-call flow.
 - **No Tavily in hot path**: Tavily was removed from the live request path. All event data comes from the daily scrape.
 - **Cross-source dedup**: Event IDs are hashed from name + venue + date (not source), so the same event from Dice and BrooklynVegan merges automatically. Sources are processed in weight order, so the higher-trust version wins.
-- **Source trust** (weight 0.6-0.9): Controls dedup merge order — higher-weight source wins when the same event appears in multiple sources. Skint (0.9) = Nonsense NYC (0.9) > RA (0.85) = Oh My Rockness (0.85) > Dice (0.8) = BrooklynVegan (0.8) = BAM (0.8) = SmallsLIVE (0.8) = Yutori (0.8) > NYC Parks (0.75) = DoNYC (0.75) = Songkick (0.75) = Ticketmaster (0.75) > Eventbrite (0.7) = NYPL (0.7) > Tavily (0.6). Not visible to compose Claude.
+- **Source trust** (weight 0.7-0.9): Controls dedup merge order — higher-weight source wins when the same event appears in multiple sources. Skint (0.9) = Nonsense NYC (0.9) = Screen Slate (0.9) > RA (0.85) > Dice (0.8) = BrooklynVegan (0.8) = BAM (0.8) = SmallsLIVE (0.8) = Yutori (0.8) > NYC Parks (0.75) = DoNYC (0.75) = Songkick (0.75) = Ticketmaster (0.75) > Eventbrite (0.7) = NYPL (0.7). Not visible to compose Claude.
 - **Event quality gates** (`extraction_confidence` + `completeness` + `needs_review`): Hard filter in `getEvents()` — events below 0.4 confidence, flagged needs_review, or below 0.4 completeness are dropped before reaching compose Claude. Structured sources (Dice, Eventbrite, etc.) have null confidence and pass through. Extracted sources (Skint, Nonsense NYC, etc.) get 0-1 confidence from the extraction prompt.
 - **Source tiers** (unstructured/primary/secondary): Soft signal passed to compose Claude via `source_tier` field. Claude prefers unstructured and primary over secondary when choosing between similar events. `extraction_confidence` is also passed as a soft signal for tie-breaking.
 - **Venue auto-learning**: Sources with lat/lng (BrooklynVegan, Dice, Songkick, Eventbrite, Ticketmaster) teach venue coords to the shared venue map at scrape time. This helps sources without geo data (RA, Skint, Nonsense NYC) resolve neighborhoods.
@@ -299,6 +316,6 @@ npm run eval:gen       # generate synthetic test scenarios
 - **480-char SMS limit**: All responses are capped at 480 chars. Claude is prompted to write concisely.
 - **TCPA opt-out compliance**: Messages starting with STOP, UNSUBSCRIBE, CANCEL, or QUIT are silently dropped (no reply sent). Twilio manages the actual opt-out list; Pulse ensures no response leaks through.
 - **Per-user daily AI budget**: Each phone number gets $0.10/day of AI spend. `trackAICost` accumulates per-user cost with provider-aware pricing (Haiku vs Gemini). `isOverBudget` blocks further AI calls with a friendly message. Resets daily (NYC timezone).
-- **Composable prompt skills**: The unified system prompt is assembled dynamically from `UNIFIED_SYSTEM` base + 11 conditional skill modules (`skills/compose-skills.js`). `buildUnifiedPrompt(events, options)` selects which skills to include based on context — tonight priority, neighborhood mismatch, free emphasis, conversation awareness, nearby suggestion, etc. A first-message-to-Williamsburg prompt activates ~5 skills; a follow-up with history activates ~7. This keeps prompts focused (~800 tokens vs ~1,400 with everything on).
+- **Composable prompt skills**: The unified system prompt is assembled dynamically from `UNIFIED_SYSTEM` base + 15 conditional skill modules (`skills/compose-skills.js`). `buildUnifiedPrompt(events, options)` selects which skills to include based on context — tonight priority, neighborhood mismatch, free emphasis, conversation awareness, nearby suggestion, city scan, single pick, multi-day, etc. A first-message-to-Williamsburg prompt activates ~5 skills; a follow-up with history activates ~7. This keeps prompts focused (~800 tokens vs ~1,400 with everything on).
 - **Request tracing**: Every request writes a JSONL trace to `data/traces/` (daily rotation, 4-file max). A 200-entry in-memory ring buffer powers the eval UI. Traces capture intent, neighborhood, picked events, AI costs, timing, and the full SMS response.
-- **Intent dispatch separation**: `handler.js` handles TCPA, dedup, budget, routing, filter resolution, tagged pool building, and the unified LLM call. `intent-handlers.js` handles 4 mechanical intent handlers (help, conversational, details, more). The unified branch in handler.js handles all semantic messages directly.
+- **Intent dispatch separation**: `handler.js` orchestrates the request pipeline (pre-router → filter resolution → unified LLM call). `request-guard.js` handles TCPA, dedup, and budget. `unified-flow.js` handles the unified LLM orchestration (context resolution, LLM call, response handling, zero-match). `intent-handlers.js` handles 4 mechanical intent handlers (help, conversational, details, more). `model-router.js` scores request complexity and routes to the appropriate model.
