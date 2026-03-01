@@ -283,6 +283,18 @@ const VENUE_MAP = {
   'Salt Marsh Nature Center': { lat: 40.6053, lng: -73.9298 },
   'Wave Hill': { lat: 40.8975, lng: -73.9115 },
 
+  // === NYC Parks — Additional Parks ===
+  'The High Line': { lat: 40.7480, lng: -74.0048 },
+  'Brooklyn Bridge Park': { lat: 40.7002, lng: -73.9965 },
+  'Pier 6': { lat: 40.6918, lng: -73.9993 },
+  'McKinley Park': { lat: 40.6540, lng: -74.0068 },
+  'Cunningham Park': { lat: 40.7350, lng: -73.7680 },
+  'Queensbridge Park': { lat: 40.7562, lng: -73.9450 },
+  'Oak Ridge': { lat: 40.7010, lng: -73.8442 },
+  'Conference House Park': { lat: 40.5000, lng: -74.2360 },
+  'Henry Hudson Park': { lat: 40.8780, lng: -73.9210 },
+  'Marine Park': { lat: 40.5930, lng: -73.9200 },
+
   // === Cultural Venues — Film ===
   'Metrograph': { lat: 40.7144, lng: -73.9879 },
   'Film Forum': { lat: 40.7284, lng: -74.0044 },
@@ -475,6 +487,8 @@ async function batchGeocodeEvents(events) {
     if (coords) {
       e.neighborhood = resolveNeighborhood(null, coords.lat, coords.lng);
       if (e.neighborhood) resolved++;
+    } else {
+      console.log(`Geocode miss: "${e.venue_name}" / "${e.venue_address}"`);
     }
   }
 

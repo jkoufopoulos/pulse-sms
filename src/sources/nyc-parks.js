@@ -1,6 +1,7 @@
 const cheerio = require('cheerio');
 const { makeEventId, FETCH_HEADERS } = require('./shared');
 const { getNycDateString, resolveNeighborhood, inferCategory } = require('../geo');
+const { lookupVenue } = require('../venues');
 
 async function fetchNYCParksEvents() {
   console.log('Fetching NYC Parks...');
@@ -49,7 +50,10 @@ async function fetchNYCParksEvents() {
 
         if (!title) return;
 
-        const neighborhood = resolveNeighborhood(borough, null, null);
+        const venueCoords = lookupVenue(venueName);
+        const neighborhood = venueCoords
+          ? resolveNeighborhood(null, venueCoords.lat, venueCoords.lng)
+          : resolveNeighborhood(borough, null, null);
 
         const id = makeEventId(title, venueName, dateLocal, 'nyc_parks');
         if (seen.has(id)) return;

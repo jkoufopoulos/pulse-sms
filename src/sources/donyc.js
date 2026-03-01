@@ -61,7 +61,7 @@ function parseCards($, cards, dateStr, categoryOverride) {
 
     // Free detection
     const cardText = card.text();
-    const isFree = /\bfree\b/i.test(cardText);
+    const isFree = /\bfree\b/i.test(cardText) || /\$0(?:\.00)?/.test(cardText);
 
     // Category — use card CSS class, then infer from name
     let category = categoryOverride;
