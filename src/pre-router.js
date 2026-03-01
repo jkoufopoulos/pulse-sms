@@ -384,8 +384,11 @@ function preRoute(message, session) {
 
   // "tonight" is an event-context signal (not a time filter) — counts toward compound threshold
   const hasTonight = /\btonight\b/i.test(lower) && !compoundTime;
+  // Session-aware: single-dim refinement ("anything later tonight", "how about free") when user
+  // has an active neighborhood and message doesn't contain clear/forget/drop/reset language
+  const isSessionRefinement = !!session?.lastNeighborhood && !/\b(?:forget|drop|clear|reset|start over|show me everything|show all|nvm)\b/i.test(lower);
   const filterDims = [hasFree, compoundTime, detectedCat, compoundDateRange].filter(Boolean).length;
-  if (filterDims >= 2 || (filterDims >= 1 && (detectedHood || hasTonight))) {
+  if (filterDims >= 2 || (filterDims >= 1 && (detectedHood || hasTonight || isSessionRefinement))) {
     const hood = detectedHood || session?.lastNeighborhood || null;
     // Only include detected keys — undetected keys fall back to session via mergeFilters
     const filters = {};

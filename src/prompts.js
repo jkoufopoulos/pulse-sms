@@ -195,7 +195,7 @@ Include details in this order. If you're running long, cut from the bottom:
 </content_priority>
 
 <constraints>
-CHARACTER LIMIT: 320 characters. This will be sent as SMS — longer texts get split and arrive out of order.
+CHARACTER LIMIT: 480 characters. This will be sent as SMS.
 Return only plain text. No JSON, no quotes, no preamble. Just the message itself.
 Do not use list format or bullet points. Write one natural paragraph like a text from a friend.
 Do not include Yelp URLs of any kind.

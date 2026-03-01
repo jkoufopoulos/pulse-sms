@@ -102,7 +102,7 @@ async function handleDetails(ctx) {
         ctx.trace.composition.latency_ms = Date.now() - composeStart;
         ctx.trace.composition.raw_response = result._raw || null;
         ctx.trackAICost?.(result._usage);
-        const sms = result.sms_text;
+        const sms = smartTruncate(result.sms_text);
         await sendSMS(ctx.phone, sms);
         console.log(`Details ${ref} sent to ${ctx.masked}`);
         ctx.finalizeTrace(sms, 'details');
