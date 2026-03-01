@@ -133,17 +133,23 @@ function preRoute(message, session) {
     return { ...base, intent: 'help', neighborhood: null };
   }
 
-  // Bare numbers → details
+  // Bare numbers → details (skip when pendingNearby — let unified handle as nudge accept)
   if (/^[1-5]$/.test(msg)) {
     if (session?.lastPicks?.length > 0) {
       return { ...base, intent: 'details', neighborhood: null, event_reference: msg };
     }
-    return { ...base, intent: 'conversational', neighborhood: null, reply: "I don't have picks loaded — tell me what you're looking for!" };
+    if (!session?.pendingNearby) {
+      return { ...base, intent: 'conversational', neighborhood: null, reply: "I don't have picks loaded — tell me what you're looking for!" };
+    }
   }
 
-  // More
+  // More (skip when pendingNearby + no picks — let unified handle as nudge accept)
   if (/^(more|show me more|what else|anything else|what else you got|next|what's next)$/i.test(msg)) {
-    return { ...base, intent: 'more', neighborhood: session?.lastNeighborhood || null };
+    if (session?.pendingNearby && !(session?.lastPicks?.length > 0)) {
+      // "MORE" after zero-match nudge = acceptance of nearby suggestion → fall through to unified
+    } else {
+      return { ...base, intent: 'more', neighborhood: session?.lastNeighborhood || null };
+    }
   }
 
   // Event name match from session picks
@@ -175,10 +181,14 @@ function preRoute(message, session) {
   }
 
   // Satisfied-exit signals — user is done, warm sign-off (zero AI cost)
+  // Works regardless of lastPicks — user can sign off after zero-match nudges too
   if (/^(cool|perfect|sick|dope|nice|sweet|awesome|amazing|fire|love it|sounds good|sounds great)(\s+thanks?)?$/i.test(msg)) {
-    if (session?.lastPicks?.length > 0) {
-      return { ...base, intent: 'conversational', neighborhood: null, reply: "Have fun tonight! Hit me up whenever you want more picks." };
-    }
+    return { ...base, intent: 'conversational', neighborhood: null, reply: "Have fun tonight! Hit me up whenever you want more picks." };
+  }
+
+  // Decline signals — user declining a nudge or done exploring
+  if (/^(nah|nope|no thanks|no thank you|nah i'?m good|i'?m good|all good|all set|i'?m set|pass|no)$/i.test(msg)) {
+    return { ...base, intent: 'conversational', neighborhood: null, reply: "No worries! Hit me up whenever you want picks." };
   }
 
   // Casual acknowledgments (session-aware — only when picks are loaded)

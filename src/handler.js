@@ -426,7 +426,8 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
   trace.events.pool_meta = { matchCount, hardCount, softCount, isSparse };
 
   // Derive suggested neighborhood deterministically (P5: code owns state)
-  const suggestedHood = isSparse && nearbyHoods.length > 0 ? nearbyHoods[0] : null;
+  // Include matchCount===0 so pendingNearby is set for zero-match LLM responses too
+  const suggestedHood = (isSparse || matchCount === 0) && nearbyHoods.length > 0 ? nearbyHoods[0] : null;
 
   console.log(`Unified flow: hood=${hood}, events=${events.length}, nearby=${nearbyHoods.join(',')}`);
 
@@ -614,6 +615,8 @@ async function handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace)
   trace.composition.latency_ms = 0;
   trace.composition.zero_match_bypass = true;
   trace.composition.zero_match_source = source;
+  trace.composition.active_filters = activeFilters || null;
+  trace.composition.neighborhood_used = hood;
 
   const eventMap = buildEventMap([...curated, ...taggedPerennials]);
   for (const e of events) eventMap[e.id] = e;
@@ -633,6 +636,8 @@ async function handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace)
   });
   updateProfile(phone, { neighborhood: hood, filters: activeFilters, responseType: 'zero_match' })
     .catch(err => console.error('profile update failed:', err.message));
+  // Flag so consecutive zero-match turns fall through to LLM (allows filter modification)
+  setSession(phone, { lastZeroMatch: true });
   await sendSMS(phone, message);
   finalizeTrace(message, 'events');
 }
@@ -729,6 +734,15 @@ async function handleMessageAI(phone, message) {
 
   // Unified LLM call — handles semantic messages + pre-detected filter follow-ups
   const unifiedCtx = await resolveUnifiedContext(message, session, preDetectedFilters, phone, trace);
+
+  // Zero-match bypass: when filters are active but match nothing, skip the LLM ($0 AI cost).
+  // Skip if the LAST response was also a zero-match — let the LLM interpret the follow-up
+  // (e.g. "paid is fine too" needs semantic understanding to clear free_only).
+  // The flag auto-clears after one LLM turn via setResponseState.
+  if (Object.values(unifiedCtx.activeFilters || {}).some(Boolean) &&
+      unifiedCtx.matchCount === 0 && !session?.lastZeroMatch) {
+    return handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace);
+  }
 
   const result = await callUnified(message, unifiedCtx, session, history, phone, trace);
   await handleUnifiedResponse(result, unifiedCtx, phone, session, trace, message, finalizeTrace);

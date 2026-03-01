@@ -237,6 +237,7 @@ async function handleMore(ctx) {
         neighborhood: hood,
         filters: activeFilters,
         offeredIds: composeRemaining.map(e => e.id),
+        pending: (isLastBatch && exhaust?.suggestedHood) ? { neighborhood: exhaust.suggestedHood } : null,
       });
       updateProfile(ctx.phone, { neighborhood: hood, filters: activeFilters, responseType: 'more' })
         .catch(err => console.error('profile update failed:', err.message));
@@ -283,6 +284,7 @@ async function handleMore(ctx) {
       neighborhood: hood,
       filters: activeFilters,
       offeredIds: perennialBatch.map(e => e.id),
+      pending: perennialExhaust.suggestedHood ? { neighborhood: perennialExhaust.suggestedHood } : null,
     });
     updateProfile(ctx.phone, { neighborhood: hood, filters: activeFilters, responseType: 'more' })
       .catch(err => console.error('profile update failed:', err.message));

@@ -217,9 +217,12 @@ async function main() {
     report.by_principle[p.id] = { name: p.name, total: 0, passed: 0 };
   }
 
+  // Run-unique prefix to avoid session contamination across eval runs
+  const runId = Date.now() % 10000;
+
   // Run one scenario and return result object
   async function runOne(scenario, index) {
-    const phoneNumber = `+1666${String(index).padStart(7, '0')}`;
+    const phoneNumber = `+1666${String(runId).padStart(4, '0')}${String(index).padStart(3, '0')}`;
     try {
       const conversation = await runScenario(scenario, phoneNumber);
       let judgment;

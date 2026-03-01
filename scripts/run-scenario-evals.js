@@ -281,10 +281,13 @@ async function main() {
     scenarios: [],
   };
 
+  // Run-unique prefix to avoid session contamination across eval runs
+  const runId = Date.now() % 10000;
+
   // Run a single scenario and return result object
   async function runOne(scenario, index) {
     const nameHash = scenario.name.split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0) >>> 0;
-    const phoneNumber = `+1555${String(nameHash % 10000000).padStart(7, '0')}`;
+    const phoneNumber = `+1555${String(runId).padStart(4, '0')}${String(nameHash % 1000).padStart(3, '0')}`;
     const userTurnCount = scenario.turns.filter(t => t.sender === 'user').length;
 
     try {
