@@ -507,7 +507,9 @@ Yutori was extracting ~50 prose bullets from non-event scout categories (self-he
 
 1. **Expanded `NON_EVENT_CATEGORIES`** — Added 13 patterns for personal development, psychology, relationships, career, tax/legal, and coaching. Blocks non-event emails before extraction via `isEventEmail()`.
 2. **Expanded `NON_EVENT_FILENAMES`** — Added 12 filename slug patterns (`friendship`, `self-help`, `career-`, `tax-`, etc.) to catch the same categories by subject line.
-3. **Post-extraction content filter** — After LLM extraction, drops events with zero structural signals (no `start_time_local`, no `venue_name` besides TBA, no `ticket_url`/`source_url`, no `date_local`). Real events always have at least one; prose advice bullets have none. Only applies to LLM-extracted events — deterministic-parsed ones already have structural validation.
+3. **Post-extraction content filter** — After LLM extraction, drops events that lack all three structural signals: `start_time_local`, real `venue_name` (not TBA, not a prefix of the event name or vice versa), and URL (`ticket_url`/`source_url`). `date_local` alone doesn't count — the LLM assigns today's date to everything. Fake venue detection catches prose titles the LLM misparses as venues (e.g. `venue="Warm assumptions and consistency"`). Only applies to LLM-extracted events — deterministic-parsed ones already have structural validation.
+
+**Verified on Railway:** Reprocess scrape dropped Yutori from 253 to 238 events (email-level filters blocked 15), content filter would catch 36 more stale items in SQLite. Real events at Spectacle Theater, Nitehawk, Metrograph, DROM, Black Forest Brooklyn all pass correctly.
 
 **Principle alignment:** P6 (deterministic extraction covers common cases) — pattern-matching blocks junk before it reaches the LLM, and a structural invariant catches anything that slips through.
 
