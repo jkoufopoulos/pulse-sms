@@ -638,9 +638,6 @@ function renderSourceCards(sources) {
 
   grid.innerHTML = entries.map(([name, s]) => {
     const status = s.status || 'null';
-    const httpBadge = s.http_status
-      ? (s.http_status < 400 ? s.http_status : `<span style="color:#f87171">${s.http_status}</span>`)
-      : '--';
     const czClass = s.consecutive_zeros >= 3 ? 'danger' : s.consecutive_zeros >= 1 ? 'warn' : '';
     const sparkline = renderSparkline(s.history);
 
@@ -661,10 +658,6 @@ function renderSourceCards(sources) {
           <div class="source-card-stat">
             <div class="stat-label">Duration</div>
             <div class="stat-value">${fmtDuration(s.duration_ms)}</div>
-          </div>
-          <div class="source-card-stat">
-            <div class="stat-label">HTTP</div>
-            <div class="stat-value">${httpBadge}</div>
           </div>
           <div class="source-card-stat">
             <div class="stat-label">Success Rate</div>

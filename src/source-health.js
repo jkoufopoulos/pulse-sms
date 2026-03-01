@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { SOURCE_LABELS, ENDPOINT_URLS } = require('./source-registry');
+const { SOURCE_LABELS } = require('./source-registry');
 const { sendHealthAlert } = require('./alerts');
 const { getNycDateString } = require('./geo');
 
@@ -14,7 +14,6 @@ function makeHealthEntry() {
     lastCount: 0,
     lastStatus: null,       // 'ok' | 'error' | 'timeout' | 'empty'
     lastError: null,        // error message string (null on success)
-    lastHttpStatus: null,   // HTTP status code from endpoint check
     lastDurationMs: null,   // how long this source took to scrape
     lastScrapeAt: null,     // ISO timestamp of last scrape attempt
     totalScrapes: 0,        // lifetime scrape count
@@ -93,12 +92,6 @@ function updateSourceHealth(label, { events, durationMs, status, error }) {
   }
 }
 
-function updateEndpointStatus(label, httpStatus) {
-  if (sourceHealth[label]) {
-    sourceHealth[label].lastHttpStatus = httpStatus;
-  }
-}
-
 function updateScrapeStats(stats) {
   lastScrapeStats = stats;
 }
@@ -114,32 +107,6 @@ function alertOnFailingSources() {
   }
 }
 
-// ============================================================
-// Proactive endpoint checks — HEAD requests during scrape
-// ============================================================
-
-async function checkEndpoints() {
-  const results = {};
-  const checks = Object.entries(ENDPOINT_URLS).map(async ([label, url]) => {
-    const start = Date.now();
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
-      const res = await fetch(url, {
-        method: 'HEAD',
-        signal: controller.signal,
-        headers: { 'User-Agent': 'BestieSMS/1.0 HealthCheck' },
-        redirect: 'follow',
-      });
-      clearTimeout(timeout);
-      results[label] = { httpStatus: res.status, durationMs: Date.now() - start };
-    } catch (err) {
-      results[label] = { httpStatus: null, durationMs: Date.now() - start, error: err.message };
-    }
-  });
-  await Promise.allSettled(checks);
-  return results;
-}
 
 // ============================================================
 // Event mix computation — takes cache as parameter
@@ -189,7 +156,6 @@ function getHealthStatus(cacheInfo) {
       last_count: h.lastCount,
       consecutive_zeros: h.consecutiveZeros,
       duration_ms: h.lastDurationMs,
-      http_status: h.lastHttpStatus,
       last_error: h.lastError,
       last_scrape: h.lastScrapeAt,
       success_rate: h.totalScrapes > 0
@@ -221,10 +187,8 @@ module.exports = {
   makeHealthEntry,
   saveHealthData,
   updateSourceHealth,
-  updateEndpointStatus,
   updateScrapeStats,
   alertOnFailingSources,
-  checkEndpoints,
   computeEventMix,
   getHealthStatus,
   HEALTH_WARN_THRESHOLD,

@@ -81,7 +81,6 @@ check('source has status field', 'status' in sampleSource);
 check('source has last_count', 'last_count' in sampleSource);
 check('source has consecutive_zeros', 'consecutive_zeros' in sampleSource);
 check('source has duration_ms', 'duration_ms' in sampleSource);
-check('source has http_status', 'http_status' in sampleSource);
 check('source has last_error', 'last_error' in sampleSource);
 check('source has last_scrape', 'last_scrape' in sampleSource);
 check('source has success_rate', 'success_rate' in sampleSource);

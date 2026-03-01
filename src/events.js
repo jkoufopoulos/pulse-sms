@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const { SOURCES, SOURCE_TIERS, SOURCE_LABELS, ENDPOINT_URLS, MERGE_ORDER } = require('./source-registry');
-const { sourceHealth, saveHealthData, updateSourceHealth, updateEndpointStatus, updateScrapeStats, alertOnFailingSources, checkEndpoints, computeEventMix, getHealthStatus: _getHealthStatus } = require('./source-health');
+const { SOURCES, SOURCE_TIERS, SOURCE_LABELS, MERGE_ORDER } = require('./source-registry');
+const { sourceHealth, saveHealthData, updateSourceHealth, updateScrapeStats, alertOnFailingSources, computeEventMix, getHealthStatus: _getHealthStatus } = require('./source-health');
 const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate } = require('./geo');
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues } = require('./venues');
 const { filterIncomplete, filterKidsEvents } = require('./curation');
@@ -100,18 +100,10 @@ async function refreshCache() {
     clearExtractionInputs(); // Clear for this scrape cycle
     console.log('Refreshing event cache (all sources)...');
 
-    // Run endpoint checks and source fetches in parallel
     // SOURCES drives the fetch array — no positional coupling
-    const [endpointResults, ...fetchResults] = await Promise.allSettled([
-      checkEndpoints(),
-      ...SOURCES.map(s => timedFetch(s.fetch, s.label, s.weight)),
-    ]);
-
-    // Store endpoint check results
-    const endpoints = endpointResults.status === 'fulfilled' ? endpointResults.value : {};
-    for (const [label, data] of Object.entries(endpoints)) {
-      updateEndpointStatus(label, data.httpStatus);
-    }
+    const fetchResults = await Promise.allSettled(
+      SOURCES.map(s => timedFetch(s.fetch, s.label, s.weight)),
+    );
 
     const allEvents = [];
     const seen = new Set();
