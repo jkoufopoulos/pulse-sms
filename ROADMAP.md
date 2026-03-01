@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-02-28 (codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout)
+> Last updated: 2026-02-28 (Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout)
 
 ---
 
@@ -158,6 +158,23 @@ All 5 are pre-LLM staging — they set up state that the downstream `saveRespons
 
 **Why:** Gemini Flash is ~10x cheaper than Haiku ($0.10/$0.40 vs $1.00/$5.00 per M tokens). Eval suite drops from ~$7-10/run to ~$1-2/run. Production pipeline cost drops from ~$0.004/session to ~$0.0004/session.
 
+**Haiku baseline (2026-02-28):** 27/48 happy_path passing (56%). Gemini is at parity — the 20 Gemini failures are not primarily model regressions. Breakdown:
+
+| Category | Count | Scenarios |
+|----------|-------|-----------|
+| **Both fail** | 13 | Systemic issues (alias gaps, thin coverage, filter/time handling, geographic expansion) |
+| **Gemini-only fail** | 7 | Gemini regressions — sign-off engagement, details quality, category drift |
+| **Haiku-only fail** | 8 | Gemini actually outperforms Haiku here |
+| **Both pass** | 20 | Stable scenarios |
+
+**Both-fail scenarios (systemic, fix benefits both models):** BK slang → borough narrowing (alias gap), Boerum Hill/Carroll Gardens (alias gap), Astoria music (category filter on thin pool), Hell's Kitchen theater (category on MORE), Washington Heights music (category on MORE), LIC brief browse (expansion transparency), Tribeca quick pick (thin coverage → expansion), UES dance (thin coverage + expansion), live music Bed-Stuy (neighborhood jump), time filter early (time interpretation), progressive filter refinement (compound filters), time range specific window, user asks to recommend.
+
+**Gemini-only failures (7):** Full evening flow, Astoria MORE detail, Cobble Hill late night, SoHo single pick, Sunset Park live music, Tribeca single pick, West Village late. These are the true Gemini delta — sign-off over-engagement, details quality, and category drift on sparse pools.
+
+**Haiku-only failures (8):** Neighborhood hopping, Bed-Stuy detail, Bushwick late-night, Park Slope → Gowanus, Red Hook detail, free events filter, Gowanus live music, Ridgewood browse. Gemini handles these better — possibly due to different expansion and formatting behaviors.
+
+**Conclusion:** Gemini Flash is production-ready as-is. The 13 both-fail scenarios are the real quality gap — fixing those lifts both models. The 7 Gemini-only failures are worth addressing but not blockers.
+
 **What's done (ai.js only):**
 - `unifiedWithGemini()` — temp=0.5, topP=0.9, maxOutputTokens=4096, `responseSchema` enforcing `{type, sms_text, picks[], clear_filters}`
 - `composeWithGemini()` — temp=0.5, topP=0.9, maxOutputTokens=8192 (already existed, params tuned)
@@ -237,7 +254,7 @@ Scenarios: Astoria MORE (says "that's everything" with 0 new picks, then detail 
 | E: Alias recognition | 2 | `neighborhoods.js` | Low |
 | F: Thin coverage handling | 3 | Prompt + handler logic | Medium |
 
-**Note:** Several of these themes (A, B, C, F) likely also affect Haiku to some degree — the eval was only run against Gemini. A Haiku baseline on the same scenarios would clarify which failures are Gemini-specific vs systemic.
+**Haiku baseline confirmed (2026-02-28):** Themes A, B, E, and F are systemic — Haiku fails the same scenarios. Only 7 of the 20 Gemini failures are Gemini-specific regressions. See Haiku baseline section above for full breakdown.
 
 ### Filter Drift — Root Cause Analysis (updated 2026-02-28)
 
