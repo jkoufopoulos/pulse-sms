@@ -91,6 +91,7 @@ message → pre-router (compound extraction) → filter merge → tagged pool
 | 1b | Unify all session saves — every SMS path ends with `saveResponseFrame` | P4 | **Done** |
 | 1c | Validate event IDs against pool before save | P7 | **Done** |
 | 2 | Compound pre-router extraction — "free comedy", "late jazz" | P1, P6 | **Done** |
+| 2b | Structural filter drift fix — gate `filter_intent`, expand compounds, validate categories | P1, P3, P6 | **Done** |
 | 3 | Derive state fields deterministically — remove 4 redundant LLM fields (8→4) | P1, P5 | **Done** |
 | 4 | Reasoning/rendering split — separate intent+selection from copywriting | P2, P5 | Needs A/B eval |
 | 5 | *(merged into step 3)* | — | **Done** |
@@ -228,7 +229,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 |----------|-------------|--------------|---------------|-------|
 | happy_path | 73.3% | 75.0% | **90%** | Strong improvement |
 | edge_case | 93.3% | 64.5% | ~60% | New scenarios exposed gaps |
-| filter_drift | — | 15.4% | — | Stuck — structural, not prompt-fixable |
+| filter_drift | — | 15.4% | — | Structural fix landed (Step 2b): gated `filter_intent`, expanded compound detection |
 | poor_experience | 60.0% | 30.0% | ~65% | Data-sparsity dependent |
 | abuse_off_topic | 83.3% | 100.0% | — | Stable |
 
@@ -249,7 +250,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 
 ## Source Coverage
 
-### Current Sources (17 active)
+### Current Sources (19 active)
 
 | Source | Weight | Method | Strength |
 |--------|--------|--------|----------|
@@ -268,6 +269,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 | Songkick | 0.75 | JSON-LD | Concerts/music |
 | Ticketmaster | 0.75 | Discovery API | Indie filter: blocklist + $100 cap |
 | Eventbrite | 0.7 | JSON-LD / `__SERVER_DATA__` | Broad aggregator |
+| Luma | 0.7 | JSON API | Community, food, art, social (~330/week) |
 | NYPL | 0.7 | Eventbrite organizer | Free library events |
 | EventbriteComedy/Arts | 0.7 | Same parser, category URLs | Comedy/art-specific |
 
@@ -280,8 +282,10 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 | Electronic/dance | Strong (RA, Dice) | — |
 | Indie/rock/punk | Good (Songkick, BrooklynVegan, Dice) | — |
 | Comedy | Moderate (EventbriteComedy, DoNYC, Dice) | No dedicated comedy source |
-| Art/galleries | Weak (EventbriteArts, Skint) | No gallery opening calendar |
+| Art/galleries | Moderate (EventbriteArts, Skint, Luma) | No gallery opening calendar |
 | Theater | Moderate (DoNYC, BAM, Dice) | No Broadway/off-Broadway source |
+| Community/social | Good (Luma, NYC Parks, Eventbrite) | — |
+| Food/drink | Moderate (Luma) | Single source for food events |
 | Underground/DIY | Single source (Nonsense NYC) | If it breaks, entire vibe gone |
 | Jazz | Good (SmallsLIVE, Skint, DoNYC) | — |
 | Film | Good (Screen Slate, BAM, Skint Ongoing) | — |
@@ -332,6 +336,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 
 | Date | What | Key Impact |
 |------|------|------------|
+| Mar 1 | Structural filter drift fix (Step 2b) | Gated `filter_intent` when pre-router set filters (P1), expanded compound detection (first-message + time+category + free+category), VALID_CATEGORIES validation (P3) |
 | Mar 1 | Degraded-mode LLM fallback + MORE dedup hardening | Gap 4 fixed — deterministic picks from tagged pool on LLM failure |
 | Mar 1 | Code eval accuracy overhaul | 99.8% code eval pass rate (was 99.5%); fixed CATEGORY_PARENTS sync, filter_match_alignment, zero-match exemption |
 | Mar 1 | Non-neighborhood opener eval expansion | +29 multi-turn + 16 regression scenarios for greetings, bare categories, vibes, meta questions |
@@ -349,6 +354,8 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 | Mar 1 | Skint Ongoing events scraper | 31 series events (exhibitions, festivals) via deterministic parser; weight 0.9 |
 | Mar 1 | Friday/Saturday newsletter event loss fix | Yesterday included in scrape filter + 6pm evening scrape added |
 | Mar 1 | Systemic failure fixes (8 changes) | handler.js events bug, borough detection, sign-off handling, early/tonight conflict, zero-match prompt hardening |
+| Mar 1 | Luma event scraper | JSON API, ~330 events/week; fills community/food/art/social gap; NYC bounding box filter |
+| Mar 1 | Fragility audit bulk fix (9 issues) | Issues #5-7, #9-11, #13-15 fixed in one commit; visitedHoods, scraper timeout, max_tokens, atomicWriteSync |
 | Mar 1 | Dice multi-category scraping | 6 category pages in parallel; 26 → 115 raw events |
 | Mar 1 | OhMyRockness removal | 80% loss rate, all duplicates; removed from SOURCES |
 | Mar 1 | Scrape audit dashboards + data quality fixes | Pass rate 30.5% → 73.7%; time_format_valid regex fixed; price coverage improvements |
