@@ -1,6 +1,6 @@
 /**
- * Shared venue coordinate map for NYC nightlife venues.
- * Used by all sources (RA, Skint, Nonsense NYC, Oh My Rockness, Tavily)
+ * Shared venue coordinate map for NYC venues and parks.
+ * Used by all sources (RA, Skint, Nonsense NYC, Oh My Rockness, Tavily, NYC Parks)
  * to resolve venue names → lat/lng when structured geo data is missing.
  */
 
@@ -221,6 +221,140 @@ const VENUE_MAP = {
   // === Long Island City ===
   'MoMA PS1': { lat: 40.7454, lng: -73.9471 },
   'Culture Lab LIC': { lat: 40.7440, lng: -73.9485 },
+
+  // === NYC Parks — Manhattan ===
+  'Central Park': { lat: 40.7812, lng: -73.9665 },
+  'Washington Square Park': { lat: 40.7308, lng: -73.9973 },
+  'Bryant Park': { lat: 40.7536, lng: -73.9832 },
+  'Union Square Park': { lat: 40.7359, lng: -73.9911 },
+  'Madison Square Park': { lat: 40.7425, lng: -73.9882 },
+  'Riverside Park': { lat: 40.8030, lng: -73.9712 },
+  'Morningside Park': { lat: 40.8044, lng: -73.9582 },
+  'Marcus Garvey Park': { lat: 40.8041, lng: -73.9440 },
+  'St. Nicholas Park': { lat: 40.8190, lng: -73.9499 },
+  'Fort Tryon Park': { lat: 40.8621, lng: -73.9314 },
+  'Highbridge Park': { lat: 40.8417, lng: -73.9320 },
+  'Battery Park': { lat: 40.7033, lng: -74.0170 },
+  'Hudson River Park': { lat: 40.7270, lng: -74.0115 },
+  'East River Park': { lat: 40.7131, lng: -73.9755 },
+  'Stuyvesant Square': { lat: 40.7338, lng: -73.9840 },
+  'DeWitt Clinton Park': { lat: 40.7664, lng: -73.9942 },
+  'Inwood Hill Park': { lat: 40.8680, lng: -73.9270 },
+  'Andrew Haswell Green Park': { lat: 40.7690, lng: -73.9520 },
+  'Sara D. Roosevelt Park': { lat: 40.7188, lng: -73.9935 },
+  'Carl Schurz Park': { lat: 40.7756, lng: -73.9441 },
+  'Pier 35': { lat: 40.7110, lng: -73.9830 },
+  'Pier 26': { lat: 40.7215, lng: -74.0120 },
+
+  // === NYC Parks — Brooklyn ===
+  'Prospect Park': { lat: 40.6602, lng: -73.9690 },
+  'McCarren Park': { lat: 40.7206, lng: -73.9515 },
+  'Fort Greene Park': { lat: 40.6895, lng: -73.9762 },
+  'Fort Greene Park Visitor Center': { lat: 40.6895, lng: -73.9762 },
+  'Maria Hernandez Park': { lat: 40.7032, lng: -73.9239 },
+  'Herbert Von King Park': { lat: 40.6881, lng: -73.9440 },
+  'Domino Park': { lat: 40.7171, lng: -73.9664 },
+  'Sunset Park': { lat: 40.6462, lng: -74.0024 },
+  'Red Hook Recreation Area': { lat: 40.6730, lng: -74.0060 },
+  'Brower Park': { lat: 40.6722, lng: -73.9592 },
+  'Cadman Plaza Park': { lat: 40.6955, lng: -73.9930 },
+  'Coffey Park': { lat: 40.6762, lng: -74.0100 },
+  'Monsignor McGolrick Park': { lat: 40.7240, lng: -73.9420 },
+  'Owl\'s Head Park': { lat: 40.6438, lng: -74.0280 },
+  'Owl\'s Head Park House': { lat: 40.6438, lng: -74.0280 },
+  'Leif Ericson Park': { lat: 40.6382, lng: -74.0300 },
+  'Betsy Head Park': { lat: 40.6627, lng: -73.9134 },
+  'Canarsie Park House': { lat: 40.6350, lng: -73.8920 },
+
+  // === NYC Parks — Queens ===
+  'Astoria Park': { lat: 40.7750, lng: -73.9240 },
+  'Socrates Sculpture Park': { lat: 40.7684, lng: -73.9388 },
+  'Gantry Plaza State Park': { lat: 40.7471, lng: -73.9586 },
+  'Flushing Meadows Corona Park': { lat: 40.7400, lng: -73.8408 },
+  'Juniper Valley Park': { lat: 40.7208, lng: -73.8828 },
+  'Kissena Park': { lat: 40.7510, lng: -73.8130 },
+
+  // === NYC Parks — Bronx ===
+  'St. Mary\'s Park': { lat: 40.8090, lng: -73.9145 },
+  'Crotona Park': { lat: 40.8389, lng: -73.8944 },
+
+  // === NYC Parks — Facilities & Nature Centers ===
+  'Greenbelt Nature Center': { lat: 40.5930, lng: -74.1460 },
+  'Salt Marsh Nature Center': { lat: 40.6053, lng: -73.9298 },
+  'Wave Hill': { lat: 40.8975, lng: -73.9115 },
+
+  // === Cultural Venues — Film ===
+  'Metrograph': { lat: 40.7144, lng: -73.9879 },
+  'Film Forum': { lat: 40.7284, lng: -74.0044 },
+  'Film at Lincoln Center': { lat: 40.7725, lng: -73.9835 },
+  'Nitehawk Cinema': { lat: 40.7160, lng: -73.9626 },
+  'Nitehawk Cinema Williamsburg': { lat: 40.7160, lng: -73.9626 },
+  'Nitehawk Prospect Park': { lat: 40.6613, lng: -73.9797 },
+  'Anthology Film Archives': { lat: 40.7248, lng: -73.9903 },
+  'BAM Rose Cinemas': { lat: 40.6867, lng: -73.9775 },
+  'Spectacle Theater': { lat: 40.7125, lng: -73.9629 },
+  'Alamo Drafthouse': { lat: 40.6866, lng: -73.9818 },
+  'Alamo Drafthouse Downtown Brooklyn': { lat: 40.6866, lng: -73.9818 },
+  'Stuart Cinema & Cafe': { lat: 40.7292, lng: -73.9594 },
+
+  // === Cultural Venues — Bookstores & Literary ===
+  'Greenlight Bookstore': { lat: 40.6862, lng: -73.9746 },
+  'Greenlight Bookstore Fort Greene': { lat: 40.6862, lng: -73.9746 },
+  'Books Are Magic': { lat: 40.6858, lng: -73.9940 },
+  'Strand Book Store': { lat: 40.7333, lng: -73.9910 },
+  'Strand Bookstore': { lat: 40.7333, lng: -73.9910 },
+  'McNally Jackson': { lat: 40.7234, lng: -73.9959 },
+  'McNally Jackson Books': { lat: 40.7234, lng: -73.9959 },
+  'Housing Works Bookstore': { lat: 40.7255, lng: -73.9975 },
+  'Housing Works Bookstore Cafe': { lat: 40.7255, lng: -73.9975 },
+  'The Center for Fiction': { lat: 40.6886, lng: -73.9793 },
+  'Powerhouse Arena': { lat: 40.7033, lng: -73.9891 },
+  'P&T Knitwear': { lat: 40.7219, lng: -73.9882 },
+  'Liz\'s Book Bar': { lat: 40.6812, lng: -73.9941 },
+  'Book Club Bar': { lat: 40.7230, lng: -73.9832 },
+  'Hive Mind Books': { lat: 40.7010, lng: -73.9175 },
+  'Everyone Comics & Books': { lat: 40.7513, lng: -73.9391 },
+
+  // === Cultural Venues — Art & Museums ===
+  'New Museum': { lat: 40.7224, lng: -73.9930 },
+  'The Shed': { lat: 40.7538, lng: -74.0022 },
+  'Abrons Arts Center': { lat: 40.7153, lng: -73.9838 },
+  'Museum of the Moving Image': { lat: 40.7563, lng: -73.9239 },
+  'The Africa Center': { lat: 40.7964, lng: -73.9488 },
+  'El Museo del Barrio': { lat: 40.7931, lng: -73.9514 },
+  'Museum of Chinese in America': { lat: 40.7194, lng: -73.9991 },
+  'Schomburg Center': { lat: 40.8147, lng: -73.9405 },
+  'Schomburg Center for Research in Black Culture': { lat: 40.8147, lng: -73.9405 },
+  'Ki Smith Gallery': { lat: 40.7212, lng: -73.9912 },
+  'Soho Photo Gallery': { lat: 40.7186, lng: -74.0056 },
+  'The National Arts Club': { lat: 40.7377, lng: -73.9867 },
+  'Museum of Arts and Design': { lat: 40.7695, lng: -73.9848 },
+  'The Paley Center for Media': { lat: 40.7607, lng: -73.9778 },
+
+  // === Cultural Venues — Music & Performance ===
+  'Roulette': { lat: 40.6888, lng: -73.9786 },
+  'Issue Project Room': { lat: 40.6837, lng: -73.9796 },
+  'Jazz Gallery': { lat: 40.7446, lng: -73.9886 },
+  'The Kitchen': { lat: 40.7424, lng: -73.9985 },
+  'Greenwich House Music School': { lat: 40.7322, lng: -74.0046 },
+  'David Geffen Hall': { lat: 40.7723, lng: -73.9830 },
+  'David Geffen Hall, Lincoln Center': { lat: 40.7723, lng: -73.9830 },
+  'New York Live Arts': { lat: 40.7421, lng: -73.9983 },
+  'Nuyorican Poets Cafe': { lat: 40.7219, lng: -73.9818 },
+  'Brooklyn Music Kitchen': { lat: 40.6926, lng: -73.9695 },
+  'BKCM': { lat: 40.6786, lng: -73.9721 },
+  'Brooklyn Conservatory of Music': { lat: 40.6786, lng: -73.9721 },
+  'New York City Center': { lat: 40.7638, lng: -73.9795 },
+  'Barclays Center': { lat: 40.6827, lng: -73.9753 },
+  'Kings Theatre': { lat: 40.6460, lng: -73.9580 },
+
+  // === Cultural Venues — Yutori Recurring ===
+  'BAM (Brooklyn Academy of Music)': { lat: 40.6861, lng: -73.9781 },
+  'Fritz': { lat: 40.6870, lng: -73.9750 },
+  'Friends and Lovers': { lat: 40.6747, lng: -73.9610 },
+  'Singers': { lat: 40.6895, lng: -73.9515 },
+  'Salon on Kingston': { lat: 40.6750, lng: -73.9475 },
+  'Brooklyn Community Pride Center': { lat: 40.6822, lng: -73.9567 },
 };
 
 // Build normalized lookup map at module load
