@@ -127,7 +127,7 @@ const evals = {
 
   /**
    * Day-label accuracy: "tonight" must not refer to a tomorrow event, and vice versa.
-   * Requires trace.composition.picks to include date_local (enriched in composeAndSend).
+   * Requires trace.composition.picks to include date_local (enriched in handler trace recording).
    */
   day_label_accuracy(trace) {
     const picks = trace.composition.picks || [];

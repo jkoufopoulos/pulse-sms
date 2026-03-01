@@ -409,43 +409,6 @@ if (process.env.PULSE_TEST_MODE === 'true') {
     res.json({ ok: true });
   });
 
-  // API: simulate a neighborhood request — shows the full event funnel
-  app.post('/api/eval/simulate', async (req, res) => {
-    try {
-      const { neighborhood } = req.body;
-      if (!neighborhood) {
-        return res.status(400).json({ error: 'Missing neighborhood' });
-      }
-
-      const { getEvents } = require('./events');
-      const { composeResponse } = require('./ai');
-
-      const candidates = await getEvents(neighborhood);
-      const sent_to_claude = candidates.slice(0, 8);
-      const compose_result = await composeResponse(
-        "what's happening in " + neighborhood,
-        sent_to_claude,
-        neighborhood,
-        {}
-      );
-
-      const pickedIds = new Set((compose_result.picks || []).map(p => p.event_id));
-      const picked = sent_to_claude.filter(e => pickedIds.has(e.id));
-      const not_picked = sent_to_claude.filter(e => !pickedIds.has(e.id));
-
-      res.json({
-        neighborhood,
-        candidates,
-        sent_to_claude,
-        compose_result,
-        picked,
-        not_picked,
-      });
-    } catch (err) {
-      console.error('Eval simulate error:', err.message);
-      res.status(500).json({ error: err.message });
-    }
-  });
 }
 
 const server = app.listen(PORT, () => {

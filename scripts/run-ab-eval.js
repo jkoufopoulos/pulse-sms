@@ -15,7 +15,7 @@ require('dotenv').config();
 
 const fs = require('fs');
 const path = require('path');
-const { composeResponse } = require('../src/ai');
+const { executeQuery } = require('../src/pipeline');
 const { getNycDateString } = require('../src/geo');
 const { judgeTone, judgePickRelevance, judgePreference } = require('../src/evals/judge-evals');
 
@@ -196,15 +196,15 @@ async function main() {
       try {
         // Call both models
         const [resultA, resultB] = await Promise.all([
-          composeResponse(testCase.message, events, testCase.neighborhood, testCase.filters, {
-            model: MODEL_A,
+          executeQuery(testCase.message, events, {
+            neighborhood: testCase.neighborhood,
+            activeFilters: testCase.filters,
             excludeIds: testCase.excludeIds,
-            extraContext: testCase.extraContext,
           }),
-          composeResponse(testCase.message, events, testCase.neighborhood, testCase.filters, {
-            model: MODEL_B,
+          executeQuery(testCase.message, events, {
+            neighborhood: testCase.neighborhood,
+            activeFilters: testCase.filters,
             excludeIds: testCase.excludeIds,
-            extraContext: testCase.extraContext,
           }),
         ]);
 

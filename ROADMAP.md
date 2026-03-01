@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-01 (Yutori junk event filter, eval trajectory & trends, Skint ongoing events scraper, Friday/Saturday newsletter event loss fix, systemic failure fixes, handler.js events bug, Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
+> Last updated: 2026-03-01 (3-model comparison eval, Yutori junk event filter, eval trajectory & trends, Skint ongoing events scraper, Friday/Saturday newsletter event loss fix, systemic failure fixes, handler.js events bug, Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
 
 ---
 
@@ -99,7 +99,7 @@ Every handler becomes a thin context builder. The pipeline handles everything el
 | 4 | Reasoning/rendering split — separate intent+selection from copywriting | P2, P5 | Contract fully minimized; clean separation | Needs A/B eval |
 | 5 | ~~Remove `filters_used` from LLM contract~~ | P1 | ~~Completes code-owns-state~~ | **Done** (merged into step 3) |
 | 6 | Finer category taxonomy — split `live_music` into jazz/rock/indie/folk | — | 3 jazz→live_music eval failures | **Done** (three-tier soft match) |
-| 7 | `executeQuery(context)` pipeline — thin handlers, single filter path | P4 | Prevents split-brain filtering from recurring | Planned |
+| 7 | `executeQuery(context)` pipeline — thin handlers, single filter path | P4 | Prevents split-brain filtering from recurring | **Done** |
 | 8 | Scoped event fetching — `neighborhood`/`borough` scope | — | Geographic bleed in MORE | Planned |
 
 Steps 1-3 are safe incremental improvements with no behavior change. Step 4 is a structural bet requiring A/B evaluation. Steps 5-8 build on the foundation.
@@ -498,6 +498,70 @@ The extraction audit shows 82-100% pass rates on most days, but this is misleadi
 ---
 
 ## Completed Work
+
+### Step 7: executeQuery Pipeline — Single Prompt Path (2026-03-01)
+
+Migrated `handleMore` from the legacy two-call flow (`routeMessage` → `composeResponse`) to the unified single-call flow via a shared `executeQuery()` function in pipeline.js. All message paths now use `unifiedRespond` with `buildUnifiedPrompt` + `UNIFIED_SYSTEM`.
+
+**Deleted ~550 lines:**
+- `routeMessage()`, `composeResponse()`, `buildRoutePrompt()`, route/compose Gemini helpers (ai.js)
+- `ROUTE_SYSTEM` (~173 lines), `COMPOSE_SYSTEM` (~91 lines) (prompts.js)
+- `buildComposePrompt()` (~102 lines) (build-compose-prompt.js)
+- `composeAndSend` closure (handler.js)
+- `/api/eval/simulate` endpoint (server.js)
+
+**Added:** `executeQuery()` in pipeline.js (thin wrapper, late `require('./ai')` to avoid circular deps), `composeViaExecuteQuery()` helper in intent-handlers.js for handleMore trace recording. Updated eval scripts (run-ab-eval.js, parks-eval.js, bv-eval.js) and unit tests. All 77 smoke tests pass.
+
+### 3-Model Comparison Eval — Haiku vs Gemini Flash vs Gemini Pro (2026-03-01)
+
+Full 48 happy_path scenario eval run locally against all three models (concurrency 5, same event cache, same code revision `d42d33b`).
+
+**Results:**
+
+| Model | Pass | Fail | Err | Rate | Elapsed | Est. Cost/msg |
+|-------|------|------|-----|------|---------|---------------|
+| Claude Haiku 4.5 | 20 | 27 | 1 | **42%** | 117s | ~$0.001-0.002 |
+| Gemini 2.5 Flash | 24 | 22 | 2 | **50%** | 191s | ~$0.0002-0.0004 |
+| Gemini 2.5 Pro | 14 | 33 | 1 | **29%** | 312s | ~$0.004-0.008 |
+
+**Key findings:**
+
+1. **Gemini Flash wins on both quality and cost.** 50% pass rate at ~5-10x cheaper than Haiku. Flash is the clear production choice.
+2. **Gemini Pro is the worst performer.** 29% pass rate at 3-4x the cost of Haiku. Slowest by far (312s vs 117s). 63 latency failures and 14 empty-response failures. Not viable for SMS.
+3. **10 scenarios pass on all 3 models** — these are reliably solved (BK slang, Chelsea browse, Park Slope switch, etc.).
+4. **20 scenarios fail on all 3 models** — these are structural/prompt issues, not model-dependent. Includes all 5 Extended scenarios, late-night requests, theater/jazz filters, MORE flows.
+5. **18 scenarios have mixed results** — model-dependent. Flash uniquely passes filter scenarios (comedy, free, EV first-time). Haiku uniquely passes some detail grabs (Red Hook, Tribeca, Boerum Hill). Pro uniquely passes West Village late request.
+
+**Code eval failures (lower is better):**
+
+| Eval | Haiku | Flash | Pro |
+|------|-------|-------|-----|
+| latency_under_10s | 0 | 9 | **63** |
+| response_not_empty | 0 | 0 | **14** |
+| price_transparency | **29** | 7 | 13 |
+| schema_compliance | 21 | 21 | 7 |
+| off_topic_redirect | 16 | 9 | 14 |
+| neighborhood_accuracy | 17 | 16 | 16 |
+| pick_count_accuracy | 3 | 0 | 0 |
+| **Total** | **90** | **64** | **132** |
+
+Flash has the fewest code eval failures (64 vs 90 Haiku, 132 Pro). Pro's latency problem (63 failures) is disqualifying for SMS — users won't wait 10+ seconds. Haiku's price_transparency issue (29 failures) suggests it mentions prices less reliably.
+
+**Model-exclusive passes:**
+
+- Flash only (4): first-time EV user, comedy filter, free filter, Bed-Stuy live music details
+- Haiku only (3): Red Hook detail, Tribeca single pick, Boerum Hill switch
+- Pro only (1): West Village late request
+
+**Overlap analysis:**
+
+- Haiku+Flash agree (not Pro): 7 scenarios — Pro struggles with neighborhood switches and detail flows
+- Flash+Pro agree (not Haiku): 3 scenarios — Haiku struggles with MORE and Tribeca
+- Haiku+Pro agree (not Flash): 0 scenarios — no shared strength against Flash
+
+**Decision:** Gemini Flash is the production model for compose/extract. 8 percentage points better than Haiku at 5-10x lower cost. The 20 shared failures are prompt/architecture issues to fix in code, not model-switchable.
+
+**Reports:** `data/reports/scenario-eval-2026-03-01T06-42-39.json` (Haiku), `scenario-eval-2026-03-01T06-45-57.json` (Flash), `scenario-eval-2026-03-01T06-51-15.json` (Pro).
 
 ### Fix Nudge-Accept Flow — Root Cause D (2026-03-01)
 
@@ -982,9 +1046,9 @@ First full 130-scenario eval run showed 35.4% pass rate (46/130). Analysis found
 
 58% happy_path pass rate. 6 failure themes documented, none fixed. Quick wins (E+C+D truncation) would move from 28/48 → ~35/48 (73%). A+B+F need prompt work. **Critical missing step:** Haiku baseline on same scenarios to isolate Gemini-specific failures from systemic gaps.
 
-#### Priority 2 — `handleMore` legacy divergence
+#### Priority 2 — `handleMore` legacy divergence — **Fixed (2026-03-01)**
 
-Uses old two-call flow (`routeMessage` → `composeResponse` with `COMPOSE_SYSTEM`) while main path uses single-call `unifiedRespond` with `UNIFIED_SYSTEM`. Different prompts, different behavior, different skill activation. Any prompt improvement must be done twice. This is step 7 in the migration (`executeQuery` pipeline).
+Migrated `handleMore` from legacy two-call flow (`routeMessage` → `composeResponse` with `COMPOSE_SYSTEM`) to single-call `executeQuery` → `unifiedRespond` with `UNIFIED_SYSTEM`. Deleted ~550 lines of dead code: `routeMessage`, `composeResponse`, `buildRoutePrompt`, `buildComposePrompt`, `ROUTE_SYSTEM`, `COMPOSE_SYSTEM`, route/compose Gemini helpers, `/api/eval/simulate` endpoint. All paths now use a single prompt builder (`buildUnifiedPrompt`) and single AI entry point (`executeQuery`).
 
 #### Priority 3 — Root Cause D (nudge-accept) — **Fixed (2026-03-01)**
 
@@ -993,8 +1057,7 @@ Was ~10% of filter persistence failures. The `ask_neighborhood` handler omitted 
 #### Priority 4 — Dead code and divergence risks
 
 - `cityScan` skill defined but handler activation uses `cityScanResults` — verify working or remove
-- `buildComposePrompt` and `buildUnifiedPrompt` share ~90% of skill-selection logic with no shared function — divergence risk
-- `ROUTE_SYSTEM` prompt may reference stale intents from before pre-router
+- `architecture.html` still references deleted `routeMessage`/`composeResponse` flow — low priority cosmetic update
 
 ### Tech Debt
 

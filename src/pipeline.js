@@ -91,6 +91,82 @@ function buildExhaustionMessage(hood, { adjacentHoods = [], visitedHoods = [] } 
 }
 
 /**
+ * Convert a filter object to a human-readable SMS label.
+ * Order: free → subcategory|category → vibe → time suffix.
+ * Examples: {category:'comedy', free_only:true} → "free comedy"
+ *           {time_after:'22:00'} → "events after 10pm"
+ */
+function describeFilters(filters) {
+  if (!filters || typeof filters !== 'object') return 'events';
+  const parts = [];
+  if (filters.free_only) parts.push('free');
+  if (filters.subcategory) {
+    parts.push(filters.subcategory);
+  } else if (filters.category) {
+    parts.push(filters.category.replace(/_/g, ' '));
+  }
+  if (filters.vibe) parts.push(filters.vibe);
+  // Need a noun if we only have modifiers (free, time) but no category/vibe
+  const hasNoun = filters.subcategory || filters.category || filters.vibe;
+  if (!hasNoun) {
+    if (parts.length === 0 && !filters.time_after) return 'events';
+    parts.push('events');
+  }
+  if (parts.length === 0) return 'events';
+  // Time suffix
+  if (filters.time_after && /^\d{2}:\d{2}$/.test(filters.time_after)) {
+    const [h, m] = filters.time_after.split(':').map(Number);
+    let label;
+    if (h === 0 && m === 0) label = 'midnight';
+    else if (h === 12 && m === 0) label = 'noon';
+    else {
+      const hr12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+      const ampm = h < 12 ? 'am' : 'pm';
+      label = m === 0 ? `${hr12}${ampm}` : `${hr12}:${String(m).padStart(2, '0')}${ampm}`;
+    }
+    parts.push(`after ${label}`);
+  }
+  return parts.join(' ');
+}
+
+/**
+ * Build a deterministic zero-match response when filters match nothing in a neighborhood.
+ * Scans adjacent hoods and citywide for matches, suggests alternatives.
+ * Returns { message, suggestedHood, source }.
+ */
+function buildZeroMatchResponse(hood, activeFilters, adjacentHoods) {
+  const label = describeFilters(activeFilters);
+  // Late require to avoid circular dep (events.js → pipeline.js)
+  const { scanCityWide } = require('./events');
+  const cityMatches = scanCityWide(activeFilters);
+  // Check adjacent neighborhoods first
+  const adjSet = new Set(adjacentHoods || []);
+  const adjacentMatch = cityMatches.find(m => adjSet.has(m.neighborhood));
+  if (adjacentMatch) {
+    return {
+      message: `No ${label} in ${hood} tonight — but ${adjacentMatch.neighborhood} has some. Want picks from there?`,
+      suggestedHood: adjacentMatch.neighborhood,
+      source: 'adjacent',
+    };
+  }
+  // Citywide match (not adjacent)
+  const cityMatch = cityMatches.find(m => m.neighborhood !== hood);
+  if (cityMatch) {
+    return {
+      message: `No ${label} in ${hood} tonight — I've got ${label} in ${cityMatch.neighborhood} though. Want picks from there?`,
+      suggestedHood: cityMatch.neighborhood,
+      source: 'citywide',
+    };
+  }
+  // Nothing anywhere
+  return {
+    message: `No ${label} anywhere tonight — want me to just show you what's in ${hood}?`,
+    suggestedHood: null,
+    source: 'none',
+  };
+}
+
+/**
  * Merge two filter objects with explicit-key semantics.
  * If a key EXISTS in incoming (even with value null/false), it overrides.
  * If a key is ABSENT from incoming, fall back to existing (enables compounding).
@@ -347,4 +423,37 @@ async function tryTavilyFallback(hood, filters, excludeIds, trace) {
   }
 }
 
-module.exports = { applyFilters, resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, failsTimeGate, buildTavilyQuery, tryTavilyFallback };
+/**
+ * Execute a unified LLM query: call unifiedRespond with events and options,
+ * return the parsed result. Thin wrapper that both the unified branch
+ * and handleMore can call.
+ *
+ * Returns { type, sms_text, picks, clear_filters, _raw, _usage, _provider }
+ */
+async function executeQuery(message, events, options = {}) {
+  // Late require to avoid circular dep (ai.js → prompts.js → ... → pipeline.js)
+  const { unifiedRespond } = require('./ai');
+
+  const result = await unifiedRespond(message, {
+    session: options.session,
+    events,
+    neighborhood: options.neighborhood,
+    nearbyHoods: options.nearbyHoods,
+    conversationHistory: options.conversationHistory,
+    currentTime: options.currentTime,
+    validNeighborhoods: options.validNeighborhoods,
+    activeFilters: options.activeFilters,
+    isSparse: options.isSparse,
+    isCitywide: options.isCitywide,
+    matchCount: options.matchCount,
+    hardCount: options.hardCount,
+    softCount: options.softCount,
+    excludeIds: options.excludeIds,
+    suggestedNeighborhood: options.suggestedNeighborhood,
+    userHoodAlias: options.userHoodAlias,
+  });
+
+  return result;
+}
+
+module.exports = { applyFilters, resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, describeFilters, buildZeroMatchResponse, mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, failsTimeGate, buildTavilyQuery, tryTavilyFallback, executeQuery };

@@ -1,7 +1,7 @@
 const express = require('express');
 const twilio = require('twilio');
 const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
-const { composeResponse, unifiedRespond } = require('./ai');
+// ai.js is now accessed via executeQuery in pipeline.js (late require)
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
 const { startTrace, saveTrace, getLatestTraceForPhone } = require('./traces');
 const { getSession, setSession, clearSession, addToHistory, clearSessionInterval } = require('./session');
@@ -12,7 +12,7 @@ const { getEvents, getEventsCitywide, getEventById, scanCityWide, getCacheStatus
 const { lookupReferralCode, recordAttribution } = require('./referral');
 const { filterKidsEvents, validatePerennialActivity } = require('./curation');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
-const { applyFilters, buildEventMap, saveResponseFrame, mergeFilters, buildTaggedPool, tryTavilyFallback } = require('./pipeline');
+const { applyFilters, buildEventMap, saveResponseFrame, mergeFilters, buildTaggedPool, buildZeroMatchResponse, describeFilters, tryTavilyFallback, executeQuery } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
 
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
@@ -435,15 +435,14 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
 }
 
 /**
- * Call unifiedRespond and capture trace/cost data.
+ * Call executeQuery and capture trace/cost data.
  */
 async function callUnified(message, unifiedCtx, session, history, phone, trace) {
   const { hood, events, nearbyHoods, now, activeFilters, isSparse, isCitywide, matchCount, hardCount, softCount, excludeIds, suggestedHood, userHoodAlias } = unifiedCtx;
 
   const composeStart = Date.now();
-  const result = await unifiedRespond(message, {
+  const result = await executeQuery(message, events, {
     session,
-    events,
     neighborhood: hood,
     nearbyHoods,
     conversationHistory: history,
@@ -459,9 +458,9 @@ async function callUnified(message, unifiedCtx, session, history, phone, trace) 
     suggestedNeighborhood: suggestedHood,
     userHoodAlias,
   });
-  trace.routing.latency_ms = Date.now() - composeStart; // unified call replaces both route + compose
+  trace.routing.latency_ms = Date.now() - composeStart;
   trace.composition.latency_ms = trace.routing.latency_ms;
-  trace.routing.provider = 'anthropic';
+  trace.routing.provider = result._provider || 'anthropic';
   trace.routing.result = { intent: result.type, neighborhood: hood, confidence: 0.8 };
   trace.composition.raw_response = result._raw || null;
   trace.composition.picks = (result.picks || []).map(p => {
@@ -598,6 +597,42 @@ async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, 
   finalizeTrace(result.sms_text, 'events');
 }
 
+/**
+ * Handle zero-match bypass: when filters match nothing in a neighborhood,
+ * compose a deterministic response and preserve filters in session.
+ * $0 AI cost. Follows the conversational branch pattern in handleUnifiedResponse.
+ */
+async function handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace) {
+  const { hood, activeFilters, nearbyHoods, events, curated, taggedPerennials } = unifiedCtx;
+  const { message, suggestedHood, source } = buildZeroMatchResponse(hood, activeFilters, nearbyHoods);
+
+  trace.routing.latency_ms = 0;
+  trace.composition.latency_ms = 0;
+  trace.composition.zero_match_bypass = true;
+  trace.composition.zero_match_source = source;
+
+  const eventMap = buildEventMap([...curated, ...taggedPerennials]);
+  for (const e of events) eventMap[e.id] = e;
+
+  const pending = suggestedHood
+    ? { neighborhood: suggestedHood, filters: activeFilters }
+    : null;
+
+  saveResponseFrame(phone, {
+    picks: session?.lastPicks || [],
+    eventMap: Object.keys(eventMap).length > 0 ? eventMap : (session?.lastEvents || {}),
+    neighborhood: hood,
+    filters: Object.values(activeFilters).some(Boolean) ? activeFilters : null,
+    offeredIds: session?.allOfferedIds || [],
+    visitedHoods: session?.visitedHoods || [],
+    pending,
+  });
+  updateProfile(phone, { neighborhood: hood, filters: activeFilters, responseType: 'zero_match' })
+    .catch(err => console.error('profile update failed:', err.message));
+  await sendSMS(phone, message);
+  finalizeTrace(message, 'events');
+}
+
 async function handleMessageAI(phone, message) {
   const traceStart = Date.now();
   const masked = maskPhone(phone);
@@ -678,49 +713,7 @@ async function handleMessageAI(phone, message) {
     trace.routing.latency_ms = 0;
     console.log(`Pre route (pre): intent=${route.intent}, neighborhood=${route.neighborhood}, confidence=${route.confidence}`);
 
-    // Shared compose helper (closure over message + trace) — needed by handleMore
-    async function composeAndSend(composeEvents, hood, filters, intentLabel, { excludeIds, skills } = {}) {
-      const enrichedSkills = { ...(skills || {}), hasConversationHistory: history.length > 0 };
-      trace.events.sent_to_claude = composeEvents.length;
-      trace.events.sent_ids = composeEvents.map(e => e.id);
-      trace.events.sent_pool = composeEvents.map(e => ({
-        id: e.id,
-        name: e.name,
-        venue_name: e.venue_name,
-        neighborhood: e.neighborhood,
-        category: e.category,
-        start_time_local: e.start_time_local,
-        date_local: e.date_local,
-        is_free: e.is_free,
-        price_display: e.price_display,
-        source_name: e.source_name,
-        filter_match: e.filter_match,
-        ticket_url: e.ticket_url || null,
-      }));
-      const composeStart = Date.now();
-      const result = await composeResponse(message, composeEvents, hood, filters, { excludeIds, skills: enrichedSkills, conversationHistory: history });
-      trace.composition.latency_ms = Date.now() - composeStart;
-      trackAICost(phone, result._usage);
-      trace.composition.raw_response = result._raw || null;
-      trace.composition.picks = (result.picks || []).map(p => {
-        const evt = composeEvents.find(e => e.id === p.event_id);
-        return {
-          ...p,
-          date_local: evt?.date_local || null,
-          event_name: evt?.name || null,
-          venue_name: evt?.venue_name || null,
-          neighborhood: evt?.neighborhood || null,
-          category: evt?.category || null,
-          is_free: evt?.is_free || false,
-          start_time_local: evt?.start_time_local || null,
-        };
-      });
-      trace.composition.not_picked_reason = result.not_picked_reason || null;
-      trace.composition.neighborhood_used = result.neighborhood_used || hood;
-      return result;
-    }
-
-    const ctx = { phone, message, masked, session, trace, route, finalizeTrace, composeAndSend, trackAICost: (usage) => trackAICost(phone, usage) };
+    const ctx = { phone, message, masked, session, trace, route, finalizeTrace, trackAICost: (usage, provider) => trackAICost(phone, usage, provider) };
 
     // Clear pending state on any pre-routed intent
     if (session?.pendingNearby) {
@@ -732,6 +725,15 @@ async function handleMessageAI(phone, message) {
 
   // Unified LLM call — handles semantic messages + pre-detected filter follow-ups
   const unifiedCtx = await resolveUnifiedContext(message, session, preDetectedFilters, phone, trace);
+
+  // Zero-match bypass: skip LLM when filters match nothing (Gap 3 fix)
+  const hasActiveFilter = unifiedCtx.activeFilters &&
+    Object.values(unifiedCtx.activeFilters).some(Boolean);
+  if (hasActiveFilter && unifiedCtx.matchCount === 0 &&
+      !unifiedCtx.isCitywide && unifiedCtx.hood) {
+    return handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace);
+  }
+
   const result = await callUnified(message, unifiedCtx, session, history, phone, trace);
   await handleUnifiedResponse(result, unifiedCtx, phone, session, trace, message, finalizeTrace);
 }

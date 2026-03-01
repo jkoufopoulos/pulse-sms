@@ -9,6 +9,7 @@ require('./unit/events.test');
 require('./unit/geo.test');
 require('./unit/formatters.test');
 const venues = require('./unit/venues.test');
+require('./unit/pipeline.test');
 require('./unit/pre-router.test');
 require('./unit/perennials.test');
 require('./unit/ai.test');

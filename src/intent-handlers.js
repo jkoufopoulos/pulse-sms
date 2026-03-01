@@ -6,9 +6,11 @@ const { getAdjacentNeighborhoods } = require('./pre-router');
 const { filterByTimeAfter } = require('./geo');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
 const { validatePerennialActivity } = require('./curation');
-const { resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, tryTavilyFallback } = require('./pipeline');
+const { resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, tryTavilyFallback, executeQuery } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
 const { generateReferralCode } = require('./referral');
+const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
+const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
 
 // --- Send compose result (picks only, no link messages) ---
 // Links are sent only when the user requests details (texts a number).
@@ -119,6 +121,65 @@ async function handleDetails(ctx) {
   ctx.finalizeTrace(sms, 'details');
 }
 
+/**
+ * Record trace data for events sent to LLM and call executeQuery.
+ * Replaces the composeAndSend closure — now uses the unified prompt path.
+ */
+async function composeViaExecuteQuery(events, ctx, { hood, activeFilters, excludeIds, skills } = {}) {
+  const history = ctx.session?.conversationHistory || [];
+  const now = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+  // Record trace data
+  ctx.trace.events.sent_to_claude = events.length;
+  ctx.trace.events.sent_ids = events.map(e => e.id);
+  ctx.trace.events.sent_pool = events.map(e => ({
+    id: e.id,
+    name: e.name,
+    venue_name: e.venue_name,
+    neighborhood: e.neighborhood,
+    category: e.category,
+    start_time_local: e.start_time_local,
+    date_local: e.date_local,
+    is_free: e.is_free,
+    price_display: e.price_display,
+    source_name: e.source_name,
+    filter_match: e.filter_match,
+    ticket_url: e.ticket_url || null,
+  }));
+
+  const composeStart = Date.now();
+  const result = await executeQuery(ctx.message, events, {
+    session: ctx.session,
+    neighborhood: hood,
+    conversationHistory: history,
+    currentTime: now,
+    validNeighborhoods: NEIGHBORHOOD_NAMES,
+    activeFilters,
+    excludeIds,
+    hasConversationHistory: history.length > 0,
+    ...skills,
+  });
+  ctx.trace.composition.latency_ms = Date.now() - composeStart;
+  ctx.trackAICost?.(result._usage, result._provider);
+  ctx.trace.composition.raw_response = result._raw || null;
+  ctx.trace.composition.picks = (result.picks || []).map(p => {
+    const evt = events.find(e => e.id === p.event_id);
+    return {
+      ...p,
+      date_local: evt?.date_local || null,
+      event_name: evt?.name || null,
+      venue_name: evt?.venue_name || null,
+      neighborhood: evt?.neighborhood || null,
+      category: evt?.category || null,
+      is_free: evt?.is_free || false,
+      start_time_local: evt?.start_time_local || null,
+    };
+  });
+  ctx.trace.composition.neighborhood_used = hood;
+
+  return result;
+}
+
 // --- More ---
 async function handleMore(ctx) {
   const allOfferedIds = new Set(ctx.session?.allOfferedIds || []);
@@ -151,7 +212,7 @@ async function handleMore(ctx) {
       ctx.trace.events.candidates_count = timeGated.length;
       ctx.trace.events.candidate_ids = timeGated.map(e => e.id);
       const skills = isLastBatch ? { isLastBatch: true, exhaustionSuggestion: exhaust.message } : {};
-      const result = await ctx.composeAndSend(composeRemaining, hood, activeFilters, 'more', { excludeIds: [...allShownIds], skills });
+      const result = await composeViaExecuteQuery(composeRemaining, ctx, { hood, activeFilters, excludeIds: [...allShownIds], skills });
 
       // Name-based dedup: filter out picks that share a name with previously shown events
       const prevPickNames = new Set(
@@ -212,7 +273,7 @@ async function handleMore(ctx) {
       adjacentHoods: getAdjacentNeighborhoods(hood, 3),
       visitedHoods: ctx.session?.visitedHoods || [],
     });
-    const result = await ctx.composeAndSend(perennialBatch, hood, activeFilters, 'more', { excludeIds: [...allShownMoreIds], skills: { isLastBatch: true, exhaustionSuggestion: perennialExhaust.message } });
+    const result = await composeViaExecuteQuery(perennialBatch, ctx, { hood, activeFilters, excludeIds: [...allShownMoreIds], skills: { isLastBatch: true, exhaustionSuggestion: perennialExhaust.message } });
     result.sms_text = stripMoreReferences(result.sms_text);
     saveResponseFrame(ctx.phone, {
       mode: 'more',
@@ -243,7 +304,7 @@ async function handleMore(ctx) {
       ctx.trace.events.cache_size = 0;
       ctx.trace.events.candidates_count = tavilyBatch.length;
       ctx.trace.events.candidate_ids = tavilyBatch.map(e => e.id);
-      const result = await ctx.composeAndSend(tavilyBatch, hood, activeFilters, 'more', { excludeIds: [...allShownMoreIds] });
+      const result = await composeViaExecuteQuery(tavilyBatch, ctx, { hood, activeFilters, excludeIds: [...allShownMoreIds] });
       result.sms_text = stripMoreReferences(result.sms_text);
       saveResponseFrame(ctx.phone, {
         mode: 'more',

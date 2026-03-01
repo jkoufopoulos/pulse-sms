@@ -1,8 +1,8 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
 const { getEventDate, getNycDateString } = require('./geo');
-const { EXTRACTION_PROMPT, ROUTE_SYSTEM, COMPOSE_SYSTEM, DETAILS_SYSTEM } = require('./prompts');
-const { buildComposePrompt, buildUnifiedPrompt } = require('./skills/build-compose-prompt');
+const { EXTRACTION_PROMPT, DETAILS_SYSTEM } = require('./prompts');
+const { buildUnifiedPrompt } = require('./skills/build-compose-prompt');
 const { smartTruncate, isSearchUrl } = require('./formatters');
 
 let client = null;
@@ -28,11 +28,7 @@ function getGeminiClient() {
   return geminiClient;
 }
 
-const ROUTE_PROVIDER = process.env.PULSE_ROUTE_PROVIDER || (process.env.GEMINI_API_KEY ? 'gemini' : 'anthropic');
-
 const MODELS = {
-  route: process.env.PULSE_MODEL_ROUTE || 'claude-haiku-4-5-20251001',
-  routeGemini: process.env.PULSE_MODEL_ROUTE_GEMINI || 'gemini-2.5-flash',
   compose: process.env.PULSE_MODEL_COMPOSE || 'gemini-2.5-flash',
   extract: process.env.PULSE_MODEL_EXTRACT || 'gemini-2.5-flash',
 };
@@ -45,116 +41,6 @@ const GEMINI_SAFETY = [
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
 ];
 
-/**
- * Build the routing prompt parts (shared by both providers).
- */
-function buildRoutePrompt(message, session, neighborhoodNames) {
-  const sessionContext = session
-    ? `Last neighborhood: ${session.lastNeighborhood || 'none'}. Last picks: ${(session.lastPicks || []).map((p, i) => {
-        const evt = session.lastEvents?.[p.event_id];
-        return evt ? `#${i + 1} "${evt.name}"` : `#${i + 1}`;
-      }).join(', ') || 'none'}.${session.lastFilters && Object.values(session.lastFilters).some(Boolean) ? ` Last filters: ${JSON.stringify(session.lastFilters)}.` : ''}`
-    : 'No prior session.';
-
-  const historyBlock = session?.conversationHistory?.length > 0
-    ? '\nRecent conversation:\n' + session.conversationHistory.map(h =>
-        `${h.role === 'user' ? 'User' : 'Bestie'}: ${h.content}`
-      ).join('\n') + '\n'
-    : '';
-
-  const userPrompt = `<user_message>${message}</user_message>
-
-Session context: ${sessionContext}
-${historyBlock}
-VALID_NEIGHBORHOODS: ${neighborhoodNames.join(', ')}`;
-
-  return { systemPrompt: ROUTE_SYSTEM, userPrompt };
-}
-
-const ROUTE_FALLBACK = {
-  intent: 'conversational',
-  neighborhood: null,
-  filters: { free_only: false, category: null, vibe: null },
-  event_reference: null,
-  reply: "Sorry, I didn't catch that. Tell me what you're in the mood for — comedy, jazz, this weekend — or try a neighborhood. HELP for more.",
-  confidence: 0,
-};
-
-function parseRouteResult(text) {
-  const parsed = parseJsonFromResponse(text);
-  if (!parsed || !parsed.intent) return null;
-  return {
-    intent: parsed.intent,
-    neighborhood: parsed.neighborhood || null,
-    filters: parsed.filters || { free_only: false, category: null, vibe: null },
-    event_reference: parsed.event_reference || null,
-    reply: parsed.reply || null,
-    confidence: parsed.confidence || 0,
-  };
-}
-
-/**
- * Route via Anthropic (Claude Haiku).
- */
-async function routeWithAnthropic(systemPrompt, userPrompt) {
-  const response = await getClient().messages.create({
-    model: MODELS.route,
-    max_tokens: 256,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: userPrompt }],
-  }, { timeout: 8000 });
-
-  const text = response.content?.[0]?.text || '';
-  return { text, usage: response.usage || null, provider: 'anthropic' };
-}
-
-/**
- * Route via Google Gemini Flash.
- */
-async function routeWithGemini(systemPrompt, userPrompt) {
-  const genAI = getGeminiClient();
-  const model = genAI.getGenerativeModel({
-    model: MODELS.routeGemini,
-    systemInstruction: systemPrompt,
-    safetySettings: GEMINI_SAFETY,
-    generationConfig: { maxOutputTokens: 256, temperature: 0, responseMimeType: 'application/json' },
-  });
-
-  const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }] });
-  const response = result.response;
-  const text = response.text() || '';
-  const usageMetadata = response.usageMetadata;
-  const usage = usageMetadata ? {
-    input_tokens: usageMetadata.promptTokenCount || 0,
-    output_tokens: usageMetadata.candidatesTokenCount || 0,
-  } : null;
-
-  return { text, usage, provider: 'gemini' };
-}
-
-/**
- * Compose via Google Gemini Flash.
- */
-async function composeWithGemini(systemPrompt, userPrompt, model) {
-  const genAI = getGeminiClient();
-  const gemModel = genAI.getGenerativeModel({
-    model: model || MODELS.routeGemini,
-    systemInstruction: systemPrompt,
-    safetySettings: GEMINI_SAFETY,
-    generationConfig: { maxOutputTokens: 8192, temperature: 0.5, topP: 0.9, responseMimeType: 'application/json' },
-  });
-
-  const result = await gemModel.generateContent({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }] });
-  const response = result.response;
-  const text = response.text() || '';
-  const usageMetadata = response.usageMetadata;
-  const usage = usageMetadata ? {
-    input_tokens: usageMetadata.promptTokenCount || 0,
-    output_tokens: usageMetadata.candidatesTokenCount || 0,
-  } : null;
-
-  return { text, usage, provider: 'gemini' };
-}
 
 /**
  * Unified respond via Google Gemini Flash.
@@ -255,172 +141,6 @@ async function detailsWithGemini(systemPrompt, userPrompt) {
   return { text, usage, provider: 'gemini' };
 }
 
-/**
- * Route an incoming SMS. Determines intent, neighborhood, and filters.
- * Uses Gemini Flash by default (cheaper), falls back to Anthropic on error.
- */
-async function routeMessage(message, session, neighborhoodNames) {
-  const { systemPrompt, userPrompt } = buildRoutePrompt(message, session, neighborhoodNames);
-
-  let raw;
-  if (ROUTE_PROVIDER === 'gemini' && getGeminiClient()) {
-    try {
-      raw = await routeWithGemini(systemPrompt, userPrompt);
-    } catch (err) {
-      console.warn(`Gemini route failed, falling back to Anthropic: ${err.message}`);
-      raw = await routeWithAnthropic(systemPrompt, userPrompt);
-    }
-  } else {
-    raw = await routeWithAnthropic(systemPrompt, userPrompt);
-  }
-
-  const parsed = parseRouteResult(raw.text);
-  if (!parsed) {
-    console.error(`routeMessage (${raw.provider}): invalid response:`, raw.text);
-    return { ...ROUTE_FALLBACK, _raw: raw.text, _usage: raw.usage, _provider: raw.provider };
-  }
-
-  return { ...parsed, _raw: raw.text, _usage: raw.usage, _provider: raw.provider };
-}
-
-/**
- * Compose an SMS response by picking events and writing the message in one Claude call.
- * Returns { sms_text, picks, neighborhood_used }
- */
-async function composeResponse(message, events, neighborhood, filters, { excludeIds, skills, model, conversationHistory } = {}) {
-  const now = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-
-  const todayNyc = getNycDateString(0);
-  const tomorrowNyc = getNycDateString(1);
-
-  const eventListStr = events.map(e => {
-    const eventDate = getEventDate(e);
-    const dayLabel = eventDate === todayNyc ? 'TODAY' : eventDate === tomorrowNyc ? 'TOMORROW' : eventDate;
-    const nearbyTag = (neighborhood && e.neighborhood && e.neighborhood !== neighborhood) ? '[NEARBY] ' : '';
-    return nearbyTag + JSON.stringify({
-      id: e.id,
-      name: e.name && e.name.length > 80 ? e.name.slice(0, 77) + '...' : e.name,
-      venue_name: e.venue_name,
-      neighborhood: e.neighborhood,
-      date_local: eventDate,
-      day: dayLabel,
-      start_time_local: e.start_time_local,
-      end_time_local: e.end_time_local,
-      is_free: e.is_free,
-      price_display: e.price_display,
-      category: e.category,
-      short_detail: e.short_detail || e.description_short,
-      source_name: e.source_name,
-      source_tier: e.source_tier || 'secondary',
-      extraction_confidence: e.extraction_confidence,
-      ticket_url: e.ticket_url,
-    });
-  }).join('\n');
-
-  const excludeNote = excludeIds && excludeIds.length > 0
-    ? `\nEXCLUDED (already shown to user — do NOT pick these): ${excludeIds.join(', ')}`
-    : '';
-
-  const historyBlock = conversationHistory?.length > 0
-    ? '\nCONVERSATION HISTORY (recent):\n' + conversationHistory.map(h =>
-        `${h.role === 'user' ? 'User' : 'Bestie'}: ${h.content}`
-      ).join('\n') + '\n'
-    : '';
-
-  const userPrompt = `Current time (NYC): ${now}
-<user_message>${message}</user_message>
-Neighborhood: ${neighborhood || 'not specified'}
-User preferences: category=${filters?.category || 'any'}, vibe=${filters?.vibe || 'any'}, free_only=${filters?.free_only ? 'yes' : 'no'}${filters?.time_after ? `, time_after=${filters.time_after}` : ''}
-${historyBlock}${excludeNote}
-EVENT_LIST:
-${eventListStr}
-
-Compose the SMS now.`;
-
-  const systemPrompt = buildComposePrompt(events, { ...skills, requestedNeighborhood: neighborhood });
-
-  let text, usage, provider;
-  const resolvedModel = model || MODELS.compose;
-  if (resolvedModel.startsWith('gemini-') && getGeminiClient()) {
-    const result = await composeWithGemini(systemPrompt, userPrompt, resolvedModel);
-    text = result.text; usage = result.usage; provider = 'gemini';
-  } else {
-    const response = await withTimeout(getClient().messages.create({
-      model: resolvedModel,
-      max_tokens: 512,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
-    }, { timeout: 12000 }), 15000, 'composeResponse');
-    text = response.content?.[0]?.text || '';
-    usage = response.usage || null;
-    provider = 'anthropic';
-  }
-
-  const parsed = parseJsonFromResponse(text);
-
-  if (!parsed || !parsed.sms_text || typeof parsed.sms_text !== 'string') {
-    console.error('composeResponse: invalid response:', text);
-    return {
-      sms_text: "Having a moment — try again in a sec!",
-      picks: [],
-      neighborhood_used: neighborhood,
-    };
-  }
-
-  const validIds = new Set(events.map(e => e.id));
-  const rawPicks = parsed.picks || [];
-  let validPicks = rawPicks.filter(p => p && typeof p.event_id === 'string' && validIds.has(p.event_id));
-
-  // Fallback: if Claude hallucinated IDs, try matching by event name
-  if (validPicks.length === 0 && rawPicks.length > 0) {
-    console.warn(`composeResponse: ${rawPicks.length} picks had invalid IDs, attempting name match`);
-    const nameToId = new Map(events.map(e => [(e.name || '').toLowerCase(), e.id]));
-    validPicks = rawPicks.map(p => {
-      if (p && validIds.has(p.event_id)) return p;
-      // Try to find event by name substring in the sms_text or pick fields
-      for (const [name, id] of nameToId) {
-        if (name && p.event_id && name.includes(p.event_id.toLowerCase())) return { ...p, event_id: id };
-      }
-      return null;
-    }).filter(Boolean);
-    // Last resort: match events whose full name appears in sms_text
-    if (validPicks.length === 0) {
-      const smsLower = parsed.sms_text.toLowerCase();
-      validPicks = events.filter(e => {
-        const name = (e.name || '').toLowerCase();
-        return name.length >= 3 && smsLower.includes(name);
-      }).slice(0, 3).map((e, i) => ({ rank: i + 1, event_id: e.id }));
-      if (validPicks.length > 0) {
-        console.warn(`composeResponse: [RECOVERED] ${validPicks.length} picks via full-name sms_text matching (IDs: ${validPicks.map(p => p.event_id).join(', ')})`);
-      }
-    }
-  }
-
-  // Sanitize neighborhood_used — Claude sometimes adds parenthetical notes
-  // e.g. "East Village (with nearby Flatiron)" → "East Village"
-  // Also rejects hallucinated neighborhoods (e.g. "Fort Greene") not in our system
-  let neighborhoodUsed = parsed.neighborhood_used || neighborhood;
-  if (neighborhoodUsed) {
-    const cleaned = neighborhoodUsed.replace(/\s*\(.*\)$/, '').trim();
-    const validNeighborhoods = Object.keys(require('./neighborhoods').NEIGHBORHOODS);
-    if (validNeighborhoods.includes(cleaned)) {
-      neighborhoodUsed = cleaned;
-    } else {
-      neighborhoodUsed = neighborhood; // fall back to requested neighborhood
-    }
-  }
-
-  return {
-    sms_text: smartTruncate(parsed.sms_text),
-    picks: validPicks,
-    not_picked_reason: parsed.not_picked_reason || null,
-    neighborhood_used: neighborhoodUsed,
-    suggested_neighborhood: parsed.suggested_neighborhood || null,
-    _raw: text,
-    _usage: usage,
-    _provider: provider,
-  };
-}
 
 /**
  * Extract normalized events from raw text (The Skint HTML content, Tavily snippets, etc.)
@@ -853,4 +573,4 @@ Respond now.`;
   };
 }
 
-module.exports = { routeMessage, composeResponse, composeDetails, extractEvents, unifiedRespond, parseJsonFromResponse };
+module.exports = { composeDetails, extractEvents, unifiedRespond, parseJsonFromResponse };

@@ -15,7 +15,7 @@
  */
 
 const { fetchNYCParksEvents, makeEventId } = require('../src/sources');
-const { composeResponse } = require('../src/ai');
+const { executeQuery } = require('../src/pipeline');
 const { rankEventsByProximity, filterUpcomingEvents, getNycDateString } = require('../src/geo');
 
 let pass = 0;
@@ -297,9 +297,9 @@ async function main() {
   console.log(`  Sending: "what's happening in ${targetHood.toLowerCase()}"\n`);
 
   const t1Start = Date.now();
-  const turn1 = await composeResponse(
+  const turn1 = await executeQuery(
     `what's happening in ${targetHood.toLowerCase()}`,
-    top8, targetHood, { free_only: false, category: null, vibe: null },
+    top8, { neighborhood: targetHood, activeFilters: { free_only: false, category: null, vibe: null } },
   );
   const t1Ms = Date.now() - t1Start;
 
@@ -350,9 +350,9 @@ async function main() {
     console.log(`  Sending: "free events"\n`);
 
     const t2Start = Date.now();
-    const turn2 = await composeResponse(
-      'free events', freeEvents, targetHood, { free_only: true, category: null, vibe: null },
-      { excludeIds: turn1.picks.map(p => p.event_id) },
+    const turn2 = await executeQuery(
+      'free events', freeEvents,
+      { neighborhood: targetHood, activeFilters: { free_only: true, category: null, vibe: null }, excludeIds: turn1.picks.map(p => p.event_id) },
     );
     const t2Ms = Date.now() - t2Start;
 
@@ -400,9 +400,9 @@ async function main() {
     console.log(`  Sending: "${testCat.replace(/_/g, ' ')} in ${targetHood.toLowerCase()}"\n`);
 
     const t3Start = Date.now();
-    const turn3 = await composeResponse(
+    const turn3 = await executeQuery(
       `${testCat.replace(/_/g, ' ')} in ${targetHood.toLowerCase()}`,
-      catEvents, targetHood, { free_only: false, category: testCat, vibe: null },
+      catEvents, { neighborhood: targetHood, activeFilters: { free_only: false, category: testCat, vibe: null } },
     );
     const t3Ms = Date.now() - t3Start;
 

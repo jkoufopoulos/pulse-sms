@@ -1,50 +1,43 @@
 const { check } = require('../helpers');
 
-// ---- AI routing output shape contracts ----
-console.log('\nAI routing contracts (routeMessage shape):');
+// ---- AI unified output shape contracts (executeQuery / unifiedRespond) ----
+console.log('\nAI contracts (unifiedRespond shape):');
 
-const validRouteOutput = {
-  intent: 'events',
-  neighborhood: 'East Village',
-  filters: { free_only: false, category: null, vibe: null },
-  event_reference: null,
-  reply: null,
-  confidence: 0.9,
-};
-
-check('routeMessage has intent', typeof validRouteOutput.intent === 'string');
-check('routeMessage has neighborhood', 'neighborhood' in validRouteOutput);
-check('routeMessage has filters', typeof validRouteOutput.filters === 'object' && validRouteOutput.filters !== null);
-check('routeMessage has confidence', typeof validRouteOutput.confidence === 'number');
-check('routeMessage intent is valid', ['events', 'details', 'more', 'free', 'help', 'conversational'].includes(validRouteOutput.intent));
-check('routeMessage filters has free_only', 'free_only' in validRouteOutput.filters);
-
-// Validate all valid intents
-const validIntents = ['events', 'details', 'more', 'free', 'help', 'conversational'];
-for (const intent of validIntents) {
-  check(`intent "${intent}" is recognized`, validIntents.includes(intent));
-}
-
-console.log('\nAI routing contracts (composeResponse shape):');
-
-const validComposeOutput = {
+const validUnifiedOutput = {
+  type: 'event_picks',
   sms_text: 'DJ Night at Output (Williamsburg) 9 PM — $20. Sick lineup tonight.\nAlso: Jazz at Smalls 8 PM\nReply DETAILS, MORE, or FREE.',
-  picks: [{ rank: 1, event_id: 'abc123' }, { rank: 2, event_id: 'def456' }],
+  picks: [{ rank: 1, event_id: 'abc123', why: 'tonight + in neighborhood' }, { rank: 2, event_id: 'def456', why: 'great lineup' }],
+  clear_filters: false,
 };
 
-check('composeResponse has sms_text', typeof validComposeOutput.sms_text === 'string');
-check('composeResponse sms_text <= 480 chars', validComposeOutput.sms_text.length <= 480);
-check('composeResponse has picks array', Array.isArray(validComposeOutput.picks));
-check('composeResponse picks have event_id', validComposeOutput.picks.every(p => typeof p.event_id === 'string'));
-check('composeResponse picks have rank', validComposeOutput.picks.every(p => typeof p.rank === 'number'));
+check('unifiedRespond has type', typeof validUnifiedOutput.type === 'string');
+check('unifiedRespond type is valid', ['event_picks', 'conversational', 'ask_neighborhood'].includes(validUnifiedOutput.type));
+check('unifiedRespond has sms_text', typeof validUnifiedOutput.sms_text === 'string');
+check('unifiedRespond sms_text <= 480 chars', validUnifiedOutput.sms_text.length <= 480);
+check('unifiedRespond has picks array', Array.isArray(validUnifiedOutput.picks));
+check('unifiedRespond picks have event_id', validUnifiedOutput.picks.every(p => typeof p.event_id === 'string'));
+check('unifiedRespond picks have rank', validUnifiedOutput.picks.every(p => typeof p.rank === 'number'));
+check('unifiedRespond picks have why', validUnifiedOutput.picks.every(p => typeof p.why === 'string'));
+check('unifiedRespond has clear_filters', typeof validUnifiedOutput.clear_filters === 'boolean');
 
 // Edge case: empty picks is valid (quiet night)
-const emptyComposeOutput = {
-  sms_text: "Quiet night in Bushwick. Try Williamsburg or East Village.\nReply DETAILS, MORE, or FREE.",
+const emptyOutput = {
+  type: 'conversational',
+  sms_text: "Quiet night in Bushwick. Try Williamsburg or East Village.",
+  picks: [],
+  clear_filters: false,
+};
+check('allows empty picks', Array.isArray(emptyOutput.picks) && emptyOutput.picks.length === 0);
+check('empty still has sms_text', typeof emptyOutput.sms_text === 'string' && emptyOutput.sms_text.length > 0);
+
+// ask_neighborhood type
+const askHoodOutput = {
+  type: 'ask_neighborhood',
+  sms_text: "Where are you looking? I can check for free jazz in any neighborhood.",
   picks: [],
 };
-check('composeResponse allows empty picks', Array.isArray(emptyComposeOutput.picks) && emptyComposeOutput.picks.length === 0);
-check('composeResponse empty still has sms_text', typeof emptyComposeOutput.sms_text === 'string' && emptyComposeOutput.sms_text.length > 0);
+check('ask_neighborhood type valid', askHoodOutput.type === 'ask_neighborhood');
+check('ask_neighborhood has empty picks', askHoodOutput.picks.length === 0);
 
 // ---- parseJsonFromResponse ----
 console.log('\nparseJsonFromResponse:');

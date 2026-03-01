@@ -13,7 +13,7 @@
  */
 
 const { fetchBrooklynVeganEvents, makeEventId } = require('../src/sources');
-const { composeResponse } = require('../src/ai');
+const { executeQuery } = require('../src/pipeline');
 const { rankEventsByProximity, filterUpcomingEvents, getNycDateString } = require('../src/geo');
 const { lookupVenue, learnVenueCoords } = require('../src/venues');
 
@@ -288,9 +288,9 @@ async function main() {
   console.log(`  Sending: "what's happening in ${targetHood.toLowerCase()}"\n`);
 
   const t1Start = Date.now();
-  const turn1 = await composeResponse(
+  const turn1 = await executeQuery(
     `what's happening in ${targetHood.toLowerCase()}`,
-    top8, targetHood, { free_only: false, category: null, vibe: null },
+    top8, { neighborhood: targetHood, activeFilters: { free_only: false, category: null, vibe: null } },
   );
   const t1Ms = Date.now() - t1Start;
 
@@ -337,9 +337,9 @@ async function main() {
     console.log(`  Sending: "any live music tonight"\n`);
 
     const t2Start = Date.now();
-    const turn2 = await composeResponse(
-      'any live music tonight', musicEvents, targetHood, { free_only: false, category: 'live_music', vibe: null },
-      { excludeIds: turn1.picks.map(p => p.event_id) },
+    const turn2 = await executeQuery(
+      'any live music tonight', musicEvents,
+      { neighborhood: targetHood, activeFilters: { free_only: false, category: 'live_music', vibe: null }, excludeIds: turn1.picks.map(p => p.event_id) },
     );
     const t2Ms = Date.now() - t2Start;
 

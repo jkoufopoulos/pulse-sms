@@ -1,5 +1,5 @@
 const { check } = require('../helpers');
-const { mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, failsTimeGate } = require('../../src/pipeline');
+const { mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, failsTimeGate, describeFilters } = require('../../src/pipeline');
 
 // ---- mergeFilters ----
 console.log('\nmergeFilters:');
@@ -102,7 +102,8 @@ check('comedy+free mismatch (paid) → false', eventMatchesFilters(comedyPaid, {
 // Time filter — no longer checked in eventMatchesFilters (enforced upstream by failsTimeGate in buildTaggedPool)
 check('time_after ignored: early event → hard', eventMatchesFilters(musicEarly, { time_after: '22:00' }) === 'hard');
 check('time_after ignored: late event → hard', eventMatchesFilters(musicLate, { time_after: '22:00' }) === 'hard');
-check('time_after ignored: no start_time → hard', eventMatchesFilters(artNoTime, { time_after: '22:00' }) === 'hard');
+// No start_time with time filter → soft (we don't know if it matches, LLM deprioritizes)
+check('time_after: no start_time → soft', eventMatchesFilters(artNoTime, { time_after: '22:00' }) === 'soft');
 
 // Empty filters → hard
 check('empty filters → hard', eventMatchesFilters(comedyPaid, {}) === 'hard');
@@ -444,3 +445,51 @@ check('midnight gate: pool size 2', midnightResult.pool.length === 2);
 const noTimeFilterResult = buildTaggedPool(timeEvents, { category: 'comedy' });
 check('no time filter: all events in pool', noTimeFilterResult.pool.length === 5);
 check('no time filter: all hard matched', noTimeFilterResult.pool.every(e => e.filter_match === 'hard'));
+
+
+// ---- describeFilters ----
+console.log('\ndescribeFilters:');
+
+// Single filters
+check('comedy → "comedy"', describeFilters({ category: 'comedy' }) === 'comedy');
+check('live_music → "live music"', describeFilters({ category: 'live_music' }) === 'live music');
+check('nightlife → "nightlife"', describeFilters({ category: 'nightlife' }) === 'nightlife');
+check('art → "art"', describeFilters({ category: 'art' }) === 'art');
+check('theater → "theater"', describeFilters({ category: 'theater' }) === 'theater');
+check('community → "community"', describeFilters({ category: 'community' }) === 'community');
+check('free_only → "free events"', describeFilters({ free_only: true }) === 'free events');
+
+// Subcategory overrides category
+check('jazz subcategory → "jazz"', describeFilters({ category: 'live_music', subcategory: 'jazz' }) === 'jazz');
+check('rock subcategory → "rock"', describeFilters({ category: 'live_music', subcategory: 'rock' }) === 'rock');
+check('techno subcategory → "techno"', describeFilters({ category: 'nightlife', subcategory: 'techno' }) === 'techno');
+check('standup subcategory → "standup"', describeFilters({ category: 'comedy', subcategory: 'standup' }) === 'standup');
+
+// Compound: free + category
+check('free comedy → "free comedy"', describeFilters({ category: 'comedy', free_only: true }) === 'free comedy');
+check('free jazz → "free jazz"', describeFilters({ category: 'live_music', subcategory: 'jazz', free_only: true }) === 'free jazz');
+
+// Compound: free + category + time
+check('free comedy after 10pm', describeFilters({ category: 'comedy', free_only: true, time_after: '22:00' }) === 'free comedy after 10pm');
+check('free jazz after 10pm', describeFilters({ category: 'live_music', subcategory: 'jazz', free_only: true, time_after: '22:00' }) === 'free jazz after 10pm');
+
+// Time variants
+check('time 22:00 → after 10pm', describeFilters({ time_after: '22:00' }) === 'events after 10pm');
+check('time 00:00 → after midnight', describeFilters({ time_after: '00:00' }) === 'events after midnight');
+check('time 21:00 → after 9pm', describeFilters({ time_after: '21:00' }) === 'events after 9pm');
+check('time 12:00 → after noon', describeFilters({ time_after: '12:00' }) === 'events after noon');
+check('time 13:30 → after 1:30pm', describeFilters({ time_after: '13:30' }) === 'events after 1:30pm');
+check('comedy after 9pm', describeFilters({ category: 'comedy', time_after: '21:00' }) === 'comedy after 9pm');
+
+// Vibe
+check('chill → "chill"', describeFilters({ vibe: 'chill' }) === 'chill');
+check('free chill → "free chill"', describeFilters({ free_only: true, vibe: 'chill' }) === 'free chill');
+check('chill comedy → "comedy chill"', describeFilters({ category: 'comedy', vibe: 'chill' }) === 'comedy chill');
+
+// Edge cases
+check('null → "events"', describeFilters(null) === 'events');
+check('undefined → "events"', describeFilters(undefined) === 'events');
+check('empty → "events"', describeFilters({}) === 'events');
+check('all falsy → "events"', describeFilters({ category: null, free_only: false, time_after: null, vibe: null }) === 'events');
+check('free_only false → "events"', describeFilters({ free_only: false }) === 'events');
+check('non-object → "events"', describeFilters('comedy') === 'events');
