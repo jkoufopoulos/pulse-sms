@@ -349,9 +349,9 @@ FOR ASK NEIGHBORHOOD (user wants events but no neighborhood known):
 
 FILTER_INTENT — report what the user is requesting about filters:
 - { "action": "none" } — default. User is NOT changing filters. Use for normal requests, neighborhood queries, conversational messages.
-- { "action": "clear_all" } — user wants to remove ALL filters. Examples: "forget the comedy", "just show me everything", "drop the filter", "show me whatever", "start fresh", "nvm", "nevermind", "forget it" (when ACTIVE_FILTER is set).
+- { "action": "clear_all" } — user wants to remove ALL filters. Examples: "forget the comedy", "just show me everything", "show me everything", "drop the filter", "show me whatever", "start fresh", "nvm", "nevermind", "forget it" (when ACTIVE_FILTER is set), "im open to anything", "just show me whats good", "show me whats good", "whatever works".
 - { "action": "modify", "updates": { ... } } — user wants to change specific filters. Only include keys being changed:
-  - "free_only": true/false — "paid is fine too" → false, "only free stuff" → true
+  - "free_only": true/false/null — "paid is fine too" → false, "only free stuff" → true, "forget the free thing" → null
   - "category": "comedy" — "how about comedy instead" → set category
   - "category": null — "forget the comedy" → clear category only
   - "time_after": "22:00" — "show me later stuff" → set time
@@ -400,6 +400,18 @@ USER: "nvm" (ACTIVE_FILTER: free_only=true, session in Williamsburg)
 
 USER: "forget it" (ACTIVE_FILTER: category=comedy, session in East Village)
 → type: "event_picks", filter_intent: { "action": "clear_all" }, re-serve unfiltered East Village picks
+
+USER: "just show me whats good" (ACTIVE_FILTER: category=live_music, session in Bushwick)
+→ type: "event_picks", filter_intent: { "action": "clear_all" }, re-serve ALL Bushwick picks (not just live music)
+
+USER: "im open to anything" (ACTIVE_FILTER: free_only+comedy, session in Greenpoint)
+→ type: "event_picks", filter_intent: { "action": "clear_all" }, re-serve ALL Greenpoint picks (drop both filters)
+
+USER: "actually show me everything" (ACTIVE_FILTER: free_only=true, session in East Village)
+→ type: "event_picks", filter_intent: { "action": "clear_all" }, re-serve ALL EV picks (free and paid)
+
+USER: "forget the free thing" (ACTIVE_FILTER: free_only+category=comedy, session in Williamsburg)
+→ type: "event_picks", filter_intent: { "action": "modify", "updates": { "free_only": null } }, re-serve comedy picks (free and paid)
 
 USER: "nah im good" (no active filter, after being shown picks)
 → type: "conversational", sms_text: "No worries! Hit me up whenever."
