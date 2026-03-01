@@ -6,6 +6,7 @@
 <title>Bestie Events</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -1112,18 +1113,16 @@ const HOOD_COORDS = {
 };
 
 let leafletMap = null;
-let mapCircles = [];
+let heatLayer = null;
+let mapLabels = [];
 
 function renderBoroughMap(container, boroughDist) {
-  // Compute per-neighborhood counts from filtered events
   const hoodCounts = {};
   const events = filteredEvents.length < allEvents.length ? filteredEvents : allEvents;
   for (const e of events) {
     const h = e.neighborhood || 'unknown';
     hoodCounts[h] = (hoodCounts[h] || 0) + 1;
   }
-
-  const maxCount = Math.max(...Object.values(hoodCounts), 1);
 
   // Initialize map once
   if (!leafletMap) {
@@ -1136,42 +1135,47 @@ function renderBoroughMap(container, boroughDist) {
       maxZoom: 16, minZoom: 10,
     }).addTo(leafletMap);
 
-    // Add minimal labels on top
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
       maxZoom: 16, minZoom: 10, pane: 'overlayPane',
     }).addTo(leafletMap);
 
     L.control.zoom({ position: 'topright' }).addTo(leafletMap);
-
-    // Fix Leaflet render on hidden container
     setTimeout(() => leafletMap.invalidateSize(), 100);
   }
 
-  // Clear old circles
-  for (const c of mapCircles) leafletMap.removeLayer(c);
-  mapCircles = [];
+  // Remove old layers
+  if (heatLayer) leafletMap.removeLayer(heatLayer);
+  for (const l of mapLabels) leafletMap.removeLayer(l);
+  mapLabels = [];
 
-  // Add circles for each neighborhood with events
+  // Build heat data: [lat, lng, intensity]
+  const heatPoints = [];
   for (const [hood, coords] of Object.entries(HOOD_COORDS)) {
     const count = hoodCounts[hood] || 0;
     if (count === 0) continue;
-    const borough = HOOD_TO_BOROUGH[hood] || 'unknown';
-    const color = BOROUGH_COLORS[borough] || '#444';
-    const radius = 200 + (count / maxCount) * 800;
+    heatPoints.push([coords[0], coords[1], count]);
+  }
 
-    const circle = L.circleMarker(coords, {
-      radius: 5 + (count / maxCount) * 20,
-      fillColor: color, fillOpacity: 0.7,
-      color: color, weight: 1, opacity: 0.9,
-    }).addTo(leafletMap);
+  heatLayer = L.heatLayer(heatPoints, {
+    radius: 35, blur: 25, maxZoom: 14,
+    gradient: { 0.2: '#0d1b2a', 0.4: '#1b263b', 0.5: '#415a77', 0.65: '#e07a1b', 0.8: '#FF6B35', 1.0: '#fff3e0' },
+  }).addTo(leafletMap);
 
+  // Add small label markers for neighborhoods with events
+  for (const [hood, coords] of Object.entries(HOOD_COORDS)) {
+    const count = hoodCounts[hood] || 0;
+    if (count === 0) continue;
     const pct = ((count / events.length) * 100).toFixed(1);
-    circle.bindTooltip(`<b>${hood}</b><br>${count} events (${pct}%)`, { className: 'hood-tooltip' });
-    circle.on('click', () => {
+    const label = L.circleMarker(coords, {
+      radius: 3, fillColor: '#fff', fillOpacity: 0.6,
+      color: '#fff', weight: 0.5, opacity: 0.4,
+    }).addTo(leafletMap);
+    label.bindTooltip(`<b>${hood}</b><br>${count} events (${pct}%)`, { className: 'hood-tooltip' });
+    label.on('click', () => {
       document.getElementById('f-neighborhood').value = hood;
       applyFilters();
     });
-    mapCircles.push(circle);
+    mapLabels.push(label);
   }
 }
 
