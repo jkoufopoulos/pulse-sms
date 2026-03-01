@@ -525,6 +525,7 @@ async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, 
       offeredIds: session?.allOfferedIds || [],
       visitedHoods: session?.visitedHoods || [],
       pending: {
+        neighborhood: suggestedHood,
         filters: activeFilters,
       },
       pendingMessage: message,
