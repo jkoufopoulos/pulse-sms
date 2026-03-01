@@ -561,9 +561,18 @@ All five root causes (A-E) are now fixed. Gap 3 (pool padding) and handleZeroMat
 
 - **Outer-borough scenarios are cache-dependent, not code-dependent:** Scenarios for thin neighborhoods (Washington Heights, Red Hook, Sunset Park) fail when the daily cache has few/no events there. These aren't code bugs — they're coverage gaps. The Tavily live-search fallback (landed 2026-03-01) may improve these, but the eval doesn't account for fallback latency.
 
-### Extraction Audit Blind Spots
+### Extraction Audit — Evidence Coverage (2026-03-01)
 
-The extraction audit shows 82-100% pass rates on most days, but this is misleading. The audit only checks events that have raw text capture (`extraction-capture.js`), and most sources skip capture. Typical runs check 2-25 events out of 200+ in the cache. The Feb 24 drop (21.4%, 3/14) was a real signal — extraction confidence thresholds were too permissive for Skint events with ambiguous dates.
+**Before:** 7.4% pass rate (26/349) — deterministic parsers (Skint, Yutori trivia/general) skipped evidence blocks, and Haiku omits evidence in extraction responses.
+
+**Fix:** Three-layer evidence synthesis:
+1. `normalizeExtractedEvent` in `shared.js` — synthesizes evidence from event fields when LLM omits it (all new extractions)
+2. `backfillEvidence` in `shared.js` — patches cached events at load time (SQLite + JSON + Yutori/Nonsense caches)
+3. Deterministic parsers (Skint `parseSkintParagraph`, Yutori `parseTriviaEvents`/`parseGeneralEventLine`) — explicit evidence from parsed fields
+
+**After:** 78.9% pass rate (266/337). Remaining failures:
+- `confidence_calibrated` (40): events with >0.8 confidence but <4/4 evidence fields — many genuinely lack price info
+- `has_evidence` (31): events with <2/4 synthesized fields (venue=TBA, no time, no price)
 
 ### Full Regression Baseline (2026-03-01)
 
