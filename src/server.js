@@ -31,8 +31,9 @@ app.use(express.urlencoded({ extended: false, limit: '5kb' }));
 app.use(express.json({ limit: '5mb' }));
 
 // Public health check — no internal details (L10 fix)
+const BUILD_SHA = require('child_process').execSync('git rev-parse --short HEAD 2>/dev/null || echo unknown').toString().trim();
 app.get('/', (req, res) => {
-  res.json({ status: 'ok', service: 'bestie' });
+  res.json({ status: 'ok', service: 'bestie', build: BUILD_SHA });
 });
 
 // Health dashboard — gated behind test mode or auth token
@@ -65,6 +66,58 @@ app.get('/api/alerts', (req, res) => {
 
   const limit = Math.min(parseInt(req.query.limit) || 50, 100);
   res.json(getRecentAlerts(limit));
+});
+
+// Cost summary API — same auth gating as /health
+app.get('/api/health/costs', (req, res) => {
+  const authToken = process.env.HEALTH_AUTH_TOKEN;
+  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
+  const hasValidToken = authToken && req.query.token === authToken;
+
+  if (!isTestMode && !hasValidToken) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const { getCostSummary } = require('./handler');
+  const traces = getRecentTraces(200);
+
+  const nycToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+
+  const todayTraces = traces.filter(t => {
+    if (!t.timestamp) return false;
+    const traceDate = new Date(t.timestamp).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+    return traceDate === nycToday;
+  });
+
+  function aggregateTraces(traceList) {
+    let totalUsd = 0;
+    const byProvider = {};
+    for (const t of traceList) {
+      const cost = t.total_ai_cost_usd || 0;
+      totalUsd += cost;
+      if (t.ai_costs) {
+        for (const ac of t.ai_costs) {
+          const provider = ac.provider || 'anthropic';
+          byProvider[provider] = (byProvider[provider] || 0) + (ac.cost_usd || 0);
+        }
+      }
+    }
+    return { total_usd: Math.round(totalUsd * 100000) / 100000, message_count: traceList.length, by_provider: byProvider };
+  }
+
+  const todayAgg = aggregateTraces(todayTraces);
+  todayAgg.avg_per_message_usd = todayAgg.message_count > 0
+    ? Math.round((todayAgg.total_usd / todayAgg.message_count) * 100000) / 100000 : 0;
+
+  const recentAgg = aggregateTraces(traces);
+  recentAgg.avg_per_message_usd = recentAgg.message_count > 0
+    ? Math.round((recentAgg.total_usd / recentAgg.message_count) * 100000) / 100000 : 0;
+
+  res.json({
+    today: todayAgg,
+    recent: recentAgg,
+    budget: getCostSummary(),
+  });
 });
 
 // SMS webhook
