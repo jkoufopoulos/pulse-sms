@@ -19,6 +19,11 @@ const NON_EVENT_CATEGORIES = [
   /crypto/i, /blockchain/i, /defi/i,
   /real\s+estate/i, /mortgage/i,
   /insurance/i, /health\s*care/i,
+  // personal development / advice / lifestyle
+  /personal\s+dev/i, /self[- ]?help/i, /coaching/i, /leadership/i,
+  /psychology/i, /relationship/i, /social\s+skills/i, /friendships?/i,
+  /productivity/i, /career/i, /hiring/i, /recruiting/i,
+  /legal/i, /compliance/i, /tax\b/i,
 ];
 
 /**
@@ -29,6 +34,10 @@ const NON_EVENT_FILENAMES = [
   /apple-s-bonus/i, /de-risking/i, /price-drop/i, /occ-nod/i,
   /cpb-screen/i, /index-trigger/i, /value-setup/i,
   /knicks/i, /nets/i, /yankees/i, /mets/i,
+  // personal development / advice
+  /friendship/i, /relationship/i, /self-help/i, /coaching/i,
+  /leadership/i, /career-/i, /hiring-/i, /tax-/i, /legal-/i,
+  /productivity/i, /psychology/i, /social-skill/i,
 ];
 
 /**
@@ -1208,10 +1217,20 @@ async function fetchYutoriEvents({ reprocess = false } = {}) {
           const raw = result.events || [];
           const normalized = raw.map(e => normalizeExtractedEvent(e, 'yutori', 'aggregator', 0.8));
           const passed = normalized.filter(e => e.name && e.completeness >= 0.25);
-          if (raw.length !== passed.length) {
-            console.log(`Yutori: LLM extracted ${raw.length} from ${file}, ${passed.length} passed gates (${raw.length - passed.length} dropped)`);
+          // Drop prose advice/commentary with no structural event signals
+          const contentFiltered = passed.filter(e => {
+            const hasTime = !!e.start_time_local;
+            const hasVenue = !!e.venue_name && e.venue_name !== 'TBA';
+            const hasUrl = !!e.ticket_url || !!e.source_url;
+            const hasDate = !!e.date_local;
+            if (!hasTime && !hasVenue && !hasUrl && !hasDate) return false;
+            return true;
+          });
+          const dropped = raw.length - contentFiltered.length;
+          if (dropped > 0) {
+            console.log(`Yutori: LLM extracted ${raw.length} from ${file}, ${contentFiltered.length} passed gates (${dropped} dropped)`);
           }
-          return passed;
+          return contentFiltered;
         })
       );
       for (const r of results) {
