@@ -135,8 +135,8 @@ function parseEventbriteJsonLd(html) {
         const offers = e.offers || {};
         const lowPrice = parseFloat(offers.lowPrice || offers.price || '');
         const nameAndDesc = ((e.name || '') + ' ' + (e.description || '')).toLowerCase();
-        const isFree = lowPrice === 0 || nameAndDesc.includes('free admission') || nameAndDesc.includes('free entry');
-        const priceDisplay = !isNaN(lowPrice) ? (lowPrice === 0 ? 'free' : `$${lowPrice}+`) : null;
+        const isFree = lowPrice === 0 || /\bfree\b/i.test(nameAndDesc);
+        const priceDisplay = isFree ? 'free' : (!isNaN(lowPrice) && lowPrice > 0 ? `$${lowPrice}+` : null);
 
         const category = inferCategory(nameAndDesc);
 

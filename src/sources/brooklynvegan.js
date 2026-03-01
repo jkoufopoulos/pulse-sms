@@ -70,7 +70,11 @@ async function fetchBrooklynVeganEvents() {
         } else if (item.ticket_info) {
           // Extract lowest dollar amount from ticket_info (may contain "$20", "$43.26, $48.41, 18+", "21+", etc.)
           const prices = [...item.ticket_info.matchAll(/\$(\d+(?:\.\d{2})?)/g)].map(m => parseFloat(m[1]));
-          if (prices.length > 0) priceDisplay = `$${Math.min(...prices)}`;
+          if (prices.length > 0) {
+            priceDisplay = `$${Math.min(...prices)}`;
+          } else if (/\bfree\b/i.test(item.ticket_info)) {
+            priceDisplay = 'free';
+          }
         }
 
         events.push({

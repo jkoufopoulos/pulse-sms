@@ -89,8 +89,10 @@ async function fetchBAMEvents() {
         end_time_local: null,
         date_local: dateLocal,
         time_window: null,
-        is_free: false,
-        price_display: null,
+        is_free: /\bfree\b/i.test(description || '') || /\bfree\b/i.test(name),
+        price_display: /\bfree\b/i.test(description || '') || /\bfree\b/i.test(name)
+          ? 'free'
+          : ((description || '').match(/\$(\d+)/) || [])[0] || null,
         category,
         subcategory: item.genres || null,
         ticket_url: ticketUrl,

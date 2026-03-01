@@ -64,8 +64,13 @@ function parseCards($, cards, dateStr, categoryOverride) {
     const isFree = /\bfree\b/i.test(cardText) || /\$0(?:\.00)?/.test(cardText);
     let priceDisplay = isFree ? 'free' : null;
     if (!isFree) {
-      const priceMatch = cardText.match(/\$(\d+)/);
-      if (priceMatch) priceDisplay = `$${priceMatch[1]}`;
+      const rangeMatch = cardText.match(/\$(\d+(?:\.\d{2})?)\s*[-–]\s*\$?(\d+(?:\.\d{2})?)/);
+      if (rangeMatch) {
+        priceDisplay = `$${rangeMatch[1]}-$${rangeMatch[2]}`;
+      } else {
+        const priceMatch = cardText.match(/\$(\d+)/);
+        if (priceMatch) priceDisplay = `$${priceMatch[1]}`;
+      }
     }
 
     // Category — use card CSS class, then infer from name
@@ -167,6 +172,8 @@ function extractPriceFromDetailPage(html) {
   // 2. Dollar amount in event detail area
   const detailText = $('.ds-event-detail, .ds-event-description, .ds-event-details').text();
   if (/\bfree\b/i.test(detailText)) return 'free';
+  const rangeMatch = detailText.match(/\$(\d+(?:\.\d{2})?)\s*[-–]\s*\$?(\d+(?:\.\d{2})?)/);
+  if (rangeMatch) return `$${rangeMatch[1]}-$${rangeMatch[2]}`;
   const match = detailText.match(/\$(\d+(?:\.\d{2})?)/);
   if (match) return `$${match[1]}`;
   return null;
