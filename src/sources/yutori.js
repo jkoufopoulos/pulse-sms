@@ -1217,13 +1217,22 @@ async function fetchYutoriEvents({ reprocess = false } = {}) {
           const raw = result.events || [];
           const normalized = raw.map(e => normalizeExtractedEvent(e, 'yutori', 'aggregator', 0.8));
           const passed = normalized.filter(e => e.name && e.completeness >= 0.25);
-          // Drop prose advice/commentary with no structural event signals
+          // Drop prose advice/commentary with no structural event signals.
+          // date_local alone doesn't count — the LLM assigns today's date to everything.
+          // Require at least one of: specific time, real venue, or URL.
+          // A venue that's a substring of the event name (or vice versa) is fabricated.
           const contentFiltered = passed.filter(e => {
             const hasTime = !!e.start_time_local;
-            const hasVenue = !!e.venue_name && e.venue_name !== 'TBA';
             const hasUrl = !!e.ticket_url || !!e.source_url;
-            const hasDate = !!e.date_local;
-            if (!hasTime && !hasVenue && !hasUrl && !hasDate) return false;
+            let hasVenue = !!e.venue_name && e.venue_name !== 'TBA';
+            if (hasVenue) {
+              const vLow = e.venue_name.toLowerCase();
+              const nLow = (e.name || '').toLowerCase();
+              if (nLow.startsWith(vLow) || vLow.startsWith(nLow.split(':')[0])) {
+                hasVenue = false;
+              }
+            }
+            if (!hasTime && !hasVenue && !hasUrl) return false;
             return true;
           });
           const dropped = raw.length - contentFiltered.length;
