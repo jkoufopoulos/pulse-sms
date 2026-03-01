@@ -258,6 +258,19 @@ async function refreshCache() {
       console.error('Source completeness check failed:', err.message);
     }
 
+    // Run scrape audit (all sources — format, completeness, counts)
+    try {
+      const { runScrapeAudit } = require('./evals/scrape-audit');
+      const scrapeReport = runScrapeAudit(validEvents, fetchMap);
+      console.log(`Scrape audit: ${scrapeReport.summary.passRate} pass (${scrapeReport.summary.passed}/${scrapeReport.summary.total}), ${scrapeReport.summary.sourcesBelow} sources below minimum`);
+      const reportsDir = path.join(__dirname, '../data/reports');
+      fs.mkdirSync(reportsDir, { recursive: true });
+      const reportFile = path.join(reportsDir, `scrape-audit-${new Date().toISOString().slice(0, 10)}.json`);
+      fs.writeFileSync(reportFile, JSON.stringify(scrapeReport, null, 2));
+    } catch (err) {
+      console.error('Scrape audit failed:', err.message);
+    }
+
     saveHealthData();
     console.log(`Cache refreshed: ${validEvents.length} events (${totalRaw} raw, ${allEvents.length} deduped, ${staleCount} stale removed | ${sourcesOk} ok / ${sourcesFailed} failed / ${sourcesEmpty} empty)`);
     return eventCache;

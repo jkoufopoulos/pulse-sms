@@ -740,6 +740,105 @@ check('NYC Parks good event passes', checkEvent(goodParksEvent, 'NYC Parks').len
 const badParksEvent = { ...goodParksEvent, is_free: false };
 check('NYC Parks paid event fails invariant', checkEvent(badParksEvent, 'NYC Parks').some(i => i.includes('invariant') && i.includes('is_free')));
 
+// ---- scrape-audit evals ----
+console.log('\nScrape audit evals:');
+
+const { runScrapeAudit, checks: scrapeChecks } = require('../src/evals/scrape-audit');
+
+// Helper to run a single check
+function runCheck(checkName, event) {
+  return scrapeChecks[checkName](event);
+}
+
+// -- date_format_valid --
+check('date_format_valid passes for YYYY-MM-DD', runCheck('date_format_valid', { date_local: '2026-03-01' }).pass === true);
+check('date_format_valid passes for null', runCheck('date_format_valid', { date_local: null }).pass === true);
+check('date_format_valid fails for bad format', runCheck('date_format_valid', { date_local: 'March 1, 2026' }).pass === false);
+check('date_format_valid fails for partial', runCheck('date_format_valid', { date_local: '2026-3-1' }).pass === false);
+
+// -- time_format_valid --
+check('time_format_valid passes for ISO datetime', runCheck('time_format_valid', { start_time_local: '2026-03-01T21:00' }).pass === true);
+check('time_format_valid passes for ISO with seconds', runCheck('time_format_valid', { start_time_local: '2026-03-01T21:00:00' }).pass === true);
+check('time_format_valid passes for null', runCheck('time_format_valid', { start_time_local: null }).pass === true);
+check('time_format_valid fails for time only', runCheck('time_format_valid', { start_time_local: '21:00' }).pass === false);
+check('time_format_valid fails for full ISO with Z', runCheck('time_format_valid', { start_time_local: '2026-03-01T21:00:00Z' }).pass === false);
+
+// -- time_present --
+check('time_present passes when time exists', runCheck('time_present', { start_time_local: '2026-03-01T21:00', category: 'nightlife' }).pass === true);
+check('time_present passes for exempt category', runCheck('time_present', { start_time_local: null, category: 'art' }).pass === true);
+check('time_present fails for nightlife without time', runCheck('time_present', { start_time_local: null, category: 'nightlife' }).pass === false);
+check('time_present fails for comedy without time', runCheck('time_present', { start_time_local: null, category: 'comedy' }).pass === false);
+check('time_present passes for null category', runCheck('time_present', { start_time_local: null, category: null }).pass === true);
+
+// -- venue_quality --
+check('venue_quality passes for real venue', runCheck('venue_quality', { venue_name: 'Smalls Jazz Club', name: 'Jazz Night' }).pass === true);
+check('venue_quality fails for TBA', runCheck('venue_quality', { venue_name: 'TBA', name: 'Jazz Night' }).pass === false);
+check('venue_quality fails for empty', runCheck('venue_quality', { venue_name: '', name: 'Jazz Night' }).pass === false);
+check('venue_quality hints when name has "at"', runCheck('venue_quality', { venue_name: 'TBA', name: 'Jazz Night at Blue Note' }).pass === false);
+check('venue_quality TBA with "at" mentions hint', runCheck('venue_quality', { venue_name: 'TBA', name: 'Jazz Night at Blue Note' }).detail.includes('hint'));
+
+// -- price_coverage --
+check('price_coverage passes for is_free', runCheck('price_coverage', { is_free: true }).pass === true);
+check('price_coverage passes for price_display', runCheck('price_coverage', { is_free: false, price_display: '$20' }).pass === true);
+check('price_coverage fails for neither', runCheck('price_coverage', { is_free: false, price_display: null }).pass === false);
+
+// -- category_valid --
+check('category_valid passes for nightlife', runCheck('category_valid', { category: 'nightlife' }).pass === true);
+check('category_valid passes for comedy', runCheck('category_valid', { category: 'comedy' }).pass === true);
+check('category_valid fails for unknown', runCheck('category_valid', { category: 'sports' }).pass === false);
+check('category_valid fails for null', runCheck('category_valid', { category: null }).pass === false);
+
+// -- has_url --
+check('has_url passes for ticket_url', runCheck('has_url', { ticket_url: 'https://example.com', source_url: null }).pass === true);
+check('has_url passes for source_url', runCheck('has_url', { ticket_url: null, source_url: 'https://example.com' }).pass === true);
+check('has_url fails for neither', runCheck('has_url', { ticket_url: null, source_url: null }).pass === false);
+
+// -- runScrapeAudit integration --
+console.log('\nScrape audit runner:');
+
+const goodEvent = {
+  id: 'e1', source_name: 'dice', name: 'Jazz Night',
+  date_local: '2026-03-01', start_time_local: '2026-03-01T21:00',
+  venue_name: 'Blue Note', is_free: false, price_display: '$20',
+  category: 'live_music', ticket_url: 'https://dice.fm/e/123',
+  source_url: null,
+};
+const badEvent = {
+  id: 'e2', source_name: 'dice', name: 'Mystery Show at Secret Spot',
+  date_local: 'March 1', start_time_local: null,
+  venue_name: 'TBA', is_free: false, price_display: null,
+  category: 'banana', ticket_url: null, source_url: null,
+};
+
+const mockFetchMap2 = {
+  Dice: { events: [goodEvent, badEvent, {}, {}, {}, {}], status: 'ok' },
+  Skint: { events: [{}, {}, {}, {}, {}], status: 'ok' },
+  RA: { events: [{}, {}], status: 'ok' },  // below minimum of 5
+};
+
+const report = runScrapeAudit([goodEvent, badEvent], mockFetchMap2);
+
+check('report type is scrape-audit', report.type === 'scrape-audit');
+check('report summary total is 2', report.summary.total === 2);
+check('report summary passed is 1', report.summary.passed === 1);
+check('report summary issues is 1', report.summary.issues === 1);
+check('report has sourceStats', 'dice' in report.sourceStats);
+check('report dice stats correct', report.sourceStats.dice.total === 2 && report.sourceStats.dice.passed === 1);
+check('report bad event has failures', report.events.length === 1 && report.events[0].event_id === 'e2');
+
+// Source count checks
+check('Dice count passes (6 >= 5)', report.sourceCountChecks.Dice.pass === true);
+check('Skint count passes (5 >= 5)', report.sourceCountChecks.Skint.pass === true);
+check('RA count fails (2 < 5)', report.sourceCountChecks.RA.pass === false);
+// Sources not in fetchMap also count as below minimum (0 events)
+const expectedBelow = Object.entries(report.sourceCountChecks).filter(([, v]) => !v.pass).length;
+check('report sourcesBelow matches failing count checks', report.summary.sourcesBelow === expectedBelow);
+
+// Empty fetchMap
+const emptyReport = runScrapeAudit([], {});
+check('empty report has 0 total', emptyReport.summary.total === 0);
+check('empty report passRate is N/A', emptyReport.summary.passRate === 'N/A');
+
 // ---- Summary ----
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

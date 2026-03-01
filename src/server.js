@@ -140,6 +140,7 @@ const REPORT_PREFIXES = {
   'scenario-eval-': 'scenario',
   'regression-eval-': 'regression',
   'extraction-audit-': 'extraction',
+  'scrape-audit-': 'scrape',
 };
 function getReportType(filename) {
   for (const [prefix, type] of Object.entries(REPORT_PREFIXES)) {
@@ -176,6 +177,9 @@ app.get('/api/eval-reports', (req, res) => {
       }
       if (type === 'extraction') {
         return { ...base, total: data.summary?.total, passed: data.summary?.passed, pass_rate: data.summary?.passRate, tier: data.tier };
+      }
+      if (type === 'scrape') {
+        return { ...base, total: data.summary?.total, passed: data.summary?.passed, pass_rate: data.summary?.passRate, sources_below: data.summary?.sourcesBelow };
       }
       return base;
     } catch { return null; }
@@ -399,6 +403,23 @@ app.get('/api/eval/audit', (req, res) => {
       .sort()
       .reverse();
     if (files.length === 0) return res.json({ error: 'No audit reports yet' });
+    const report = JSON.parse(fs.readFileSync(require('path').join(reportsDir, files[0]), 'utf8'));
+    res.json(report);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// API: scrape audit (GET = read latest report)
+app.get('/api/eval/scrape-audit', (req, res) => {
+  const fs = require('fs');
+  const reportsDir = require('path').join(__dirname, '../data/reports');
+  try {
+    const files = fs.readdirSync(reportsDir)
+      .filter(f => f.startsWith('scrape-audit-'))
+      .sort()
+      .reverse();
+    if (files.length === 0) return res.json({ error: 'No scrape audit reports yet' });
     const report = JSON.parse(fs.readFileSync(require('path').join(reportsDir, files[0]), 'utf8'));
     res.json(report);
   } catch (err) {
