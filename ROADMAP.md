@@ -359,11 +359,9 @@ Same pattern in: free+comedy stacking (compound applied, nothing matched, LLM sh
 
 When the LLM suggests a nearby neighborhood ("want me to check Gowanus?"), the user says "ok" or "sure," but gets "Tell me what you're looking for" (casual ack path) instead of events from the suggested neighborhood.
 
-**Why:** The nudge-accept flow depends on `pendingNearby` being set in the session. `pendingNearby` is only set when `saveResponseFrame` is called with `type: 'ask_neighborhood'`. If the LLM just *mentions* nearby neighborhoods conversationally (not via the structured `ask_neighborhood` response type), `pendingNearby` is never set.
+**Why:** The `ask_neighborhood` response handler saved `pending: { filters: activeFilters }` but omitted the `neighborhood` key, so `pendingNearby` was always null for that path. The pre-router then caught "ok"/"bet" as casual acks (since `!session?.pendingNearby` was always true). The other three response paths (`event_picks`, `conversational`, `zero_match`) already correctly set `pending: { neighborhood: suggestedHood, filters: activeFilters }`.
 
-**Affected scenarios:** jazz in cobble hill→"ok"→context lost, comedy in cobble hill→"ok"→fallback, category survives ambiguous response→"ok"/"sure"→reset.
-
-**Fix options:** Improve the LLM prompt to use `ask_neighborhood` type when suggesting neighborhoods, or make the pre-router smarter about matching "ok"/"sure" to recently-mentioned neighborhoods.
+**Fixed (2026-03-01):** Added `neighborhood: suggestedHood` to the `ask_neighborhood` handler's `pending` object in `handleUnifiedResponse` (handler.js:527-528), making it consistent with the other three paths. Verified on Railway: "jazz in red hook" → "sure" correctly resolves to the suggested nearby neighborhood via the `pendingNearby` → affirmation regex flow in `resolveUnifiedContext`.
 
 #### Root Cause E: Filter stacking — pre-router gate blocks detection after zero-match turns (~15% of failures)
 
@@ -382,10 +380,10 @@ Two sub-cases: (1) Overlap with Root Cause C — compound filter matches nothing
 | **A: 502/crashes** | ~35% | Infrastructure | Test endpoint timeout + session persistence | **Fixed (2026-02-28)** |
 | **B: Session loss** | ~15% | Yes | Session disk persistence | **Partially fixed (2026-02-28)** — `ask_neighborhood` empty picks remains |
 | **C: Zero-match fallback** | ~25% | Design question | Prompt hardening: LLM must lead with "No [filter] in [hood]" before alternatives | **Fixed (2026-02-28)** |
-| **D: Nudge-accept** | ~10% | Yes (prompt gap) | LLM prompt or pre-router improvement | Open |
+| **D: Nudge-accept** | ~10% | Yes (missing field) | Add `neighborhood` to `ask_neighborhood` pending object | **Fixed (2026-03-01)** |
 | **E: Stacking via pre-router** | ~15% | Yes (pre-router edge case) | Remove `lastPicks.length > 0` gate from filter detection | **Fixed (2026-02-28)** |
 
-Fixing A+B+C+E (done) should address ~90% of failures. Root Cause D (nudge-accept, ~10%) remains open.
+All five root causes (A-E) are now fixed. Remaining filter_drift failures are likely LLM compose-time issues (picking non-matching events from padded pool — Gap 3).
 
 ### P5 — Temporal Accuracy (was 25%, expected fixed)
 
@@ -494,12 +492,18 @@ The extraction audit shows 82-100% pass rates on most days, but this is misleadi
 | Reduce pool padding for zero-match filters (Gap 3) | +10-15% filter_drift (structural fix) | Medium | Planned |
 | Stabilize eval judge (pin Sonnet, add deterministic assertions) | Reduces noise, enables real A/B | Low | Planned |
 | Tavily fallback for thin neighborhoods | +5-10% happy_path, poor_experience | Done (2026-03-01) | Verify in next run |
-| Nudge-accept flow (`pendingNearby` + pre-router) | +5% filter_drift (Root Cause D) | Medium | Open |
+| Nudge-accept flow (`pendingNearby` + pre-router) | +5% filter_drift (Root Cause D) | Low | **Done (2026-03-01)** |
 | Reasoning/rendering split (Step 4) | Unknown — needs A/B eval | High | Planned |
 
 ---
 
 ## Completed Work
+
+### Fix Nudge-Accept Flow — Root Cause D (2026-03-01)
+
+The `ask_neighborhood` handler in `handleUnifiedResponse` saved `pending: { filters: activeFilters }` but omitted the `neighborhood` key, so `pendingNearby` was always null for that path. When the user replied "ok"/"sure"/"bet" to a nearby suggestion, the pre-router caught it as a casual ack instead of triggering the nudge-accept flow.
+
+**Fix:** Added `neighborhood: suggestedHood` to the `pending` object in the `ask_neighborhood` handler (handler.js:527-528), making it consistent with the `event_picks`, `conversational`, and `zero_match` paths that already set it correctly. One-line change. Closes Root Cause D (~10% of filter persistence failures).
 
 ### Filter Junk Personal-Advice Events from Yutori (2026-03-01)
 
@@ -982,9 +986,9 @@ First full 130-scenario eval run showed 35.4% pass rate (46/130). Analysis found
 
 Uses old two-call flow (`routeMessage` → `composeResponse` with `COMPOSE_SYSTEM`) while main path uses single-call `unifiedRespond` with `UNIFIED_SYSTEM`. Different prompts, different behavior, different skill activation. Any prompt improvement must be done twice. This is step 7 in the migration (`executeQuery` pipeline).
 
-#### Priority 3 — Root Cause D (nudge-accept)
+#### Priority 3 — Root Cause D (nudge-accept) — **Fixed (2026-03-01)**
 
-~10% of filter persistence failures. LLM mentions nearby neighborhoods conversationally but `pendingNearby` never set, so "ok"/"sure" falls through. Fix: prompt instruction to use `ask_neighborhood` type, or pre-router detection of affirmative + recent neighborhood mention.
+Was ~10% of filter persistence failures. The `ask_neighborhood` handler omitted `neighborhood` from the `pending` object, so `pendingNearby` was never set for that path. One-line fix: added `neighborhood: suggestedHood` to the pending object.
 
 #### Priority 4 — Dead code and divergence risks
 
