@@ -62,8 +62,20 @@ function parseEventbriteServerData(html) {
     const id = makeEventId(e.name, venue.name, e.start_date, 'eventbrite');
 
     const nameAndDesc = ((e.name || '') + ' ' + (e.summary || '')).toLowerCase();
-    const isFree = nameAndDesc.includes('free admission') || nameAndDesc.includes('free entry') || nameAndDesc.includes('free event');
+    const tags = (e.tags || []).map(t => (t.display_name || t.tag || '').toLowerCase());
+    const hasFreeTag = tags.some(t => t === 'free' || t === 'free_entry');
+    const isFree = hasFreeTag || nameAndDesc.includes('free admission') || nameAndDesc.includes('free entry') || nameAndDesc.includes('free event');
     const category = inferCategory(nameAndDesc);
+
+    let priceDisplay = null;
+    if (isFree) {
+      priceDisplay = 'free';
+    } else {
+      // Extract first dollar amount from name or summary
+      const priceText = (e.name || '') + ' ' + (e.summary || '');
+      const priceMatch = priceText.match(/\$(\d+(?:\.\d{2})?)/);
+      if (priceMatch) priceDisplay = `$${priceMatch[1]}`;
+    }
 
     events.push({
       id,
@@ -80,7 +92,7 @@ function parseEventbriteServerData(html) {
       date_local: e.start_date || null,
       time_window: null,
       is_free: isFree,
-      price_display: isFree ? 'free' : null,
+      price_display: priceDisplay,
       category,
       subcategory: null,
       ticket_url: e.url || null,

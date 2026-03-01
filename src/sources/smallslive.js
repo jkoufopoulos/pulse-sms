@@ -100,7 +100,7 @@ async function fetchSmallsLiveEvents() {
           date_local: dateLocal || today,
           time_window: null,
           is_free: false,
-          price_display: null,
+          price_display: 'Cover charge',
           category: 'live_music',
           subcategory: 'jazz',
           ticket_url: sourceUrl,
