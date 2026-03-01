@@ -97,7 +97,8 @@ function preRoute(message, session) {
   }
 
   // Event name match from session picks
-  if (session?.lastPicks && session?.lastEvents && lower.length >= 3) {
+  // Skip when the message is a known neighborhood — neighborhood routing takes priority
+  if (session?.lastPicks && session?.lastEvents && lower.length >= 3 && !extractNeighborhood(msg)) {
     for (let i = 0; i < session.lastPicks.length; i++) {
       const event = session.lastEvents[session.lastPicks[i].event_id];
       if (!event?.name) continue;

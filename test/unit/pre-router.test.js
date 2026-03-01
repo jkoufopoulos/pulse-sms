@@ -43,6 +43,15 @@ const nameMatchSession = {
 check('event name match → details', preRoute('smalls', nameMatchSession)?.intent === 'details');
 check('event name match → correct ref', preRoute('smalls', nameMatchSession)?.event_reference === '1');
 
+// Neighborhood names should NOT match event names — neighborhood routing takes priority
+const hoodNameSession = {
+  lastPicks: [{ event_id: 'e1' }, { event_id: 'e2' }],
+  lastEvents: { e1: { name: 'Trivia Night at Little Rebel (East Village)' }, e2: { name: 'Mixtape Bingo! (Bushwick)' } },
+  lastNeighborhood: 'Williamsburg',
+};
+check('east village → null (not event name match)', preRoute('east village', hoodNameSession) === null);
+check('bushwick → null (not event name match)', preRoute('bushwick', hoodNameSession) === null);
+
 // Greetings
 check('hey → conversational', preRoute('hey', null)?.intent === 'conversational');
 check('hi → conversational', preRoute('hi', null)?.intent === 'conversational');
