@@ -512,56 +512,50 @@ Migrated `handleMore` from the legacy two-call flow (`routeMessage` → `compose
 
 **Added:** `executeQuery()` in pipeline.js (thin wrapper, late `require('./ai')` to avoid circular deps), `composeViaExecuteQuery()` helper in intent-handlers.js for handleMore trace recording. Updated eval scripts (run-ab-eval.js, parks-eval.js, bv-eval.js) and unit tests. All 77 smoke tests pass.
 
-### 3-Model Comparison Eval — Haiku vs Gemini Flash vs Gemini Pro (2026-03-01)
+### Model Comparison Eval — Haiku vs Flash vs Flash-Lite (2026-03-01)
 
-Full 48 happy_path scenario eval run locally against all three models (concurrency 5, same event cache, same code revision `d42d33b`).
+Full 48 happy_path scenario eval run locally (concurrency 5, same event cache, same code revision `d42d33b`).
 
 **Results:**
 
 | Model | Pass | Fail | Err | Rate | Elapsed | Est. Cost/msg |
 |-------|------|------|-----|------|---------|---------------|
-| Claude Haiku 4.5 | 20 | 27 | 1 | **42%** | 117s | ~$0.001-0.002 |
-| Gemini 2.5 Flash | 24 | 22 | 2 | **50%** | 191s | ~$0.0002-0.0004 |
-| Gemini 2.5 Pro | 14 | 33 | 1 | **29%** | 312s | ~$0.004-0.008 |
+| Gemini 2.5 Flash | 24 | 22 | 2 | **50%** | 191s | ~$0.0003 |
+| Gemini 2.5 Flash-Lite | 20 | 28 | 0 | **42%** | 76s | ~$0.0001 |
+| Claude Haiku 4.5 | 20 | 27 | 1 | **42%** | 117s | ~$0.0015 |
 
 **Key findings:**
 
-1. **Gemini Flash wins on both quality and cost.** 50% pass rate at ~5-10x cheaper than Haiku. Flash is the clear production choice.
-2. **Gemini Pro is the worst performer.** 29% pass rate at 3-4x the cost of Haiku. Slowest by far (312s vs 117s). 63 latency failures and 14 empty-response failures. Not viable for SMS.
-3. **10 scenarios pass on all 3 models** — these are reliably solved (BK slang, Chelsea browse, Park Slope switch, etc.).
-4. **20 scenarios fail on all 3 models** — these are structural/prompt issues, not model-dependent. Includes all 5 Extended scenarios, late-night requests, theater/jazz filters, MORE flows.
-5. **18 scenarios have mixed results** — model-dependent. Flash uniquely passes filter scenarios (comedy, free, EV first-time). Haiku uniquely passes some detail grabs (Red Hook, Tribeca, Boerum Hill). Pro uniquely passes West Village late request.
+1. **Gemini 2.5 Flash is the best model.** 50% pass rate, fewest code eval failures (64), 5-10x cheaper than Haiku.
+2. **Flash-Lite ties Haiku on pass rate (42%) but is fastest (76s) and cheapest.** Fewer code eval failures than Haiku (92 vs 90 — comparable). Could be viable if cost is the primary constraint.
+3. **Flash beats Flash-Lite by 8 points.** Flash wins 7 scenarios Lite loses; Lite only wins 3 that Flash loses. The reasoning capability in full Flash matters for multi-turn flows.
+4. **13 scenarios pass on all 3 models** — reliably solved. 19 fail on all 3 — structural/prompt issues, not model-dependent.
+5. **Gemini Pro was also tested (14/48, 29%) but eliminated** — too slow (312s), too expensive, 63 latency failures. Not viable for SMS.
+
+**Flash vs Flash-Lite head-to-head:**
+
+- Flash wins (7): free events filter, details on multiple picks, Park Slope→Gowanus, Greenpoint→DUMBO, Greenpoint detail, Tribeca quick pick, Bed-Stuy live music details
+- Lite wins (3): neighborhood hopping with memory, Red Hook detail, direct MORE without details
+- Flash's advantage is in multi-turn filter/neighborhood flows — exactly where quality matters most.
 
 **Code eval failures (lower is better):**
 
-| Eval | Haiku | Flash | Pro |
-|------|-------|-------|-----|
-| latency_under_10s | 0 | 9 | **63** |
-| response_not_empty | 0 | 0 | **14** |
-| price_transparency | **29** | 7 | 13 |
-| schema_compliance | 21 | 21 | 7 |
-| off_topic_redirect | 16 | 9 | 14 |
-| neighborhood_accuracy | 17 | 16 | 16 |
-| pick_count_accuracy | 3 | 0 | 0 |
-| **Total** | **90** | **64** | **132** |
+| Eval | Flash | Flash-Lite | Haiku |
+|------|-------|------------|-------|
+| schema_compliance | 21 | 25 | 21 |
+| price_transparency | 7 | **24** | **29** |
+| neighborhood_accuracy | 16 | **22** | 17 |
+| off_topic_redirect | 9 | 9 | **16** |
+| latency_under_10s | 9 | 1 | 0 |
+| pick_count_accuracy | 0 | 7 | 3 |
+| neighborhood_expansion | 2 | 3 | 4 |
+| **Total** | **64** | **92** | **90** |
 
-Flash has the fewest code eval failures (64 vs 90 Haiku, 132 Pro). Pro's latency problem (63 failures) is disqualifying for SMS — users won't wait 10+ seconds. Haiku's price_transparency issue (29 failures) suggests it mentions prices less reliably.
+Flash-Lite's weakness is price_transparency (24 failures) and neighborhood_accuracy (22) — it's less precise about mentioning costs and serving the right hood. Full Flash is materially better on both.
 
-**Model-exclusive passes:**
+**Decision:** Gemini 2.5 Flash remains the production model. Flash-Lite is not worth the quality tradeoff — the cost savings (~$0.0002/msg) are negligible at our volume, but the 8-point pass rate gap and weaker neighborhood accuracy would hurt user experience.
 
-- Flash only (4): first-time EV user, comedy filter, free filter, Bed-Stuy live music details
-- Haiku only (3): Red Hook detail, Tribeca single pick, Boerum Hill switch
-- Pro only (1): West Village late request
-
-**Overlap analysis:**
-
-- Haiku+Flash agree (not Pro): 7 scenarios — Pro struggles with neighborhood switches and detail flows
-- Flash+Pro agree (not Haiku): 3 scenarios — Haiku struggles with MORE and Tribeca
-- Haiku+Pro agree (not Flash): 0 scenarios — no shared strength against Flash
-
-**Decision:** Gemini Flash is the production model for compose/extract. 8 percentage points better than Haiku at 5-10x lower cost. The 20 shared failures are prompt/architecture issues to fix in code, not model-switchable.
-
-**Reports:** `data/reports/scenario-eval-2026-03-01T06-42-39.json` (Haiku), `scenario-eval-2026-03-01T06-45-57.json` (Flash), `scenario-eval-2026-03-01T06-51-15.json` (Pro).
+**Reports:** `scenario-eval-2026-03-01T06-42-39.json` (Haiku), `scenario-eval-2026-03-01T06-45-57.json` (Flash), `scenario-eval-2026-03-01T07-03-56.json` (Flash-Lite).
 
 ### Fix Nudge-Accept Flow — Root Cause D (2026-03-01)
 
