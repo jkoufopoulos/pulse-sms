@@ -501,6 +501,7 @@ const matchAlignPassTrace = {
       { event_id: 'e2', filter_match: 'soft' },
       { event_id: 'e3', filter_match: false },
     ],
+    pool_meta: { matchCount: 2 },
   },
   composition: {
     ...goodTrace.composition,
@@ -508,7 +509,6 @@ const matchAlignPassTrace = {
       { rank: 1, event_id: 'e1' },
       { rank: 2, event_id: 'e2' },
     ],
-    pool_meta: { matchCount: 2 },
   },
 };
 const matchAlignPassResults = runCodeEvals(matchAlignPassTrace);
@@ -524,6 +524,7 @@ const matchAlignFailTrace = {
       { event_id: 'e2', filter_match: false },
       { event_id: 'e3', filter_match: false },
     ],
+    pool_meta: { matchCount: 1 },
   },
   composition: {
     ...goodTrace.composition,
@@ -531,7 +532,6 @@ const matchAlignFailTrace = {
       { rank: 1, event_id: 'e2' },
       { rank: 2, event_id: 'e3' },
     ],
-    pool_meta: { matchCount: 1 },
   },
 };
 const matchAlignFailResults = runCodeEvals(matchAlignFailTrace);

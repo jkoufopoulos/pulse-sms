@@ -199,9 +199,9 @@ The architecture principles (P1-P7) and migration steps address the core design.
 | 1: `clear_filters` bridge | P1 (code owns state) | Filter wipe on non-clearing turns; semantic clearing misses | **Superseded (2026-03-01)** — replaced with `filter_intent` schema |
 | 2: Reasoning/rendering coupling | P2 (separate concerns) | Category drift, zero-match fallback (Theme A + Root Cause C) | High — Step 4 A/B eval required |
 | 3: Pool padding | P1 (code owns state) | Structural enabler of filter drift (Theme A, C, F) | **Done (2026-03-01)** — eliminated unmatched padding |
-| 4: No degraded-mode recovery | (No principle yet) | 35% of eval failures cascade from single LLM failure | Medium — deterministic fallback formatter |
+| 4: No degraded-mode recovery | (No principle yet) | 35% of eval failures cascade from single LLM failure | **Done (2026-03-01)** — deterministic fallback in handler.js |
 
-Gaps 1 and 3 are now fixed. Gap 2 is the remaining blocker for filter drift improvement. Gap 4 is the biggest operational risk.
+Gaps 1, 3, and 4 are now fixed. Gap 2 is the remaining blocker for filter drift improvement.
 
 ---
 
@@ -447,8 +447,8 @@ All five root causes (A-E) are now fixed. Gap 3 (pool padding) and handleZeroMat
 | Issue | Impact | Notes |
 |-------|--------|-------|
 | ~~Scraper `source_weight` hardcoded in 14 files~~ | ~~Dead code — overridden by SOURCES registry~~ | **Fixed** (2026-02-22) |
-| MORE sometimes repeats events from initial batch | Possible exclude-IDs gap in handleMore | Needs investigation |
-| "later tonight" time filter repeats same event | Time filter not excluding already-shown events | Needs investigation |
+| ~~MORE sometimes repeats events from initial batch~~ | ~~Cross-source name dedup gap in handleMore~~ | **Fixed (2026-03-01)** — pre-compose name dedup |
+| ~~"later tonight" time filter repeats same event~~ | ~~Time filter not excluding already-shown events~~ | **Fixed (2026-03-01)** — same dedup fix |
 | Comedy in Midtown — details fail after thin results | Session state gap: thin response may not save picks | May be fixed by step 1b |
 
 ### Yutori Extraction — Series Events Missing Times (2026-02-25)
@@ -649,6 +649,16 @@ Scenario pass rate is low because each scenario requires ALL assertions to pass 
 ---
 
 ## Completed Work
+
+### Dice multi-category scraping (2026-03-01)
+
+**Problem:** Dice scraper fetched a single browse page (`/browse/new_york-...`) which only returned ~30 events (8 this week). Investigation showed Dice has 6 category-specific browse pages (gig, dj, party, comedy, theatre, social) with 50-60 unique events this week across them.
+
+**Fix:** Refactored `fetchDiceEvents()` to fetch all 6 category pages in parallel, dedup by Dice event ID before parsing. Raw events: 26 → 115. Cache events: 9 → 97 (after cross-source dedup). Good category diversity: comedy (24), live_music (23), nightlife (22), art (22), theater (19).
+
+**Trade-off:** 76 new price_coverage failures — Dice's `amount_from` is null for many events. Genuine data gap, not fixable without scraping individual event pages.
+
+**Changes:** `src/sources/dice.js`, `src/source-registry.js`.
 
 ### Remove OhMyRockness source (2026-03-01)
 

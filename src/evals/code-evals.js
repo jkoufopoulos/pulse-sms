@@ -8,11 +8,18 @@ const { NEIGHBORHOODS } = require('../neighborhoods');
 const VALID_INTENTS = ['events', 'details', 'more', 'free', 'help', 'conversational'];
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
 
-// Subcategory→category mapping shared by category_adherence and compound_filter_accuracy
+// Subcategory→category mapping — must stay in sync with pipeline.js CATEGORY_NORMALIZE
 const CATEGORY_PARENTS = {
   jazz: 'live_music', rock: 'live_music', indie: 'live_music', folk: 'live_music',
-  punk: 'live_music', hip_hop: 'live_music', electronic: 'nightlife',
-  standup: 'comedy', improv: 'comedy', sketch: 'comedy',
+  punk: 'live_music', metal: 'live_music', 'hip hop': 'live_music', 'hip-hop': 'live_music',
+  'r&b': 'live_music', soul: 'live_music', funk: 'live_music', rap: 'live_music',
+  music: 'live_music', 'live music': 'live_music',
+  techno: 'nightlife', house: 'nightlife', electronic: 'nightlife', dj: 'nightlife',
+  dance: 'nightlife', salsa: 'nightlife', bachata: 'nightlife', swing: 'nightlife',
+  standup: 'comedy', 'stand-up': 'comedy', improv: 'comedy', sketch: 'comedy',
+  theatre: 'theater',
+  trivia: 'community', karaoke: 'community', drag: 'community',
+  burlesque: 'community', bingo: 'community', 'open mic': 'community', poetry: 'community',
 };
 
 const evals = {
@@ -274,6 +281,11 @@ const evals = {
     if (!filters?.category || picks.length === 0) {
       return { name: 'category_adherence', pass: true, detail: 'no category filter or no picks' };
     }
+    // If pool had zero matching events, LLM couldn't comply — exempt
+    const poolMeta = trace.events?.pool_meta;
+    if (poolMeta && poolMeta.matchCount === 0) {
+      return { name: 'category_adherence', pass: true, detail: `no ${filters.category} events in pool (data scarcity)` };
+    }
     const picksWithCat = picks.filter(p => p.category);
     if (picksWithCat.length === 0) {
       return { name: 'category_adherence', pass: true, detail: 'no category data on picks' };
@@ -321,6 +333,11 @@ const evals = {
     if (!filters?.free_only || !filters?.category || picks.length === 0) {
       return { name: 'compound_filter_accuracy', pass: true, detail: 'no compound filter or no picks' };
     }
+    // If pool had zero matching events, LLM couldn't comply — exempt
+    const poolMeta = trace.events?.pool_meta;
+    if (poolMeta && poolMeta.matchCount === 0) {
+      return { name: 'compound_filter_accuracy', pass: true, detail: `no free+${filters.category} events in pool (data scarcity)` };
+    }
     const filterCat = filters.category;
     const bothMatch = picks.filter(p =>
       p.is_free === true && (p.category === filterCat || CATEGORY_PARENTS[p.category] === filterCat)
@@ -340,12 +357,12 @@ const evals = {
    */
   filter_match_alignment(trace) {
     const picks = trace.composition.picks || [];
-    const poolMeta = trace.composition.pool_meta;
+    const poolMeta = trace.events?.pool_meta;
     const sentPool = trace.events.sent_pool;
     if (!poolMeta || !poolMeta.matchCount || !sentPool || picks.length === 0) {
       return { name: 'filter_match_alignment', pass: true, detail: 'no pool_meta, no matches, no sent_pool, or no picks' };
     }
-    const poolById = new Map(sentPool.map(e => [e.event_id, e]));
+    const poolById = new Map(sentPool.map(e => [e.id || e.event_id, e]));
     const fromMatched = picks.filter(p => {
       const poolEvent = poolById.get(p.event_id);
       return poolEvent && poolEvent.filter_match && poolEvent.filter_match !== false;
