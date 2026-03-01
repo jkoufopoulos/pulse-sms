@@ -452,3 +452,7 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('unhandledRejection', (reason) => {
   console.error('[CRITICAL] Unhandled rejection:', reason);
 });
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught exception:', err);
+  shutdown('uncaughtException');
+});
