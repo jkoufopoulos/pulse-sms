@@ -129,13 +129,20 @@ async function runScenario(scenario, phoneNumber) {
     turnNumber = userTurn.turn;
     conversation.push({ turn: turnNumber, sender: 'user', message: userTurn.message });
 
-    const res = await fetch(`${BASE}/api/sms/test`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ Body: userTurn.message, From: phoneNumber }),
-    });
-
-    const data = await res.json();
+    let res, data;
+    try {
+      res = await fetch(`${BASE}/api/sms/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Body: userTurn.message, From: phoneNumber }),
+        signal: AbortSignal.timeout(28000), // abort before Railway's 30s proxy timeout
+      });
+      data = await res.json().catch(() => ({ error: `HTTP ${res.status} (non-JSON response)` }));
+    } catch (err) {
+      const msg = err.name === 'TimeoutError' ? 'fetch timeout (28s)' : err.message;
+      conversation.push({ turn: turnNumber, sender: 'bestie', message: `[ERROR: ${msg}]` });
+      continue;
+    }
 
     if (!res.ok) {
       conversation.push({ turn: turnNumber, sender: 'bestie', message: `[ERROR: ${data.error || res.status}]` });

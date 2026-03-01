@@ -33,9 +33,10 @@ const difficultyFilter = args.find(a => a.startsWith('--difficulty='))?.split('=
 const BASE = args.find(a => a.startsWith('--url='))?.split('=')[1]
   || (args.includes('--url') ? args[args.indexOf('--url') + 1] : null)
   || 'http://localhost:3000';
+const isRemote = BASE !== 'http://localhost:3000';
 const CONCURRENCY = parseInt(args.find(a => a.startsWith('--concurrency='))?.split('=')[1]
   || (args.includes('--concurrency') ? args[args.indexOf('--concurrency') + 1] : null)
-  || '10', 10);
+  || (isRemote ? '5' : '10'), 10);
 const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-haiku-4-5-20251001';
 const BUDGET_LIMIT = parseFloat(args.find(a => a.startsWith('--budget='))?.split('=')[1]
   || (args.includes('--budget') ? args[args.indexOf('--budget') + 1] : null)
@@ -198,13 +199,20 @@ async function runScenario(scenario, phoneNumber) {
     // Send user message
     actualConversation.push({ sender: 'user', message: turn.message });
 
-    const res = await fetch(`${BASE}/api/sms/test`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ Body: turn.message, From: phoneNumber }),
-    });
-
-    const data = await res.json();
+    let res, data;
+    try {
+      res = await fetch(`${BASE}/api/sms/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Body: turn.message, From: phoneNumber }),
+        signal: AbortSignal.timeout(28000), // abort before Railway's 30s proxy timeout
+      });
+      data = await res.json().catch(() => ({ error: `HTTP ${res.status} (non-JSON response)` }));
+    } catch (err) {
+      const msg = err.name === 'TimeoutError' ? 'fetch timeout (28s)' : err.message;
+      actualConversation.push({ sender: 'bestie', message: `[ERROR: ${msg}]` });
+      continue;
+    }
 
     if (!res.ok) {
       actualConversation.push({ sender: 'bestie', message: `[ERROR: ${data.error || res.status}]` });
