@@ -107,6 +107,12 @@ async function fetchLumaEvents() {
       const coord = ev.coordinate;
       if (geo?.mode === 'obfuscated' && !coord) continue;
 
+      // NYC bounding box filter — the API's city param isn't strict
+      if (coord?.latitude && coord?.longitude) {
+        const cLat = coord.latitude, cLng = coord.longitude;
+        if (cLat < 40.49 || cLat > 40.92 || cLng < -74.26 || cLng > -73.70) continue;
+      }
+
       // Date filter: only keep events within 7-day window
       const startAt = ev.start_at ? new Date(ev.start_at) : null;
       if (!startAt || isNaN(startAt.getTime())) continue;
