@@ -461,10 +461,11 @@ const evals = {
     if (!['events', 'more'].includes(intent) || picks.length === 0) {
       return { name: 'price_transparency', pass: true, detail: 'not applicable' };
     }
-    // Check if any picked events actually have price data available
-    const picksWithPrice = picks.filter(p => p.is_free != null || p.price_display);
+    // Check if any picked events have actionable price data (actual amount or explicit free)
+    // is_free=false with no price_display only tells Claude "not free" — no price to display
+    const picksWithPrice = picks.filter(p => p.is_free === true || p.price_display);
     if (picksWithPrice.length === 0) {
-      return { name: 'price_transparency', pass: true, detail: 'no price data available on picked events (source gap)' };
+      return { name: 'price_transparency', pass: true, detail: 'no actionable price data on picked events (source gap)' };
     }
     // Check for price-like patterns in the SMS: "$5", "$10-20", "Free", "free!", "no cover", "cover charge", "ticketed", "paid"
     const pricePattern = /\$\d|free\b|no cover|cover charge|\bcover\b|ticketed|\bpaid\b|price TBD/i;

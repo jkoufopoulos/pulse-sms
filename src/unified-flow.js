@@ -180,7 +180,8 @@ async function callUnified(message, unifiedCtx, session, history, phone, trace, 
       venue_name: evt?.venue_name || null,
       neighborhood: evt?.neighborhood || null,
       category: evt?.category || null,
-      is_free: evt?.is_free || false,
+      is_free: evt?.is_free ?? null,
+      price_display: evt?.price_display || null,
       start_time_local: evt?.start_time_local || null,
     };
   });
