@@ -566,13 +566,13 @@ The extraction audit shows 82-100% pass rates on most days, but this is misleadi
 
 **NYC Parks fix:** The scraper passed only `borough` to `resolveNeighborhood()`, which returns null for boroughs by design. Added `lookupVenue()` call before borough fallback (same pattern as `ra.js`), so parks in `VENUE_MAP` resolve to neighborhoods via coords. Added 10 missing park entries to `VENUE_MAP` (The High Line, Brooklyn Bridge Park, Pier 6, Marine Park, etc.). Result: 46/97 NYC Parks events now resolve neighborhoods (was 31).
 
-**RA price fix:** `isTicketed` was fetched in the GraphQL query but never used. Now `is_free: true` when `isTicketed === false`. Result: 63 RA events correctly marked free.
+**RA price fix (attempted then reverted):** `isTicketed` was fetched in the GraphQL query but never used. Initially set `is_free: true` when `isTicketed === false`. Source eval revealed 3 false positives (DakhaBrakha at Pioneer Works, Vinyl Sundays, Sorry Records) — `isTicketed` on RA means "tickets sold through RA," not "free admission." Paid events with tickets sold elsewhere have `isTicketed: false`. Reverted to title-only free detection (`/\bfree\b/i` on event title). Result: 2 RA events correctly marked free, RA completeness 64% → 99% pass.
 
 **DoNYC price fix:** Expanded free detection regex to catch `$0`/`$0.00` patterns alongside `\bfree\b`.
 
 **refreshSources bug fix:** `refreshSources` used direct string comparison (`e.source_name === t.label.toLowerCase()`) to remove old events before merging new ones. This failed for sources with underscores — `'nyc_parks' !== 'nycparks'`. Old events stayed in cache, new ones deduped against them. Fixed by reusing the existing `normalize()` function (strips non-alpha) that was already used for input matching.
 
-**Changes:** `src/sources/nyc-parks.js` (lookupVenue import + venue coord lookup), `src/venues.js` (10 park entries + geocode miss logging), `src/sources/ra.js` (isTicketed → is_free), `src/sources/donyc.js` ($0 regex), `src/events.js` (normalize-based source matching in refreshSources).
+**Changes:** `src/sources/nyc-parks.js` (lookupVenue import + venue coord lookup), `src/venues.js` (10 park entries + geocode miss logging), `src/sources/ra.js` (title-only free detection), `src/sources/donyc.js` ($0 regex), `src/events.js` (normalize-based source matching in refreshSources).
 
 ### Gap 3 Fix: Remove Unmatched Pool Padding When Filters Active (2026-03-01)
 
