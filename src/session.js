@@ -32,7 +32,7 @@ function getSession(phone) {
 }
 
 function setSession(phone, data) {
-  const existing = sessions.get(phone);
+  const existing = sessions.get(phone) || sessions.get(hashPhone(phone));
   sessions.set(phone, { ...existing, ...data, timestamp: Date.now() });
   scheduleDiskWrite();
 }
@@ -45,7 +45,7 @@ function setSession(phone, data) {
  * Only conversationHistory is preserved from the previous session.
  */
 function setResponseState(phone, frame) {
-  const existing = sessions.get(phone);
+  const existing = sessions.get(phone) || sessions.get(hashPhone(phone));
   sessions.set(phone, {
     conversationHistory: existing?.conversationHistory || [],
     lastPicks: frame.picks ?? [],
@@ -73,7 +73,7 @@ function clearSession(phone) {
 const MAX_HISTORY_TURNS = 6;
 
 function addToHistory(phone, role, content) {
-  const session = sessions.get(phone);
+  const session = sessions.get(phone) || sessions.get(hashPhone(phone));
   if (!session) return;
   if (!session.conversationHistory) session.conversationHistory = [];
   session.conversationHistory.push({ role, content: content.slice(0, 300) });

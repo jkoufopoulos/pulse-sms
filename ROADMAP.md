@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-01 (NYC Parks neighborhood resolution, price extraction gaps, refreshSources bug fix, post-Gap-3 eval findings — dead handleZeroMatch, session contamination, conversational-with-pool; Gap 3 pool padding fix, 3-model comparison eval, Yutori junk event filter, eval trajectory & trends, Skint ongoing events scraper, Friday/Saturday newsletter event loss fix, systemic failure fixes, handler.js events bug, Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
+> Last updated: 2026-03-01 (behavioral eval: 11/26 filter_drift passing — semantic filter clear is dominant gap; handleZeroMatch bypass + cascade protection; NYC Parks neighborhood resolution, price extraction gaps, refreshSources bug fix; Gap 3 pool padding fix, 3-model comparison eval, Yutori junk event filter, eval trajectory & trends, Skint ongoing events scraper, Friday/Saturday newsletter event loss fix, systemic failure fixes, handler.js events bug, Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
 
 ---
 
@@ -315,48 +315,45 @@ Scenarios: Astoria MORE (says "that's everything" with 0 new picks, then detail 
 
 **Haiku baseline confirmed (2026-02-28):** Themes A, B, E, and F are systemic — Haiku fails the same scenarios. Only 7 of the 20 Gemini failures are Gemini-specific regressions. See Haiku baseline section above for full breakdown.
 
-### Post-Gap 3 Eval Findings — 0/26 filter_drift (2026-03-01)
+### Post-Gap 3 Behavioral Eval — 11/26 filter_drift passing (2026-03-01)
 
-**Status:** Gap 3 pool padding fix landed and works correctly — filtered pools no longer include unmatched events. But 0/26 filter_drift scenarios pass. Post-fix eval against Railway (1421 events cached, judge off, code evals only: 96.9% pass at 2118/2185) revealed 5 issues.
+**Status:** After wiring `handleZeroMatch` bypass + cascade protection + session contamination fix, manual behavioral review of 26 filter_drift scenarios yielded **11 PASS / 15 FAIL**. Report: `data/reports/scenario-eval-2026-03-01T08-39-42.json` (judge_model: manual-behavioral-review).
 
-**Pool size distribution across 115 response turns:**
+**Root cause distribution across 15 failures:**
 
-| Pool Size | Turns | % |
-|-----------|-------|---|
-| 0 (empty) | 47 | 41% |
-| 1-5 (sparse) | 44 | 38% |
-| 6-9 | 22 | 19% |
-| 14-15 (full) | 2 | 2% |
+| Root Cause | Scenarios | Description |
+|------------|-----------|-------------|
+| Semantic filter clear not processed | 7 (#0, 3, 7, 9, 13, 14, 20) | "paid is fine too", "drop jazz", "show me everything" etc. not understood |
+| 502 errors | 7 (#2, 17, 19, 22, 24, 25) | Infrastructure failures prevent evaluation |
+| Zero-match loop | 4 (#0, 3, 7, 20) | User trapped after semantic clear fails |
+| Conversational-with-pool | 3 (#2, 12, 21) | LLM returns no picks despite events in pool |
+| Pre-router gap: "live music" | 2 (#12, 21) | Standalone "live music" not detected as category filter |
+| LLM acknowledges but handler ignores | 1 (#13) | LLM says "dropping jazz" but filter state unchanged |
 
-**Code eval failure breakdown:** latency_under_10s (30), off_topic_redirect (21), neighborhood_accuracy (7), neighborhood_expansion_transparency (3), day_label_accuracy (2), schema_compliance (2), category_adherence (1), compound_filter_accuracy (1).
+**What works well (11 PASS):** Filter persistence across neighborhood switches, category replacement (comedy→jazz), filter compounding (free+comedy), gibberish survival, MORE exhaustion, number requests, nudge acceptance.
 
-#### Issue 1: `handleZeroMatch` is dead code (HIGHEST IMPACT — 41% of turns)
+**Dominant failure: Semantic filter modification (7 scenarios).** When the zero-match bypass is active, the user's only escape is the pre-router's `clear_filters` regex. Messages like "paid is fine too", "not just comedy", "show me earlier stuff", "lemme see whats happening" don't match the regex → bypass fires again with stale filters. Even when cascade protection lets the LLM run, the LLM may verbally acknowledge ("no price limits!") but the handler preserves the deterministic filter state (P1).
 
-`handleZeroMatch` exists at handler.js:613 but is never called. The main flow at handler.js:735-738 goes `resolveUnifiedContext → callUnified → handleUnifiedResponse` with no `matchCount` check. When the pool is empty, the LLM receives 0 events, wastes $0.001, and generates repetitive "No X in Y — got X in Z" responses. Every follow-up ("paid is fine too", "forget jazz") hits the same empty pool → same LLM response → inescapable loop.
+**Fix priorities:**
 
-Fully stuck scenarios (100% zero-pool): 7, 16, 20, 24. Partially stuck (some turns zero-pool): 19 more.
+| Fix | Scenarios fixed | Effort |
+|-----|----------------|--------|
+| Expand pre-router clear_filters regex (catch "paid is fine", "not just X", "show me everything/whats good", "drop X", "earlier stuff") | 7 scenarios (#0, 3, 7, 9, 13, 14, 20) | Medium |
+| Add "live music" to pre-router category detection | 2 scenarios (#12, 21) | Small |
+| Fix 502 timeouts (Tavily circuit breaker or timeout reduction) | 7 scenarios (#2, 17, 19, 22, 24, 25) | Medium |
+| Investigate conversational-with-pool | 3 scenarios (#2, 12, 21) | Medium |
 
-**Fix:** Add `if (matchCount === 0 && hasActiveFilters) return handleZeroMatch(...)` before `callUnified`. Saves $0.001/turn, gives deterministic non-repetitive responses, breaks the loop.
+#### Previous findings (resolved)
 
-#### Issue 2: Eval runner session contamination (3 scenarios)
+**Issue 1 (handleZeroMatch dead code):** **Fixed (2026-03-01).** Zero-match bypass wired into handler.js:735-738 with `lastZeroMatch` cascade protection.
 
-Scenarios 1 ("east village" → jazz filter) and 3 ("les" → comedy filter) start with filters the first user message couldn't have set. Phone numbers are deterministic (hash-based) and Railway's session store retains sessions from previous runs. The session clear request may succeed but sessions from other concurrent scenarios in the same run could also contaminate via hash collision.
+**Issue 2 (session contamination):** **Fixed (2026-03-01).** Run-unique timestamp prefix in both eval runners.
 
-**Fix:** Add run-unique prefix to eval phone numbers so each run gets clean sessions.
+**Issue 3 (conversational-with-pool):** Still present in 3 scenarios. LLM returns conversational despite events in pool.
 
-#### Issue 3: LLM returns conversational despite having events (15 scenarios)
+**Issue 4 (Tavily latency):** Reduced from 30 to 11 `latency_under_10s` failures after bypass. Still present as 502 timeouts in 7 scenarios.
 
-15 scenarios have turns where pool > 0 but LLM intent = "conversational" — it decides the soft matches aren't good enough and says "nothing here, try elsewhere?" instead of picking from available events.
-
-**Fix:** Investigate which events are in the pool vs what the LLM declines. May need prompt tuning for sparse/soft-match pools.
-
-#### Issue 4: Latency from Tavily fallback (30 code eval failures)
-
-When pool is sparse and user has visited the hood before, Tavily fires adding 5-15s. Accounts for all 30 `latency_under_10s` failures. Acceptable tradeoff for last-resort fallback, but inflates failure count.
-
-#### Issue 5: Trace gap on MORE/details paths (cosmetic)
-
-`trace.composition.active_filters` only set in `callUnified`. Pre-router paths (more, details) show `filters: null` in trace_debug. Filters are preserved in session — this is a reporting gap, not filter loss.
+**Issue 5 (trace gap):** Cosmetic. `active_filters` added to `handleZeroMatch` trace output.
 
 ### Filter Drift — Root Cause Analysis (updated 2026-02-28)
 
@@ -424,7 +421,7 @@ Two sub-cases: (1) Overlap with Root Cause C — compound filter matches nothing
 | **D: Nudge-accept** | ~10% | Yes (missing field) | Add `neighborhood` to `ask_neighborhood` pending object | **Fixed (2026-03-01)** |
 | **E: Stacking via pre-router** | ~15% | Yes (pre-router edge case) | Remove `lastPicks.length > 0` gate from filter detection | **Fixed (2026-02-28)** |
 
-All five root causes (A-E) are now fixed. Gap 3 (pool padding) is also fixed. However, post-Gap-3 eval (2026-03-01, 0/26 filter_drift) revealed `handleZeroMatch` is dead code — never called in the request flow. See "Post-Gap 3 Eval Findings" open issue below.
+All five root causes (A-E) are now fixed. Gap 3 (pool padding) and handleZeroMatch bypass also fixed. Behavioral eval (2026-03-01): **11/26 filter_drift passing (42%)**. Remaining failures: semantic filter modifications not processed by pre-router (7), 502 errors (7), conversational-with-pool (3), pre-router gap for "live music" (2). See "Post-Gap 3 Behavioral Eval" open issue above.
 
 ### P5 — Temporal Accuracy (was 25%, expected fixed)
 
@@ -531,18 +528,37 @@ The extraction audit shows 82-100% pass rates on most days, but this is misleadi
 
 | Action | Expected Impact | Effort | Status |
 |--------|----------------|--------|--------|
-| Wire up `handleZeroMatch` bypass + cascade fixes | +20-30% filter_drift (41% of turns are zero-pool) | Low | **Done (2026-03-01)** — 43/48 happy_path (90%) |
-| Fix eval runner session contamination | Cleaner eval signal (3 scenarios contaminated) | Low | **Done (2026-03-01)** — timestamp-based phone prefix |
-| Reduce pool padding for zero-match filters (Gap 3) | +10-15% filter_drift (structural fix) | Medium | **Done (2026-03-01)** — exposed dead handleZeroMatch |
-| Investigate LLM conversational-with-pool (15 scenarios) | +10% filter_drift | Medium | Planned |
-| Stabilize eval judge (pin Sonnet, add deterministic assertions) | Reduces noise, enables real A/B | Low | Planned |
-| Tavily fallback for thin neighborhoods | +5-10% happy_path, poor_experience | Done (2026-03-01) | Verify in next run |
-| Nudge-accept flow (`pendingNearby` + pre-router) | +5% filter_drift (Root Cause D) | Low | **Done (2026-03-01)** |
+| Expand pre-router clear_filters regex | +27% filter_drift (7 of 15 failures) | Medium | **Next priority** |
+| Add "live music" to pre-router category detection | +8% filter_drift (2 scenarios) | Small | **Next priority** |
+| Fix 502 timeouts (Tavily circuit breaker) | +27% filter_drift (7 scenarios untestable) | Medium | Planned |
+| Investigate conversational-with-pool | +12% filter_drift (3 scenarios) | Medium | Planned |
+| Wire up `handleZeroMatch` bypass + cascade fixes | +42% filter_drift (was 0/26, now 11/26) | Low | **Done (2026-03-01)** |
+| Fix eval runner session contamination | Cleaner eval signal | Low | **Done (2026-03-01)** |
+| Reduce pool padding for zero-match filters (Gap 3) | Structural fix | Medium | **Done (2026-03-01)** |
+| Nudge-accept flow (`pendingNearby` + pre-router) | Root Cause D | Low | **Done (2026-03-01)** |
 | Reasoning/rendering split (Step 4) | Unknown — needs A/B eval | High | Planned |
 
 ---
 
 ## Completed Work
+
+### Price Analytics + Scraper Price Improvements (2026-03-01)
+
+**Problem:** 73% of events (1,037/1,421) had no price info. The analytics panel only showed a simple Free vs Paid binary bar. Users couldn't understand the price landscape or identify which scrapers lacked price data.
+
+**Price analytics UI:** Replaced "Free vs Paid" card with "Price Distribution" — keeps the free/paid stacked bar summary, adds horizontal bar chart with 5 price buckets (Free, $1–20, $21–50, $51+, Unknown). Added new "Price Coverage by Source" card showing what % of each source's events have price data, highlighting gap sources.
+
+**Scraper improvements (structured sources):**
+- **Ticketmaster:** Full price ranges (`$25–$75`) instead of `$25+`. Falls back to "Ticketed" when API omits `priceRanges` (Broadway, museums). 11% → 100%.
+- **DoNYC:** Added detail page price enrichment — batch-fetches event pages (10 concurrent) to extract `itemprop="price"` or `$XX` from detail text. ~90% hit rate, ~3s for 400+ pages. 3% → 68%.
+- **Eventbrite `__SERVER_DATA__`:** Detects free from `OrganizerTag/Free` tags + extracts `$XX` from name/summary text. 0% → 19%.
+- **BrooklynVegan:** Extracts lowest `$XX` from `ticket_info` instead of using raw text (was dumping "21+" or "All Ages" as price). 0% → 20%.
+- **SmallsLIVE:** All events marked "Cover charge" (known paid venues). 0% → 100%.
+- **RA:** Broadened free detection to catch "Free Entry"/"FREE RSVP" in titles.
+
+**Result:** Price coverage 27% → **79%** (1,323/1,677 events). Remaining 21% unknown is structurally unavailable: DoNYC detail pages without price (143), Yutori LLM extraction misses (74), BAM no price in API (49), Songkick no offers in JSON-LD (35), Eventbrite no price in summary (29).
+
+**Changes:** `src/events-ui.html` (price distribution + source coverage cards), `src/sources/ticketmaster.js`, `src/sources/donyc.js` (detail page enrichment), `src/sources/eventbrite.js`, `src/sources/brooklynvegan.js`, `src/sources/smallslive.js`, `src/sources/ra.js`.
 
 ### NYC Parks Neighborhood Resolution + Price Extraction + refreshSources Bug Fix (2026-03-01)
 
@@ -564,7 +580,7 @@ Eliminated unmatched event padding from `buildTaggedPool` when filters are activ
 
 **Changes:** `buildTaggedPool` in pipeline.js (removed `unmatchedSlice` line), `resolveUnifiedContext` in handler.js (conditional perennial padding), 8 test assertions updated in pipeline.test.js. No-filter path unchanged (still 15 diverse events). Zero-match bypass (`handleZeroMatch`) unchanged.
 
-**Eval verification (2026-03-01):** 0/26 filter_drift passing. Pool padding removal worked as intended (pool now correctly empty when no matches), but exposed a critical issue: `handleZeroMatch` was never wired into the request flow — the function exists but is never called. 41% of response turns send 0 events to the LLM, which wastes an API call and generates repetitive dead-end responses. See "Post-Gap 3 Eval Findings" open issue below.
+**Eval verification (2026-03-01):** After wiring `handleZeroMatch` bypass + cascade protection, behavioral eval: **11/26 filter_drift passing (42%)**. Pool padding removal and zero-match bypass both work as intended. Remaining failures are semantic filter modification (7), 502 errors (7), conversational-with-pool (3), pre-router "live music" gap (2). See "Post-Gap 3 Behavioral Eval" open issue.
 
 ### Step 7: executeQuery Pipeline — Single Prompt Path (2026-03-01)
 
@@ -1149,6 +1165,51 @@ Was ~10% of filter persistence failures. The `ask_neighborhood` handler omitted 
 ### Strategic Position
 
 The project is at an inflection point between "works for testing" and "works for users." Architecture, eval suite, and data pipeline are production-quality. Gaps are mostly UX polish (sign-offs, alias recognition, thin coverage messaging) and model quality (Gemini vs Haiku). Cost structure is favorable — even on Haiku, AI is ~10% of per-session cost. The bigger Gemini win is eval suite cost ($7-10 → $1-2/run) enabling faster iteration. The eval suite is the strongest asset — it makes model switching, prompt changes, and architectural refactors safe.
+
+---
+
+## Pre-Launch Fragility Audit (2026-03-01)
+
+Full codebase audit for silent failure modes, unenforced assumptions, and single points of failure. Findings ranked by production impact.
+
+### Critical — Fixed (2026-03-01)
+
+| # | Issue | Location | What Breaks | Fix |
+|---|-------|----------|-------------|-----|
+| 1 | **Unauthenticated write endpoints** | server.js PUT/DELETE eval-reports, eval-overrides | Anyone can write files to data/ or delete eval reports on the public Railway server | Added test-mode/auth-token gating (same as /health) |
+| 2 | **Session hash-key mismatch on redeploy** | session.js setSession, addToHistory | Sessions load under hashed keys on boot; setSession/addToHistory only read raw keys, creating orphan sessions. Every returning user after a deploy loses their session | setSession/setResponseState/addToHistory now check both raw and hashed keys |
+| 3 | **composeDetails cost tracking 10x overcount** | intent-handlers.js:104 | trackAICost called without \_provider; defaults to Anthropic pricing when Gemini is primary. Users hit $0.10 daily budget ~10x too fast | Pass \_provider to trackAICost |
+| 4 | **TCPA opt-out regex over-broad** | handler.js:207 | `/^\s*(stop\|...)\b/i` matches "stop showing me comedy". User's message silently dropped, Twilio may unsubscribe them | Changed to exact match: `\s*$` instead of `\b` |
+
+### High Priority — Open
+
+| # | Issue | Location | What Breaks | Fix Effort |
+|---|-------|----------|-------------|------------|
+| 5 | `visitedHoods` resets on every new neighborhood | pipeline.js:69, handler.js:589 | Multi-neighborhood exploration history lost; Tavily fallback never triggers for revisited hoods | Quick — pass accumulated visitedHoods |
+| 6 | Hanging scraper blocks all future cache refreshes | events.js timedFetch, refreshPromise mutex | One hung fetch() permanently blocks refreshCache; cache goes stale until restart | Quick — add Promise.race timeout in timedFetch |
+| 7 | Anthropic fallback max\_tokens: 512 truncation | ai.js:507-527 | Gemini→Anthropic fallback produces truncated JSON → parse failure → dead-end "Having a moment" response | Quick — increase to 1024 |
+| 8 | Pre-router false-positives on common words | pre-router.js:389-400, 363-369 | "sorry I'm late" sets time\_after:22:00; "I'll rock up" sets category:live\_music. Single-dim compounds fire during active sessions | Structural — require anchor phrases or filterDims >= 2 |
+
+### Medium Priority — Open
+
+| # | Issue | Location | What Breaks | Fix Effort |
+|---|-------|----------|-------------|------------|
+| 9 | `isLastBatch`/`exhaustionSuggestion` skills dropped in MORE path | intent-handlers.js → pipeline.js executeQuery | Last-batch MORE still says "Reply MORE for extra picks" (compensated by regex strip, but LLM doesn't know it's the last batch) | Quick — forward skills through executeQuery |
+| 10 | `tonightPriority` and `conversationAwareness` conflict on "tomorrow" queries | compose-skills.js | Both skills active simultaneously with contradictory time instructions | Quick — skip tonightPriority when future date detected |
+| 11 | Prompt injection via unbounded `short_detail` | ai.js:434 | Event descriptions interpolated into prompt with no length cap; crafted listings could influence LLM output | Quick — cap to ~120 chars |
+| 12 | Graceful shutdown kills in-flight handlers after 5s | server.js:451 | Railway SIGTERM during Tavily fallback (10-25s) kills handler mid-flight; user gets no response, session may not save | Medium — increase timeout or track active handlers |
+| 13 | Gemini finishReason logged but not acted on | ai.js:85-88 | MAX\_TOKENS/SAFETY finish reasons produce truncated response; should throw to trigger Anthropic fallback | Quick |
+| 14 | `extractEvents` returns unvalidated JSON shape | ai.js:203-209 | LLM returns `{venues: [...]}` instead of `{events: [...]}` → callers get undefined | Quick — add Array.isArray guard |
+| 15 | Non-atomic disk writes for cache/sessions | events.js:399, session.js:119 | Process kill during writeFileSync → corrupted JSON → empty cache on boot → 8-min cold start | Quick — write-to-temp + rename |
+
+### Deferred
+
+| # | Issue | Why Deferred |
+|---|-------|-------------|
+| 16 | Race condition on parallel messages from same phone | Rare at current traffic; Twilio serializes per-number in production |
+| 17 | Dead `core` skill with conflicting output schema | Zero impact today; only risks confusing future developers |
+| 18 | Event name dedup merges distinct same-venue events (ft. stripping) | Edge case for jazz venues with multiple sets; structural fix needed |
+| 19 | Events in undefined neighborhoods invisible to geo queries | 3km hard filter + null-neighborhood = rawDist 4.0; structural design choice |
 
 ---
 

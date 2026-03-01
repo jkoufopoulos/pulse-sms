@@ -204,7 +204,7 @@ router.post('/incoming', (req, res) => {
 // =======================================================
 
 // --- TCPA opt-out keywords — must not respond to these ---
-const OPT_OUT_KEYWORDS = /^\s*(stop|unsubscribe|cancel|quit)\b/i;
+const OPT_OUT_KEYWORDS = /^\s*(stop|unsubscribe|cancel|quit)\s*$/i;
 
 async function handleMessage(phone, message) {
   const masked = maskPhone(phone);
@@ -706,7 +706,7 @@ async function handleMessageAI(phone, message) {
 
   // Pre-router clear_filters: wipe filters and fall through to unified branch
   if (preRouted && preRouted.intent === 'clear_filters') {
-    setSession(phone, { lastFilters: null, pendingFilters: null });
+    setSession(phone, { lastFilters: null, pendingFilters: null, lastPicks: [], lastEvents: {} });
     session = getSession(phone);
     trace.routing.pre_routed = true;
     trace.routing.result = { intent: 'clear_filters', neighborhood: preRouted.neighborhood, confidence: 1.0 };

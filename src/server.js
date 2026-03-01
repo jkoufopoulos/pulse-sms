@@ -142,6 +142,12 @@ app.get('/api/eval-reports/:filename', (req, res) => {
 
 // Eval report upload — accepts JSON report body, writes to data/reports/
 app.put('/api/eval-reports/:filename', (req, res) => {
+  const authToken = process.env.HEALTH_AUTH_TOKEN;
+  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
+  const hasValidToken = authToken && req.query.token === authToken;
+  if (!isTestMode && !hasValidToken) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   const fs = require('fs');
   const path = require('path');
   const filename = req.params.filename;
@@ -155,6 +161,12 @@ app.put('/api/eval-reports/:filename', (req, res) => {
 });
 
 app.delete('/api/eval-reports/:filename', (req, res) => {
+  const authToken = process.env.HEALTH_AUTH_TOKEN;
+  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
+  const hasValidToken = authToken && req.query.token === authToken;
+  if (!isTestMode && !hasValidToken) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   const fs = require('fs');
   const path = require('path');
   const filename = req.params.filename;
@@ -178,6 +190,12 @@ app.get('/api/eval-overrides', (req, res) => {
 });
 
 app.put('/api/eval-overrides/:scenarioName', (req, res) => {
+  const authToken = process.env.HEALTH_AUTH_TOKEN;
+  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
+  const hasValidToken = authToken && req.query.token === authToken;
+  if (!isTestMode && !hasValidToken) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   const fs = require('fs');
   const path = require('path');
   const reportsDir = path.join(__dirname, '..', 'data', 'reports');
@@ -211,6 +229,12 @@ app.put('/api/eval-overrides/:scenarioName', (req, res) => {
 });
 
 app.delete('/api/eval-overrides/:scenarioName', (req, res) => {
+  const authToken = process.env.HEALTH_AUTH_TOKEN;
+  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
+  const hasValidToken = authToken && req.query.token === authToken;
+  if (!isTestMode && !hasValidToken) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   const fs = require('fs');
   const filePath = require('path').join(__dirname, '..', 'data', 'reports', 'scenario-overrides.json');
   if (!fs.existsSync(filePath)) return res.json({ ok: true });

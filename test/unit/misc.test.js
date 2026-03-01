@@ -179,9 +179,10 @@ module.exports.runAsync = async function() {
   const { OPT_OUT_KEYWORDS } = require('../../src/handler');
   check('STOP matches', OPT_OUT_KEYWORDS.test('STOP'));
   check('"stop" matches', OPT_OUT_KEYWORDS.test('stop'));
-  check('"stop please" matches', OPT_OUT_KEYWORDS.test('stop please'));
   check('"  quit" matches (leading whitespace)', OPT_OUT_KEYWORDS.test('  quit'));
-  check('"unsubscribe me" matches', OPT_OUT_KEYWORDS.test('unsubscribe me'));
+  check('"stop please" does NOT match (not exact)', !OPT_OUT_KEYWORDS.test('stop please'));
+  check('"unsubscribe me" does NOT match (not exact)', !OPT_OUT_KEYWORDS.test('unsubscribe me'));
+  check('"stop showing me comedy" does NOT match', !OPT_OUT_KEYWORDS.test('stop showing me comedy'));
   check('"can\'t stop dancing" does NOT match', !OPT_OUT_KEYWORDS.test("can't stop dancing"));
   check('"don\'t quit" does NOT match', !OPT_OUT_KEYWORDS.test("don't quit"));
   check('"I want to cancel" does NOT match', !OPT_OUT_KEYWORDS.test("I want to cancel"));
