@@ -59,9 +59,14 @@ function parseCards($, cards, dateStr, categoryOverride) {
       if (m) dateLocal = m[1];
     }
 
-    // Free detection
+    // Free + price detection
     const cardText = card.text();
     const isFree = /\bfree\b/i.test(cardText) || /\$0(?:\.00)?/.test(cardText);
+    let priceDisplay = isFree ? 'free' : null;
+    if (!isFree) {
+      const priceMatch = cardText.match(/\$(\d+)/);
+      if (priceMatch) priceDisplay = `$${priceMatch[1]}`;
+    }
 
     // Category — use card CSS class, then infer from name
     let category = categoryOverride;
@@ -94,7 +99,7 @@ function parseCards($, cards, dateStr, categoryOverride) {
       date_local: dateLocal,
       time_window: null,
       is_free: isFree,
-      price_display: isFree ? 'free' : null,
+      price_display: priceDisplay,
       category,
       subcategory: null,
       ticket_url: sourceUrl,

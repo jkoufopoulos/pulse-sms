@@ -118,7 +118,7 @@ async function fetchRAEvents() {
           date_local: dateLocal,
           time_window: null,
           is_free: e.isTicketed === false,
-          price_display: e.isTicketed === false ? 'free' : null,
+          price_display: e.isTicketed === false ? 'free' : (e.isTicketed === true ? 'Ticketed' : null),
           category: 'nightlife',
           subcategory: null,
           ticket_url: e.contentUrl ? `https://ra.co${e.contentUrl}` : null,

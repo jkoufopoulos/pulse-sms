@@ -227,6 +227,13 @@
   .bar-fill-source { background: linear-gradient(90deg, #3d2200, #FF6B35); }
   .bar-fill-hood { background: linear-gradient(90deg, #1a2a4e, #3b82f6); }
   .bar-fill-borough { background: linear-gradient(90deg, #1a3d2a, #4ade80); }
+  .bar-fill-price-free { background: linear-gradient(90deg, #1a3d1a, #4ade80); }
+  .bar-fill-price-low { background: linear-gradient(90deg, #1a3d3d, #22d3ee); }
+  .bar-fill-price-mid { background: linear-gradient(90deg, #2d1f4e, #a78bfa); }
+  .bar-fill-price-high { background: linear-gradient(90deg, #3d1f2d, #f687b3); }
+  .bar-fill-price-unknown { background: linear-gradient(90deg, #2a2a2a, #666); }
+  .bar-fill-price-coverage { background: linear-gradient(90deg, #1a3d2a, #4ade80); }
+  .bar-fill-price-nocoverage { background: linear-gradient(90deg, #2a2a2a, #555); }
 
   /* Borough map */
   .borough-map-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px; }
@@ -381,12 +388,16 @@
 <div class="analytics-panel" id="analytics-panel">
   <div class="analytics-grid-top">
     <div class="analytics-card"><h4>Date Distribution</h4><div id="analytics-dates"></div></div>
-    <div class="analytics-card"><h4>Free vs Paid</h4><div id="analytics-freepaid"></div></div>
+    <div class="analytics-card"><h4>Price Distribution</h4><div id="analytics-freepaid"></div></div>
   </div>
   <div class="analytics-grid">
     <div class="analytics-card"><h4>Category Distribution</h4><div id="analytics-categories"></div></div>
     <div class="analytics-card"><h4>Source Coverage</h4><div id="analytics-sources"></div></div>
     <div class="analytics-card"><h4>Neighborhood Coverage</h4><div id="analytics-hoods"></div></div>
+  </div>
+  <div class="analytics-grid-top">
+    <div class="analytics-card"><h4>Price Coverage by Source</h4><div id="analytics-price-coverage"></div></div>
+    <div></div>
   </div>
   <div class="borough-map-row">
     <div class="analytics-card">
@@ -946,12 +957,51 @@ function setDateFilter(date) {
   applyFilters();
 }
 
+function parsePrice(event) {
+  if (event.is_free) return 0;
+  const pd = event.price_display;
+  if (!pd) return null;
+  const m = pd.match(/\$(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
 function renderFreePaid(events) {
   const free = events.filter(e => e.is_free).length;
   const paid = events.length - free;
   const total = events.length;
   const freePct = total > 0 ? (free / total * 100) : 0;
   const paidPct = 100 - freePct;
+
+  // Price buckets
+  let low = 0, mid = 0, high = 0, unknown = 0;
+  for (const e of events) {
+    if (e.is_free) continue;
+    const p = parsePrice(e);
+    if (p === null) { unknown++; }
+    else if (p <= 20) { low++; }
+    else if (p <= 50) { mid++; }
+    else { high++; }
+  }
+
+  const buckets = [
+    ['Free', free, 'bar-fill-price-free'],
+    ['$1–20', low, 'bar-fill-price-low'],
+    ['$21–50', mid, 'bar-fill-price-mid'],
+    ['$51+', high, 'bar-fill-price-high'],
+    ['Unknown', unknown, 'bar-fill-price-unknown'],
+  ];
+  const maxBucket = Math.max(...buckets.map(b => b[1]), 1);
+
+  let bucketsHtml = '';
+  for (const [label, count, cls] of buckets) {
+    const pct = ((count / maxBucket) * 100).toFixed(1);
+    const sharePct = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
+    bucketsHtml += `<div class="analytics-bar-row">
+      <span class="analytics-bar-label">${label}</span>
+      <div class="analytics-bar-track"><div class="analytics-bar-fill ${cls}" style="width:${pct}%"></div></div>
+      <span class="analytics-bar-value">${count} (${sharePct}%)</span>
+    </div>`;
+  }
 
   document.getElementById('analytics-freepaid').innerHTML =
     `<div class="fp-stat">${total} <span style="font-size:13px;color:#666;font-weight:400">events</span></div>` +
@@ -962,7 +1012,36 @@ function renderFreePaid(events) {
     `<div class="fp-labels">
       <span style="color:#4ade80">${free} free (${freePct.toFixed(0)}%)</span>
       <span style="color:#888">${paid} paid (${paidPct.toFixed(0)}%)</span>
+    </div>` +
+    `<div style="margin-top:10px">${bucketsHtml}</div>`;
+}
+
+function renderPriceCoverage(events) {
+  const sourceCounts = {};
+  const sourceWithPrice = {};
+  for (const e of events) {
+    const src = e.source_name || 'unknown';
+    sourceCounts[src] = (sourceCounts[src] || 0) + 1;
+    if (e.price_display || e.is_free) {
+      sourceWithPrice[src] = (sourceWithPrice[src] || 0) + 1;
+    }
+  }
+
+  const sources = Object.entries(sourceCounts).sort((a, b) => b[1] - a[1]);
+  let html = '';
+  for (const [src, total] of sources) {
+    const withPrice = sourceWithPrice[src] || 0;
+    const pct = total > 0 ? ((withPrice / total) * 100) : 0;
+    const noPct = 100 - pct;
+    html += `<div class="analytics-bar-row">
+      <span class="analytics-bar-label" title="${esc(src)}">${esc(src)}</span>
+      <div class="analytics-bar-track">
+        <div class="analytics-bar-fill bar-fill-price-coverage" style="width:${pct}%"></div>
+      </div>
+      <span class="analytics-bar-value">${withPrice}/${total} (${pct.toFixed(0)}%)</span>
     </div>`;
+  }
+  document.getElementById('analytics-price-coverage').innerHTML = html;
 }
 
 function updateAnalytics() {
@@ -976,9 +1055,10 @@ function updateAnalytics() {
   const badge = document.getElementById('analytics-filtered-badge');
   badge.style.display = isFiltered ? 'inline' : 'none';
 
-  // Date distribution + Free/Paid
+  // Date distribution + Price
   renderDateChart(events);
   renderFreePaid(events);
+  renderPriceCoverage(events);
 
   // Category distribution
   const catDist = computeDistribution(events, 'category');

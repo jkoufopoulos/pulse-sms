@@ -121,9 +121,21 @@ async function fetchTicketmasterEvents() {
         const neighborhood = resolveNeighborhood(venue.city?.name, geoLat, geoLng);
 
         const priceMin = e.priceRanges?.[0]?.min;
+        const priceMax = e.priceRanges?.[0]?.max;
         const isFree = priceMin === 0;
         const nameAndDesc = ((e.name || '') + ' ' + (e.info || '')).toLowerCase();
         const category = mapTicketmasterCategory(e.classifications) || inferCategory(nameAndDesc);
+
+        let price_display = null;
+        if (isFree) {
+          price_display = 'free';
+        } else if (typeof priceMin === 'number' && typeof priceMax === 'number' && priceMax > priceMin) {
+          price_display = `$${priceMin}–$${priceMax}`;
+        } else if (typeof priceMin === 'number' && priceMin > 0) {
+          price_display = `$${priceMin}`;
+        } else if (typeof priceMax === 'number' && priceMax > 0) {
+          price_display = `$${priceMax}`;
+        }
 
         allEvents.push({
           id: makeEventId(e.name, venueName, localDate, 'ticketmaster'),
@@ -140,7 +152,7 @@ async function fetchTicketmasterEvents() {
           date_local: localDate,
           time_window: null,
           is_free: isFree,
-          price_display: isFree ? 'free' : (typeof priceMin === 'number' && priceMin > 0 ? `$${priceMin}+` : null),
+          price_display,
           category,
           subcategory: e.classifications?.[0]?.subGenre?.name || null,
           ticket_url: e.url || null,
