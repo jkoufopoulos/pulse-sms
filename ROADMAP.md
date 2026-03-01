@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-01 (systemic failure fixes, handler.js events bug, Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
+> Last updated: 2026-03-01 (Friday/Saturday newsletter event loss fix, systemic failure fixes, handler.js events bug, Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
 
 ---
 
@@ -447,6 +447,18 @@ Fixing A+B+C+E (done) should address ~90% of failures. Root Cause D (nudge-accep
 ---
 
 ## Completed Work
+
+### Fix Friday/Saturday Event Loss from Newsletter Sources (2026-03-01)
+
+The Nonsense NYC newsletter arrives Friday ~7pm with events for Fri/Sat/Sun+. The daily 10am scrape meant all Friday events were dated yesterday by Saturday's scrape and dropped by the scrape-time date filter (`d >= today`). Saturday events similarly lost by Sunday. This lost ~40% of each newsletter's events.
+
+**Two fixes in `src/events.js`:**
+
+1. **Relaxed scrape-time date filter to include yesterday** — Changed lower bound from `getNycDateString(0)` to `getNycDateString(-1)` in all 3 ingestion filter locations (refreshCache main path, refreshCache SQLite fallback, refreshSources selective path). Yesterday's events now enter the cache as a safety net. Serving-time `filterUpcomingEvents` (which checks `end_time_local` with a 2-hour grace window) still handles actual expiry. No change to SQLite range queries or the 7-day serving window.
+
+2. **Added 6pm ET evening scrape** — Changed `SCRAPE_HOUR = 10` to `SCRAPE_HOURS = [10, 18]`. Rewrote `msUntilNextScrape()` to find the next upcoming hour from the array using seconds-based arithmetic, which also fixes a pre-existing bug where `hoursUntil === 0` with remaining minutes produced negative ms (firing the scrape immediately). The evening scrape catches same-day newsletters while their events are still "today."
+
+**Tests:** 77 passing.
 
 ### Systemic Failure Fixes — 8 changes across 5 files (2026-03-01)
 
