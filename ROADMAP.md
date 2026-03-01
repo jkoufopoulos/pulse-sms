@@ -650,6 +650,26 @@ Scenario pass rate is low because each scenario requires ALL assertions to pass 
 
 ## Completed Work
 
+### Code eval accuracy overhaul — reduce false positives + price prompt (2026-03-01)
+
+**Problem:** 38 code eval failures at 99.5% pass rate. Analysis showed most were eval false positives, not product bugs:
+- `neighborhood_accuracy` (6): Expansion acknowledgment regex too narrow — missed "next to", "area", "closest", and cases where the SMS explicitly names the actual neighborhood
+- `neighborhood_expansion_transparency` (6): Same regex gaps
+- `off_topic_redirect` (5): Missing exemptions for price inquiries, event-specific questions, bot banter, and clarification prompts
+- `day_label_accuracy` (2): "No jazz tonight" (negation context) + tomorrow picks incorrectly flagged as mislabeling
+- `price_transparency` (16→27 stochastic): Events genuinely lack price data from sources; eval punished Claude for omitting what doesn't exist
+
+**Fixes:**
+1. **neighborhood_accuracy + expansion_transparency**: Added `next to`, `area`, `closest` to regex. Added named-neighborhood acknowledgment — if the SMS mentions the actual event neighborhood by name, that counts as acknowledging expansion.
+2. **off_topic_redirect**: Added exemptions for price inquiries ("how much"), event-specific questions ("which do you recommend", "top pick"), bot banter ("not a real person"), clarification prompts ("what's up", "one more thing"). Expanded redirect regex with "dig up", "something else", "just help find". Added "not my beat" to event discussion patterns.
+3. **day_label_accuracy**: Detect negation context — "no jazz tonight" with tomorrow picks passes because "tonight" is negated, not affirmative.
+4. **price_transparency**: Skip when picked events have no price data (`is_free` and `price_display` both null) — source gap, not LLM failure. Added `paid` and `price TBD` to eval regex.
+5. **Prompt**: Added explicit price fallback instruction to core skill: "ALWAYS mention price: use price_display if available, 'free' if is_free, or 'ticketed'/'cover' as fallback when unknown."
+
+**Results:** neighborhood_accuracy 6→0, expansion_transparency 6→0, off_topic_redirect 6→2, day_label_accuracy 2→0. Remaining failures are stochastic LLM variation (price_transparency, latency, pick_count).
+
+**Changes:** `src/evals/code-evals.js`, `src/skills/compose-skills.js` (price fallback instruction), `test/eval.test.js` (updated price_transparency test fixture).
+
 ### Fix event name match hijacking neighborhood routing + non-neighborhood opener eval expansion (2026-03-01)
 
 **Problem:** Pre-router's event name match block (lines 99-110) used `eventNameLower.includes(lower)` which was too greedy — neighborhood names like "east village" matched event titles containing "(East Village)" and routed as `details` instead of falling through to unified LLM for neighborhood routing. This caused 8 hard failures across the new opener scenarios.

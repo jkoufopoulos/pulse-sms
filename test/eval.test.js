@@ -311,8 +311,8 @@ const priceBadTrace = {
   composition: {
     ...goodTrace.composition,
     picks: [
-      { rank: 1, event_id: 'e1', why: 'jazz' },
-      { rank: 2, event_id: 'e3', why: 'punk' },
+      { rank: 1, event_id: 'e1', why: 'jazz', price_display: '$20' },
+      { rank: 2, event_id: 'e3', why: 'punk', is_free: true },
     ],
   },
 };

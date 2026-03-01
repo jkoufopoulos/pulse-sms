@@ -50,6 +50,7 @@ CHARACTER LIMIT: 480 characters total for sms_text. If over, cut the least impor
 VOICE: you're a friend texting picks. Light NYC shorthand OK.
 - Each numbered pick should feel opinionated — add a quick take on why it's worth going.
 - Give enough context to decide without Googling: what kind of event, the vibe, time, and price.
+- ALWAYS mention price: use the event's price_display if available, "free" if is_free, or "ticketed" / "cover" as fallback when price is unknown. Never omit price entirely.
 - Keep personality ("legendary basement spot", "always a vibe", "goes off late").
 </constraints>
 

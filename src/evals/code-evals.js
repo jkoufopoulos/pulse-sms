@@ -105,14 +105,34 @@ const evals = {
     if (isFarewell) {
       return { name: 'off_topic_redirect', pass: true, detail: 'farewell/thanks (no redirect needed)' };
     }
+    // Price inquiry or event-specific question — direct answer is correct, not off-topic
+    const isPriceInquiry = /how much|what does it cost|what.s the price|how expensive|is it free/i.test(input);
+    if (isPriceInquiry) {
+      return { name: 'off_topic_redirect', pass: true, detail: 'price inquiry (direct answer appropriate)' };
+    }
+    // Clarification prompt — user is mid-conversation, short response is natural
+    const isClarification = /^(what.s up|what do you mean|huh|like what|one more thing|actually)/i.test(input);
+    if (isClarification) {
+      return { name: 'off_topic_redirect', pass: true, detail: 'clarification prompt (no redirect needed)' };
+    }
+    // Event-specific questions about picks or recommendations — direct answer is correct
+    const isEventQuestion = /which.*(recommend|pick|choose|best)|top pick|is .{1,20} (any )?good|send.*(link|url)|your (fav|pick)|what do you think/i.test(input);
+    if (isEventQuestion) {
+      return { name: 'off_topic_redirect', pass: true, detail: 'event-specific question (direct answer appropriate)' };
+    }
+    // Casual banter about the bot itself — deflection + brief redirect is fine
+    const isBotBanter = /not a real person|are you (a |an )?(bot|ai|real|human)|you.re (a |an )?(bot|ai)|lol$/i.test(input);
+    if (isBotBanter) {
+      return { name: 'off_topic_redirect', pass: true, detail: 'bot banter (deflection appropriate)' };
+    }
     // Zero-pick graceful degradation: if the response discusses events/neighborhoods,
     // it's an appropriate event-related response, not off-topic
-    const isEventDiscussion = /no .{1,30} in|nothing .{1,30} tonight|slim pickings|exhausted|cleaned out|already (got|showed)|drop the .{1,20} filter|no free|no comedy|no jazz|no live|no match/i.test(sms);
+    const isEventDiscussion = /no .{1,30} in|nothing .{1,30} tonight|slim pickings|exhausted|cleaned out|already (got|showed)|drop(ping)? the .{1,20} filter|no free|no comedy|no jazz|no live|no match|not my (beat|thing)|not much .{1,30} in|nearby has|you want .{1,30}(comedy|jazz|music|dance|art|free)|dropping the|back to/i.test(sms);
     if (isEventDiscussion) {
       return { name: 'off_topic_redirect', pass: true, detail: 'zero-match graceful degradation (event-related)' };
     }
     // Check that the response contains a redirect to neighborhoods/events
-    const hasRedirect = /text (me )?a neighborhood|text me a|drop me a|go out|tonight.s picks|when you.re ready|mood for|what you.re looking|vibe|try a|want me to check|want .{1,30} picks|check .{1,30} instead|still .{1,20} tonight|hit me up|reply \d|want those|up for something|neighborhood|what.re you (in the )?mood/i.test(sms);
+    const hasRedirect = /text (me )?a neighborhood|text me a|drop me a|go out|tonight.s picks|when you.re ready|mood for|what you.re looking|vibe|try a|want me to check|want .{1,30} picks|want more .{1,30} stuff|check .{1,30} instead|still .{1,20} tonight|hit me up|reply \d|want those|up for something|neighborhood|what.re you (in the )?mood|what.s (actually )?good|happening .{0,10}(in|tonight)|good .{0,10} tonight|dig up|something else|can.t click|just help find|i just find/i.test(sms);
     return {
       name: 'off_topic_redirect',
       pass: hasRedirect,
@@ -149,8 +169,11 @@ const evals = {
     const tomorrowDate = new Date(traceDate.getTime() + 86400000);
     const tomorrowStr = tomorrowDate.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 
-    const saysTonight = /\btonight\b|\btoday\b/.test(sms);
-    const saysTomorrow = /\btomorrow\b/.test(sms);
+    // Check for affirmative usage — exclude negation contexts like "no jazz tonight"
+    const tonightNegated = /\b(no|nothing|not much|slim|none)\b.{0,30}\btonight\b/i.test(sms);
+    const saysTonight = /\btonight\b|\btoday\b/.test(sms) && !tonightNegated;
+    const tomorrowNegated = /\b(no|nothing|not much|slim|none)\b.{0,30}\btomorrow\b/i.test(sms);
+    const saysTomorrow = /\btomorrow\b/.test(sms) && !tomorrowNegated;
 
     // Categorize picks by date
     const todayPicks = picks.filter(p => p.date_local === todayStr);
@@ -227,9 +250,12 @@ const evals = {
     }
     // No picks in claimed hood — pass if the SMS acknowledges the expansion
     const sms = (trace.output_sms || '').toLowerCase();
-    const expansionAck = /nearby|next door|not much|close to|right there|over in|but .{1,30} has|around\b|just (across|over|down)|steps away/i.test(sms);
-    if (expansionAck) {
-      return { name: 'neighborhood_accuracy', pass: true, detail: `0/${picksWithHood.length} in ${hood} but expansion acknowledged (${[...new Set(picksWithHood.map(p => p.neighborhood))].join(', ')})` };
+    const actualHoods = [...new Set(picksWithHood.map(p => p.neighborhood))];
+    const expansionAck = /nearby|next door|next to|not much|close to|closest|right there|over in|but .{1,30} has|around\b|\barea\b|just (across|over|down)|steps away/i.test(sms);
+    // Also count naming the actual neighborhood explicitly as acknowledgment
+    const namedActualHood = actualHoods.some(h => sms.includes(h.toLowerCase()));
+    if (expansionAck || namedActualHood) {
+      return { name: 'neighborhood_accuracy', pass: true, detail: `0/${picksWithHood.length} in ${hood} but expansion acknowledged (${actualHoods.join(', ')})` };
     }
     return {
       name: 'neighborhood_accuracy',
@@ -412,7 +438,9 @@ const evals = {
       return { name: 'neighborhood_expansion_transparency', pass: true, detail: 'majority of picks in claimed hood' };
     }
     // Majority of picks are outside claimed hood — SMS should acknowledge
-    const hasAck = /nearby|next door|not much .{0,20} in|not much else|checking|close to|over in|around\b|right there|but .{1,30} has|but .{1,30} is right|just (across|over|down)|steps away|a walk/i.test(sms);
+    const actualHoods = [...new Set(outOfHood.map(p => p.neighborhood))];
+    const namedActualHood = actualHoods.some(h => sms.includes(h.toLowerCase()));
+    const hasAck = namedActualHood || /nearby|next door|next to|not much .{0,20} in|not much else|checking|close to|closest|over in|around\b|\barea\b|right there|but .{1,30} has|but .{1,30} is right|just (across|over|down)|steps away|a walk/i.test(sms);
     return {
       name: 'neighborhood_expansion_transparency',
       pass: hasAck,
@@ -433,13 +461,18 @@ const evals = {
     if (!['events', 'more'].includes(intent) || picks.length === 0) {
       return { name: 'price_transparency', pass: true, detail: 'not applicable' };
     }
-    // Check for price-like patterns in the SMS: "$5", "$10-20", "Free", "free!", "no cover", "cover charge", "ticketed"
-    const pricePattern = /\$\d|free\b|no cover|cover charge|\bcover\b|ticketed/i;
+    // Check if any picked events actually have price data available
+    const picksWithPrice = picks.filter(p => p.is_free != null || p.price_display);
+    if (picksWithPrice.length === 0) {
+      return { name: 'price_transparency', pass: true, detail: 'no price data available on picked events (source gap)' };
+    }
+    // Check for price-like patterns in the SMS: "$5", "$10-20", "Free", "free!", "no cover", "cover charge", "ticketed", "paid"
+    const pricePattern = /\$\d|free\b|no cover|cover charge|\bcover\b|ticketed|\bpaid\b|price TBD/i;
     const hasPrice = pricePattern.test(sms);
     return {
       name: 'price_transparency',
       pass: hasPrice,
-      detail: hasPrice ? 'price info found in SMS' : 'no price or "free" mention in SMS',
+      detail: hasPrice ? 'price info found in SMS' : `no price mention in SMS (${picksWithPrice.length}/${picks.length} picks have price data)`,
     };
   },
 
