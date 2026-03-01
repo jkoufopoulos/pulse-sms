@@ -17,6 +17,10 @@ const { resolveUnifiedContext, callUnified, handleUnifiedResponse, handleZeroMat
 
 const router = express.Router();
 
+// In-flight request counter for graceful shutdown
+let inflightRequests = 0;
+function getInflightCount() { return inflightRequests; }
+
 // --- Twilio webhook signature validation ---
 const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
 if (twilioAuthToken) {
@@ -118,13 +122,15 @@ router.post('/incoming', (req, res) => {
 
   // Register MessageSid only after processing succeeds — if handler crashes,
   // Twilio retries won't be permanently dropped (L13 fix)
+  inflightRequests++;
   handleMessage(phone, message)
     .then(() => {
       if (messageSid) processedMessages.set(messageSid, Date.now());
     })
     .catch(err => {
       console.error('Async handler error:', err.message);
-    });
+    })
+    .finally(() => inflightRequests--);
 });
 
 // =======================================================
@@ -429,3 +435,4 @@ module.exports.clearSession = clearSession;
 module.exports._handleMessage = handleMessage; // exported for integration tests
 module.exports.OPT_OUT_KEYWORDS = OPT_OUT_KEYWORDS;
 module.exports.getCostSummary = getCostSummary;
+module.exports.getInflightCount = getInflightCount;

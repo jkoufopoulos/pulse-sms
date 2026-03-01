@@ -138,7 +138,7 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
   const prevOfferedIds = session?.allOfferedIds || [];
   const excludeIds = [...new Set([...prevPickIds, ...prevOfferedIds])];
 
-  return { hood, activeFilters, events, curated, matchCount, hardCount, softCount, isSparse, isCitywide, nearbyHoods, suggestedHood, excludeIds, now, userHoodAlias };
+  return { hood, activeFilters, events, curated, matchCount, hardCount, softCount, isSparse, isCitywide, nearbyHoods, suggestedHood, excludeIds, now, userHoodAlias, preDetectedFilters };
 }
 
 /**
@@ -212,18 +212,37 @@ async function callUnified(message, unifiedCtx, session, history, phone, trace, 
 async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, message, finalizeTrace) {
   let { hood, activeFilters, events, curated, suggestedHood } = unifiedCtx;
 
-  // Filter state management after unified call — apply LLM's filter_intent
-  // P1 compliant: LLM reports what user requested (language), handler applies it (state).
+  // Filter state management after unified call — gated by pre-router (P1: code owns state)
+  // - clear_all: always trust (LLM handles semantic clearing the pre-router can't)
+  // - modify when pre-router set filters: IGNORE (pre-router is deterministic ground truth;
+  //   LLM is just echoing the ACTIVE_FILTER context it was given)
+  // - modify when pre-router did NOT set filters: trust (first-message extraction, targeted clears)
   trace.composition = trace.composition || {};
+  const hadPreDetectedFilters = !!(unifiedCtx.preDetectedFilters && Object.values(unifiedCtx.preDetectedFilters).some(Boolean));
+  trace.composition.filter_state = {
+    pre_router_filters: unifiedCtx.preDetectedFilters || null,
+    llm_filter_intent: result.filter_intent || null,
+    had_pre_detected: hadPreDetectedFilters,
+  };
+
   if (result.filter_intent?.action === 'clear_all' || result.clear_filters) {
     activeFilters = {};
     trace.composition.filter_intent_action = 'clear_all';
+    trace.composition.filter_state.decision = 'clear_all_trusted';
   } else if (result.filter_intent?.action === 'modify' && result.filter_intent?.updates) {
-    const normalized = normalizeFilterIntent(result.filter_intent.updates);
-    activeFilters = mergeFilters(activeFilters, normalized);
-    trace.composition.filter_intent_action = 'modify';
-    trace.composition.filter_intent_updates = normalized;
+    if (hadPreDetectedFilters) {
+      // Pre-router already set filters deterministically — ignore LLM's echo
+      trace.composition.filter_intent_action = 'modify_ignored_pre_router';
+      trace.composition.filter_state.decision = 'modify_ignored_pre_router';
+    } else {
+      const normalized = normalizeFilterIntent(result.filter_intent.updates);
+      activeFilters = mergeFilters(activeFilters, normalized);
+      trace.composition.filter_intent_action = 'modify';
+      trace.composition.filter_intent_updates = normalized;
+      trace.composition.filter_state.decision = 'modify_trusted';
+    }
   }
+  trace.composition.filter_state.final_filters = { ...activeFilters };
 
   // Handle response by type
   if (result.type === 'ask_neighborhood') {
@@ -239,6 +258,7 @@ async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, 
         filters: activeFilters,
       },
       pendingMessage: message,
+      lastResponseHadPicks: false,
     });
     updateProfile(phone, { neighborhood: hood, filters: activeFilters, responseType: 'ask_neighborhood' })
       .catch(err => console.error('profile update failed:', err.message));
@@ -251,6 +271,27 @@ async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, 
   // Merge tagged pool events into eventMap so filter_match is available for validation
   for (const e of events) eventMap[e.id] = e;
 
+  // Guardrail: LLM returned conversational but pool has matched events — override to event_picks
+  // The LLM should always compose from matched events. If it chose conversational despite matches,
+  // fall through to the event_picks path with deterministic picks from the pool.
+  if ((result.type === 'conversational' || !result.picks || result.picks.length === 0)
+      && unifiedCtx.matchCount > 0 && events.length > 0) {
+    const matched = events.filter(e => e.filter_match === 'hard' || e.filter_match === 'soft');
+    const fallbackPool = matched.length > 0 ? matched : events;
+    if (fallbackPool.length > 0) {
+      console.warn(`Conversational-with-pool override: type=${result.type}, matchCount=${unifiedCtx.matchCount}, forcing event_picks with ${fallbackPool.length} events`);
+      result.type = 'event_picks';
+      if (!result.picks || result.picks.length === 0) {
+        result.picks = fallbackPool.slice(0, 3).map((e, i) => ({
+          rank: i + 1,
+          event_id: e.id,
+        }));
+      }
+      trace.composition.conversational_override = true;
+      // Fall through to event_picks handling below
+    }
+  }
+
   if (result.type === 'conversational' || !result.picks || result.picks.length === 0) {
     // Conversational or empty picks — save atomically, preserving existing picks/events for details/more
     saveResponseFrame(phone, {
@@ -261,6 +302,7 @@ async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, 
       offeredIds: session?.allOfferedIds || [],
       visitedHoods: session?.visitedHoods || [],
       pending: suggestedHood ? { neighborhood: suggestedHood, filters: activeFilters } : null,
+      lastResponseHadPicks: false,
     });
     updateProfile(phone, { neighborhood: hood, filters: activeFilters, responseType: 'conversational' })
       .catch(err => console.error('profile update failed:', err.message));
@@ -340,6 +382,7 @@ async function handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace)
     offeredIds: session?.allOfferedIds || [],
     visitedHoods: session?.visitedHoods || [],
     pending,
+    lastResponseHadPicks: false,
   });
   updateProfile(phone, { neighborhood: hood, filters: activeFilters, responseType: 'zero_match' })
     .catch(err => console.error('profile update failed:', err.message));

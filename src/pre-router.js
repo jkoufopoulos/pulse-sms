@@ -161,18 +161,81 @@ function preRoute(message, session) {
   }
 
   // Category map — used for session-aware single-dimension filter detection
+  // Multi-word entries (e.g. "live music") are tested separately from single-word entries
+  // to avoid word-boundary regex failures inside pipe-delimited alternations.
   const catMap = {
     'comedy|standup|stand-up|improv': { category: 'comedy' },
     'theater|theatre': { category: 'theater' },
     'jazz': { category: 'live_music', subcategory: 'jazz' },
-    'music|live music|rock|punk|metal|folk|indie|hip hop|hip-hop|r&b|soul|funk|rap': { category: 'live_music' },
+    'music|rock|punk|metal|folk|indie|hip-hop|r&b|soul|funk|rap': { category: 'live_music' },
     'techno|house|electronic|dj': { category: 'nightlife' },
     'art': { category: 'art' },
     'nightlife': { category: 'nightlife' },
     'dance': { category: 'nightlife' },
-    'trivia|bingo|open mic|poetry|karaoke|drag|burlesque': { category: 'community' },
+    'trivia|bingo|poetry|karaoke|drag|burlesque': { category: 'community' },
     'salsa|bachata|swing': { category: 'nightlife' },
   };
+  // Multi-word patterns tested with \s+ instead of literal space
+  const multiWordCatMap = {
+    'live\\s+music': { category: 'live_music' },
+    'hip\\s+hop': { category: 'live_music' },
+    'stand\\s+up': { category: 'comedy' },
+    'open\\s+mic': { category: 'community' },
+  };
+
+  // Match category from message — checks multi-word patterns first (more specific),
+  // then single-word patterns. Returns { catInfo, pattern } or null.
+  function matchCategory(text) {
+    for (const [pattern, catInfo] of Object.entries(multiWordCatMap)) {
+      if (new RegExp(`\\b${pattern}\\b`, 'i').test(text)) return { catInfo, pattern };
+    }
+    for (const [pattern, catInfo] of Object.entries(catMap)) {
+      if (new RegExp(`\\b(?:${pattern})\\b`, 'i').test(text)) return { catInfo, pattern };
+    }
+    return null;
+  }
+
+  // --- First-message compound detection (no session required) ---
+  // Catches "comedy in williamsburg", "jazz tonight", "free comedy", etc.
+  // Runs before session-guard so first messages with category words get deterministic filters.
+  // Ambiguous words (rock, funk, soul, house, swing, rap, dance, music) need a second
+  // signal (neighborhood, free, time, or event-intent suffix) to avoid false positives
+  // like "I'll rock up" or "let's dance".
+  const AMBIGUOUS_CAT_WORDS = /\b(?:rock|funk|soul|house|swing|rap|dance|music|art)\b/i;
+  const extractedHood = extractNeighborhood(msg);
+  const sessionHoodEarly = session?.lastNeighborhood || null;
+  if (!sessionHoodEarly && !session?.lastPicks?.length) {
+    const catMatch = matchCategory(msg);
+    const isFree = /\bfree\b/i.test(msg);
+    const time = parseTimeExpr(msg);
+    // "late" only counts as time intent with explicit event context
+    const isLate = !time && /\blate\b/i.test(msg) && /\b(?:night|tonight|stuff|events?|shows?)\b/i.test(msg);
+    const isMidnight = !time && /\bafter\s*midnight\b/i.test(msg);
+
+    if (catMatch) {
+      // Check if the matched word is ambiguous and needs a second signal
+      const needsCompound = AMBIGUOUS_CAT_WORDS.test(msg) && !catMatch.pattern.includes('\\s+');
+      const hasSecondSignal = extractedHood || isFree || time || isLate || isMidnight
+        || /\b(?:stuff|shows?|events?|picks?|tonight|night)\b/i.test(msg);
+
+      if (!needsCompound || hasSecondSignal) {
+        const filters = { ...catMatch.catInfo };
+        if (isFree) filters.free_only = true;
+        if (time) filters.time_after = time;
+        else if (isLate) filters.time_after = '22:00';
+        else if (isMidnight) filters.time_after = '00:00';
+        return { ...base, intent: 'events', neighborhood: extractedHood || null, filters };
+      }
+    }
+    // Bare "free stuff/events" on first message (with optional time compound)
+    if (isFree && /\b(?:stuff|events?|shows?|things?|picks?)\b/i.test(msg)) {
+      const filters = { free_only: true };
+      if (time) filters.time_after = time;
+      else if (isLate) filters.time_after = '22:00';
+      else if (isMidnight) filters.time_after = '00:00';
+      return { ...base, intent: 'events', neighborhood: extractedHood || null, filters };
+    }
+  }
 
   // --- Filter clearing (deterministic — P6: catch clear phrases before they hit the LLM) ---
   // Only trigger when session has active filters. Falls through to unified LLM otherwise.
@@ -195,36 +258,48 @@ function preRoute(message, session) {
   // is NOT required — misspelled neighborhoods leave it null but filters should still detect.
   const sessionHood = session?.lastNeighborhood || null;
   if (sessionHood || session?.lastPicks?.length > 0) {
-    // Free (single-dimension) — permissive: any message centered on "free"
-    if (/^(?:how about |what about |ok )?(?:anything |something )?free(?:\s+(?:stuff|events?|shows?|picks?|again|please|too|only))?(?:\s+(?:for .+|tho|though|instead))?$/i.test(msg)) {
-      return { ...base, intent: 'events', neighborhood: sessionHood, filters: { free_only: true } };
+    // Free — permissive: any message centered on "free", with optional category compound
+    // Catches "free", "free comedy", "free jazz stuff", "how about free comedy"
+    if (/^(?:how about |what about |ok |any )?(?:anything |something )?free/i.test(msg)) {
+      const filters = { free_only: true };
+      const catMatch = matchCategory(msg);
+      if (catMatch) Object.assign(filters, catMatch.catInfo);
+      return { ...base, intent: 'events', neighborhood: sessionHood, filters };
     }
 
     // Category follow-ups — permissive prefixes including corrections and "more"
-    for (const [pattern, catInfo] of Object.entries(catMap)) {
-      const catRegex = new RegExp(`^(?:how about|what about|any|show me|got any|have any|know any|more|ok (?:how about|what about)|actually|no i meant|i (?:said|meant|want)|anything with)\\s+(?:${pattern})(?:\\s+(?:night|stuff|shows?|events?|tonight|picks?|options?|tho|though|instead|please))*$`, 'i');
-      if (catRegex.test(msg)) {
-        return { ...base, intent: 'events', neighborhood: sessionHood, filters: { ...catInfo } };
+    const prefixRegex = /^(?:how about|what about|any|show me|got any|have any|know any|more|ok (?:how about|what about)|actually|no i meant|i (?:said|meant|want)|anything with)\s+/i;
+    const suffixRegex = /(?:\s+(?:night|stuff|shows?|events?|tonight|picks?|options?|tho|though|instead|please))*$/i;
+    const prefixMatch = msg.match(prefixRegex);
+    if (prefixMatch) {
+      const afterPrefix = msg.slice(prefixMatch[0].length);
+      const catMatch = matchCategory(afterPrefix.replace(suffixRegex, ''));
+      if (catMatch) {
+        return { ...base, intent: 'events', neighborhood: sessionHood, filters: { ...catMatch.catInfo } };
       }
     }
 
     // Bare category words (no prefix): "comedy", "jazz", "live music", "comedy shows"
+    for (const [pattern, catInfo] of Object.entries(multiWordCatMap)) {
+      if (new RegExp(`^${pattern}(?:\\s+(?:stuff|shows?|events?|picks?))?$`, 'i').test(msg)) {
+        return { ...base, intent: 'events', neighborhood: sessionHood, filters: { ...catInfo } };
+      }
+    }
     for (const [pattern, catInfo] of Object.entries(catMap)) {
-      const bareRegex = new RegExp(`^(?:${pattern})(?:\\s+(?:stuff|shows?|events?|picks?))?$`, 'i');
-      if (bareRegex.test(msg)) {
+      if (new RegExp(`^(?:${pattern})(?:\\s+(?:stuff|shows?|events?|picks?))?$`, 'i').test(msg)) {
         return { ...base, intent: 'events', neighborhood: sessionHood, filters: { ...catInfo } };
       }
     }
 
-    // Specific time follow-ups: "after 8pm", "around 9:30", "anything after 10"
-    // Skip if a category word is present — let unified LLM handle "comedy after 9pm"
+    // Specific time follow-ups: "after 8pm", "comedy after 9pm", "free jazz after 10"
+    // Now detects compounds (time + category + free) instead of skipping to LLM
     const specificTime = parseTimeExpr(msg);
     if (specificTime && /\b(?:after|around|past|by|at|starting|from)\b/i.test(msg)) {
-      const hasCatWord = Object.keys(catMap).some(p => new RegExp(`\\b(?:${p})\\b`, 'i').test(msg));
-      const hasFreeWord = /\bfree\b/i.test(msg);
-      if (!hasCatWord && !hasFreeWord) {
-        return { ...base, intent: 'events', neighborhood: sessionHood, filters: { time_after: specificTime } };
-      }
+      const filters = { time_after: specificTime };
+      const catMatch = matchCategory(msg);
+      if (catMatch) Object.assign(filters, catMatch.catInfo);
+      if (/\bfree\b/i.test(msg)) filters.free_only = true;
+      return { ...base, intent: 'events', neighborhood: sessionHood, filters };
     }
 
     // Time follow-ups (single-dimension) — fuzzy phrases

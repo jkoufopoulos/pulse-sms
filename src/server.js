@@ -3,7 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const helmet = require('helmet');
 const smsRoutes = require('./handler');
-const { clearSmsIntervals } = require('./handler');
+const { clearSmsIntervals, getInflightCount } = require('./handler');
 const { refreshCache, getCacheStatus, getHealthStatus, getEventById, isCacheFresh, scheduleDailyScrape, clearSchedule } = require('./events');
 const { loadProfiles } = require('./preference-profile');
 const { loadReferrals, clearReferralInterval } = require('./referral');
@@ -529,24 +529,39 @@ const server = app.listen(PORT, () => {
   scheduleDailyScrape();
 });
 
-// Graceful shutdown
-function shutdown(signal) {
+// Graceful shutdown — wait for in-flight requests before exiting
+const GRACEFUL_TIMEOUT_MS = 30000;
+let shuttingDown = false;
+
+async function shutdown(signal) {
+  if (shuttingDown) return; // prevent double-shutdown
+  shuttingDown = true;
   console.log(`${signal} received, shutting down gracefully...`);
+
+  // Phase 1: Stop accepting new connections + clear scheduled work
   clearSchedule();
   clearSmsIntervals();
   clearReferralInterval();
   clearSessionInterval();
-  // Flush sessions and conversations before exit
+  server.close(() => console.log('Server stopped accepting connections'));
+
+  // Phase 2: Wait for in-flight requests to complete (up to 30s)
+  const drainStart = Date.now();
+  while (getInflightCount() > 0 && Date.now() - drainStart < GRACEFUL_TIMEOUT_MS) {
+    console.log(`Waiting for ${getInflightCount()} in-flight request(s)...`);
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  if (getInflightCount() > 0) {
+    console.warn(`Shutdown timeout: ${getInflightCount()} request(s) still in-flight after ${GRACEFUL_TIMEOUT_MS}ms`);
+  }
+
+  // Phase 3: Cleanup
   try { flushSessions(); } catch (e) { console.error('Session flush on shutdown:', e.message); }
   try { require('./traces').stopConversationCapture(); } catch {}
-  // Close SQLite connection
   try { require('./db').closeDb(); } catch {}
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
-  });
-  // Force exit after 5s if connections don't close
-  setTimeout(() => process.exit(1), 5000);
+
+  console.log('Graceful shutdown complete');
+  process.exit(getInflightCount() > 0 ? 1 : 0);
 }
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
