@@ -2,6 +2,15 @@ const crypto = require('crypto');
 const { resolveNeighborhood } = require('../geo');
 const { lookupVenue } = require('../venues');
 
+// NYC bounding box — shared across scrapers that need geo filtering
+const NYC_BBOX = { minLat: 40.49, maxLat: 40.92, minLng: -74.26, maxLng: -73.70 };
+
+function isInsideNYC(lat, lng) {
+  if (isNaN(lat) || isNaN(lng)) return false;
+  return lat >= NYC_BBOX.minLat && lat <= NYC_BBOX.maxLat &&
+         lng >= NYC_BBOX.minLng && lng <= NYC_BBOX.maxLng;
+}
+
 const FETCH_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
   'Accept': 'text/html',
@@ -241,4 +250,4 @@ function stripHtml(html) {
     .trim();
 }
 
-module.exports = { FETCH_HEADERS, makeEventId, normalizeExtractedEvent, normalizeEventName, computeCompleteness, backfillEvidence, backfillDateTimes, stripHtml };
+module.exports = { FETCH_HEADERS, NYC_BBOX, isInsideNYC, makeEventId, normalizeExtractedEvent, normalizeEventName, computeCompleteness, backfillEvidence, backfillDateTimes, stripHtml };

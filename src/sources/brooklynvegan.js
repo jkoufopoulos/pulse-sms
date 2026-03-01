@@ -1,4 +1,4 @@
-const { makeEventId, FETCH_HEADERS } = require('./shared');
+const { makeEventId, FETCH_HEADERS, isInsideNYC } = require('./shared');
 const { resolveNeighborhood, inferCategory, getNycDateString } = require('../geo');
 const { learnVenueCoords } = require('../venues');
 
@@ -34,6 +34,9 @@ async function fetchBrooklynVeganEvents() {
         const lat = parseFloat(venue.latitude);
         const lng = parseFloat(venue.longitude);
         const venueName = venue.title || null;
+
+        // Filter: outside NYC bounding box
+        if (!isNaN(lat) && !isNaN(lng) && !isInsideNYC(lat, lng)) continue;
 
         if (venueName && !isNaN(lat) && !isNaN(lng)) {
           learnVenueCoords(venueName, lat, lng);

@@ -1,7 +1,19 @@
 const cheerio = require('cheerio');
-const { makeEventId, FETCH_HEADERS } = require('./shared');
+const { makeEventId, FETCH_HEADERS, isInsideNYC } = require('./shared');
 const { getNycDateString, resolveNeighborhood, inferCategory } = require('../geo');
 const { lookupVenue, learnVenueCoords } = require('../venues');
+
+// Venues DoNYC lists that are outside NYC — no coords to bbox-filter
+const NON_NYC_VENUES = new Set([
+  'the paramount',           // Huntington, Long Island
+  'ubs arena',               // Elmont, Long Island
+  'nassau coliseum',         // Uniondale, Long Island
+  'tilles center for the performing arts', // Brookville, Long Island
+  'paramount hudson valley theater', // Peekskill, NY
+  'hard rock hotel & casino', // Atlantic City, NJ
+  'ritz theatre',            // Elizabeth, NJ
+  'flagstar at westbury music fair', // Westbury, Long Island
+]);
 
 const CATEGORIES = [
   { slug: 'music', categoryOverride: null },              // infer from name (live_music vs nightlife)
@@ -42,6 +54,12 @@ function parseCards($, cards, dateStr, categoryOverride) {
       const coords = lookupVenue(venueName);
       if (coords) { lat = coords.lat; lng = coords.lng; }
     }
+
+    // Filter: outside NYC bounding box
+    if (!isNaN(lat) && !isNaN(lng) && !isInsideNYC(lat, lng)) return;
+
+    // Filter: known non-NYC venues (no coords to bbox-filter)
+    if (venueName && NON_NYC_VENUES.has(venueName.toLowerCase().trim())) return;
 
     const neighborhood = (!isNaN(lat) && !isNaN(lng))
       ? resolveNeighborhood(null, lat, lng)

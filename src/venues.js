@@ -377,6 +377,128 @@ const VENUE_MAP = {
   'Fabrik': { lat: 40.7036, lng: -73.9870 },
   'The Sailboat': { lat: 40.7087, lng: -73.9246 },
   'Studios 797': { lat: 40.7440, lng: -73.9485 },
+
+  // === Venues added for neighborhood resolution gap (#19) ===
+
+  // Bowery / Nolita
+  'Silence Please': { lat: 40.7189, lng: -73.9949 },
+
+  // Chinatown / LES
+  '36 E Broadway': { lat: 40.7141, lng: -73.9893 },
+  'P.S. 130 Hernando De Soto': { lat: 40.7170, lng: -73.9990 },
+
+  // Chelsea
+  'Bar Bonobo': { lat: 40.7431, lng: -74.0000 },
+
+  // NoMad / Gramercy
+  'Tavern 29': { lat: 40.7443, lng: -73.9840 },
+
+  // TriBeCa
+  'Farm.One': { lat: 40.7181, lng: -74.0074 },
+
+  // East Williamsburg / Bushwick
+  'Moondog Hifi': { lat: 40.7079, lng: -73.9292 },
+  'SILO': { lat: 40.7106, lng: -73.9227 },
+
+  // Williamsburg
+  'Cargo @ Dead Letter No. 9': { lat: 40.7145, lng: -73.9673 },
+  'Brooklyn Comedy Collective': { lat: 40.7072, lng: -73.9411 },
+  'The Brooklyn Comedy Collective': { lat: 40.7072, lng: -73.9411 },
+
+  // Crown Heights / Prospect Heights
+  'Kvartira Books': { lat: 40.6750, lng: -73.9629 },
+
+  // Sheepshead Bay
+  'Brooklyn Public Library - Kings Highway Branch': { lat: 40.6103, lng: -73.9531 },
+
+  // Rockaway
+  'Rockaway Botanica': { lat: 40.5836, lng: -73.8161 },
+
+  // Staten Island
+  'St. George Theatre': { lat: 40.6420, lng: -74.0775 },
+  'H.H. Biddle House': { lat: 40.5035, lng: -74.2515 },
+
+  // Queens — LIC / Queensbridge
+  'Queensbridge Park House': { lat: 40.7565, lng: -73.9486 },
+
+  // Queens — Sunnyside
+  '43rd Street & Skillman Avenue': { lat: 40.7469, lng: -73.9212 },
+
+  // Queens — Bayside
+  'Commonpoint Queens - Bay Terrace Center': { lat: 40.7851, lng: -73.7793 },
+  'Commonpoint Queens Bay Terrace Center': { lat: 40.7851, lng: -73.7793 },
+
+  // Queens — Fort Totten / Bayside
+  'Fort Totten Park Visitors Center': { lat: 40.7924, lng: -73.7881 },
+
+  // Bronx — Mott Haven
+  'Pregones Theater': { lat: 40.8196, lng: -73.9283 },
+
+  // Bronx — Van Cortlandt
+  'Broadway and Mosholu Avenue': { lat: 40.8982, lng: -73.9036 },
+
+  // Queens — East Elmhurst
+  'PS 329Q - East Elmhurst Community School': { lat: 40.7633, lng: -73.8697 },
+
+  // Queens — Jamaica
+  'Rochdale Village Community Center': { lat: 40.6770, lng: -73.7660 },
+
+  // Bronx — Hunts Point
+  'Graham Hunts Point Beacon Community Center': { lat: 40.8181, lng: -73.8925 },
+
+  // Bronx — Pelham Bay
+  'Bartow Community Center - Room 31': { lat: 40.8722, lng: -73.8038 },
+
+  // Manhattan — Midtown East
+  'Ralph Bunche Park': { lat: 40.7492, lng: -73.9695 },
+
+  // Manhattan — Chelsea
+  'Hudson Guild Fulton Community Center': { lat: 40.7440, lng: -74.0006 },
+
+  // Manhattan — Inwood
+  'West 218th Street and Indian Road': { lat: 40.8693, lng: -73.9247 },
+
+  // Manhattan — Harlem
+  'NYPL - Countee Cullen Library': { lat: 40.8147, lng: -73.9405 },
+
+  // Brooklyn — Flatlands
+  'Christian Cultural Center - Brooklyn Campus': { lat: 40.6250, lng: -73.9040 },
+
+  // Brooklyn — Flatbush
+  'Fit4Dance NYC': { lat: 40.6518, lng: -73.9581 },
+
+  // Brooklyn — Williamsburg
+  'Old Man Hustle BKLYN COMEDY Club': { lat: 40.7138, lng: -73.9617 },
+
+  // Queens — LIC
+  'Queens Public Library - Broadway': { lat: 40.7620, lng: -73.9250 },
+  'Queens Public Library - East Elmhurst': { lat: 40.7636, lng: -73.8680 },
+
+  // Queens — Bayside
+  'Queens Public Library - Bayside': { lat: 40.7688, lng: -73.7710 },
+
+  // Brooklyn — Mill Basin
+  'Brooklyn Public Library - Mill Basin': { lat: 40.6060, lng: -73.9090 },
+
+  // Bronx — Eastchester
+  'NYPL - Eastchester Library': { lat: 40.8769, lng: -73.8301 },
+
+  // Staten Island — Willowbrook
+  'Greenbelt Native Plant Center': { lat: 40.5930, lng: -74.1460 },
+
+  // LES / Chinatown
+  'Basement Chinatown': { lat: 40.7150, lng: -73.9975 },
+
+  // === NYC Parks facilities — generic names with known locations ===
+  '102nd Street Field House': { lat: 40.7951, lng: -73.9695 },
+  'Entrance - West 77th Street and Central Park West': { lat: 40.7807, lng: -73.9741 },
+  'Parade Start: Mott and Canal': { lat: 40.7182, lng: -73.9979 },
+  'Stuyvesant Square - east fountain': { lat: 40.7335, lng: -73.9837 },
+  'Eton Place Parking Lot': { lat: 40.6009, lng: -74.1583 },
+  'Cunningham Park Parking Lot': { lat: 40.7359, lng: -73.7687 },
+  'Golden Age Classroom A': { lat: 40.6564, lng: -73.9299 },
+  'Multipurpose Room': { lat: 40.6895, lng: -73.9762 },
+  'Athletic Courts': { lat: 40.6895, lng: -73.9762 },
 };
 
 // Build normalized lookup map at module load

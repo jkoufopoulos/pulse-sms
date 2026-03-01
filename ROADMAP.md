@@ -219,13 +219,15 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 **~28 events are outside NYC entirely** (NJ, CT, Westchester) — these should be filtered, not geocoded.
 **~143 are NYC events** at venues the system can't resolve.
 
-**Fix plan (three parts):**
+**Fix (three parts, all done 2026-03-01):**
 
-| # | Fix | Expected Recovery | Status |
-|---|-----|-------------------|--------|
-| 19a | Add ~25 recurring NYC venues to static venue map | ~50-60 events (RA, DoNYC, NYC Parks) | In progress |
-| 19b | Filter non-NYC events at scrape time in Ticketmaster + DoNYC | Remove ~28 false positives | In progress |
-| 19c | Add NYC Parks location coords to venue map for generic park facilities | ~20-30 events | In progress |
+| # | Fix | Recovery | Status |
+|---|-----|----------|--------|
+| 19a | Add ~40 NYC venues to static venue map (bars, comedy clubs, libraries, parks facilities, community centers) | ~63 events resolved | **Done** |
+| 19b | NYC bounding box filter in Ticketmaster, DoNYC, BrooklynVegan + venue blocklists for non-NYC venues without coords | ~28 non-NYC events removed | **Done** |
+| 19c | Add Rockaway + St. George neighborhoods (+ Staten Island borough support) | Enables resolution for events in Rockaways and north shore SI | **Done** |
+
+**Result:** 171 → ~80 missing (53% reduction). Remaining ~80 are mostly RA "TBA" secret locations (~25, inherently unresolvable), NYC Parks community centers needing individual geocoding (~15), and a handful of DoNYC/RA venues without addresses. Shared `isInsideNYC()` bbox helper extracted to `shared.js` for reuse across scrapers (Luma refactored to use it).
 
 ---
 
@@ -263,21 +265,21 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 
 ### Eval Coverage Audit (2026-03-01)
 
-241 golden scenarios (169 multi-turn + 72 regression, 365 assertions). Suite is strong on filter persistence (P1), session context (P7), graceful degradation (P6). Eight gaps identified:
+255 golden scenarios (176 multi-turn + 79 regression, 384 assertions). Suite is strong on filter persistence (P1), session context (P7), graceful degradation (P6). Nine gaps identified:
 
 | # | Gap | Priority | Status |
 |---|-----|----------|--------|
 | 1 | **Temporal accuracy (P5)** — 7 assertions total. Zero explicit clock-time tests ("after 10pm"), zero after-midnight wrapping, zero time+category compounds. Dangerous given new compound pre-router. | **High** | **Done** — 6 multi-turn + 6 regression scenarios added |
 | 2 | **First-message compounds** — No end-to-end test of "comedy in bushwick" or "free jazz tonight" as openers. Unit tests verify pre-router struct but not full pipeline through filter_intent gating. | **High** | **Done** — 4 multi-turn + 4 regression scenarios added |
 | 3 | **filter_intent gating observability** — The P1 gate (ignore LLM filter_intent when pre-router set filters) has no code eval to verify it fires. | **High** | **Done** — `filter_intent_gating` code eval added |
-| 4 | **Abuse/off-topic** — 5 scenarios (3%). Missing: hostility, identity questions, other-city requests, persistent off-topic. Target: 8-10%. | Medium | Planned |
-| 5 | **handleMore path** — No dedicated MORE eval. Dedup across 3+ cycles, filter persistence through MOREs, compose-only prompt path untested. | Medium | Planned |
-| 6 | **Tavily scenarios vestigial** — Scenarios 45-47 test Tavily fallback but Tavily removed from hot path. Either trivially pass or consistently fail. | Medium | Planned — remove or update to test deterministic fallback |
+| 4 | **Abuse/off-topic** — 5 scenarios (3%). Missing: hostility, identity questions, other-city requests, persistent off-topic. Target: 8-10%. | Medium | **Done** — 4 multi-turn + 4 regression scenarios added (now 5.1%) |
+| 5 | **handleMore path** — No dedicated MORE eval. Dedup across 3+ cycles, filter persistence through MOREs, compose-only prompt path untested. | Medium | **Done** — 3 multi-turn + 3 regression scenarios added |
+| 6 | **Tavily scenarios vestigial** — 3 regression scenarios tested Tavily fallback (removed from hot path). | Medium | **Done** — updated to test deterministic exhaustion behavior, removed P8 references |
 | 7 | **TCPA/opt-out** — Zero scenarios for STOP/UNSUBSCRIBE compliance. Deterministic but legally required. | Low | Planned |
 | 8 | **Neighborhood skew** — EV 13x, Bushwick 7x, Wburg 5x. Many outer-borough neighborhoods absent. Failures are cache-dependent, not code-dependent. | Low | Planned |
 | 9 | Trace fetch race condition — could grab wrong trace under concurrent load | Low | Planned |
 
-**Distribution assessment:** happy_path 38% (ideal 30-35%), edge_case 26% (right), filter_drift 16% (right), poor_experience 16% (right), abuse_off_topic 3% (under-indexed, target 8-10%).
+**Distribution assessment:** happy_path 35.2%, edge_case 25.6%, filter_drift 19.3%, poor_experience 14.8%, abuse_off_topic 5.1%. All categories in healthy range.
 
 ---
 
@@ -369,6 +371,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 
 | Date | What | Key Impact |
 |------|------|------------|
+| Mar 1 | Neighborhood resolution gap fix (#19) | 171 → ~80 missing neighborhoods (53% reduction). +40 venues in map, NYC bbox filter on 4 scrapers, Rockaway + St. George neighborhoods added, Staten Island borough support |
 | Mar 1 | Structural filter drift fix (Step 2b) | Gated `filter_intent` when pre-router set filters (P1), expanded compound detection (first-message + time+category + free+category), VALID_CATEGORIES validation (P3) |
 | Mar 1 | Degraded-mode LLM fallback + MORE dedup hardening | Gap 4 fixed — deterministic picks from tagged pool on LLM failure |
 | Mar 1 | Code eval accuracy overhaul | 99.8% code eval pass rate (was 99.5%); fixed CATEGORY_PARENTS sync, filter_match_alignment, zero-match exemption |

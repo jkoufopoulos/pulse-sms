@@ -1,4 +1,4 @@
-const { makeEventId } = require('./shared');
+const { makeEventId, isInsideNYC } = require('./shared');
 const { getNycDateString, resolveNeighborhood, inferCategory } = require('../geo');
 const { learnVenueCoords } = require('../venues');
 
@@ -18,6 +18,11 @@ const LARGE_VENUE_BLOCKLIST = new Set([
   'the theater at madison square garden',
   'hulu theater at madison square garden',
   'terminal 5',
+  // Non-NYC venues that fall within search radius
+  'ritz theatre',                   // Elizabeth, NJ
+  'the paramount',                  // Huntington, Long Island
+  'nassau coliseum',                // Uniondale, Long Island
+  'flagstar at westbury music fair', // Westbury, Long Island
 ]);
 
 const MAX_PRICE = 100;
@@ -115,6 +120,10 @@ async function fetchTicketmasterEvents() {
 
         const geoLat = parseFloat(venue.location?.latitude);
         const geoLng = parseFloat(venue.location?.longitude);
+
+        // Filter: outside NYC bounding box
+        if (!isNaN(geoLat) && !isNaN(geoLng) && !isInsideNYC(geoLat, geoLng)) continue;
+
         if (venueName && !isNaN(geoLat) && !isNaN(geoLng)) {
           learnVenueCoords(venueName, geoLat, geoLng);
         }

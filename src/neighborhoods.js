@@ -298,6 +298,18 @@ const NEIGHBORHOODS = {
     lat: 40.8988, lng: -73.9121, radius_km: 1.5,
     aliases: ['riverdale']
   },
+
+  // === STATEN ISLAND ===
+  'St. George': {
+    lat: 40.6433, lng: -74.0764, radius_km: 1.5,
+    aliases: ['st george', 'st. george', 'staten island ferry', 'north shore']
+  },
+
+  // === QUEENS (additional) ===
+  'Rockaway': {
+    lat: 40.5860, lng: -73.8161, radius_km: 2.0,
+    aliases: ['rockaway', 'rockaway beach', 'far rockaway', 'rockaway park', 'the rockaways', 'rockaways']
+  },
 };
 
 // Build a flat lookup: alias → neighborhood name
@@ -332,7 +344,7 @@ const BOROUGHS = {
     'Astoria', 'Long Island City', 'Sunnyside', 'Woodside',
     'Jackson Heights', 'Elmhurst', 'Corona', 'Flushing',
     'Forest Hills', 'Rego Park', 'Kew Gardens', 'Jamaica',
-    'Ridgewood', 'Bayside',
+    'Ridgewood', 'Bayside', 'Rockaway',
   ],
   'manhattan': [
     'East Village', 'West Village', 'Lower East Side', 'Chelsea',
@@ -346,6 +358,9 @@ const BOROUGHS = {
   'bronx': [
     'Mott Haven', 'Fordham', 'Belmont', 'Concourse', 'Riverdale',
   ],
+  'staten island': [
+    'St. George',
+  ],
 };
 
 // Borough aliases
@@ -354,6 +369,7 @@ const BOROUGH_ALIASES = {
   'queens': 'queens', 'qns': 'queens',
   'manhattan': 'manhattan', 'nyc': 'manhattan', 'the city': 'manhattan',
   'bronx': 'bronx', 'the bronx': 'bronx', 'bx': 'bronx',
+  'staten island': 'staten island', 'si': 'staten island', 'shaolin': 'staten island',
 };
 
 /**
