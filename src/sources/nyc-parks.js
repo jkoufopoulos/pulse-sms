@@ -55,7 +55,7 @@ async function fetchNYCParksEvents() {
           ? resolveNeighborhood(null, venueCoords.lat, venueCoords.lng)
           : resolveNeighborhood(borough, null, null);
 
-        const id = makeEventId(title, venueName, dateLocal, 'nyc_parks');
+        const id = makeEventId(title, venueName, dateLocal, 'nyc_parks', null, startDate);
         if (seen.has(id)) return;
         seen.add(id);
 

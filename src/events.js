@@ -429,6 +429,59 @@ async function getEvents(neighborhood, { dateRange } = {}) {
 }
 
 /**
+ * Get events for a borough — filters to neighborhoods within the borough.
+ * Applies quality gates, date filtering, and neighborhood diversity (max 3 per hood).
+ */
+async function getEventsForBorough(borough, { dateRange } = {}) {
+  if (eventCache.length === 0) {
+    await refreshCache();
+  }
+
+  const { BOROUGHS } = require('./neighborhoods');
+  const hoodSet = new Set(BOROUGHS[borough] || []);
+  const qualityFiltered = applyQualityGates(eventCache);
+  const inBorough = qualityFiltered.filter(e => hoodSet.has(e.neighborhood));
+
+  // Filter by date range (defaults to 7-day window)
+  const todayNyc = getNycDateString(0);
+  const weekOutNyc = getNycDateString(7);
+  const rangeStart = dateRange?.start || todayNyc;
+  const rangeEnd = dateRange?.end || weekOutNyc;
+  const dateFiltered = inBorough.filter(e => {
+    const d = getEventDate(e);
+    if (!d) return true;
+    return d >= rangeStart && d <= rangeEnd;
+  });
+
+  // Sort by date proximity x source tier (same as citywide)
+  const tierOrder = { unstructured: 0, primary: 1, secondary: 2 };
+  const sorted = dateFiltered.sort((a, b) => {
+    const dateA = getEventDate(a) || rangeEnd;
+    const dateB = getEventDate(b) || rangeEnd;
+    if (dateA !== dateB) return dateA < dateB ? -1 : 1;
+    const tierA = tierOrder[a.source_tier] ?? 2;
+    const tierB = tierOrder[b.source_tier] ?? 2;
+    if (tierA !== tierB) return tierA - tierB;
+    const confA = a.extraction_confidence ?? 1;
+    const confB = b.extraction_confidence ?? 1;
+    return confB - confA;
+  });
+
+  // Apply neighborhood diversity: max 3 per hood
+  const diverse = [];
+  const hoodCounts = {};
+  for (const e of sorted) {
+    const hood = e.neighborhood || 'unknown';
+    hoodCounts[hood] = (hoodCounts[hood] || 0) + 1;
+    if (hoodCounts[hood] <= 3) diverse.push(e);
+    if (diverse.length >= 30) break;
+  }
+
+  console.log(`Borough ${borough}: ${diverse.length} events (${dateFiltered.length} total, range ${rangeStart}..${rangeEnd}, cache: ${eventCache.length})`);
+  return diverse;
+}
+
+/**
  * Get events citywide — no geographic anchor. Returns best events across all neighborhoods.
  * Applies same quality gates as getEvents.
  */
@@ -587,4 +640,4 @@ function scanCityWide(filters) {
     .map(([neighborhood, matchCount]) => ({ neighborhood, matchCount }));
 }
 
-module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, getEvents, getEventsCitywide, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs, scanCityWide };
+module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, getEvents, getEventsForBorough, getEventsCitywide, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs, scanCityWide };

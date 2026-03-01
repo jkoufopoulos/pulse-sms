@@ -71,7 +71,7 @@ async function fetchBAMEvents() {
       const ticketUrl = item.buyLink || null;
       const moreLink = item.moreLink ? `https://www.bam.org${item.moreLink}` : null;
 
-      const id = makeEventId(name, 'BAM', dateLocal, 'bam');
+      const id = makeEventId(name, 'BAM', dateLocal, 'bam', null, startTime);
       if (seen.has(id)) continue;
       seen.add(id);
 

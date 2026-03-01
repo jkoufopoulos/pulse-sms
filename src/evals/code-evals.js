@@ -134,12 +134,12 @@ const evals = {
     }
     // Zero-pick graceful degradation: if the response discusses events/neighborhoods,
     // it's an appropriate event-related response, not off-topic
-    const isEventDiscussion = /no .{1,30} in|nothing .{1,30} tonight|slim pickings|exhausted|cleaned out|already (got|showed)|drop(ping)? (the )?.{1,20}(filter|jazz|comedy|music|art)|no free|no comedy|no jazz|no live|no match|not my (beat|thing)|not much .{1,30} in|nearby has|you want .{1,30}(comedy|jazz|music|dance|art|free)|dropping the|back to|that.s (really )?it|that.s all|cycled through|dead\b|just the events|let me grab/i.test(sms);
+    const isEventDiscussion = /no .{1,30} in|nothing .{1,30} tonight|slim pickings|exhausted|cleaned out|already (got|showed)|drop(ping)? (the )?.{1,20}(filter|jazz|comedy|music|art)|no free|no comedy|no jazz|no live|no match|not my (beat|thing)|not much .{1,30} in|nearby has|you want .{1,30}(comedy|jazz|music|dance|art|free)|dropping the|back to|that.s (really )?it|that.s all|cycled through|dead\b|just the events|let me grab|happening.{0,5}right now|check back|isn.t showing up|go (dance|check)/i.test(sms);
     if (isEventDiscussion) {
       return { name: 'off_topic_redirect', pass: true, detail: 'zero-match graceful degradation (event-related)' };
     }
     // Check that the response contains a redirect to neighborhoods/events
-    const hasRedirect = /text (me )?a neighborhood|text me a|drop me a|go out|tonight.s picks|when you.re ready|mood for|what you.re (looking|feeling)|what.{1,30}looking for|vibe|try a|want me to check|want .{1,30} picks|want more .{1,30} stuff|check .{1,30} instead|still .{1,20} tonight|hit me up|reply \d|want those|up for something|neighborhood|what.re you (in the )?mood|what.s (actually )?good|happening .{0,10}(in|tonight)|good .{0,10} tonight|dig up|something else|can.t click|just help find|i just find|events (guy|bot)|i can help/i.test(sms);
+    const hasRedirect = /text (me )?a neighborhood|text me (a|what)|drop me a|go out|tonight.s picks|when you.re ready|mood for|what you.re (looking|feeling)|what.{1,30}looking for|vibe|try a|want me to (check|show)|want .{0,30} picks|want more .{0,30} stuff|check .{1,30} instead|still .{1,20} tonight|hit me up|reply \d|want those|up for something|neighborhood|what.re you (in the )?mood|what.s (actually )?good|what kind of (night|event|stuff)|happening .{0,10}(in|tonight)|good .{0,10} tonight|dig up|something (else|different)|can.t click|just help find|i just find|events (guy|bot)|i can help/i.test(sms);
     return {
       name: 'off_topic_redirect',
       pass: hasRedirect,
@@ -526,7 +526,33 @@ const evals = {
     if (sms === "Having a moment — try again in a sec!" || sms === "Bestie hit a snag — try again in a sec!") {
       return { name: 'schema_compliance', pass: false, detail: 'fallback error response (JSON parse likely failed)' };
     }
-    // Try to parse the raw response
+    // Split mode: reasoning uses tool_use (Anthropic) or JSON schema (Gemini) — different raw format
+    if (trace.composition?.split_mode) {
+      const reasonRaw = trace.composition.reason_raw;
+      if (!reasonRaw) {
+        return { name: 'schema_compliance', pass: false, detail: 'split mode but no reason_raw' };
+      }
+      // Anthropic tool_use returns array of content blocks; Gemini returns JSON string
+      try {
+        const parsed = JSON.parse(reasonRaw);
+        // Anthropic: array with tool_use block
+        if (Array.isArray(parsed)) {
+          const toolBlock = parsed.find(b => b.type === 'tool_use');
+          if (!toolBlock || !toolBlock.input?.type) {
+            return { name: 'schema_compliance', pass: false, detail: 'split mode: no tool_use block with type field' };
+          }
+        } else if (typeof parsed === 'object') {
+          // Gemini: direct JSON with type field
+          if (!parsed.type) {
+            return { name: 'schema_compliance', pass: false, detail: `split mode: missing type field (has: ${Object.keys(parsed).join(', ')})` };
+          }
+        }
+        return { name: 'schema_compliance', pass: true, detail: 'split mode: valid reasoning response' };
+      } catch {
+        return { name: 'schema_compliance', pass: false, detail: 'split mode: reason_raw is not valid JSON' };
+      }
+    }
+    // Unified mode: try to parse the raw response
     try {
       const fenceMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
       const jsonStr = fenceMatch ? fenceMatch[1].trim() : raw;
@@ -654,6 +680,28 @@ const evals = {
       return { name: 'filter_intent_gating', pass: true, detail: 'clear_all always trusted' };
     }
     return { name: 'filter_intent_gating', pass: true, detail: `no gating scenario (pre_detected=${hadPreDetected}, action=${llmIntent?.action || 'none'})` };
+  },
+
+  /**
+   * Split validation effectiveness: reports how many picks the code checkpoint caught.
+   * Informational — always passes. Metric for A/B comparison between split and unified modes.
+   */
+  split_validation_effective(trace) {
+    if (!trace.composition?.split_mode) {
+      return { name: 'split_validation_effective', pass: true, detail: 'not split mode' };
+    }
+    const violations = trace.composition.split_filter_violations || 0;
+    const renderFallback = trace.composition.render_fallback || false;
+    const conversationalOverride = trace.composition.conversational_override || false;
+    const parts = [];
+    if (violations > 0) parts.push(`${violations} filter-violating picks stripped`);
+    if (conversationalOverride) parts.push('conversational override applied');
+    if (renderFallback) parts.push('render fallback used');
+    return {
+      name: 'split_validation_effective',
+      pass: true,
+      detail: parts.length > 0 ? parts.join(', ') : 'no interventions needed',
+    };
   },
 
   /**

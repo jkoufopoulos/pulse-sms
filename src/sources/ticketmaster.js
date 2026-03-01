@@ -149,7 +149,7 @@ async function fetchTicketmasterEvents() {
         }
 
         allEvents.push({
-          id: makeEventId(e.name, venueName, localDate, 'ticketmaster'),
+          id: makeEventId(e.name, venueName, localDate, 'ticketmaster', null, startTimeLocal),
           source_name: 'ticketmaster',
           source_type: 'aggregator',
           name: e.name,

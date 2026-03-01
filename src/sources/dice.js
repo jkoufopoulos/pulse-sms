@@ -98,7 +98,7 @@ async function fetchDiceEvents() {
         || (artists.length > 0 ? artists.slice(0, 3).join(', ') + (artists.length > 3 ? ` + ${artists.length - 3} more` : '') : null);
 
       events.push({
-        id: makeEventId(e.name, venue.name, dateLocal, 'dice'),
+        id: makeEventId(e.name, venue.name, dateLocal, 'dice', null, startDate),
         source_name: 'dice',
         source_type: 'aggregator',
         name: e.name,

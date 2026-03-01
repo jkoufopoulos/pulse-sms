@@ -122,7 +122,7 @@ async function fetchRAEvents() {
           : null;
 
         events.push({
-          id: makeEventId(e.title, venueName, dateLocal, 'ra'),
+          id: makeEventId(e.title, venueName, dateLocal, 'ra', null, startTime),
           source_name: 'ra',
           source_type: 'aggregator',
           name: e.title,

@@ -429,11 +429,14 @@ function upsertEvents(db, events) {
   db.close();
 }
 
-// 15. Occurrence IDs match scraped event IDs (dedup)
+// 15. Occurrence IDs match scraped event IDs (dedup) — with startTime
 {
-  const scrapedId = makeEventId('Tuesday Trivia', 'Test Venue', '2026-03-03');
-  const occurrenceId = makeEventId('Tuesday Trivia', 'Test Venue', '2026-03-03');
-  check('Occurrence IDs: match scraped IDs for dedup', scrapedId === occurrenceId);
+  const scrapedId = makeEventId('Tuesday Trivia', 'Test Venue', '2026-03-03', null, null, '2026-03-03T19:00:00');
+  const occurrenceId = makeEventId('Tuesday Trivia', 'Test Venue', '2026-03-03', null, null, '2026-03-03T19:00:00');
+  check('Occurrence IDs: match scraped IDs for dedup (with time)', scrapedId === occurrenceId);
+  // Without startTime: still backward compatible
+  const noTimeId = makeEventId('Tuesday Trivia', 'Test Venue', '2026-03-03');
+  check('Occurrence IDs: no startTime still works', noTimeId.length === 12);
 }
 
 // 16. DAY_NAMES mapping

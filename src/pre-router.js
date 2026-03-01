@@ -1,4 +1,4 @@
-const { NEIGHBORHOODS, BOROUGHS, extractNeighborhood, detectBorough } = require('./neighborhoods');
+const { NEIGHBORHOODS, BOROUGHS, extractNeighborhood } = require('./neighborhoods');
 
 // Build reverse map: neighborhood → borough
 const HOOD_TO_BOROUGH = {};
@@ -153,12 +153,8 @@ function preRoute(message, session) {
     return { ...base, intent: 'conversational', neighborhood: null, reply: "Hey! Tell me what you're looking for — comedy, jazz, something weird — or a neighborhood." };
   }
 
-  // Borough detection — ask user to narrow to a neighborhood
-  const boroughResult = detectBorough(msg);
-  if (boroughResult && !extractNeighborhood(msg)) {
-    const topHoods = boroughResult.neighborhoods.slice(0, 4).join(', ');
-    return { ...base, intent: 'conversational', neighborhood: null, reply: `${boroughResult.borough.charAt(0).toUpperCase() + boroughResult.borough.slice(1)} is a big place! Which neighborhood? I can check ${topHoods}...` };
-  }
+  // Borough detection — fall through to unified flow for borough-wide event serving
+  // (detectBorough is called in unified-flow.js to serve borough-scoped events)
 
   // Category map — used for session-aware single-dimension filter detection
   // Multi-word entries (e.g. "live music") are tested separately from single-word entries

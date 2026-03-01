@@ -2,7 +2,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
 const { getEventDate, getNycDateString } = require('./geo');
 const { EXTRACTION_PROMPT, DETAILS_SYSTEM } = require('./prompts');
-const { buildUnifiedPrompt } = require('./skills/build-compose-prompt');
+const { buildUnifiedPrompt, buildReasonPrompt, buildRenderPrompt } = require('./skills/build-compose-prompt');
 const { smartTruncate, isSearchUrl } = require('./formatters');
 
 let client = null;
@@ -426,7 +426,7 @@ Write the details text. Include this URL: ${bestUrl}`;
  *
  * Returns { type, sms_text, picks, clear_filters }
  */
-async function unifiedRespond(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime, validNeighborhoods, activeFilters, isSparse, isCitywide, matchCount, hardCount, softCount, excludeIds, suggestedNeighborhood, userHoodAlias, isLastBatch, exhaustionSuggestion, model } = {}) {
+async function unifiedRespond(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime, validNeighborhoods, activeFilters, isSparse, isCitywide, isBorough, borough, matchCount, hardCount, softCount, excludeIds, suggestedNeighborhood, userHoodAlias, isLastBatch, exhaustionSuggestion, model } = {}) {
   const now = currentTime || new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   const todayNyc = getNycDateString(0);
@@ -503,9 +503,12 @@ async function unifiedRespond(message, { session, events, neighborhood, nearbyHo
     : '';
 
   const aliasNote = userHoodAlias ? ` (user said "${userHoodAlias}" — this is a known alias for ${neighborhood}, serve events normally)` : '';
-  const neighborhoodDisplay = isCitywide
-    ? 'citywide — serve best events across all NYC neighborhoods. Label each pick with its neighborhood.'
-    : (neighborhood || 'not specified') + aliasNote;
+  const boroughLabel = borough ? borough.charAt(0).toUpperCase() + borough.slice(1) : '';
+  const neighborhoodDisplay = isBorough
+    ? `${boroughLabel} (borough-wide) — serve best events across ${boroughLabel} neighborhoods. Label each pick with its neighborhood.`
+    : isCitywide
+      ? 'citywide — serve best events across all NYC neighborhoods. Label each pick with its neighborhood.'
+      : (neighborhood || 'not specified') + aliasNote;
   const userPrompt = `Current time (NYC): ${now}
 <user_message>${message}</user_message>
 Session context: ${sessionContext}
@@ -622,4 +625,379 @@ Respond now.`;
   };
 }
 
-module.exports = { composeDetails, extractEvents, unifiedRespond, parseJsonFromResponse };
+// Tool schema for Anthropic tool_use in reasonIntent
+const REASON_TOOL = {
+  name: 'event_recommendation',
+  description: 'Return your event recommendation decision',
+  input_schema: {
+    type: 'object',
+    properties: {
+      type: { type: 'string', enum: ['event_picks', 'conversational', 'ask_neighborhood'] },
+      picks: { type: 'array', items: {
+        type: 'object',
+        properties: {
+          rank: { type: 'integer' },
+          event_id: { type: 'string' },
+          why: { type: 'string' },
+        },
+        required: ['rank', 'event_id', 'why'],
+      }},
+      reply_text: { type: 'string', description: 'SMS text for conversational/ask_neighborhood/zero-match. null for event_picks with picks.' },
+      filter_intent: { type: 'object', properties: {
+        action: { type: 'string', enum: ['none', 'clear_all', 'modify'] },
+        updates: { type: 'object', properties: {
+          free_only: { type: 'boolean' },
+          category: { type: 'string' },
+          time_after: { type: 'string' },
+          vibe: { type: 'string' },
+        }},
+      }, required: ['action'] },
+    },
+    required: ['type', 'picks', 'filter_intent'],
+  },
+};
+
+// Gemini JSON schema for reasonIntent
+const REASON_GEMINI_SCHEMA = {
+  type: 'object',
+  properties: {
+    type: { type: 'string', enum: ['event_picks', 'conversational', 'ask_neighborhood'] },
+    picks: { type: 'array', items: {
+      type: 'object',
+      properties: {
+        rank: { type: 'integer' },
+        event_id: { type: 'string' },
+        why: { type: 'string' },
+      },
+      required: ['rank', 'event_id', 'why'],
+    }},
+    reply_text: { type: 'string', nullable: true },
+    filter_intent: { type: 'object', properties: {
+      action: { type: 'string', enum: ['none', 'clear_all', 'modify'] },
+      updates: { type: 'object', properties: {
+        free_only: { type: 'boolean', nullable: true },
+        category: { type: 'string', nullable: true },
+        time_after: { type: 'string', nullable: true },
+        vibe: { type: 'string', nullable: true },
+      }},
+    }, required: ['action'] },
+  },
+  required: ['type', 'picks', 'filter_intent'],
+};
+
+/**
+ * Reasoning call for split mode: classifies intent and selects events.
+ * Returns { type, picks, filter_intent, reply_text, _raw, _usage, _provider }
+ */
+async function reasonIntent(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime, validNeighborhoods, activeFilters, isSparse, isCitywide, isBorough, borough, matchCount, hardCount, softCount, excludeIds, suggestedNeighborhood, userHoodAlias, model } = {}) {
+  const now = currentTime || new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+  const todayNyc = getNycDateString(0);
+  const tomorrowNyc = getNycDateString(1);
+
+  // Build event list string (same as unifiedRespond)
+  const hasActiveFilter = activeFilters && Object.values(activeFilters).some(Boolean);
+  const filterLabel = hasActiveFilter
+    ? Object.entries(activeFilters).filter(([,v]) => v).map(([k,v]) => `${k}=${v}`).join(', ')
+    : 'none';
+
+  let eventListStr = '';
+  if (events && events.length > 0) {
+    eventListStr = events.map(e => {
+      const eventDate = getEventDate(e);
+      const dayLabel = eventDate === todayNyc ? 'TODAY' : eventDate === tomorrowNyc ? 'TOMORROW' : eventDate;
+      const tag = e.filter_match === 'hard' ? '[MATCH] '
+                : e.filter_match === 'soft' ? '[SOFT] '
+                : '';
+      const nearbyTag = (neighborhood && e.neighborhood && e.neighborhood !== neighborhood) ? '[NEARBY] ' : '';
+      return tag + nearbyTag + JSON.stringify({
+        id: e.id,
+        name: cap(e.name, 80),
+        venue_name: e.venue_name,
+        neighborhood: e.neighborhood,
+        date_local: eventDate,
+        day: dayLabel,
+        start_time_local: e.start_time_local,
+        end_time_local: e.end_time_local,
+        is_free: e.is_free,
+        price_display: e.price_display,
+        category: e.category,
+        short_detail: cap(e.short_detail || e.description_short, 120),
+        source_name: e.source_name,
+        source_tier: e.source_tier || 'secondary',
+        extraction_confidence: e.extraction_confidence,
+        ticket_url: e.ticket_url,
+      });
+    }).join('\n');
+  }
+
+  // Build session context (same as unifiedRespond)
+  const sessionContext = session
+    ? `Last neighborhood: ${session.lastNeighborhood || 'none'}. Last picks: ${(session.lastPicks || []).map((p, i) => {
+        const evt = session.lastEvents?.[p.event_id];
+        return evt ? `#${i + 1} "${evt.name}"` : `#${i + 1}`;
+      }).join(', ') || 'none'}.${session.lastFilters && Object.values(session.lastFilters).some(Boolean) ? ` Active filters: ${JSON.stringify(session.lastFilters)}.` : ''}${session.pendingNearby ? ` Pending suggestion: "${session.pendingNearby}" (user was asked if they want picks there).` : ''}${session.pendingFilters ? ` Pending filters: ${JSON.stringify(session.pendingFilters)}.` : ''}${session.pendingMessage ? ` Original request: "${session.pendingMessage}".` : ''}`
+    : 'No prior session.';
+
+  const historyBlock = conversationHistory?.length > 0
+    ? '\nCONVERSATION HISTORY:\n' + conversationHistory.map(h =>
+        `${h.role === 'user' ? 'User' : 'Bestie'}: ${h.content}`
+      ).join('\n') + '\n'
+    : '';
+
+  const nearbyBlock = nearbyHoods?.length > 0
+    ? `\nNearby neighborhoods: ${nearbyHoods.join(', ')}`
+    : '';
+
+  const validNeighborhoodsBlock = validNeighborhoods?.length > 0
+    ? `\nVALID_NEIGHBORHOODS: ${validNeighborhoods.join(', ')}`
+    : '';
+
+  let filterContextBlock = '';
+  if (hasActiveFilter) {
+    filterContextBlock = `\nACTIVE_FILTER: ${filterLabel}\nHARD_MATCH: ${hardCount || 0}\nSOFT_MATCH: ${softCount || 0} of ${events?.length || 0} events\nSPARSE: ${isSparse ? 'true — few matches, acknowledge honestly' : 'false'}`;
+    if ((hardCount || 0) === 0 && (softCount || 0) > 0) {
+      filterContextBlock += `\nCAUTION: Zero hard matches. [SOFT] events match the broad category only. You MUST read each event name and description to verify it genuinely matches "${filterLabel}". A DJ night is NOT jazz. A comedy show is NOT theater. If none actually match, treat as zero matches.`;
+    }
+  }
+
+  const excludeNote = excludeIds && excludeIds.length > 0
+    ? `\nEXCLUDED (already shown to user — do NOT pick these): ${excludeIds.join(', ')}`
+    : '';
+
+  const aliasNote = userHoodAlias ? ` (user said "${userHoodAlias}" — this is a known alias for ${neighborhood}, serve events normally)` : '';
+  const boroughLabel = borough ? borough.charAt(0).toUpperCase() + borough.slice(1) : '';
+  const neighborhoodDisplay = isBorough
+    ? `${boroughLabel} (borough-wide) — serve best events across ${boroughLabel} neighborhoods. Label each pick with its neighborhood.`
+    : isCitywide
+      ? 'citywide — serve best events across all NYC neighborhoods. Label each pick with its neighborhood.'
+      : (neighborhood || 'not specified') + aliasNote;
+  const userPrompt = `Current time (NYC): ${now}
+<user_message>${message}</user_message>
+Session context: ${sessionContext}
+Neighborhood: ${neighborhoodDisplay}
+${historyBlock}${nearbyBlock}${validNeighborhoodsBlock}${filterContextBlock}${excludeNote}
+${eventListStr ? `EVENT_LIST (${events.length} events):\n${eventListStr}` : 'No events available for this area.'}
+
+Respond now.`;
+
+  // Build system prompt with reasoning skills
+  const skillOptions = {
+    requestedNeighborhood: neighborhood,
+    userMessage: message,
+    hasConversationHistory: conversationHistory?.length > 0,
+    hasActiveCategory: !!activeFilters?.category,
+  };
+  const systemPrompt = buildReasonPrompt(events || [], skillOptions);
+
+  let parsed, usage, provider, raw;
+  const resolvedModel = model || MODELS.compose;
+
+  if (resolvedModel.startsWith('gemini-') && getGeminiClient()) {
+    // Gemini path: JSON schema response
+    try {
+      const genAI = getGeminiClient();
+      const gemModel = genAI.getGenerativeModel({
+        model: resolvedModel,
+        systemInstruction: systemPrompt,
+        safetySettings: GEMINI_SAFETY,
+        generationConfig: {
+          maxOutputTokens: 2048,
+          temperature: 0.3,
+          topP: 0.9,
+          responseMimeType: 'application/json',
+          responseSchema: REASON_GEMINI_SCHEMA,
+        },
+      });
+      const result = await withTimeout(
+        gemModel.generateContent({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }] }),
+        15_000, 'reasonIntent-gemini'
+      );
+      const response = result.response;
+      checkGeminiFinish(response, 'reasonIntent-gemini');
+      raw = response.text() || '';
+      const usageMetadata = response.usageMetadata;
+      usage = usageMetadata ? { input_tokens: usageMetadata.promptTokenCount || 0, output_tokens: usageMetadata.candidatesTokenCount || 0 } : null;
+      provider = 'gemini';
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      console.warn(`Gemini reasonIntent failed, falling back to Anthropic: ${err.message}`);
+      const response = await withTimeout(getClient().messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        system: systemPrompt,
+        tools: [REASON_TOOL],
+        tool_choice: { type: 'tool', name: 'event_recommendation' },
+        messages: [{ role: 'user', content: userPrompt }],
+      }, { timeout: 12000 }), 15000, 'reasonIntent-anthropic');
+      raw = JSON.stringify(response.content);
+      usage = response.usage || null;
+      provider = 'anthropic';
+      const toolBlock = response.content.find(b => b.type === 'tool_use');
+      parsed = toolBlock ? toolBlock.input : null;
+    }
+  } else {
+    // Anthropic path: tool_use
+    const response = await withTimeout(getClient().messages.create({
+      model: resolvedModel.startsWith('gemini-') ? 'claude-haiku-4-5-20251001' : resolvedModel,
+      max_tokens: 1024,
+      system: systemPrompt,
+      tools: [REASON_TOOL],
+      tool_choice: { type: 'tool', name: 'event_recommendation' },
+      messages: [{ role: 'user', content: userPrompt }],
+    }, { timeout: 12000 }), 15000, 'reasonIntent-anthropic');
+    raw = JSON.stringify(response.content);
+    usage = response.usage || null;
+    provider = 'anthropic';
+    const toolBlock = response.content.find(b => b.type === 'tool_use');
+    parsed = toolBlock ? toolBlock.input : null;
+  }
+
+  if (!parsed) {
+    console.error('reasonIntent: no valid response:', raw);
+    return {
+      type: 'conversational',
+      picks: [],
+      filter_intent: { action: 'none' },
+      reply_text: "Having a moment — try again in a sec!",
+      _raw: raw,
+      _usage: usage,
+      _provider: provider,
+    };
+  }
+
+  // Validate picks against provided events (same boundary validation as unifiedRespond)
+  let validPicks = [];
+  if (parsed.picks && parsed.picks.length > 0 && events && events.length > 0) {
+    const validIds = new Set(events.map(e => e.id));
+    validPicks = parsed.picks.filter(p => p && typeof p.event_id === 'string' && validIds.has(p.event_id));
+
+    if (validPicks.length === 0 && parsed.picks.length > 0) {
+      console.warn(`reasonIntent: ${parsed.picks.length} picks had invalid IDs, attempting name match`);
+      const nameToId = new Map(events.map(e => [(e.name || '').toLowerCase(), e.id]));
+      validPicks = parsed.picks.map(p => {
+        if (p && validIds.has(p.event_id)) return p;
+        for (const [name, id] of nameToId) {
+          if (name && p.event_id && name.includes(p.event_id.toLowerCase())) return { ...p, event_id: id };
+        }
+        return null;
+      }).filter(Boolean);
+    }
+  }
+
+  const filterIntent = parsed.filter_intent || { action: 'none' };
+
+  return {
+    type: parsed.type || (validPicks.length > 0 ? 'event_picks' : 'conversational'),
+    picks: validPicks,
+    filter_intent: filterIntent,
+    reply_text: parsed.reply_text || null,
+    _raw: raw,
+    _usage: usage,
+    _provider: provider,
+  };
+}
+
+/**
+ * Rendering call for split mode: writes SMS copy from validated picks.
+ * Returns { sms_text, _raw, _usage, _provider }
+ */
+async function renderSms(picks, events, { neighborhood, activeFilters, currentTime, conversationHistory, isCitywide, suggestedNeighborhood, isLastBatch, exhaustionSuggestion, userMessage } = {}) {
+  const now = currentTime || new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+  const todayNyc = getNycDateString(0);
+  const tomorrowNyc = getNycDateString(1);
+
+  // Build picked events context (just the selected events, not the full pool)
+  const pickedEventsStr = picks.map((p, i) => {
+    const e = events.find(ev => ev.id === p.event_id);
+    if (!e) return null;
+    const eventDate = getEventDate(e);
+    const dayLabel = eventDate === todayNyc ? 'TODAY' : eventDate === tomorrowNyc ? 'TOMORROW' : eventDate;
+    return JSON.stringify({
+      rank: i + 1,
+      id: e.id,
+      name: e.name,
+      venue_name: e.venue_name,
+      neighborhood: e.neighborhood,
+      date_local: eventDate,
+      day: dayLabel,
+      start_time_local: e.start_time_local,
+      end_time_local: e.end_time_local,
+      is_free: e.is_free,
+      price_display: e.price_display,
+      category: e.category,
+      short_detail: e.short_detail || e.description_short,
+    });
+  }).filter(Boolean).join('\n');
+
+  const neighborhoodDisplay = isCitywide
+    ? 'citywide — label each pick with its neighborhood in parentheses'
+    : (neighborhood || 'not specified');
+
+  const userPrompt = `Current time (NYC): ${now}
+Neighborhood: ${neighborhoodDisplay}
+
+SELECTED EVENTS (compose SMS from these):
+${pickedEventsStr}
+
+Write the SMS text now.`;
+
+  // Build rendering prompt with skills
+  const pickedEventObjects = picks.map(p => events.find(ev => ev.id === p.event_id)).filter(Boolean);
+  const skillOptions = {
+    requestedNeighborhood: neighborhood,
+    userMessage,
+    hasConversationHistory: conversationHistory?.length > 0,
+    suggestedNeighborhood: suggestedNeighborhood || null,
+    pickCount: picks.length,
+    isFree: activeFilters?.free_only,
+    isLastBatch,
+    exhaustionSuggestion,
+  };
+  const systemPrompt = buildRenderPrompt(pickedEventObjects, skillOptions);
+
+  let text, usage, provider;
+  // Always prefer Gemini Flash for rendering (cheap copy task)
+  if (getGeminiClient()) {
+    try {
+      const result = await detailsWithGemini(systemPrompt, userPrompt);
+      text = result.text; usage = result.usage; provider = 'gemini';
+    } catch (err) {
+      console.warn(`Gemini renderSms failed, falling back to Anthropic: ${err.message}`);
+      const response = await withTimeout(getClient().messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 512,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      }, { timeout: 8000 }), 10000, 'renderSms-anthropic');
+      text = response.content?.[0]?.text || '';
+      usage = response.usage || null;
+      provider = 'anthropic';
+    }
+  } else {
+    const response = await withTimeout(getClient().messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 512,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    }, { timeout: 8000 }), 10000, 'renderSms-anthropic');
+    text = response.content?.[0]?.text || '';
+    usage = response.usage || null;
+    provider = 'anthropic';
+  }
+
+  // Handle model returning JSON despite plain-text instruction
+  let smsText;
+  try {
+    const parsed = JSON.parse(text);
+    console.warn(`renderSms (${provider}): returned JSON despite plain-text instruction`);
+    smsText = parsed.sms_text || parsed.text || parsed.message || text;
+  } catch {
+    smsText = text.replace(/^["']|["']$/g, '').trim();
+  }
+
+  return { sms_text: smartTruncate(smsText), _raw: text, _usage: usage, _provider: provider };
+}
+
+module.exports = { composeDetails, extractEvents, unifiedRespond, reasonIntent, renderSms, parseJsonFromResponse };

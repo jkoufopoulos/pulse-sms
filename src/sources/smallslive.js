@@ -81,7 +81,7 @@ async function fetchSmallsLiveEvents() {
         const startTime = parseFirstTime(timeText, dateLocal);
         const venueAddress = VENUE_ADDRESSES[venueName] || VENUE_ADDRESSES['Smalls'];
 
-        const id = makeEventId(name, venueName === 'Mezzrow' ? 'Mezzrow' : 'Smalls Jazz Club', dateLocal, 'smallslive');
+        const id = makeEventId(name, venueName === 'Mezzrow' ? 'Mezzrow' : 'Smalls Jazz Club', dateLocal, 'smallslive', null, startTime);
         if (seen.has(id)) return;
         seen.add(id);
 

@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-01
+> Last updated: 2026-03-01 (fragility audit #16-#19 complete)
 
 ---
 
@@ -93,15 +93,15 @@ message → pre-router (compound extraction) → filter merge → tagged pool
 | 2 | Compound pre-router extraction — "free comedy", "late jazz" | P1, P6 | **Done** |
 | 2b | Structural filter drift fix — gate `filter_intent`, expand compounds, validate categories | P1, P3, P6 | **Done** |
 | 3 | Derive state fields deterministically — remove 4 redundant LLM fields (8→4) | P1, P5 | **Done** |
-| 4 | Reasoning/rendering split — separate intent+selection from copywriting | P2, P5 | Needs A/B eval |
+| 4 | Reasoning/rendering split — separate intent+selection from copywriting | P2, P5 | **Implemented** — A/B eval pending |
 | 5 | *(merged into step 3)* | — | **Done** |
 | 6 | Finer category taxonomy — three-tier soft match | — | **Done** |
 | 7 | `executeQuery` pipeline — single prompt path, ~550 lines deleted | P4 | **Done** |
 | 8 | Scoped event fetching — `neighborhood`/`borough` scope | — | Planned |
 
-Steps 1-3, 6-7 are done. Step 4 is a structural bet requiring A/B evaluation. Step 8 builds on the foundation.
+Steps 1-4, 6-7 are done. Step 4 is behind `PULSE_SPLIT_MODE=true` feature flag, awaiting A/B eval. Step 8 builds on the foundation.
 
-**Key decision:** Use `tool_use` for reasoning call (step 4). Nothing from reasoning passes to rendering except event data.
+**Key decision:** Use `tool_use` for reasoning call (step 4). Nothing from reasoning passes to rendering except event data. Rendering always uses Gemini Flash (cheap copy task). Feature flag `PULSE_SPLIT_MODE=true` enables split; default off (unified path unchanged).
 
 ---
 
@@ -110,15 +110,20 @@ Steps 1-3, 6-7 are done. Step 4 is a structural bet requiring A/B evaluation. St
 | Gap | What | Principle | Status |
 |-----|------|-----------|--------|
 | 1 | `clear_filters` — LLM → code state bridge | P1 | **Superseded** — replaced with `filter_intent` schema (2026-03-01) |
-| 2 | Unified call couples reasoning and rendering | P2 | **Open** — Step 4 A/B eval required |
+| 2 | Unified call couples reasoning and rendering | P2 | **Implemented** — `PULSE_SPLIT_MODE=true`, A/B eval pending |
 | 3 | Pool padding gives LLM material to violate filter intent | P1 | **Fixed** — eliminated unmatched padding (2026-03-01) |
 | 4 | No degraded-mode recovery when LLM fails | — | **Fixed** — deterministic fallback from tagged pool (2026-03-01) |
 
-### Gap 2: Reasoning/Rendering Coupling (Open)
+### Gap 2: Reasoning/Rendering Coupling (Implemented — A/B eval pending)
 
-`unifiedRespond` produces both structured fields (`type`, `picks`, `filter_intent`) and natural language (`sms_text`) in a single call. When the model makes a poor selection (e.g., picks unmatched events despite filter instructions), there's no checkpoint to catch it before the copy is written. The structured output and prose are entangled.
+`unifiedRespond` produces both structured fields (`type`, `picks`, `filter_intent`) and natural language (`sms_text`) in a single call. When the model makes a poor selection (e.g., picks unmatched events despite filter instructions), there's no checkpoint to catch it before the copy is written.
 
-**Fix direction:** Migration Step 4 — split into reasoning call (`type`, `picks`, `filter_intent` via `tool_use`) and rendering call (`sms_text` from validated picks). Code validates picks between calls. Needs A/B eval to confirm no quality regression.
+**Implementation (2026-03-01):** `PULSE_SPLIT_MODE=true` enables a two-call pipeline:
+1. `reasonIntent()` — classifies intent, selects events via `tool_use` (Anthropic) or JSON schema (Gemini). No formatting.
+2. Code validation — strips filter-noncompliant picks, applies conversational override guardrail.
+3. `renderSms()` — writes SMS copy from validated picks only. Always Gemini Flash (cheap).
+
+Files: `src/prompts.js` (REASON_SYSTEM, RENDER_SYSTEM), `src/skills/build-compose-prompt.js` (buildReasonPrompt, buildRenderPrompt), `src/ai.js` (reasonIntent, renderSms), `src/unified-flow.js` (callSplitUnified). Conversational/ask_neighborhood responses use `reply_text` from reasoning (1 call). Event picks use both calls. Trace captures `split_mode`, `reason_raw`, `render_raw`, `split_filter_violations`. New eval: `split_validation_effective` (informational).
 
 ---
 
@@ -192,14 +197,14 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 | 14 | `extractEvents` returns unvalidated JSON shape | ai.js | **Fixed 2026-03-01** — normalizes venues/array/object shapes to events array |
 | 15 | Non-atomic disk writes for cache/sessions | events.js, session.js, preference-profile.js, referral.js | **Fixed 2026-03-01** — atomicWriteSync (write .tmp + rename) on all 6 critical write sites |
 
-### Deferred
+### Deferred (all resolved)
 
-| # | Issue | Why Deferred |
-|---|-------|-------------|
-| 16 | Race condition on parallel messages from same phone | Rare at current traffic; Twilio serializes per-number |
-| 17 | Dead `core` skill with conflicting output schema | Zero impact today |
-| 18 | Event name dedup merges distinct same-venue events | Edge case for jazz venues with multiple sets |
-| 19 | Events in undefined neighborhoods invisible to geo queries | See "Neighborhood Resolution Gap" below — fix in progress |
+| # | Issue | Status |
+|---|-------|--------|
+| 16 | Race condition on parallel messages from same phone | **Fixed 2026-03-01** — per-phone promise-based mutex in session.js, handleMessage wrapped with lock |
+| 17 | Dead `core` skill with conflicting output schema | **Fixed 2026-03-01** — deleted from compose-skills.js, cleaned up references |
+| 18 | Event name dedup merges distinct same-venue events | **Fixed 2026-03-01** — `makeEventId` includes optional startTime (HH:MM) in hash; all 15 scrapers + db.js updated |
+| 19 | Events in undefined neighborhoods invisible to geo queries | **Accepted 2026-03-01** — see "Neighborhood Resolution Gap" below; remaining 120/1911 (6%) are structural limits |
 
 ### Neighborhood Resolution Gap (#19)
 
@@ -228,6 +233,8 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 | 19c | Add Rockaway + St. George neighborhoods (+ Staten Island borough support) | Enables resolution for events in Rockaways and north shore SI | **Done** |
 
 **Result:** 171 → ~80 missing (53% reduction). Remaining ~80 are mostly RA "TBA" secret locations (~25, inherently unresolvable), NYC Parks community centers needing individual geocoding (~15), and a handful of DoNYC/RA venues without addresses. Shared `isInsideNYC()` bbox helper extracted to `shared.js` for reuse across scrapers (Luma refactored to use it).
+
+**Updated diagnostic (2026-03-01, #16-#19 audit):** 120/1911 events (6.3%) unresolved. Breakdown: ~38 outside-NYC leakage (DoNYC NJ/CT venues), ~28 RA "TBA" secret locations (intentionally unresolvable), ~22 venues in VENUE_MAP but beyond 36-neighborhood 3km radii, ~32 misc one-off venues. No additional VENUE_MAP entries would materially reduce the gap — remaining unresolved events are structural limits of the 36-neighborhood model.
 
 ---
 
@@ -371,6 +378,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 
 | Date | What | Key Impact |
 |------|------|------------|
+| Mar 1 | Fragility audit #16-#19 | Per-phone mutex (#16), dead `core` skill removed (#17), `makeEventId` includes startTime for same-venue dedup (#18), neighborhood gap accepted as structural (#19) |
 | Mar 1 | Quick wins: dead skill cleanup, stale docs, TCPA evals | Removed `cityScan` + `venueFraming` dead skills, fixed architecture.html stale two-call refs, added 2 TCPA regression scenarios (7 assertions) |
 | Mar 1 | Neighborhood resolution gap fix (#19) | 171 → ~80 missing neighborhoods (53% reduction). +40 venues in map, NYC bbox filter on 4 scrapers, Rockaway + St. George neighborhoods added, Staten Island borough support |
 | Mar 1 | Structural filter drift fix (Step 2b) | Gated `filter_intent` when pre-router set filters (P1), expanded compound detection (first-message + time+category + free+category), VALID_CATEGORIES validation (P3) |

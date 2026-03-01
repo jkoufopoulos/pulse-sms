@@ -363,7 +363,6 @@ function generateOccurrences(startDate, endDate) {
     while (cursor <= end) {
       if (cursor.getDay() === p.day_of_week) {
         const dateLocal = cursor.toISOString().slice(0, 10);
-        const id = makeEventId(p.name, p.venue_name, dateLocal);
 
         let startTime = null;
         let endTime = null;
@@ -373,6 +372,7 @@ function generateOccurrences(startDate, endDate) {
         if (p.end_time_local) {
           endTime = `${dateLocal}T${p.end_time_local}:00`;
         }
+        const id = makeEventId(p.name, p.venue_name, dateLocal, null, null, startTime);
 
         events.push({
           id,

@@ -108,7 +108,7 @@ function parseCards($, cards, dateStr, categoryOverride) {
     }
 
     parsed.push({
-      id: makeEventId(name, venueName, dateLocal, 'donyc'),
+      id: makeEventId(name, venueName, dateLocal, 'donyc', null, startDate),
       source_name: 'donyc',
       source_type: 'aggregator',
       name,

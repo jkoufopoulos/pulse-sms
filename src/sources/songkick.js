@@ -43,7 +43,7 @@ async function fetchSongkickEvents() {
             ? null
             : resolveNeighborhood(address.addressLocality, geoLat, geoLng);
 
-          const id = makeEventId(e.name, location.name, startDate, 'songkick');
+          const id = makeEventId(e.name, location.name, startDate, 'songkick', null, e.startDate);
 
           const offers = e.offers || {};
           const skPrice = parseFloat(offers.lowPrice || offers.price || '');

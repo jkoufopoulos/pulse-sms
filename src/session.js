@@ -19,6 +19,19 @@ const SESSIONS_PATH = path.join(__dirname, '../data/sessions.json');
 
 let writeTimer = null;
 
+// Per-phone mutex to prevent concurrent request races (#16)
+const phoneLocks = new Map();
+
+async function acquireLock(phone) {
+  while (phoneLocks.has(phone)) {
+    await phoneLocks.get(phone);
+  }
+  let resolve;
+  const promise = new Promise(r => { resolve = r; });
+  phoneLocks.set(phone, promise);
+  return () => { phoneLocks.delete(phone); resolve(); };
+}
+
 // Test phone numbers excluded from disk persistence
 const TEST_PHONE_PREFIX = '+1000000';
 
@@ -61,6 +74,7 @@ function setResponseState(phone, frame) {
     lastNeighborhood: frame.neighborhood ?? null,
     lastDateRange: frame.dateRange ?? null,
     lastFilters: frame.filters ?? null,
+    lastBorough: frame.borough ?? null,
     visitedHoods: frame.visitedHoods ?? [],
     pendingNearby: frame.pendingNearby ?? null,
     pendingNearbyEvents: frame.pendingNearbyEvents ?? null,
@@ -115,6 +129,7 @@ function scheduleDiskWrite() {
           lastNeighborhood: session.lastNeighborhood || null,
           lastDateRange: session.lastDateRange || null,
           lastFilters: session.lastFilters || null,
+          lastBorough: session.lastBorough || null,
           visitedHoods: session.visitedHoods || [],
           pendingNearby: session.pendingNearby || null,
           pendingNearbyEvents: session.pendingNearbyEvents || null,
@@ -176,6 +191,7 @@ function flushSessions() {
         lastNeighborhood: session.lastNeighborhood || null,
         lastDateRange: session.lastDateRange || null,
         lastFilters: session.lastFilters || null,
+        lastBorough: session.lastBorough || null,
         visitedHoods: session.visitedHoods || [],
         pendingNearby: session.pendingNearby || null,
         pendingNearbyEvents: session.pendingNearbyEvents || null,
@@ -208,4 +224,4 @@ function clearSessionInterval() {
   }
 }
 
-module.exports = { getSession, setSession, setResponseState, clearSession, addToHistory, clearSessionInterval, loadSessions, flushSessions };
+module.exports = { getSession, setSession, setResponseState, clearSession, addToHistory, clearSessionInterval, loadSessions, flushSessions, acquireLock };

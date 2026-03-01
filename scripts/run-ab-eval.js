@@ -200,11 +200,13 @@ async function main() {
             neighborhood: testCase.neighborhood,
             activeFilters: testCase.filters,
             excludeIds: testCase.excludeIds,
+            model: MODEL_A,
           }),
           executeQuery(testCase.message, events, {
             neighborhood: testCase.neighborhood,
             activeFilters: testCase.filters,
             excludeIds: testCase.excludeIds,
+            model: MODEL_B,
           }),
         ]);
 

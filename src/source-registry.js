@@ -1,4 +1,4 @@
-const { fetchSkintEvents, fetchSkintOngoingEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchNonsenseNYC, fetchDoNYCEvents, fetchBAMEvents, fetchSmallsLiveEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents, fetchTicketmasterEvents, fetchYutoriEvents, fetchScreenSlateEvents, fetchLumaEvents } = require('./sources');
+const { fetchSkintEvents, fetchSkintOngoingEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchNonsenseNYC, fetchDoNYCEvents, fetchBAMEvents, fetchSmallsLiveEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents, fetchTicketmasterEvents, fetchYutoriEvents, fetchScreenSlateEvents, fetchLumaEvents, fetchTinyCupboardEvents } = require('./sources');
 
 // Source tier classification for compose prompt
 const SOURCE_TIERS = {
@@ -21,6 +21,7 @@ const SOURCE_TIERS = {
   NYPL: 'secondary',
   EventbriteComedy: 'secondary',
   EventbriteArts: 'secondary',
+  TinyCupboard: 'secondary',
 };
 
 // ============================================================
@@ -49,6 +50,7 @@ const SOURCES = [
   { label: 'NYPL',             fetch: fetchNYPLEvents,          weight: 0.7,  mergeRank: 2, endpoint: 'https://www.eventbrite.com/o/new-york-public-library-for-the-performing-arts-5993389089' },
   { label: 'EventbriteComedy', fetch: fetchEventbriteComedy,    weight: 0.7,  mergeRank: 3, endpoint: null },
   { label: 'EventbriteArts',   fetch: fetchEventbriteArts,      weight: 0.7,  mergeRank: 4, endpoint: null },
+  { label: 'TinyCupboard',    fetch: fetchTinyCupboardEvents,  weight: 0.75, mergeRank: 5, endpoint: 'https://www.thetinycupboard.com/calendar' },
   // Tavily removed entirely — daily scrape returns 0 events, hot-path fallback added 9-15s
   // latency per request with 58% waste rate. All event data comes from the 18 scrapers above.
 ];

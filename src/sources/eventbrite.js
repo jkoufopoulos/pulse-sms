@@ -59,7 +59,7 @@ function parseEventbriteServerData(html) {
       ? `${e.end_date}T${e.end_time}:00`
       : e.end_date || null;
 
-    const id = makeEventId(e.name, venue.name, e.start_date, 'eventbrite');
+    const id = makeEventId(e.name, venue.name, e.start_date, 'eventbrite', null, startDateTime);
 
     const nameAndDesc = ((e.name || '') + ' ' + (e.summary || '')).toLowerCase();
     const tags = (e.tags || []).map(t => (t.display_name || t.tag || '').toLowerCase());
@@ -130,7 +130,7 @@ function parseEventbriteJsonLd(html) {
           ? null
           : resolveNeighborhood(address.addressLocality, geoLat, geoLng);
 
-        const id = makeEventId(e.name, location.name, e.startDate, 'eventbrite');
+        const id = makeEventId(e.name, location.name, e.startDate, 'eventbrite', null, e.startDate);
 
         const offers = e.offers || {};
         const lowPrice = parseFloat(offers.lowPrice || offers.price || '');

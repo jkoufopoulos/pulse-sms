@@ -1,5 +1,94 @@
 const { TRIVIA_HOODS, parseTo24h, resolveMonthDay } = require('./trivia-parser');
 
+// === Date range expansion for series events ===
+
+const MONTH_NUM = {
+  jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
+  apr: 3, april: 3, may: 4, jun: 5, june: 5,
+  jul: 6, july: 6, aug: 7, august: 7, sep: 8, september: 8,
+  oct: 9, october: 9, nov: 10, november: 10, dec: 11, december: 11,
+};
+
+const MP = '(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)';
+
+/**
+ * Detect date range patterns in text and return an array of YYYY-MM-DD dates.
+ * Patterns: "Mar 3-8", "Mar 3 - Mar 8", "through March 31".
+ * Returns null if no range detected. Caps expansion at 14 dates.
+ */
+function detectDateRange(text, refYear) {
+  const MAX_DATES = 14;
+
+  // "Mar 3-8", "March 3 - 8" (same-month day range)
+  const sameMonth = text.match(new RegExp(`(${MP})\\s+(\\d{1,2})\\s*[-–]\\s*(\\d{1,2})(?:,?\\s*(\\d{4}))?`, 'i'));
+  if (sameMonth) {
+    const mi = MONTH_NUM[sameMonth[1].toLowerCase()];
+    if (mi !== undefined) {
+      const s = parseInt(sameMonth[2], 10);
+      const e = parseInt(sameMonth[3], 10);
+      const y = sameMonth[4] ? parseInt(sameMonth[4], 10) : refYear;
+      if (e > s && (e - s) < MAX_DATES) {
+        const dates = [];
+        for (let d = s; d <= e; d++) {
+          const dt = new Date(y, mi, d);
+          if (!isNaN(dt.getTime())) dates.push(dt.toISOString().slice(0, 10));
+        }
+        return dates.length > 1 ? dates : null;
+      }
+    }
+  }
+
+  // "Mar 3 - Mar 8", "March 3 - April 2" (cross-month range)
+  const crossMonth = text.match(new RegExp(`(${MP})\\s+(\\d{1,2})\\s*[-–]\\s*(${MP})\\s+(\\d{1,2})(?:,?\\s*(\\d{4}))?`, 'i'));
+  if (crossMonth) {
+    const m1 = MONTH_NUM[crossMonth[1].toLowerCase()];
+    const d1 = parseInt(crossMonth[2], 10);
+    const m2 = MONTH_NUM[crossMonth[3].toLowerCase()];
+    const d2 = parseInt(crossMonth[4], 10);
+    const y = crossMonth[5] ? parseInt(crossMonth[5], 10) : refYear;
+    if (m1 !== undefined && m2 !== undefined) {
+      const start = new Date(y, m1, d1);
+      const end = new Date(y, m2, d2);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end > start) {
+        const diff = Math.round((end - start) / 86400000);
+        if (diff < MAX_DATES) {
+          const dates = [];
+          const c = new Date(start);
+          while (c <= end) {
+            dates.push(c.toISOString().slice(0, 10));
+            c.setDate(c.getDate() + 1);
+          }
+          return dates.length > 1 ? dates : null;
+        }
+      }
+    }
+  }
+
+  // "through March 31" / "runs through March" / "until Mar 15"
+  const throughMatch = text.match(new RegExp(`(?:through|thru|until|till)\\s+(${MP})(?:\\s+(\\d{1,2}))?(?:,?\\s*(\\d{4}))?`, 'i'));
+  if (throughMatch) {
+    const mi = MONTH_NUM[throughMatch[1].toLowerCase()];
+    const y = throughMatch[3] ? parseInt(throughMatch[3], 10) : refYear;
+    if (mi !== undefined) {
+      const endDay = throughMatch[2] ? parseInt(throughMatch[2], 10) : new Date(y, mi + 1, 0).getDate();
+      const end = new Date(y, mi, endDay);
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      if (today <= end && !isNaN(end.getTime())) {
+        const capEnd = new Date(Math.min(end.getTime(), today.getTime() + MAX_DATES * 86400000));
+        const dates = [];
+        const c = new Date(today);
+        while (c <= capEnd) {
+          dates.push(c.toISOString().slice(0, 10));
+          c.setDate(c.getDate() + 1);
+        }
+        return dates.length > 1 ? dates : null;
+      }
+    }
+  }
+
+  return null;
+}
+
 // === Deterministic general event parser (P6: deterministic extraction first) ===
 
 /**
@@ -141,18 +230,30 @@ function parseGeneralEventLine(line, fallbackDate) {
   }
 
   // 5. Extract date: "Day Mon DD[, YYYY]" or "Month DD[, YYYY]"
+  //    Also detect date ranges for series events ("Mar 3-8", "through March 31")
   let dateLocal = null;
-  const datePatterns = [
-    /(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*,?\s+)?(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2})(?:,?\s*(\d{4}))?/i,
-    /(?:(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+)?(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})(?:,?\s*(\d{4}))?/i,
-  ];
-  for (const pat of datePatterns) {
-    const dateMatch = text.match(pat);
-    if (dateMatch) {
-      dateLocal = resolveMonthDay(dateMatch[1], dateMatch[2], dateMatch[3] ? parseInt(dateMatch[3], 10) : refYear);
-      if (dateLocal) {
-        text = text.slice(0, dateMatch.index) + ' ' + text.slice(dateMatch.index + dateMatch[0].length);
-        break;
+  let seriesDates = null;
+
+  // Try date range detection first (catches "Mar 3-8", "through March 31")
+  const rangeDates = detectDateRange(text, refYear);
+  if (rangeDates && rangeDates.length > 1) {
+    seriesDates = rangeDates;
+    dateLocal = rangeDates[0];
+  }
+
+  if (!dateLocal) {
+    const datePatterns = [
+      /(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*,?\s+)?(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2})(?:,?\s*(\d{4}))?/i,
+      /(?:(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+)?(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})(?:,?\s*(\d{4}))?/i,
+    ];
+    for (const pat of datePatterns) {
+      const dateMatch = text.match(pat);
+      if (dateMatch) {
+        dateLocal = resolveMonthDay(dateMatch[1], dateMatch[2], dateMatch[3] ? parseInt(dateMatch[3], 10) : refYear);
+        if (dateLocal) {
+          text = text.slice(0, dateMatch.index) + ' ' + text.slice(dateMatch.index + dateMatch[0].length);
+          break;
+        }
       }
     }
   }
@@ -290,7 +391,7 @@ function parseGeneralEventLine(line, fallbackDate) {
   const remaining = text.replace(/\s+/g, ' ').trim();
   const description = remaining.length > 20 ? remaining.slice(0, 200).trim() : null;
 
-  return {
+  const result = {
     name,
     venue_name: venueName,
     venue_address: venueAddress,
@@ -312,6 +413,8 @@ function parseGeneralEventLine(line, fallbackDate) {
       price_quote: price ? price.toLowerCase() : null,
     },
   };
+  if (seriesDates && seriesDates.length > 1) result._seriesDates = seriesDates;
+  return result;
 }
 
 /**
@@ -333,10 +436,31 @@ function parseNonTriviaEvents(text, filename) {
   for (const line of lines) {
     if (!line.startsWith('[Event]')) continue;
     const event = parseGeneralEventLine(line, fallbackDate);
-    if (event) events.push(event);
+    if (!event) continue;
+
+    // Expand series events: clone the event for each date in the range
+    if (event._seriesDates && event._seriesDates.length > 1) {
+      for (const date of event._seriesDates) {
+        const clone = { ...event, date_local: date };
+        // Update start_time_local with the new date if it had a time
+        if (event.start_time_local && /T\d{2}:\d{2}/.test(event.start_time_local)) {
+          const timePart = event.start_time_local.split('T')[1];
+          clone.start_time_local = `${date}T${timePart}`;
+        }
+        if (event.end_time_local && /T\d{2}:\d{2}/.test(event.end_time_local)) {
+          const timePart = event.end_time_local.split('T')[1];
+          clone.end_time_local = `${date}T${timePart}`;
+        }
+        delete clone._seriesDates;
+        events.push(clone);
+      }
+    } else {
+      delete event._seriesDates;
+      events.push(event);
+    }
   }
 
   return events;
 }
 
-module.exports = { parseGeneralEventLine, parseNonTriviaEvents, inferCategory };
+module.exports = { parseGeneralEventLine, parseNonTriviaEvents, inferCategory, detectDateRange };

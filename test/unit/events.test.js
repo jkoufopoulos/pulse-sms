@@ -176,6 +176,21 @@ const leBainEvent = normalizeExtractedEvent({
 }, 'theskint', 'curated', 0.9);
 check('Le Bain → Chelsea (RA migration)', leBainEvent.neighborhood === 'Chelsea');
 
+// ---- startTime differentiation (#18) ----
+console.log('\nmakeEventId with startTime:');
+
+const early = makeEventId('Show', 'Venue', '2026-03-01', 's', null, '2026-03-01T19:00:00');
+const late = makeEventId('Show', 'Venue', '2026-03-01', 's', null, '2026-03-01T22:00:00');
+check('different startTimes → different IDs', early !== late);
+check('startTime IDs are 12 chars', early.length === 12 && late.length === 12);
+// Backward compat: no startTime → same ID as before
+const noTime = makeEventId('Show', 'Venue', '2026-03-01');
+const nullTime = makeEventId('Show', 'Venue', '2026-03-01', null, null, null);
+check('no startTime → backward compatible ID', noTime === nullTime);
+// Same startTime → same ID
+const same1 = makeEventId('Show', 'Venue', '2026-03-01', 's', null, '2026-03-01T19:00:00');
+check('same startTime → same ID', early === same1);
+
 // ---- cross-source dedup ----
 console.log('\ncross-source dedup:');
 

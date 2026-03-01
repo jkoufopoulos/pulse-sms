@@ -115,11 +115,13 @@ function rankEventsByProximity(events, targetNeighborhood, { refTimeMs } = {}) {
         }
       }
     }
-    // Cross-borough penalty for sort order only — deprioritize events across
-    // borough lines so same-borough results rank higher, but don't exclude
-    // genuinely nearby cross-river hoods (e.g. East Village ↔ Williamsburg)
+    // In-hood boost: events in the exact target neighborhood always sort first
+    // within each date tier. Cross-borough penalty deprioritizes events across
+    // borough lines but doesn't exclude nearby cross-river hoods.
     let sortDist = rawDist;
-    if (resolvedHood && targetBoro) {
+    if (resolvedHood === targetNeighborhood) {
+      sortDist = 0; // in-hood always sorts first within date tier
+    } else if (resolvedHood && targetBoro) {
       const eventBoro = HOOD_TO_BOROUGH[resolvedHood] || null;
       if (eventBoro && eventBoro !== targetBoro) {
         sortDist *= 1.5;

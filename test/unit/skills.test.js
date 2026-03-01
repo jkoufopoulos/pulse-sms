@@ -7,7 +7,7 @@ console.log('\nskill definitions:');
 
 const skillIds = Object.values(skills).map(s => s.id);
 check('all skill IDs are unique', new Set(skillIds).size === skillIds.length);
-check('core skill has text', skills.core.text.length > 100);
+check('core skill removed (#17)', !skills.core);
 check('all skills have id', Object.values(skills).every(s => typeof s.id === 'string'));
 check('all skills have text field', Object.values(skills).every(s => typeof s.text === 'string'));
 

@@ -62,7 +62,7 @@ async function fetchBrooklynVeganEvents() {
           : (inferred === 'other' && apiCat === 'performing arts') ? 'theater'
           : inferred;
 
-        const id = makeEventId(item.title, venueName, dateLocal, 'brooklynvegan');
+        const id = makeEventId(item.title, venueName, dateLocal, 'brooklynvegan', null, startDate);
         if (seen.has(id)) continue;
         seen.add(id);
 

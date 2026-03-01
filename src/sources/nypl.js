@@ -81,7 +81,7 @@ function parseOrganizerJsonLd(html) {
         const nameAndDesc = ((e.name || '') + ' ' + (e.description || '')).toLowerCase();
         const category = inferCategory(nameAndDesc);
 
-        const id = makeEventId(e.name, location.name, e.startDate, 'nypl');
+        const id = makeEventId(e.name, location.name, e.startDate, 'nypl', null, e.startDate);
 
         events.push({
           id,
@@ -142,7 +142,7 @@ function parseServerDataEvents(results) {
       ? `${e.end_date}T${e.end_time}:00`
       : e.end_date || null;
 
-    const id = makeEventId(e.name, venue.name, e.start_date, 'nypl');
+    const id = makeEventId(e.name, venue.name, e.start_date, 'nypl', null, startDateTime);
     const nameAndDesc = ((e.name || '') + ' ' + (e.summary || '')).toLowerCase();
     const category = inferCategory(nameAndDesc);
 

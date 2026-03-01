@@ -57,7 +57,7 @@ function buildEventMap(events) {
  * Every field is explicitly set to prevent stale state from persisting.
  */
 function saveResponseFrame(phone, { mode = 'fresh', picks = [], prevSession,
-    eventMap = {}, neighborhood, filters, offeredIds = [], visitedHoods, pending, pendingMessage, lastResponseHadPicks } = {}) {
+    eventMap = {}, neighborhood, borough, filters, offeredIds = [], visitedHoods, pending, pendingMessage, lastResponseHadPicks } = {}) {
   const isMore = mode === 'more';
   setResponseState(phone, {
     picks,
@@ -65,13 +65,12 @@ function saveResponseFrame(phone, { mode = 'fresh', picks = [], prevSession,
     offeredIds: isMore ? [...(prevSession?.allOfferedIds || []), ...offeredIds] : offeredIds,
     eventMap,
     neighborhood,
+    borough: borough || null,
     dateRange: filters?.date_range || null,
     filters: filters || null,
     visitedHoods: visitedHoods
       ? visitedHoods
-      : isMore
-        ? [...new Set([...(prevSession?.visitedHoods || []), neighborhood])]
-        : [...new Set([...(prevSession?.visitedHoods || []), neighborhood].filter(Boolean))],
+      : [...new Set([...(prevSession?.visitedHoods || []), neighborhood || 'citywide'])],
     pendingNearby: pending?.neighborhood || null,
     pendingNearbyEvents: pending?.nearbyEvents || null,
     pendingFilters: pending?.filters || null,
@@ -83,15 +82,16 @@ function saveResponseFrame(phone, { mode = 'fresh', picks = [], prevSession,
 /**
  * Build a consistent exhaustion message with nearby neighborhood suggestion.
  */
-function buildExhaustionMessage(hood, { adjacentHoods = [], visitedHoods = [], filters } = {}) {
+function buildExhaustionMessage(hood, { adjacentHoods = [], visitedHoods = [], filters, borough } = {}) {
   const unvisited = adjacentHoods.filter(n => !visitedHoods.includes(n));
   const suggestion = unvisited[0] || null;
   const label = describeFilters(filters);
   const hasFilter = label !== 'events';
   const what = hasFilter ? `all the ${label}` : 'everything';
+  const locationName = hood || (borough ? borough.charAt(0).toUpperCase() + borough.slice(1) : 'this area');
   const message = suggestion
-    ? `That's ${what} I've got in ${hood}! ${suggestion} is right nearby — want ${hasFilter ? label : 'picks'} from there?`
-    : `That's ${what} I've got in ${hood}! Try a different neighborhood for more.`;
+    ? `That's ${what} I've got in ${locationName}! ${suggestion} is right nearby — want ${hasFilter ? label : 'picks'} from there?`
+    : `That's ${what} I've got in ${locationName}! Try a different neighborhood for more.`;
   return { message, suggestedHood: suggestion };
 }
 
@@ -475,6 +475,8 @@ async function executeQuery(message, events, options = {}) {
     activeFilters: options.activeFilters,
     isSparse: options.isSparse,
     isCitywide: options.isCitywide,
+    isBorough: options.isBorough,
+    borough: options.borough,
     matchCount: options.matchCount,
     hardCount: options.hardCount,
     softCount: options.softCount,

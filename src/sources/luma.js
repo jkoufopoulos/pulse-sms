@@ -140,7 +140,7 @@ async function fetchLumaEvents() {
       const neighborhood = resolveNeighborhood(null, lat, lng);
 
       const name = ev.name.trim();
-      const id = makeEventId(name, venueName, dateLocal, 'luma', `https://lu.ma/${ev.url}`);
+      const id = makeEventId(name, venueName, dateLocal, 'luma', `https://lu.ma/${ev.url}`, startTimeLocal);
       if (seen.has(id)) continue;
       seen.add(id);
 

@@ -1,9 +1,9 @@
-const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
+const { extractNeighborhood, NEIGHBORHOODS, detectBorough } = require('./neighborhoods');
 const { sendSMS } = require('./twilio');
 const { recordAICost } = require('./traces');
 const { getSession, setSession } = require('./session');
 const { getAdjacentNeighborhoods } = require('./pre-router');
-const { getEvents, getEventsCitywide, getCacheStatus } = require('./events');
+const { getEvents, getEventsForBorough, getEventsCitywide, getCacheStatus } = require('./events');
 const { filterKidsEvents } = require('./curation');
 const { buildEventMap, saveResponseFrame, mergeFilters, normalizeFilterIntent, buildTaggedPool, buildZeroMatchResponse, executeQuery } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
@@ -69,10 +69,12 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
   let softCount = 0;
   let isSparse = false;
 
-  // Fetch events — neighborhood or citywide
+  // Fetch events — neighborhood, borough, or citywide
   let events = [];
   let curated = [];
   let isCitywide = false;
+  let isBorough = false;
+  let borough = null;
   if (hood) {
     const eventsStart = Date.now();
     const raw = await getEvents(hood, { dateRange: activeFilters.date_range });
@@ -89,21 +91,41 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
     isSparse = taggedResult.isSparse;
 
   } else {
-    // Citywide flow — serve best events across all neighborhoods
-    isCitywide = true;
-    const eventsStart = Date.now();
-    const raw = await getEventsCitywide({ dateRange: activeFilters.date_range });
-    trace.events.getEvents_ms = Date.now() - eventsStart;
-    trace.events.cache_size = getCacheStatus().cache_size;
-    curated = filterKidsEvents(raw);
-    const taggedResult = buildTaggedPool(curated, activeFilters, { citywide: true });
-    trace.events.candidates_count = curated.length;
-    trace.events.candidate_ids = curated.map(e => e.id);
-    events = taggedResult.pool;
-    matchCount = taggedResult.matchCount;
-    hardCount = taggedResult.hardCount;
-    softCount = taggedResult.softCount;
-    isSparse = taggedResult.isSparse;
+    // Check for borough before falling through to citywide
+    const boroughResult = detectBorough(message);
+    if (boroughResult) {
+      isBorough = true;
+      borough = boroughResult.borough;
+      const eventsStart = Date.now();
+      const raw = await getEventsForBorough(borough, { dateRange: activeFilters.date_range });
+      trace.events.getEvents_ms = Date.now() - eventsStart;
+      trace.events.cache_size = getCacheStatus().cache_size;
+      curated = filterKidsEvents(raw);
+      const taggedResult = buildTaggedPool(curated, activeFilters, { citywide: true });
+      trace.events.candidates_count = curated.length;
+      trace.events.candidate_ids = curated.map(e => e.id);
+      events = taggedResult.pool;
+      matchCount = taggedResult.matchCount;
+      hardCount = taggedResult.hardCount;
+      softCount = taggedResult.softCount;
+      isSparse = taggedResult.isSparse;
+    } else {
+      // Citywide flow — serve best events across all neighborhoods
+      isCitywide = true;
+      const eventsStart = Date.now();
+      const raw = await getEventsCitywide({ dateRange: activeFilters.date_range });
+      trace.events.getEvents_ms = Date.now() - eventsStart;
+      trace.events.cache_size = getCacheStatus().cache_size;
+      curated = filterKidsEvents(raw);
+      const taggedResult = buildTaggedPool(curated, activeFilters, { citywide: true });
+      trace.events.candidates_count = curated.length;
+      trace.events.candidate_ids = curated.map(e => e.id);
+      events = taggedResult.pool;
+      matchCount = taggedResult.matchCount;
+      hardCount = taggedResult.hardCount;
+      softCount = taggedResult.softCount;
+      isSparse = taggedResult.isSparse;
+    }
   }
   const nearbyHoods = hood ? getAdjacentNeighborhoods(hood, 3) : [];
 
@@ -131,21 +153,26 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
   // Include matchCount===0 so pendingNearby is set for zero-match LLM responses too
   const suggestedHood = (isSparse || matchCount === 0) && nearbyHoods.length > 0 ? nearbyHoods[0] : null;
 
-  console.log(`Unified flow: hood=${hood}, events=${events.length}, nearby=${nearbyHoods.join(',')}`);
+  console.log(`Unified flow: hood=${hood}, borough=${borough || 'none'}, events=${events.length}, nearby=${nearbyHoods.join(',')}`);
 
   // Build exclude list from previously shown events
   const prevPickIds = (session?.allPicks || session?.lastPicks || []).map(p => p.event_id);
   const prevOfferedIds = session?.allOfferedIds || [];
   const excludeIds = [...new Set([...prevPickIds, ...prevOfferedIds])];
 
-  return { hood, activeFilters, events, curated, matchCount, hardCount, softCount, isSparse, isCitywide, nearbyHoods, suggestedHood, excludeIds, now, userHoodAlias, preDetectedFilters };
+  return { hood, activeFilters, events, curated, matchCount, hardCount, softCount, isSparse, isCitywide, isBorough, borough, nearbyHoods, suggestedHood, excludeIds, now, userHoodAlias, preDetectedFilters };
 }
 
 /**
  * Call executeQuery and capture trace/cost data.
  */
 async function callUnified(message, unifiedCtx, session, history, phone, trace, { model } = {}) {
-  const { hood, events, nearbyHoods, now, activeFilters, isSparse, isCitywide, matchCount, hardCount, softCount, excludeIds, suggestedHood, userHoodAlias } = unifiedCtx;
+  // Feature flag: split mode dispatches to reasoning + rendering pipeline
+  if (process.env.PULSE_SPLIT_MODE === 'true') {
+    return callSplitUnified(message, unifiedCtx, session, history, phone, trace, { model });
+  }
+
+  const { hood, events, nearbyHoods, now, activeFilters, isSparse, isCitywide, isBorough, borough, matchCount, hardCount, softCount, excludeIds, suggestedHood, userHoodAlias } = unifiedCtx;
 
   const composeStart = Date.now();
   const result = await executeQuery(message, events, {
@@ -158,6 +185,8 @@ async function callUnified(message, unifiedCtx, session, history, phone, trace, 
     activeFilters,
     isSparse,
     isCitywide,
+    isBorough,
+    borough,
     matchCount,
     hardCount,
     softCount,
@@ -188,14 +217,14 @@ async function callUnified(message, unifiedCtx, session, history, phone, trace, 
   trace.composition.active_filters = activeFilters || null;
   trace.composition.neighborhood_used = hood;
   // Derive which prompt skills were activated (mirrors buildUnifiedPrompt logic)
-  const activeSkills = ['core', 'sourceTiers'];
+  const activeSkills = ['sourceTiers'];
   if (events.some(e => (e.date_local || e.day) === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) || e.day === 'TODAY')) activeSkills.push('tonightPriority');
   if (hood && !events.some(e => e.neighborhood === hood)) activeSkills.push('neighborhoodMismatch');
   if (activeFilters?.free_only) activeSkills.push('freeEmphasis');
   if (history.length > 0) activeSkills.push('conversationAwareness');
   if (suggestedHood) activeSkills.push('nearbySuggestion');
   if (matchCount === 1 || (events.length <= 1)) activeSkills.push('singlePick');
-  if (isCitywide && events.length > 0) activeSkills.push('citywide');
+  if ((isCitywide || isBorough) && events.length > 0) activeSkills.push('citywide');
   const uniqueDates = new Set(events.map(e => e.date_local).filter(Boolean));
   if (uniqueDates.size >= 2) activeSkills.push('multiDay');
   trace.composition.active_skills = activeSkills;
@@ -210,7 +239,7 @@ async function callUnified(message, unifiedCtx, session, history, phone, trace, 
  * All paths are terminal: saveResponseFrame -> updateProfile -> sendSMS -> finalizeTrace.
  */
 async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, message, finalizeTrace) {
-  let { hood, activeFilters, events, curated, suggestedHood } = unifiedCtx;
+  let { hood, activeFilters, events, curated, suggestedHood, borough } = unifiedCtx;
 
   // Filter state management after unified call — gated by pre-router (P1: code owns state)
   // - clear_all: always trust (LLM handles semantic clearing the pre-router can't)
@@ -250,6 +279,7 @@ async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, 
       picks: session?.lastPicks || [],
       eventMap: session?.lastEvents || {},
       neighborhood: hood,
+      borough,
       filters: Object.values(activeFilters).some(Boolean) ? activeFilters : null,
       offeredIds: session?.allOfferedIds || [],
       visitedHoods: session?.visitedHoods || [],
@@ -298,6 +328,7 @@ async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, 
       picks: session?.lastPicks || [],
       eventMap: Object.keys(eventMap).length > 0 ? eventMap : (session?.lastEvents || {}),
       neighborhood: hood,
+      borough,
       filters: Object.values(activeFilters).some(Boolean) ? activeFilters : null,
       offeredIds: session?.allOfferedIds || [],
       visitedHoods: session?.visitedHoods || [],
@@ -338,9 +369,10 @@ async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, 
     picks: filterCompliantPicks,
     eventMap,
     neighborhood: hood,
+    borough,
     filters: activeFilters,
     offeredIds: filterCompliantPicks.map(p => p.event_id),
-    visitedHoods: [...new Set([...(session?.visitedHoods || []), hood].filter(Boolean))],
+    visitedHoods: [...new Set([...(session?.visitedHoods || []), hood || 'citywide'])],
     pending: suggestedHood ? {
       neighborhood: suggestedHood,
       filters: activeFilters,
@@ -357,7 +389,7 @@ async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, 
  * $0 AI cost.
  */
 async function handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace) {
-  const { hood, activeFilters, nearbyHoods, events, curated } = unifiedCtx;
+  const { hood, activeFilters, nearbyHoods, events, curated, borough } = unifiedCtx;
   const { message, suggestedHood, source } = buildZeroMatchResponse(hood, activeFilters, nearbyHoods);
 
   trace.routing.latency_ms = 0;
@@ -378,6 +410,7 @@ async function handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace)
     picks: session?.lastPicks || [],
     eventMap: Object.keys(eventMap).length > 0 ? eventMap : (session?.lastEvents || {}),
     neighborhood: hood,
+    borough,
     filters: Object.values(activeFilters).some(Boolean) ? activeFilters : null,
     offeredIds: session?.allOfferedIds || [],
     visitedHoods: session?.visitedHoods || [],
@@ -390,6 +423,209 @@ async function handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace)
   setSession(phone, { lastZeroMatch: true });
   await sendSMS(phone, message);
   finalizeTrace(message, 'events');
+}
+
+/**
+ * Split-mode unified call: reasoning (intent + picks) → code validation → rendering (SMS text).
+ * Feature-flagged via PULSE_SPLIT_MODE=true. Returns same shape as callUnified.
+ */
+async function callSplitUnified(message, unifiedCtx, session, history, phone, trace, { model } = {}) {
+  const { reasonIntent, renderSms } = require('./ai');
+  const { formatTime } = require('./formatters');
+  const { hood, events, nearbyHoods, now, activeFilters, isSparse, isCitywide, isBorough, borough, matchCount, hardCount, softCount, excludeIds, suggestedHood, userHoodAlias } = unifiedCtx;
+
+  trace.composition.split_mode = true;
+
+  // --- Phase 1: Reasoning call ---
+  const reasonStart = Date.now();
+  const reasonResult = await reasonIntent(message, {
+    session,
+    events,
+    neighborhood: hood,
+    nearbyHoods,
+    conversationHistory: history,
+    currentTime: now,
+    validNeighborhoods: NEIGHBORHOOD_NAMES,
+    activeFilters,
+    isSparse,
+    isCitywide,
+    matchCount,
+    hardCount,
+    softCount,
+    excludeIds,
+    suggestedNeighborhood: suggestedHood,
+    userHoodAlias,
+    model,
+  });
+  trace.composition.reason_latency_ms = Date.now() - reasonStart;
+  trace.composition.reason_raw = reasonResult._raw || null;
+  recordAICost(trace, 'reason', reasonResult._usage, reasonResult._provider);
+  trackAICost(phone, reasonResult._usage, reasonResult._provider);
+
+  // Record routing info
+  trace.routing.latency_ms = trace.composition.reason_latency_ms;
+  trace.routing.provider = reasonResult._provider || 'anthropic';
+  trace.routing.result = { intent: reasonResult.type, neighborhood: hood, confidence: 0.8 };
+
+  // --- Phase 2: Code validation between calls ---
+  let validatedPicks = reasonResult.picks || [];
+
+  // Filter compliance: strip picks where filter_match isn't hard or soft (when filter active + matches exist)
+  const hasActiveFilter = activeFilters && Object.values(activeFilters).some(Boolean);
+  let splitFilterViolations = 0;
+  if (hasActiveFilter && validatedPicks.length > 0) {
+    const hasMatches = events.some(e => e.filter_match === 'hard' || e.filter_match === 'soft');
+    if (hasMatches) {
+      const before = validatedPicks.length;
+      validatedPicks = validatedPicks.filter(p => {
+        const evt = events.find(e => e.id === p.event_id);
+        return evt?.filter_match === 'hard' || evt?.filter_match === 'soft';
+      });
+      splitFilterViolations = before - validatedPicks.length;
+      if (splitFilterViolations > 0) {
+        console.warn(`Split validation: ${splitFilterViolations} non-matching picks stripped`);
+      }
+    }
+  }
+  trace.composition.split_filter_violations = splitFilterViolations;
+
+  // Conversational override guardrail: reasoning returned conversational but pool has matches
+  if ((reasonResult.type === 'conversational' || validatedPicks.length === 0)
+      && matchCount > 0 && events.length > 0) {
+    const matched = events.filter(e => e.filter_match === 'hard' || e.filter_match === 'soft');
+    const fallbackPool = matched.length > 0 ? matched : events;
+    if (fallbackPool.length > 0 && reasonResult.type === 'conversational') {
+      console.warn(`Split conversational override: matchCount=${matchCount}, forcing event_picks`);
+      reasonResult.type = 'event_picks';
+      validatedPicks = fallbackPool.slice(0, 3).map((e, i) => ({
+        rank: i + 1,
+        event_id: e.id,
+        why: 'conversational override',
+      }));
+      trace.composition.conversational_override = true;
+    }
+  }
+  trace.composition.validated_picks = validatedPicks.map(p => {
+    const evt = events.find(e => e.id === p.event_id);
+    return { ...p, event_name: evt?.name || null, neighborhood: evt?.neighborhood || null };
+  });
+
+  // --- Short-circuit: non-event-picks (conversational, ask_neighborhood) ---
+  if (reasonResult.type !== 'event_picks' || validatedPicks.length === 0) {
+    const smsText = reasonResult.reply_text || "Having a moment — try again in a sec!";
+    // Enrich picks for trace
+    trace.composition.picks = validatedPicks.map(p => {
+      const evt = events.find(e => e.id === p.event_id);
+      return {
+        ...p,
+        date_local: evt?.date_local || null,
+        event_name: evt?.name || null,
+        venue_name: evt?.venue_name || null,
+        neighborhood: evt?.neighborhood || null,
+        category: evt?.category || null,
+        is_free: evt?.is_free ?? null,
+        price_display: evt?.price_display || null,
+        start_time_local: evt?.start_time_local || null,
+      };
+    });
+    trace.composition.active_filters = activeFilters || null;
+    trace.composition.neighborhood_used = hood;
+    trace.composition.raw_response = reasonResult._raw || null;
+    return {
+      type: reasonResult.type,
+      sms_text: smsText,
+      picks: validatedPicks,
+      clear_filters: reasonResult.filter_intent?.action === 'clear_all',
+      filter_intent: reasonResult.filter_intent,
+      _raw: reasonResult._raw,
+      _usage: reasonResult._usage,
+      _provider: reasonResult._provider,
+    };
+  }
+
+  // --- Phase 3: Rendering call ---
+  let smsText;
+  const renderStart = Date.now();
+  try {
+    const renderResult = await renderSms(validatedPicks, events, {
+      neighborhood: hood,
+      activeFilters,
+      currentTime: now,
+      conversationHistory: history,
+      isCitywide,
+      suggestedNeighborhood: suggestedHood,
+      isLastBatch: unifiedCtx.isLastBatch,
+      exhaustionSuggestion: unifiedCtx.exhaustionSuggestion,
+      userMessage: message,
+    });
+    trace.composition.render_latency_ms = Date.now() - renderStart;
+    trace.composition.render_raw = renderResult._raw || null;
+    recordAICost(trace, 'render', renderResult._usage, renderResult._provider);
+    trackAICost(phone, renderResult._usage, renderResult._provider);
+    smsText = renderResult.sms_text;
+  } catch (renderErr) {
+    // Render fallback: format picks deterministically
+    console.error(`Split render failed, using deterministic fallback: ${renderErr.message}`);
+    trace.composition.render_latency_ms = Date.now() - renderStart;
+    trace.composition.render_fallback = true;
+    const header = hood ? `Here's what's happening in ${hood}:` : "Here's what's happening tonight:";
+    const lines = validatedPicks.map((p, i) => {
+      const e = events.find(ev => ev.id === p.event_id);
+      if (!e) return `${i + 1}. Unknown event`;
+      let line = `${i + 1}) ${e.name}`;
+      if (e.venue_name && e.venue_name !== 'TBA') line += ` at ${e.venue_name}`;
+      if (e.start_time_local) line += ` — ${formatTime(e.start_time_local)}`;
+      if (e.is_free) line += ' (Free!)';
+      return line;
+    });
+    const footer = 'Reply a number for details, or "more" for more picks.';
+    const { smartTruncate } = require('./formatters');
+    smsText = smartTruncate(`${header}\n\n${lines.join('\n')}\n\n${footer}`);
+  }
+
+  // Enrich picks for trace
+  trace.composition.picks = validatedPicks.map(p => {
+    const evt = events.find(e => e.id === p.event_id);
+    return {
+      ...p,
+      date_local: evt?.date_local || null,
+      event_name: evt?.name || null,
+      venue_name: evt?.venue_name || null,
+      neighborhood: evt?.neighborhood || null,
+      category: evt?.category || null,
+      is_free: evt?.is_free ?? null,
+      price_display: evt?.price_display || null,
+      start_time_local: evt?.start_time_local || null,
+    };
+  });
+  trace.composition.active_filters = activeFilters || null;
+  trace.composition.neighborhood_used = hood;
+  trace.composition.raw_response = reasonResult._raw || null;
+  trace.composition.latency_ms = (trace.composition.reason_latency_ms || 0) + (trace.composition.render_latency_ms || 0);
+
+  // Derive active skills for trace (mirrors buildReasonPrompt + buildRenderPrompt)
+  const activeSkills = ['sourceTiers', 'split_reason', 'split_render'];
+  if (events.some(e => (e.date_local || e.day) === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) || e.day === 'TODAY')) activeSkills.push('tonightPriority');
+  if (hood && !events.some(e => e.neighborhood === hood)) activeSkills.push('neighborhoodMismatch');
+  if (activeFilters?.free_only) activeSkills.push('freeEmphasis');
+  if (history.length > 0) activeSkills.push('conversationAwareness');
+  if (suggestedHood) activeSkills.push('nearbySuggestion');
+  if (validatedPicks.length === 1) activeSkills.push('singlePick');
+  if ((isCitywide || isBorough) && events.length > 0) activeSkills.push('citywide');
+  const uniqueDates = new Set(events.map(e => e.date_local).filter(Boolean));
+  if (uniqueDates.size >= 2) activeSkills.push('multiDay');
+  trace.composition.active_skills = activeSkills;
+
+  return {
+    type: reasonResult.type,
+    sms_text: smsText,
+    picks: validatedPicks,
+    clear_filters: reasonResult.filter_intent?.action === 'clear_all',
+    filter_intent: reasonResult.filter_intent,
+    _raw: reasonResult._raw,
+    _usage: reasonResult._usage,
+    _provider: reasonResult._provider,
+  };
 }
 
 module.exports = { resolveUnifiedContext, callUnified, handleUnifiedResponse, handleZeroMatch };

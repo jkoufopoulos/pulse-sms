@@ -215,10 +215,14 @@ async function handleMore(ctx) {
   if (ctx.session && ctx.session.lastEvents) {
     const allRemaining = Object.values(ctx.session.lastEvents).filter(e => !allShownIds.has(e.id));
 
-    // Filter by neighborhood when one is set; skip for citywide "more" (hood is null).
+    // Filter by neighborhood when one is set; borough-scope when borough is set; skip for citywide "more".
+    const { BOROUGHS } = require('./neighborhoods');
+    const boroughHoods = ctx.session.lastBorough ? new Set(BOROUGHS[ctx.session.lastBorough] || []) : null;
     const inHoodRemaining = hood
       ? allRemaining.filter(e => e.neighborhood === hood)
-      : allRemaining;
+      : boroughHoods
+        ? allRemaining.filter(e => boroughHoods.has(e.neighborhood))
+        : allRemaining;
     // Hard time gate (P5): exclude events before time_after
     const timeGated = activeFilters.time_after
       ? filterByTimeAfter(inHoodRemaining, activeFilters.time_after)
@@ -236,9 +240,10 @@ async function handleMore(ctx) {
       const composeRemaining = dedupedPool.slice(0, 8);
       const isLastBatch = dedupedPool.length <= 8;
       const exhaust = isLastBatch ? buildExhaustionMessage(hood, {
-        adjacentHoods: getAdjacentNeighborhoods(hood, 3),
+        adjacentHoods: hood ? getAdjacentNeighborhoods(hood, 3) : [],
         visitedHoods: ctx.session?.visitedHoods || [],
         filters: activeFilters,
+        borough: ctx.session?.lastBorough,
       }) : null;
 
       ctx.trace.events.cache_size = Object.keys(ctx.session.lastEvents).length;
@@ -282,7 +287,7 @@ async function handleMore(ctx) {
     }
   }
 
-  if (!ctx.session?.lastNeighborhood) {
+  if (!ctx.session?.lastNeighborhood && !ctx.session?.lastBorough) {
     const sms = "Tell me what you're in the mood for — comedy, live music, something weird? Or drop a neighborhood.";
     await sendSMS(ctx.phone, sms);
     ctx.finalizeTrace(sms, 'more');
@@ -291,9 +296,10 @@ async function handleMore(ctx) {
 
   // All scraped events exhausted — suggest specific nearby neighborhood
   const finalExhaust = buildExhaustionMessage(hood, {
-    adjacentHoods: getAdjacentNeighborhoods(hood, 4),
-    visitedHoods: ctx.session?.visitedHoods || [hood],
+    adjacentHoods: hood ? getAdjacentNeighborhoods(hood, 4) : [],
+    visitedHoods: ctx.session?.visitedHoods || [hood].filter(Boolean),
     filters: activeFilters,
+    borough: ctx.session?.lastBorough,
   });
   const sms = finalExhaust.message;
   saveResponseFrame(ctx.phone, {

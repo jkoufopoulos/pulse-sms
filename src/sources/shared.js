@@ -31,10 +31,11 @@ function normalizeEventName(name) {
 }
 
 /**
- * Generate a stable event ID from name + venue + date.
+ * Generate a stable event ID from name + venue + date (+ optional startTime).
  * Falls back to source + url hash when core fields are empty to avoid collisions.
+ * startTime differentiates distinct performances at the same venue on the same day (#18).
  */
-function makeEventId(name, venue, date, source, sourceUrl) {
+function makeEventId(name, venue, date, source, sourceUrl, startTime) {
   const norm = normalizeEventName(name);
   const v = (venue || '').toLowerCase().trim();
   const d = (date || '').trim();
@@ -45,7 +46,14 @@ function makeEventId(name, venue, date, source, sourceUrl) {
     return crypto.createHash('md5').update(fallback).digest('hex').slice(0, 12);
   }
 
-  const raw = `${norm}|${v}|${d}`;
+  // Extract HH:MM from ISO datetime or bare time
+  let t = '';
+  if (startTime) {
+    const m = startTime.match(/T(\d{2}:\d{2})/);
+    t = m ? m[1] : '';
+  }
+
+  const raw = `${norm}|${v}|${d}${t ? '|' + t : ''}`;
   return crypto.createHash('md5').update(raw).digest('hex').slice(0, 12);
 }
 
@@ -124,7 +132,7 @@ function normalizeDateTimeFields(e) {
 
 function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
   normalizeDateTimeFields(e);
-  const id = makeEventId(e.name, e.venue_name, e.date_local || e.start_time_local || '', sourceName, e.source_url);
+  const id = makeEventId(e.name, e.venue_name, e.date_local || e.start_time_local || '', sourceName, e.source_url, e.start_time_local);
 
   // Try venue lookup for coords when Claude didn't extract lat/lng
   let lat = parseFloat(e.latitude);
