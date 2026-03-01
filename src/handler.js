@@ -12,7 +12,7 @@ const { getEvents, getEventsCitywide, getEventById, scanCityWide, getCacheStatus
 const { lookupReferralCode, recordAttribution } = require('./referral');
 const { filterKidsEvents, validatePerennialActivity } = require('./curation');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
-const { applyFilters, buildEventMap, saveResponseFrame, mergeFilters, buildTaggedPool, tryTavilyFallback } = require('./pipeline');
+const { applyFilters, buildEventMap, saveResponseFrame, mergeFilters, buildTaggedPool, buildZeroMatchResponse, tryTavilyFallback } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
 
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
@@ -601,6 +601,42 @@ async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, 
   finalizeTrace(result.sms_text, 'events');
 }
 
+/**
+ * Handle zero-match bypass: when filters match nothing in a neighborhood,
+ * compose a deterministic response and preserve filters in session.
+ * $0 AI cost.
+ */
+async function handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace) {
+  const { hood, activeFilters, nearbyHoods, events, curated, taggedPerennials } = unifiedCtx;
+  const { message, suggestedHood, source } = buildZeroMatchResponse(hood, activeFilters, nearbyHoods);
+
+  trace.routing.latency_ms = 0;
+  trace.composition.latency_ms = 0;
+  trace.composition.zero_match_bypass = true;
+  trace.composition.zero_match_source = source;
+
+  const eventMap = buildEventMap([...curated, ...taggedPerennials]);
+  for (const e of events) eventMap[e.id] = e;
+
+  const pending = suggestedHood
+    ? { neighborhood: suggestedHood, filters: activeFilters }
+    : null;
+
+  saveResponseFrame(phone, {
+    picks: session?.lastPicks || [],
+    eventMap: Object.keys(eventMap).length > 0 ? eventMap : (session?.lastEvents || {}),
+    neighborhood: hood,
+    filters: Object.values(activeFilters).some(Boolean) ? activeFilters : null,
+    offeredIds: session?.allOfferedIds || [],
+    visitedHoods: session?.visitedHoods || [],
+    pending,
+  });
+  updateProfile(phone, { neighborhood: hood, filters: activeFilters, responseType: 'zero_match' })
+    .catch(err => console.error('profile update failed:', err.message));
+  await sendSMS(phone, message);
+  finalizeTrace(message, 'events');
+}
+
 async function handleMessageAI(phone, message) {
   const traceStart = Date.now();
   const masked = maskPhone(phone);
@@ -693,6 +729,14 @@ async function handleMessageAI(phone, message) {
 
   // Unified LLM call — handles semantic messages + pre-detected filter follow-ups
   const unifiedCtx = await resolveUnifiedContext(message, session, preDetectedFilters, phone, trace);
+
+  // Zero-match bypass: skip LLM when filters match nothing ($0 AI cost)
+  const hasActiveFilter = unifiedCtx.activeFilters &&
+    Object.values(unifiedCtx.activeFilters).some(Boolean);
+  if (hasActiveFilter && unifiedCtx.matchCount === 0 &&
+      !unifiedCtx.isCitywide && unifiedCtx.hood) {
+    return handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace);
+  }
 
   const result = await callUnified(message, unifiedCtx, session, history, phone, trace);
   await handleUnifiedResponse(result, unifiedCtx, phone, session, trace, message, finalizeTrace);
