@@ -14,6 +14,7 @@ require('./unit/pre-router.test');
 require('./unit/perennials.test');
 require('./unit/ai.test');
 require('./unit/curation.test');
+require('./unit/model-router.test');
 require('./unit/skills.test');
 require('./unit/scrapers.test');
 require('./unit/db.test');

@@ -3,7 +3,7 @@ const twilio = require('twilio');
 const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
 // ai.js is now accessed via executeQuery in pipeline.js (late require)
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
-const { startTrace, saveTrace, getLatestTraceForPhone } = require('./traces');
+const { startTrace, saveTrace, getLatestTraceForPhone, PRICING, recordAICost } = require('./traces');
 const { getSession, setSession, clearSession, addToHistory, clearSessionInterval } = require('./session');
 const { preRoute, getAdjacentNeighborhoods } = require('./pre-router');
 const { handleHelp, handleConversational, handleDetails, handleMore } = require('./intent-handlers');
@@ -12,8 +12,9 @@ const { getEvents, getEventsCitywide, getEventById, scanCityWide, getCacheStatus
 const { lookupReferralCode, recordAttribution } = require('./referral');
 const { filterKidsEvents, validatePerennialActivity } = require('./curation');
 const { getPerennialPicks, toEventObjects } = require('./perennial');
-const { applyFilters, buildEventMap, saveResponseFrame, mergeFilters, buildTaggedPool, buildZeroMatchResponse, tryTavilyFallback, executeQuery } = require('./pipeline');
+const { applyFilters, buildEventMap, saveResponseFrame, mergeFilters, normalizeFilterIntent, buildTaggedPool, buildZeroMatchResponse, tryTavilyFallback, executeQuery } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
+const { routeModel } = require('./model-router');
 
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
 
@@ -43,12 +44,6 @@ const dedupInterval = setInterval(() => {
 // --- Cost-based daily AI budget per user ---
 const aiBudgets = new Map(); // phone → { cost_usd, date }
 const DAILY_BUDGET_USD = 0.10;
-// Per-token pricing by provider
-const PRICING = {
-  anthropic: { input: 1.00 / 1_000_000, output: 5.00 / 1_000_000 },  // Haiku 4.5
-  gemini:    { input: 0.10 / 1_000_000, output: 0.40 / 1_000_000 },  // Gemini 2.0 Flash
-};
-
 function getNycDate() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 }
@@ -442,7 +437,7 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
 /**
  * Call executeQuery and capture trace/cost data.
  */
-async function callUnified(message, unifiedCtx, session, history, phone, trace) {
+async function callUnified(message, unifiedCtx, session, history, phone, trace, { model } = {}) {
   const { hood, events, nearbyHoods, now, activeFilters, isSparse, isCitywide, matchCount, hardCount, softCount, excludeIds, suggestedHood, userHoodAlias } = unifiedCtx;
 
   const composeStart = Date.now();
@@ -462,6 +457,7 @@ async function callUnified(message, unifiedCtx, session, history, phone, trace) 
     excludeIds,
     suggestedNeighborhood: suggestedHood,
     userHoodAlias,
+    model,
   });
   trace.routing.latency_ms = Date.now() - composeStart;
   trace.composition.latency_ms = trace.routing.latency_ms;
@@ -497,6 +493,7 @@ async function callUnified(message, unifiedCtx, session, history, phone, trace) 
   const uniqueDates = new Set(events.map(e => e.date_local).filter(Boolean));
   if (uniqueDates.size >= 2) activeSkills.push('multiDay');
   trace.composition.active_skills = activeSkills;
+  recordAICost(trace, 'unified', result._usage, result._provider);
   trackAICost(phone, result._usage, result._provider);
 
   return result;
@@ -509,14 +506,17 @@ async function callUnified(message, unifiedCtx, session, history, phone, trace) 
 async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, message, finalizeTrace) {
   let { hood, activeFilters, events, curated, taggedPerennials, suggestedHood } = unifiedCtx;
 
-  // Filter state management after unified call
-  // Only trust LLM's clear_filters when user message contains clear-intent language.
-  // This prevents hallucination on normal conversational turns (BUG 1) while
-  // preserving semantic clearing ("just show me what's good"). P1 compliant:
-  // code validates LLM's claim against user's actual input.
-  const CLEAR_SIGNALS = /\b(everything|all\b|fresh|reset|start over|no filter|drop|forget|nvm|never\s?mind|clear|what's good|whats good|whatever|surprise me)\b/i;
-  if (result.clear_filters && CLEAR_SIGNALS.test(message)) {
+  // Filter state management after unified call — apply LLM's filter_intent
+  // P1 compliant: LLM reports what user requested (language), handler applies it (state).
+  trace.composition = trace.composition || {};
+  if (result.filter_intent?.action === 'clear_all' || result.clear_filters) {
     activeFilters = {};
+    trace.composition.filter_intent_action = 'clear_all';
+  } else if (result.filter_intent?.action === 'modify' && result.filter_intent?.updates) {
+    const normalized = normalizeFilterIntent(result.filter_intent.updates);
+    activeFilters = mergeFilters(activeFilters, normalized);
+    trace.composition.filter_intent_action = 'modify';
+    trace.composition.filter_intent_updates = normalized;
   }
 
   // Handle response by type
@@ -592,6 +592,7 @@ async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, 
     neighborhood: hood,
     filters: activeFilters,
     offeredIds: filterCompliantPicks.map(p => p.event_id),
+    visitedHoods: [...new Set([...(session?.visitedHoods || []), hood].filter(Boolean))],
     pending: suggestedHood ? {
       neighborhood: suggestedHood,
       filters: activeFilters,
@@ -704,17 +705,7 @@ async function handleMessageAI(phone, message) {
     console.log(`Pre route (pre): intent=${preRouted.intent}, neighborhood=${preRouted.neighborhood} → unified with filters`);
   }
 
-  // Pre-router clear_filters: wipe filters and fall through to unified branch
-  if (preRouted && preRouted.intent === 'clear_filters') {
-    setSession(phone, { lastFilters: null, pendingFilters: null, lastPicks: [], lastEvents: {} });
-    session = getSession(phone);
-    trace.routing.pre_routed = true;
-    trace.routing.result = { intent: 'clear_filters', neighborhood: preRouted.neighborhood, confidence: 1.0 };
-    trace.routing.latency_ms = 0;
-    console.log(`Pre route (pre): intent=clear_filters → unified with no filters`);
-  }
-
-  if (preRouted && !preDetectedFilters && preRouted.intent !== 'clear_filters') {
+  if (preRouted && !preDetectedFilters) {
     // Pre-router matched — mechanical shortcuts
     const route = preRouted;
     trace.routing.pre_routed = true;
@@ -722,7 +713,7 @@ async function handleMessageAI(phone, message) {
     trace.routing.latency_ms = 0;
     console.log(`Pre route (pre): intent=${route.intent}, neighborhood=${route.neighborhood}, confidence=${route.confidence}`);
 
-    const ctx = { phone, message, masked, session, trace, route, finalizeTrace, trackAICost: (usage, provider) => trackAICost(phone, usage, provider) };
+    const ctx = { phone, message, masked, session, trace, route, finalizeTrace, trackAICost: (usage, provider) => trackAICost(phone, usage, provider), recordAICost };
 
     // Clear pending state on any pre-routed intent
     if (session?.pendingNearby) {
@@ -744,7 +735,28 @@ async function handleMessageAI(phone, message) {
     return handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace);
   }
 
-  const result = await callUnified(message, unifiedCtx, session, history, phone, trace);
+  // Compute model routing based on complexity signals
+  const budgetEntry = aiBudgets.get(phone);
+  const budgetUsedPct = (budgetEntry?.date === getNycDate())
+    ? budgetEntry.cost_usd / DAILY_BUDGET_USD : 0;
+
+  const routing = routeModel({
+    message,
+    session,
+    matchCount: unifiedCtx.matchCount,
+    hardCount: unifiedCtx.hardCount,
+    softCount: unifiedCtx.softCount,
+    isSparse: unifiedCtx.isSparse,
+    hood: unifiedCtx.hood,
+    activeFilters: unifiedCtx.activeFilters,
+    events: unifiedCtx.events,
+    conversationHistory: history,
+    isCitywide: unifiedCtx.isCitywide,
+    budgetUsedPct,
+  });
+  trace.routing.model_routing = routing;
+
+  const result = await callUnified(message, unifiedCtx, session, history, phone, trace, { model: routing.model });
   await handleUnifiedResponse(result, unifiedCtx, phone, session, trace, message, finalizeTrace);
 }
 

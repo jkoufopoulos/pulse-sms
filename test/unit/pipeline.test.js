@@ -1,5 +1,5 @@
 const { check } = require('../helpers');
-const { mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, failsTimeGate, describeFilters } = require('../../src/pipeline');
+const { mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, normalizeFilterIntent, failsTimeGate, describeFilters } = require('../../src/pipeline');
 
 // ---- mergeFilters ----
 console.log('\nmergeFilters:');
@@ -494,3 +494,67 @@ check('empty → "events"', describeFilters({}) === 'events');
 check('all falsy → "events"', describeFilters({ category: null, free_only: false, time_after: null, vibe: null }) === 'events');
 check('free_only false → "events"', describeFilters({ free_only: false }) === 'events');
 check('non-object → "events"', describeFilters('comedy') === 'events');
+
+
+// ---- normalizeFilterIntent ----
+console.log('\nnormalizeFilterIntent:');
+
+// Empty / invalid input
+check('null → empty obj', JSON.stringify(normalizeFilterIntent(null)) === '{}');
+check('undefined → empty obj', JSON.stringify(normalizeFilterIntent(undefined)) === '{}');
+check('string → empty obj', JSON.stringify(normalizeFilterIntent('comedy')) === '{}');
+
+// Category normalization (same as normalizeFilters)
+const jazzIntent = normalizeFilterIntent({ category: 'jazz' });
+check('jazz → live_music', jazzIntent.category === 'live_music');
+check('jazz → subcategory jazz', jazzIntent.subcategory === 'jazz');
+
+const comedyIntent = normalizeFilterIntent({ category: 'comedy' });
+check('comedy → comedy (canonical)', comedyIntent.category === 'comedy');
+check('comedy → subcategory null', comedyIntent.subcategory === null);
+
+const technoIntent = normalizeFilterIntent({ category: 'techno' });
+check('techno → nightlife', technoIntent.category === 'nightlife');
+check('techno → subcategory techno', technoIntent.subcategory === 'techno');
+
+// Category clearing
+const clearCat = normalizeFilterIntent({ category: null });
+check('category null → null', clearCat.category === null);
+check('category null → subcategory null', clearCat.subcategory === null);
+
+const clearCatEmpty = normalizeFilterIntent({ category: '' });
+check('category empty → null', clearCatEmpty.category === null);
+
+// Free: coerce to boolean
+check('free_only true → true', normalizeFilterIntent({ free_only: true }).free_only === true);
+check('free_only false → false', normalizeFilterIntent({ free_only: false }).free_only === false);
+check('free_only null → false (cleared)', normalizeFilterIntent({ free_only: null }).free_only === false);
+
+// Time: validate format
+check('valid time_after', normalizeFilterIntent({ time_after: '22:00' }).time_after === '22:00');
+check('null time_after → null', normalizeFilterIntent({ time_after: null }).time_after === null);
+check('invalid time_after → null', normalizeFilterIntent({ time_after: 'late' }).time_after === null);
+
+// Vibe passthrough
+check('vibe passes through', normalizeFilterIntent({ vibe: 'chill' }).vibe === 'chill');
+check('vibe null → null', normalizeFilterIntent({ vibe: null }).vibe === null);
+
+// Key-presence: absent keys should NOT be in result (for mergeFilters semantics)
+const partialIntent = normalizeFilterIntent({ free_only: false });
+check('partial: free_only present', 'free_only' in partialIntent);
+check('partial: category absent', !('category' in partialIntent));
+check('partial: time_after absent', !('time_after' in partialIntent));
+
+// Combined: "paid is fine, keep jazz" → only free_only key
+const paidIntent = normalizeFilterIntent({ free_only: false });
+check('paid intent: only free_only', Object.keys(paidIntent).length === 1);
+check('paid intent: free_only false', paidIntent.free_only === false);
+
+// Integration with mergeFilters: filter_intent updates compound correctly
+const existing = { category: 'live_music', subcategory: 'jazz', free_only: true, time_after: '22:00' };
+const intent = normalizeFilterIntent({ free_only: false }); // "paid is fine"
+const merged = mergeFilters(existing, intent);
+check('merge: free_only cleared', merged.free_only === false);
+check('merge: category persists', merged.category === 'live_music');
+check('merge: subcategory persists', merged.subcategory === 'jazz');
+check('merge: time_after persists', merged.time_after === '22:00');

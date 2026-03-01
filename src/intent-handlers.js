@@ -101,6 +101,7 @@ async function handleDetails(ctx) {
         const result = await composeDetails(event, pick.why, { bestieUrl });
         ctx.trace.composition.latency_ms = Date.now() - composeStart;
         ctx.trace.composition.raw_response = result._raw || null;
+        ctx.recordAICost?.(ctx.trace, 'details', result._usage, result._provider);
         ctx.trackAICost?.(result._usage, result._provider);
         const sms = smartTruncate(result.sms_text);
         await sendSMS(ctx.phone, sms);
@@ -160,6 +161,7 @@ async function composeViaExecuteQuery(events, ctx, { hood, activeFilters, exclud
     ...skills,
   });
   ctx.trace.composition.latency_ms = Date.now() - composeStart;
+  ctx.recordAICost?.(ctx.trace, 'compose', result._usage, result._provider);
   ctx.trackAICost?.(result._usage, result._provider);
   ctx.trace.composition.raw_response = result._raw || null;
   ctx.trace.composition.picks = (result.picks || []).map(p => {

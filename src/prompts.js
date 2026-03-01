@@ -326,25 +326,42 @@ FOR EVENT PICKS (you have events to recommend):
   "type": "event_picks",
   "sms_text": "Tonight in Bushwick:\\n\\n1) Helena Hauff at Signal — techno legend. 9pm\\n\\nReply 1 for details, MORE for extra picks",
   "picks": [{ "rank": 1, "event_id": "evt_123", "why": "tonight + techno + in neighborhood" }],
-  "clear_filters": false
+  "filter_intent": { "action": "none" }
 }
-
-"clear_filters": set to true ONLY when the user explicitly asks to remove/drop/forget active filters. Examples: "forget the comedy", "just show me everything", "drop the filter". Do NOT set this when the user adds or changes a filter.
 
 FOR CONVERSATIONAL (greetings, thanks, declines, off-topic):
 {
   "type": "conversational",
   "sms_text": "Ha — I just do events! Text me a neighborhood and I'll tell you what's happening tonight.",
   "picks": [],
-  "clear_filters": false
+  "filter_intent": { "action": "none" }
 }
 
 FOR ASK NEIGHBORHOOD (user wants events but no neighborhood known):
 {
   "type": "ask_neighborhood",
   "sms_text": "Where are you looking? I can check for free jazz in any neighborhood.",
-  "picks": []
+  "picks": [],
+  "filter_intent": { "action": "none" }
 }
+
+FILTER_INTENT — report what the user is requesting about filters:
+- { "action": "none" } — default. User is NOT changing filters. Use for normal requests, neighborhood queries, conversational messages.
+- { "action": "clear_all" } — user explicitly asks to remove ALL filters. Examples: "forget the comedy", "just show me everything", "drop the filter", "show me whatever", "start fresh".
+- { "action": "modify", "updates": { ... } } — user wants to change specific filters. Only include keys being changed:
+  - "free_only": true/false — "paid is fine too" → false, "only free stuff" → true
+  - "category": "comedy" — "how about comedy instead" → set category
+  - "category": null — "forget the comedy" → clear category only
+  - "time_after": "22:00" — "show me later stuff" → set time
+  - "time_after": null — "anytime works" → clear time filter
+  - "vibe": "chill" — "something more chill" → set vibe
+
+Rules:
+- Do NOT set "clear_all" when user adds or changes a filter — use "modify" instead.
+- Do NOT set "modify" for normal event requests ("bushwick", "what's tonight") — use "none".
+- "paid is fine" / "not just comedy" / "anytime works" → "modify" with the relevant key cleared.
+- "forget the comedy" → "modify" with { "category": null } (targeted clear, not clear_all).
+- "show me everything" / "drop all filters" → "clear_all".
 </output_format>
 
 <examples>

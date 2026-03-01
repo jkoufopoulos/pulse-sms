@@ -13,6 +13,12 @@ const crypto = require('crypto');
 const TRACES_DIR = path.join(__dirname, '..', 'data', 'traces');
 const CONVERSATIONS_DIR = path.join(__dirname, '..', 'data', 'conversations');
 const RING_BUFFER_SIZE = 200;
+
+// Per-token pricing by provider (shared source of truth)
+const PRICING = {
+  anthropic: { input: 1.00 / 1_000_000, output: 5.00 / 1_000_000 },  // Haiku 4.5
+  gemini:    { input: 0.10 / 1_000_000, output: 0.40 / 1_000_000 },  // Gemini 2.5 Flash
+};
 const MAX_TRACE_FILES = 4;
 const CONVERSATION_IDLE_MS = 10 * 60 * 1000; // 10 minutes
 const CONVERSATION_CHECK_MS = 5 * 60 * 1000; // check every 5 minutes
@@ -45,15 +51,38 @@ function startTrace(phone_masked, input_message) {
     phone_masked,
     input_message,
     session_before: { lastNeighborhood: null, lastPicks: null },
-    routing: { pre_routed: false, result: null, latency_ms: 0, raw_response: null },
+    routing: { pre_routed: false, result: null, latency_ms: 0, raw_response: null, model_routing: null },
     events: { cache_size: 0, candidates_count: 0, sent_to_claude: 0, candidate_ids: [], sent_ids: [], getEvents_ms: null },
     composition: { raw_response: null, latency_ms: 0, picks: null, not_picked_reason: null, neighborhood_used: null },
     output_sms: null,
     output_sms_length: 0,
     output_intent: null,
     total_latency_ms: 0,
+    ai_costs: [],
+    total_ai_cost_usd: 0,
     annotation: null,
   };
+}
+
+/**
+ * Record an AI call's cost on a trace.
+ * Pushes to trace.ai_costs, increments total_ai_cost_usd, returns cost_usd.
+ */
+function recordAICost(trace, callType, usage, provider = 'anthropic') {
+  if (!trace || !usage) return 0;
+  const pricing = PRICING[provider] || PRICING.anthropic;
+  const inputTokens = usage.input_tokens || 0;
+  const outputTokens = usage.output_tokens || 0;
+  const cost = inputTokens * pricing.input + outputTokens * pricing.output;
+  trace.ai_costs.push({
+    call_type: callType,
+    provider: provider || 'anthropic',
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+    cost_usd: cost,
+  });
+  trace.total_ai_cost_usd += cost;
+  return cost;
 }
 
 /**
@@ -322,5 +351,6 @@ function stopConversationCapture() {
 
 module.exports = {
   startTrace, saveTrace, loadTraces, annotateTrace, getRecentTraces, getTraceById, getLatestTraceForPhone,
-  recordConversationTurn, startConversationCapture, stopConversationCapture
+  recordConversationTurn, startConversationCapture, stopConversationCapture,
+  PRICING, recordAICost
 };

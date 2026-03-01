@@ -8,6 +8,7 @@ const validUnifiedOutput = {
   sms_text: 'DJ Night at Output (Williamsburg) 9 PM — $20. Sick lineup tonight.\nAlso: Jazz at Smalls 8 PM\nReply DETAILS, MORE, or FREE.',
   picks: [{ rank: 1, event_id: 'abc123', why: 'tonight + in neighborhood' }, { rank: 2, event_id: 'def456', why: 'great lineup' }],
   clear_filters: false,
+  filter_intent: { action: 'none' },
 };
 
 check('unifiedRespond has type', typeof validUnifiedOutput.type === 'string');
@@ -19,6 +20,9 @@ check('unifiedRespond picks have event_id', validUnifiedOutput.picks.every(p => 
 check('unifiedRespond picks have rank', validUnifiedOutput.picks.every(p => typeof p.rank === 'number'));
 check('unifiedRespond picks have why', validUnifiedOutput.picks.every(p => typeof p.why === 'string'));
 check('unifiedRespond has clear_filters', typeof validUnifiedOutput.clear_filters === 'boolean');
+check('unifiedRespond has filter_intent', typeof validUnifiedOutput.filter_intent === 'object');
+check('unifiedRespond filter_intent has action', typeof validUnifiedOutput.filter_intent.action === 'string');
+check('unifiedRespond filter_intent action valid', ['none', 'clear_all', 'modify'].includes(validUnifiedOutput.filter_intent.action));
 
 // Edge case: empty picks is valid (quiet night)
 const emptyOutput = {

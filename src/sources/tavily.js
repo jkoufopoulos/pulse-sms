@@ -4,8 +4,9 @@ const { filterUpcomingEvents } = require('../geo');
 const { captureExtractionInput } = require('../extraction-capture');
 
 async function searchTavilyEvents(neighborhood, { query: customQuery, minCompleteness = 0.5 } = {}) {
+  const EMPTY = { events: [], _usage: null, _provider: null };
   const apiKey = process.env.TAVILY_API_KEY;
-  if (!apiKey) return [];
+  if (!apiKey) return EMPTY;
 
   const today = new Date().toLocaleDateString('en-US', {
     timeZone: 'America/New_York',
@@ -31,13 +32,13 @@ async function searchTavilyEvents(neighborhood, { query: customQuery, minComplet
       const body = await res.json().catch(() => ({}));
       const reason = body?.detail?.error || body?.detail || body?.error || `HTTP ${res.status}`;
       console.error(`[TAVILY] search failed: ${reason}`);
-      return [];
+      return EMPTY;
     }
 
     const data = await res.json();
     if (data.detail?.error) {
       console.error(`[TAVILY] API error: ${data.detail.error}`);
-      return [];
+      return EMPTY;
     }
     const results = data.results || [];
 
@@ -56,7 +57,7 @@ async function searchTavilyEvents(neighborhood, { query: customQuery, minComplet
       .map(r => `[Source: ${r.url}]\n${r.title}\n${r.content}`)
       .join('\n\n---\n\n');
 
-    if (!rawText.trim()) return [];
+    if (!rawText.trim()) return EMPTY;
 
     const extracted = await extractEvents(rawText, 'tavily', query, { model: 'claude-haiku-4-5-20251001' });
     const events = (extracted.events || [])
@@ -69,10 +70,10 @@ async function searchTavilyEvents(neighborhood, { query: customQuery, minComplet
     }
 
     console.log(`Tavily: ${upcoming.length} events for ${neighborhood}`);
-    return upcoming;
+    return { events: upcoming, _usage: extracted._usage || null, _provider: extracted._provider || null };
   } catch (err) {
     console.error('Tavily search error:', err.message);
-    return [];
+    return EMPTY;
   }
 }
 

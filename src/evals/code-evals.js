@@ -466,6 +466,58 @@ const evals = {
   },
 
   /**
+   * Model routing must be captured for all LLM-hitting traces.
+   * Verifies trace.routing.model_routing has score, tier, and model fields.
+   */
+  model_routing_captured(trace) {
+    // Skip pre-routed mechanical shortcuts (no LLM call)
+    if (trace.routing.pre_routed && !trace.composition.raw_response) {
+      return { name: 'model_routing_captured', pass: true, detail: 'pre-routed (no LLM call)' };
+    }
+    // Skip zero-match bypass (no LLM call)
+    if (trace.composition.zero_match_bypass) {
+      return { name: 'model_routing_captured', pass: true, detail: 'zero-match bypass (no LLM call)' };
+    }
+    const mr = trace.routing?.model_routing;
+    if (!mr) {
+      return { name: 'model_routing_captured', pass: false, detail: 'model_routing missing from trace' };
+    }
+    const hasFields = typeof mr.score === 'number' && typeof mr.tier === 'string' && typeof mr.model === 'string';
+    return {
+      name: 'model_routing_captured',
+      pass: hasFields,
+      detail: hasFields
+        ? `tier=${mr.tier}, score=${mr.score}, model=${mr.model}`
+        : `missing fields: score=${mr.score}, tier=${mr.tier}, model=${mr.model}`,
+    };
+  },
+
+  /**
+   * AI cost must be tracked for all LLM-hitting traces.
+   */
+  ai_cost_tracked(trace) {
+    // Skip pre-routed mechanical shortcuts (no LLM call)
+    if (trace.routing.pre_routed && !trace.composition.raw_response) {
+      return { name: 'ai_cost_tracked', pass: true, detail: 'pre-routed (no LLM call)' };
+    }
+    // Skip zero-match bypass (no LLM call)
+    if (trace.composition.zero_match_bypass) {
+      return { name: 'ai_cost_tracked', pass: true, detail: 'zero-match bypass (no LLM call)' };
+    }
+    const costs = trace.ai_costs || [];
+    const total = trace.total_ai_cost_usd || 0;
+    if (costs.length === 0) {
+      return { name: 'ai_cost_tracked', pass: false, detail: 'LLM call made but no cost recorded' };
+    }
+    const callTypes = costs.map(c => c.call_type).join(', ');
+    return {
+      name: 'ai_cost_tracked',
+      pass: total > 0,
+      detail: `$${total.toFixed(5)} (${costs.length} call${costs.length > 1 ? 's' : ''}: ${callTypes})`,
+    };
+  },
+
+  /**
    * Total latency should be under 10s
    */
   latency_under_10s(trace) {

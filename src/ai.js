@@ -45,10 +45,10 @@ const GEMINI_SAFETY = [
 /**
  * Unified respond via Google Gemini Flash.
  */
-async function unifiedWithGemini(systemPrompt, userPrompt) {
+async function unifiedWithGemini(systemPrompt, userPrompt, modelName) {
   const genAI = getGeminiClient();
   const gemModel = genAI.getGenerativeModel({
-    model: MODELS.compose,
+    model: modelName || MODELS.compose,
     systemInstruction: systemPrompt,
     safetySettings: GEMINI_SAFETY,
     generationConfig: {
@@ -70,9 +70,17 @@ async function unifiedWithGemini(systemPrompt, userPrompt) {
             },
             required: ['rank', 'event_id', 'why'],
           }},
-          clear_filters: { type: 'boolean' },
+          filter_intent: { type: 'object', properties: {
+            action: { type: 'string', enum: ['none', 'clear_all', 'modify'] },
+            updates: { type: 'object', properties: {
+              free_only: { type: 'boolean', nullable: true },
+              category: { type: 'string', nullable: true },
+              time_after: { type: 'string', nullable: true },
+              vibe: { type: 'string', nullable: true },
+            }},
+          }, required: ['action'] },
         },
-        required: ['type', 'sms_text', 'picks', 'clear_filters'],
+        required: ['type', 'sms_text', 'picks', 'filter_intent'],
       },
     },
   });
@@ -186,6 +194,7 @@ Extract all events and venues into the JSON format specified in your instruction
         messages: [{ role: 'user', content: userPrompt }],
       }, { timeout, maxRetries: 0 });
       text = response.content?.[0]?.text || '';
+      usage = response.usage || null;
       provider = 'anthropic';
     }
   } else {
@@ -197,16 +206,17 @@ Extract all events and venues into the JSON format specified in your instruction
       messages: [{ role: 'user', content: userPrompt }],
     }, { timeout, maxRetries: 0 });
     text = response.content?.[0]?.text || '';
+    usage = response.usage || null;
     provider = 'anthropic';
   }
 
   const parsed = parseJsonFromResponse(text);
   if (!parsed) {
     console.error(`extractEvents (${provider}): no valid JSON in response:`, text);
-    return { events: [] };
+    return { events: [], _usage: usage || null, _provider: provider };
   }
 
-  return parsed;
+  return { ...parsed, _usage: usage || null, _provider: provider };
 }
 
 /**
@@ -398,7 +408,7 @@ Write the details text. Include this URL: ${bestUrl}`;
  *
  * Returns { type, sms_text, picks, clear_filters }
  */
-async function unifiedRespond(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime, validNeighborhoods, activeFilters, isSparse, isCitywide, matchCount, hardCount, softCount, excludeIds, suggestedNeighborhood, userHoodAlias } = {}) {
+async function unifiedRespond(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime, validNeighborhoods, activeFilters, isSparse, isCitywide, matchCount, hardCount, softCount, excludeIds, suggestedNeighborhood, userHoodAlias, model } = {}) {
   const now = currentTime || new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   const todayNyc = getNycDateString(0);
@@ -502,9 +512,10 @@ Respond now.`;
   const systemPrompt = buildUnifiedPrompt(events || [], skillOptions);
 
   let text, usage, provider;
-  if (MODELS.compose.startsWith('gemini-') && getGeminiClient()) {
+  const resolvedModel = model || MODELS.compose;
+  if (resolvedModel.startsWith('gemini-') && getGeminiClient()) {
     try {
-      const result = await unifiedWithGemini(systemPrompt, userPrompt);
+      const result = await unifiedWithGemini(systemPrompt, userPrompt, resolvedModel);
       text = result.text; usage = result.usage; provider = 'gemini';
     } catch (err) {
       console.warn(`Gemini unifiedRespond failed, falling back to Anthropic: ${err.message}`);
@@ -520,7 +531,7 @@ Respond now.`;
     }
   } else {
     const response = await withTimeout(getClient().messages.create({
-      model: MODELS.compose,
+      model: resolvedModel,
       max_tokens: 512,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
@@ -575,11 +586,16 @@ Respond now.`;
     }
   }
 
+  // Derive filter_intent from response — support both new filter_intent and legacy clear_filters
+  const filterIntent = parsed.filter_intent || { action: 'none' };
+  const clearFilters = filterIntent.action === 'clear_all' || parsed.clear_filters === true;
+
   return {
     type: parsed.type || (validPicks.length > 0 ? 'event_picks' : 'conversational'),
     sms_text: smartTruncate(parsed.sms_text),
     picks: validPicks,
-    clear_filters: parsed.clear_filters === true,
+    clear_filters: clearFilters,
+    filter_intent: filterIntent,
     _raw: text,
     _usage: usage,
     _provider: provider,

@@ -1,6 +1,7 @@
 const { setResponseState } = require('./session');
 const { filterByTimeAfter, parseAsNycTime, getEventDate } = require('./geo');
 const { searchTavilyEvents } = require('./sources/tavily');
+const { recordAICost } = require('./traces');
 
 /**
  * Apply event filters (free, category, time).
@@ -370,6 +371,55 @@ function normalizeFilters(filters) {
 }
 
 /**
+ * Normalize LLM filter_intent.updates into a format suitable for mergeFilters.
+ * Validates keys against known filter fields, maps subcategories → categories.
+ * Returns an object with explicit-key semantics (present keys override, absent fall back).
+ */
+function normalizeFilterIntent(updates) {
+  if (!updates || typeof updates !== 'object') return {};
+  const result = {};
+
+  // Category: normalize subcategories (jazz → live_music + subcategory)
+  if ('category' in updates) {
+    if (updates.category === null || updates.category === '') {
+      result.category = null;
+      result.subcategory = null;
+    } else {
+      const key = String(updates.category).toLowerCase().trim();
+      const canonical = CATEGORY_NORMALIZE[key] || key;
+      result.category = canonical;
+      if (CATEGORY_NORMALIZE[key] && key !== canonical) {
+        result.subcategory = key;
+      } else {
+        result.subcategory = null;
+      }
+    }
+  }
+
+  // Free: coerce to boolean
+  if ('free_only' in updates) {
+    result.free_only = updates.free_only === null ? false : Boolean(updates.free_only);
+  }
+
+  // Time: validate HH:MM format
+  if ('time_after' in updates) {
+    if (updates.time_after === null) {
+      result.time_after = null;
+    } else {
+      const ta = String(updates.time_after).trim();
+      result.time_after = /^\d{2}:\d{2}$/.test(ta) ? ta : null;
+    }
+  }
+
+  // Vibe: passthrough
+  if ('vibe' in updates) {
+    result.vibe = updates.vibe || null;
+  }
+
+  return result;
+}
+
+/**
  * Build a filter-aware Tavily search query for a neighborhood.
  */
 function buildTavilyQuery(hood, filters) {
@@ -398,12 +448,14 @@ async function tryTavilyFallback(hood, filters, excludeIds, trace) {
   try {
     const query = buildTavilyQuery(hood, filters);
     const start = Date.now();
-    const results = await searchTavilyEvents(hood, { query, minCompleteness: 0.3 });
+    const tavilyResult = await searchTavilyEvents(hood, { query, minCompleteness: 0.3 });
+    const results = tavilyResult.events || tavilyResult;
     const latency = Date.now() - start;
     const excludeSet = new Set(excludeIds || []);
     const fresh = results.filter(e => !excludeSet.has(e.id));
+    const extractCost = (tavilyResult._usage && trace) ? recordAICost(trace, 'tavily_extract', tavilyResult._usage, tavilyResult._provider) : 0;
     if (trace) {
-      trace.tavily_fallback = { triggered: true, query, latency_ms: latency, raw_count: results.length, fresh_count: fresh.length };
+      trace.tavily_fallback = { triggered: true, query, latency_ms: latency, raw_count: results.length, fresh_count: fresh.length, cost_usd: extractCost };
     }
     if (fresh.length === 0) {
       console.log(`Tavily fallback: 0 fresh results for "${query}" (${results.length} raw, ${latency}ms)`);
@@ -450,9 +502,10 @@ async function executeQuery(message, events, options = {}) {
     excludeIds: options.excludeIds,
     suggestedNeighborhood: options.suggestedNeighborhood,
     userHoodAlias: options.userHoodAlias,
+    model: options.model,
   });
 
   return result;
 }
 
-module.exports = { applyFilters, resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, describeFilters, buildZeroMatchResponse, mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, failsTimeGate, buildTavilyQuery, tryTavilyFallback, executeQuery };
+module.exports = { applyFilters, resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, describeFilters, buildZeroMatchResponse, mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, normalizeFilterIntent, failsTimeGate, buildTavilyQuery, tryTavilyFallback, executeQuery };
