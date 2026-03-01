@@ -15,6 +15,7 @@ const { fetchNYPLEvents } = require('./nypl');
 const { searchTavilyEvents, fetchTavilyFreeEvents } = require('./tavily');
 const { fetchTicketmasterEvents } = require('./ticketmaster');
 const { fetchYutoriEvents } = require('./yutori');
+const { fetchScreenSlateEvents } = require('./screenslate');
 
 module.exports = {
   fetchSkintEvents,
@@ -40,4 +41,5 @@ module.exports = {
   fetchTavilyFreeEvents,
   fetchTicketmasterEvents,
   fetchYutoriEvents,
+  fetchScreenSlateEvents,
 };

@@ -1,4 +1,4 @@
-const { fetchSkintEvents, fetchSkintOngoingEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchDoNYCEvents, fetchBAMEvents, fetchSmallsLiveEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents, fetchTicketmasterEvents, fetchYutoriEvents } = require('./sources');
+const { fetchSkintEvents, fetchSkintOngoingEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchNonsenseNYC, fetchOhMyRockness, fetchDoNYCEvents, fetchBAMEvents, fetchSmallsLiveEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents, fetchTicketmasterEvents, fetchYutoriEvents, fetchScreenSlateEvents } = require('./sources');
 
 // Source tier classification for compose prompt
 const SOURCE_TIERS = {
@@ -7,6 +7,7 @@ const SOURCE_TIERS = {
   NonsenseNYC: 'unstructured',
   OhMyRockness: 'unstructured',
   Yutori: 'unstructured',
+  ScreenSlate: 'unstructured',
   RA: 'primary',
   Dice: 'primary',
   BrooklynVegan: 'primary',
@@ -37,6 +38,7 @@ const SOURCES = [
   { label: 'BAM',              fetch: fetchBAMEvents,           weight: 0.8,  mergeRank: 2, endpoint: 'https://www.bam.org/api/BAMApi/GetCalendarEventsByDayWithOnGoing' },
   { label: 'SmallsLIVE',       fetch: fetchSmallsLiveEvents,    weight: 0.8,  mergeRank: 3, endpoint: 'https://www.smallslive.com/events/today' },
   { label: 'Yutori',            fetch: fetchYutoriEvents,        weight: 0.8,  mergeRank: 4, endpoint: null },
+  { label: 'ScreenSlate',      fetch: fetchScreenSlateEvents,   weight: 0.9,  mergeRank: 2, endpoint: null },
   { label: 'NYCParks',         fetch: fetchNYCParksEvents,      weight: 0.75, mergeRank: 0, endpoint: 'https://www.nycgovparks.org/events' },
   { label: 'DoNYC',            fetch: fetchDoNYCEvents,         weight: 0.75, mergeRank: 1, endpoint: 'https://donyc.com/events/today' },
   { label: 'Songkick',         fetch: fetchSongkickEvents,      weight: 0.75, mergeRank: 2, endpoint: 'https://www.songkick.com/metro-areas/7644-us-new-york/today' },

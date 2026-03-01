@@ -308,6 +308,10 @@ const VENUE_MAP = {
   'Alamo Drafthouse': { lat: 40.6866, lng: -73.9818 },
   'Alamo Drafthouse Downtown Brooklyn': { lat: 40.6866, lng: -73.9818 },
   'Stuart Cinema & Cafe': { lat: 40.7292, lng: -73.9594 },
+  'Roxy Cinema': { lat: 40.7199, lng: -74.0086 },
+  'The Roxy Cinema': { lat: 40.7199, lng: -74.0086 },
+  'Paris Theater': { lat: 40.7642, lng: -73.9726 },
+  'The Paris Theater': { lat: 40.7642, lng: -73.9726 },
 
   // === Cultural Venues — Bookstores & Literary ===
   'Greenlight Bookstore': { lat: 40.6862, lng: -73.9746 },
