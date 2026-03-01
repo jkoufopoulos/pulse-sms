@@ -522,6 +522,8 @@
 
 <div class="summary-row" id="summary-row"></div>
 
+<div class="summary-row" id="cost-row" style="display:none"></div>
+
 <div class="event-mix-summary" id="event-mix-summary" style="display:none">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
     <h2 style="font-size:16px;font-weight:600;color:#aaa">Event Mix</h2>
@@ -854,6 +856,45 @@ async function scrapeAll() {
   }
 }
 
+function renderCosts(data) {
+  const row = $('cost-row');
+  if (!data) { row.style.display = 'none'; return; }
+  row.style.display = '';
+
+  const fmtUsd = (v) => v < 0.01 ? '$' + v.toFixed(4) : '$' + v.toFixed(3);
+  const providerParts = Object.entries(data.today.by_provider || {})
+    .map(([p, v]) => p + ': ' + fmtUsd(v));
+  const providerSub = providerParts.length > 0 ? providerParts.join(', ') : 'no calls yet';
+
+  const cards = [
+    { label: 'AI Spend (Today)', value: fmtUsd(data.today.total_usd), sub: data.today.message_count + ' messages' },
+    { label: 'Avg / Message', value: fmtUsd(data.recent.avg_per_message_usd), sub: 'last ' + data.recent.message_count + ' traces' },
+    { label: 'Active Users', value: data.budget.active_users, sub: fmtUsd(data.budget.total_spend_usd) + ' / ' + fmtUsd(data.budget.daily_limit_usd) + ' budget' },
+    { label: 'Provider Split', value: Object.keys(data.today.by_provider || {}).length || 0, sub: providerSub },
+  ];
+
+  row.innerHTML = cards.map(c => `
+    <div class="summary-card">
+      <div class="label">${c.label}</div>
+      <div class="value">${c.value}</div>
+      <div class="sub">${c.sub}</div>
+    </div>
+  `).join('');
+}
+
+async function refreshCosts() {
+  try {
+    const res = await fetch('/api/health/costs');
+    if (res.ok) {
+      renderCosts(await res.json());
+    } else {
+      renderCosts(null);
+    }
+  } catch {
+    renderCosts(null);
+  }
+}
+
 async function refresh() {
   try {
     const res = await fetch('/health?json=1');
@@ -933,9 +974,11 @@ async function refreshAlerts() {
 }
 
 refresh();
+refreshCosts();
 refreshAudit();
 refreshAlerts();
 setInterval(refresh, 60000);
+setInterval(refreshCosts, 60000);
 setInterval(refreshAudit, 60000);
 setInterval(refreshAlerts, 60000);
 </script>

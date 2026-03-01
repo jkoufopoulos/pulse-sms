@@ -71,6 +71,18 @@ function trackAICost(phone, usage, provider = 'anthropic') {
   }
 }
 
+function getCostSummary() {
+  const today = getNycDate();
+  let activeUsers = 0, totalSpend = 0;
+  for (const [, entry] of aiBudgets) {
+    if (entry.date === today) {
+      activeUsers++;
+      totalSpend += entry.cost_usd;
+    }
+  }
+  return { active_users: activeUsers, total_spend_usd: totalSpend, daily_limit_usd: DAILY_BUDGET_USD };
+}
+
 // Clean stale budget + IP rate limit entries every 10 minutes
 const rateLimitInterval = setInterval(() => {
   try {
@@ -773,3 +785,4 @@ module.exports.setSession = setSession;
 module.exports.clearSession = clearSession;
 module.exports._handleMessage = handleMessage; // exported for integration tests
 module.exports.OPT_OUT_KEYWORDS = OPT_OUT_KEYWORDS;
+module.exports.getCostSummary = getCostSummary;
