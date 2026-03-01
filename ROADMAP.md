@@ -128,17 +128,13 @@ Steps 1-3, 6-7 are done. Step 4 is a structural bet requiring A/B evaluation. St
 
 Gemini 2.5 Flash is the production model (50% pass rate, best of 3 models tested, ~10x cheaper than Haiku). Haiku baseline was 42%. A fresh post-fix comparison is needed — the 13 both-fail systemic scenarios have been addressed since the original comparison.
 
-### Pre-Router False Positives on Common Words (#8 from fragility audit)
+### ~~Pre-Router False Positives on Common Words (#8)~~ — **Fixed 2026-03-01**
 
-"sorry I'm late" sets `time_after:22:00`; "I'll rock up" sets `category:live_music`. Single-dimension compounds fire during active sessions. Fix: require anchor phrases or `filterDims >= 2`.
+Ambiguous words (rock, funk, soul, house, swing, rap, dance, music, art) now require a second signal on first message. "late" requires event context (night/tonight/shows). Multi-word patterns (live music, hip hop, stand up, open mic) split into separate regex map.
 
-### "live music" Pre-Router Gap
+### ~~Conversational-with-Pool~~ — **Fixed 2026-03-01**
 
-Standalone "live music" not detected as category filter by pre-router. 2 eval scenarios affected.
-
-### Conversational-with-Pool (3 scenarios)
-
-LLM returns `type: conversational` despite events in pool. Scenarios #2, #12, #21 from behavioral eval.
+Code guardrail overrides `type: conversational` → `event_picks` when pool has `matchCount > 0`, using top 3 matched events.
 
 ### Yutori Extraction — Remaining Gaps
 
@@ -182,7 +178,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 | 5 | `visitedHoods` resets on every new neighborhood | pipeline.js | **Fixed 2026-03-01** — default now accumulates from prevSession |
 | 6 | Hanging scraper blocks all future cache refreshes | events.js timedFetch | **Fixed 2026-03-01** — 60s Promise.race timeout in timedFetch |
 | 7 | Anthropic fallback max_tokens: 512 truncation | ai.js | **Fixed 2026-03-01** — both Anthropic paths now use max_tokens: 1024 |
-| 8 | Pre-router false-positives on common words | pre-router.js | Open — Structural fix needed |
+| 8 | Pre-router false-positives on common words | pre-router.js | **Fixed 2026-03-01** — ambiguous words require second signal; multi-word patterns split |
 
 ### Medium Priority
 
@@ -191,7 +187,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 | 9 | `isLastBatch`/`exhaustionSuggestion` skills dropped | pipeline.js, ai.js | **Fixed 2026-03-01** — forwarded through executeQuery and unifiedRespond to skillOptions |
 | 10 | `tonightPriority` conflicts with "tomorrow" queries | build-compose-prompt.js | **Fixed 2026-03-01** — future-query regex skips tonightPriority |
 | 11 | Unbounded `short_detail` in prompt | ai.js | **Fixed 2026-03-01** — capped to 120 chars, name capped to 80 via shared cap() helper |
-| 12 | Graceful shutdown kills in-flight handlers after 5s | server.js | Open — Medium fix needed |
+| 12 | Graceful shutdown kills in-flight handlers after 5s | server.js | **Fixed 2026-03-01** — inflightRequests counter + 30s drain wait |
 | 13 | Gemini finishReason logged but not acted on | ai.js | **Fixed 2026-03-01** — checkGeminiFinish() throws on SAFETY/MAX_TOKENS in all 3 Gemini functions |
 | 14 | `extractEvents` returns unvalidated JSON shape | ai.js | **Fixed 2026-03-01** — normalizes venues/array/object shapes to events array |
 | 15 | Non-atomic disk writes for cache/sessions | events.js, session.js, preference-profile.js, referral.js | **Fixed 2026-03-01** — atomicWriteSync (write .tmp + rename) on all 6 critical write sites |
@@ -203,7 +199,33 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 | 16 | Race condition on parallel messages from same phone | Rare at current traffic; Twilio serializes per-number |
 | 17 | Dead `core` skill with conflicting output schema | Zero impact today |
 | 18 | Event name dedup merges distinct same-venue events | Edge case for jazz venues with multiple sets |
-| 19 | Events in undefined neighborhoods invisible to geo queries | 3km hard filter + null-neighborhood; structural design choice |
+| 19 | Events in undefined neighborhoods invisible to geo queries | See "Neighborhood Resolution Gap" below — fix in progress |
+
+### Neighborhood Resolution Gap (#19)
+
+**Impact:** 171/1,533 events (11%) have no neighborhood. These are invisible for neighborhood-based queries (the primary use case) due to the 3km proximity filter in `rankEventsByProximity()`. Only surfaced in citywide flows.
+
+**Breakdown by source:**
+
+| Source | Missing | Total | Rate | Root Cause |
+|--------|---------|-------|------|------------|
+| NYC Parks | 53 | 119 | 45% | Generic venue names ("Multipurpose Room", "Athletic Courts"), intersection-style addresses Nominatim can't resolve |
+| RA | 53 | 180 | 29% | No geo data from API; depends entirely on static venue map |
+| DoNYC | 48 | 427 | 11% | Mix of non-NYC venues (~15) and NYC venues not in venue map |
+| Ticketmaster | 7 | 433 | 2% | Non-NYC events leaking through (NJ PAC, Stamford, Westbury) |
+| BrooklynVegan | 3 | 41 | 7% | Non-NYC venues (Port Chester, etc.) |
+| Yutori/Songkick/EB | 7 | 167 | 4% | Sparse |
+
+**~28 events are outside NYC entirely** (NJ, CT, Westchester) — these should be filtered, not geocoded.
+**~143 are NYC events** at venues the system can't resolve.
+
+**Fix plan (three parts):**
+
+| # | Fix | Expected Recovery | Status |
+|---|-----|-------------------|--------|
+| 19a | Add ~25 recurring NYC venues to static venue map | ~50-60 events (RA, DoNYC, NYC Parks) | In progress |
+| 19b | Filter non-NYC events at scrape time in Ticketmaster + DoNYC | Remove ~28 false positives | In progress |
+| 19c | Add NYC Parks location coords to venue map for generic park facilities | ~20-30 events | In progress |
 
 ---
 
@@ -239,12 +261,23 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 - **Pool padding was the structural enabler of filter drift (Gap 3 — fixed):** Eliminating unmatched padding when filters are active means the LLM only sees matched events. Expected to resolve remaining filter_drift failures.
 - **Outer-borough scenarios are cache-dependent, not code-dependent:** Thin neighborhoods (Washington Heights, Red Hook, Sunset Park) fail when the daily cache has few events there. Not code bugs — coverage gaps.
 
-### Eval Fidelity Gaps (remaining)
+### Eval Coverage Audit (2026-03-01)
+
+241 golden scenarios (169 multi-turn + 72 regression, 365 assertions). Suite is strong on filter persistence (P1), session context (P7), graceful degradation (P6). Eight gaps identified:
 
 | # | Gap | Priority | Status |
 |---|-----|----------|--------|
-| 7 | Trace fetch race condition — could grab wrong trace under concurrent load | P2 | Planned |
-| 8 | No dedicated handleMore path eval | P2 | Planned |
+| 1 | **Temporal accuracy (P5)** — 7 assertions total. Zero explicit clock-time tests ("after 10pm"), zero after-midnight wrapping, zero time+category compounds. Dangerous given new compound pre-router. | **High** | **Done** — 6 multi-turn + 6 regression scenarios added |
+| 2 | **First-message compounds** — No end-to-end test of "comedy in bushwick" or "free jazz tonight" as openers. Unit tests verify pre-router struct but not full pipeline through filter_intent gating. | **High** | **Done** — 4 multi-turn + 4 regression scenarios added |
+| 3 | **filter_intent gating observability** — The P1 gate (ignore LLM filter_intent when pre-router set filters) has no code eval to verify it fires. | **High** | **Done** — `filter_intent_gating` code eval added |
+| 4 | **Abuse/off-topic** — 5 scenarios (3%). Missing: hostility, identity questions, other-city requests, persistent off-topic. Target: 8-10%. | Medium | Planned |
+| 5 | **handleMore path** — No dedicated MORE eval. Dedup across 3+ cycles, filter persistence through MOREs, compose-only prompt path untested. | Medium | Planned |
+| 6 | **Tavily scenarios vestigial** — Scenarios 45-47 test Tavily fallback but Tavily removed from hot path. Either trivially pass or consistently fail. | Medium | Planned — remove or update to test deterministic fallback |
+| 7 | **TCPA/opt-out** — Zero scenarios for STOP/UNSUBSCRIBE compliance. Deterministic but legally required. | Low | Planned |
+| 8 | **Neighborhood skew** — EV 13x, Bushwick 7x, Wburg 5x. Many outer-borough neighborhoods absent. Failures are cache-dependent, not code-dependent. | Low | Planned |
+| 9 | Trace fetch race condition — could grab wrong trace under concurrent load | Low | Planned |
+
+**Distribution assessment:** happy_path 38% (ideal 30-35%), edge_case 26% (right), filter_drift 16% (right), poor_experience 16% (right), abuse_off_topic 3% (under-indexed, target 8-10%).
 
 ---
 
@@ -354,6 +387,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 | Mar 1 | Skint Ongoing events scraper | 31 series events (exhibitions, festivals) via deterministic parser; weight 0.9 |
 | Mar 1 | Friday/Saturday newsletter event loss fix | Yesterday included in scrape filter + 6pm evening scrape added |
 | Mar 1 | Systemic failure fixes (8 changes) | handler.js events bug, borough detection, sign-off handling, early/tonight conflict, zero-match prompt hardening |
+| Mar 1 | Fix 4 open bugs | Multi-word categories, false positives (#8), graceful shutdown (#12), conversational-with-pool guardrail |
 | Mar 1 | Luma event scraper | JSON API, ~330 events/week; fills community/food/art/social gap; NYC bounding box filter |
 | Mar 1 | Fragility audit bulk fix (9 issues) | Issues #5-7, #9-11, #13-15 fixed in one commit; visitedHoods, scraper timeout, max_tokens, atomicWriteSync |
 | Mar 1 | Dice multi-category scraping | 6 category pages in parallel; 26 → 115 raw events |
