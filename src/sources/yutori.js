@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { extractEvents } = require('../ai');
 const { fetchYutoriEmails } = require('../gmail');
-const { normalizeExtractedEvent } = require('./shared');
+const { normalizeExtractedEvent, backfillEvidence } = require('./shared');
 const { captureExtractionInput } = require('../extraction-capture');
 
 const YUTORI_DIR = path.join(__dirname, '../../data/yutori');
@@ -931,7 +931,9 @@ function parseNonTriviaEvents(text, filename) {
 function loadCachedEvents() {
   try {
     if (fs.existsSync(CACHE_FILE)) {
-      return JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+      if (data?.events) backfillEvidence(data.events);
+      return data;
     }
   } catch (err) {
     console.warn('Yutori: failed to load cached-events.json:', err.message);

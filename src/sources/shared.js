@@ -182,4 +182,22 @@ function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
   };
 }
 
-module.exports = { FETCH_HEADERS, makeEventId, normalizeExtractedEvent, normalizeEventName, computeCompleteness };
+/**
+ * Backfill evidence blocks on cached events that predate evidence synthesis.
+ * Mutates in place and returns the array.
+ */
+function backfillEvidence(events) {
+  for (const e of events) {
+    if (!e.evidence) {
+      e.evidence = {
+        name_quote: e.name ? e.name.toLowerCase() : null,
+        time_quote: e.start_time_local || null,
+        location_quote: e.venue_name && e.venue_name !== 'TBA' ? e.venue_name.toLowerCase() : null,
+        price_quote: e.price_display ? e.price_display.toLowerCase() : (e.is_free === true ? 'free' : null),
+      };
+    }
+  }
+  return events;
+}
+
+module.exports = { FETCH_HEADERS, makeEventId, normalizeExtractedEvent, normalizeEventName, computeCompleteness, backfillEvidence };

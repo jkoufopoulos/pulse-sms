@@ -6,7 +6,7 @@ const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues } = require
 const { sendHealthAlert } = require('./alerts');
 const { filterIncomplete, filterKidsEvents } = require('./curation');
 const { eventMatchesFilters, failsTimeGate } = require('./pipeline');
-const { computeCompleteness } = require('./sources/shared');
+const { computeCompleteness, backfillEvidence } = require('./sources/shared');
 const { runExtractionAudit } = require('./evals/extraction-audit');
 const { checkSourceCompleteness } = require('./evals/source-completeness');
 const { captureExtractionInput, getExtractionInputs, clearExtractionInputs } = require('./extraction-capture');
@@ -74,6 +74,7 @@ if (eventCache.length === 0) {
   try {
     const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
     if (cached.events?.length > 0) {
+      backfillEvidence(cached.events);
       eventCache = cached.events;
       cacheTimestamp = cached.timestamp || 0;
       const ageMin = cacheTimestamp ? Math.round((Date.now() - cacheTimestamp) / 60000) : '?';

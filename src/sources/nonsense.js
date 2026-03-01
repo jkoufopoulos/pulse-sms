@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { extractEvents } = require('../ai');
 const { fetchEmails } = require('../gmail');
-const { normalizeExtractedEvent } = require('./shared');
+const { normalizeExtractedEvent, backfillEvidence } = require('./shared');
 const { captureExtractionInput } = require('../extraction-capture');
 const { stripHtml } = require('./yutori');
 
@@ -16,7 +16,9 @@ const CACHE_FILE = path.join(NONSENSE_DIR, 'cached-events.json');
 function loadCachedEvents() {
   try {
     if (fs.existsSync(CACHE_FILE)) {
-      return JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+      if (data?.events) backfillEvidence(data.events);
+      return data;
     }
   } catch (err) {
     console.warn('NonsenseNYC: failed to load cached-events.json:', err.message);
