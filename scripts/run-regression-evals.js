@@ -12,6 +12,7 @@
  *   node scripts/run-regression-evals.js --principle P1       # By principle
  *   node scripts/run-regression-evals.js --url http://...     # Custom server
  *   node scripts/run-regression-evals.js --concurrency 10     # Parallel scenarios (default: 5)
+ *   node scripts/run-regression-evals.js --judge               # Enable LLM judge (off by default)
  */
 
 require('dotenv').config();
@@ -34,6 +35,7 @@ const CONCURRENCY = parseInt(
   || (args.includes('--concurrency') ? args[args.indexOf('--concurrency') + 1] : null)
   || '5', 10);
 const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-haiku-4-5-20251001';
+const NO_JUDGE = !args.includes('--judge');
 
 const client = new Anthropic();
 
@@ -220,10 +222,14 @@ async function main() {
     const phoneNumber = `+1666${String(index).padStart(7, '0')}`;
     try {
       const conversation = await runScenario(scenario, phoneNumber);
-      const judgment = await judgeScenario(scenario, conversation);
-
-      if (!judgment || !judgment.assertions) {
-        throw new Error('Judge returned unparseable response');
+      let judgment;
+      if (NO_JUDGE) {
+        judgment = { assertions: scenario.assertions.map(a => ({ id: a.id, pass: null, evidence: null, reasoning: 'Judge skipped (pass --judge to enable)' })) };
+      } else {
+        judgment = await judgeScenario(scenario, conversation);
+        if (!judgment || !judgment.assertions) {
+          throw new Error('Judge returned unparseable response');
+        }
       }
 
       // Run code evals on every bestie turn that has a trace
@@ -264,7 +270,7 @@ async function main() {
 
       for (const assertion of scenario.assertions) {
         const result = judgedById[assertion.id];
-        const pass = result?.pass ?? false;
+        const pass = result?.pass === null ? null : (result?.pass ?? false);
         assertionResults.push({
           id: assertion.id,
           principle: assertion.principle,
@@ -273,12 +279,13 @@ async function main() {
           evidence: result?.evidence || null,
           reasoning: result?.reasoning || null,
         });
-        if (pass) scenarioPassed++;
+        if (pass === true) scenarioPassed++;
       }
 
+      const allSkipped = assertionResults.every(a => a.pass === null);
       return {
         name: scenario.name,
-        pass: scenarioPassed === scenarioTotal,
+        pass: allSkipped ? null : scenarioPassed === scenarioTotal,
         assertions_passed: scenarioPassed,
         assertions_total: scenarioTotal,
         assertions: assertionResults,
@@ -312,6 +319,8 @@ async function main() {
 
         if (r.error) {
           console.log(`[${idx}/${scenarios.length}] ${r.name}... \x1b[33mERROR\x1b[0m  ${r.error}`);
+        } else if (r.pass === null) {
+          console.log(`[${idx}/${scenarios.length}] ${r.name}... \x1b[36mRAN\x1b[0m (judge skipped)${codeTag}`);
         } else if (r.pass) {
           console.log(`[${idx}/${scenarios.length}] ${r.name}... \x1b[32mPASS\x1b[0m (${r.assertions_passed}/${r.assertions_total} assertions)${codeTag}`);
         } else {
@@ -339,14 +348,17 @@ async function main() {
   for (const r of results) {
     if (r.error) {
       report.scenarios_errored++;
+    } else if (r.pass === null) {
+      // Judge skipped — count as ran but not scored
     } else if (r.pass) {
       report.scenarios_passed++;
     } else {
       report.scenarios_failed++;
     }
 
-    // Aggregate assertions
+    // Aggregate assertions (skip null/skipped)
     for (const ar of (r.assertions || [])) {
+      if (ar.pass === null) continue;
       report.total_assertions++;
       if (ar.pass) report.assertions_passed++;
       const pid = ar.principle;
