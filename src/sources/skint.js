@@ -230,6 +230,18 @@ function parseSkintParagraph(text, dateLocal) {
   if (startTime) confidence += 0.1;
   if (neighborhood) confidence += 0.1;
 
+  // Compute end date — if end hour < start hour, it crosses midnight
+  let endDate = dateLocal;
+  if (startTime && endTime && dateLocal) {
+    const startH = parseInt(startTime.split(':')[0], 10);
+    const endH = parseInt(endTime.split(':')[0], 10);
+    if (endH < startH) {
+      const d = new Date(dateLocal + 'T12:00:00');
+      d.setDate(d.getDate() + 1);
+      endDate = d.toISOString().slice(0, 10);
+    }
+  }
+
   return {
     name: eventName,
     description_short: description || null,
@@ -237,8 +249,8 @@ function parseSkintParagraph(text, dateLocal) {
     venue_address: null,
     neighborhood: neighborhood || null,
     date_local: dateLocal,
-    start_time_local: startTime,
-    end_time_local: endTime,
+    start_time_local: startTime && dateLocal ? `${dateLocal}T${startTime}:00` : startTime,
+    end_time_local: endTime && endDate ? `${endDate}T${endTime}:00` : endTime,
     is_free: isFree,
     price_display: priceDisplay,
     category,

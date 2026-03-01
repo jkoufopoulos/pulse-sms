@@ -53,7 +53,68 @@ function computeCompleteness(e) {
   return score;
 }
 
+/**
+ * Parse bare am/pm time like "9pm", "10:30am" into "HH:MM".
+ * Returns null if not matched.
+ */
+function parseAmPmTime(str) {
+  const m = str.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
+  if (!m) return null;
+  let h = parseInt(m[1], 10);
+  const min = m[2] ? parseInt(m[2], 10) : 0;
+  const period = m[3].toLowerCase();
+  if (period === 'pm' && h !== 12) h += 12;
+  if (period === 'am' && h === 12) h = 0;
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+}
+
+/**
+ * Normalize date/time fields from LLM extraction output.
+ * Coerces freeform strings into YYYY-MM-DD (date_local) and ISO datetime (start/end_time_local).
+ * Mutates the event object in place.
+ */
+function normalizeDateTimeFields(e) {
+  // --- date_local: must be YYYY-MM-DD ---
+  if (e.date_local && !/^\d{4}-\d{2}-\d{2}$/.test(e.date_local)) {
+    const parsed = new Date(e.date_local);
+    if (!isNaN(parsed.getTime())) {
+      e.date_local = parsed.toLocaleDateString('en-CA'); // YYYY-MM-DD
+    } else {
+      e.date_local = null;
+    }
+  }
+
+  // --- start_time_local / end_time_local: must be ISO datetime ---
+  for (const field of ['start_time_local', 'end_time_local']) {
+    const val = e[field];
+    if (!val) continue;
+
+    // Already ISO datetime
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(val)) continue;
+
+    // Bare HH:MM or HH:MM:SS — combine with date_local
+    if (/^\d{2}:\d{2}(:\d{2})?$/.test(val)) {
+      if (e.date_local) {
+        const timePart = val.length === 5 ? `${val}:00` : val;
+        e[field] = `${e.date_local}T${timePart}`;
+      }
+      continue;
+    }
+
+    // Bare am/pm time like "9pm", "10:30am"
+    const hhmm = parseAmPmTime(val.trim());
+    if (hhmm && e.date_local) {
+      e[field] = `${e.date_local}T${hhmm}:00`;
+      continue;
+    }
+
+    // Unparseable
+    e[field] = null;
+  }
+}
+
 function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
+  normalizeDateTimeFields(e);
   const id = makeEventId(e.name, e.venue_name, e.date_local || e.start_time_local || '', sourceName, e.source_url);
 
   // Try venue lookup for coords when Claude didn't extract lat/lng

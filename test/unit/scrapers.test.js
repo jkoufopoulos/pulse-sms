@@ -128,7 +128,7 @@ const std = parseSkintParagraph(
 check('std: parses name', std && std.name === 'tale storytelling show');
 check('std: parses venue', std && std.venue_name === 'the red room at kgb bar');
 check('std: parses neighborhood', std && std.neighborhood === 'East Village');
-check('std: parses time', std && std.start_time_local === '19:00');
+check('std: parses time', std && std.start_time_local === '2026-02-27T19:00:00');
 check('std: parses date', std && std.date_local === '2026-02-27');
 check('std: has price', std && std.price_display && std.price_display.includes('$8'));
 check('std: not free', std && std.is_free === false);
@@ -145,15 +145,15 @@ check('free: parses venue', free1 && free1.venue_name === "pete's candy store");
 check('free: parses neighborhood', free1 && free1.neighborhood === 'Williamsburg');
 check('free: is free', free1 && free1.is_free === true);
 check('free: has price display', free1 && free1.price_display && /free admission/i.test(free1.price_display));
-check('free: modifier stripped', free1 && free1.start_time_local === '19:00');
+check('free: modifier stripped', free1 && free1.start_time_local === '2026-03-03T19:00:00');
 
 // Time range
 const range = parseSkintParagraph(
   'sat 12-6pm: brooklyn flea winter market: vintage goods and local artisans. atlantic center (fort greene), free. >>',
   '2026-03-01'
 );
-check('range: start time', range && range.start_time_local === '12:00');
-check('range: end time', range && range.end_time_local === '18:00');
+check('range: start time', range && range.start_time_local === '2026-03-01T12:00:00');
+check('range: end time', range && range.end_time_local === '2026-03-01T18:00:00');
 check('range: is free', range && range.is_free === true);
 check('range: category market', range && range.category === 'market');
 
@@ -182,7 +182,7 @@ const daily = parseSkintParagraph(
   'daily 10am: free museum admission: explore the galleries at no cost. brooklyn museum (prospect heights), free. >>',
   '2026-02-28'
 );
-check('daily: parses time', daily && daily.start_time_local === '10:00');
+check('daily: parses time', daily && daily.start_time_local === '2026-02-28T10:00:00');
 check('daily: is free', daily && daily.is_free === true);
 check('daily: has neighborhood', daily && daily.neighborhood === 'Prospect Heights');
 
@@ -207,7 +207,7 @@ const tonight = parseSkintParagraph(
   'tonight 9pm: late night jazz: smooth sounds all night. blue note (greenwich village), $25. >>',
   '2026-02-27'
 );
-check('tonight: parses time', tonight && tonight.start_time_local === '21:00');
+check('tonight: parses time', tonight && tonight.start_time_local === '2026-02-27T21:00:00');
 check('tonight: parses name', tonight && tonight.name === 'late night jazz');
 
 
