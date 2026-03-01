@@ -200,4 +200,15 @@ function backfillEvidence(events) {
   return events;
 }
 
-module.exports = { FETCH_HEADERS, makeEventId, normalizeExtractedEvent, normalizeEventName, computeCompleteness, backfillEvidence };
+/**
+ * Backfill ISO date/time formats on cached events that predate normalization.
+ * Mutates in place and returns the array.
+ */
+function backfillDateTimes(events) {
+  for (const e of events) {
+    normalizeDateTimeFields(e);
+  }
+  return events;
+}
+
+module.exports = { FETCH_HEADERS, makeEventId, normalizeExtractedEvent, normalizeEventName, computeCompleteness, backfillEvidence, backfillDateTimes };

@@ -6,7 +6,7 @@ const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues } = require
 const { sendHealthAlert } = require('./alerts');
 const { filterIncomplete, filterKidsEvents } = require('./curation');
 const { eventMatchesFilters, failsTimeGate } = require('./pipeline');
-const { computeCompleteness, backfillEvidence } = require('./sources/shared');
+const { computeCompleteness, backfillEvidence, backfillDateTimes } = require('./sources/shared');
 const { runExtractionAudit } = require('./evals/extraction-audit');
 const { checkSourceCompleteness } = require('./evals/source-completeness');
 const { captureExtractionInput, getExtractionInputs, clearExtractionInputs } = require('./extraction-capture');
@@ -61,6 +61,7 @@ try {
     const fresh = occurrences.filter(o => !seenIds.has(o.id));
     eventCache = filterKidsEvents([...dbEvents, ...fresh]);
     backfillEvidence(eventCache);
+    backfillDateTimes(eventCache);
     cacheTimestamp = Date.now();
     console.log(`Loaded ${eventCache.length} events from SQLite (${dbEvents.length} scraped + ${fresh.length} recurring)`);
   }
@@ -76,6 +77,7 @@ if (eventCache.length === 0) {
     const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
     if (cached.events?.length > 0) {
       backfillEvidence(cached.events);
+      backfillDateTimes(cached.events);
       eventCache = cached.events;
       cacheTimestamp = cached.timestamp || 0;
       const ageMin = cacheTimestamp ? Math.round((Date.now() - cacheTimestamp) / 60000) : '?';
@@ -382,6 +384,7 @@ async function refreshCache() {
       const seenIds = new Set(dbEvents.map(e => e.id));
       const freshOccurrences = occurrences.filter(o => !seenIds.has(o.id));
       eventCache = filterKidsEvents([...dbEvents, ...freshOccurrences]);
+      backfillDateTimes(eventCache);
       cacheTimestamp = Date.now();
       console.log(`SQLite: ${validEvents.length} events stored, serving ${eventCache.length} (${dbEvents.length} scraped + ${freshOccurrences.length} recurring)`);
     } catch (err) {
