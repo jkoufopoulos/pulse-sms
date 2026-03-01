@@ -3258,12 +3258,27 @@
     {
       "name": "P10: pre-router full clear — 'forget it' clears all filters",
       "category": "edge_case",
-      "tests_principles": ["P10", "P7"],
+      "tests_principles": [
+        "P10",
+        "P7"
+      ],
       "user_turns": [
-        { "turn": 1, "message": "east village" },
-        { "turn": 2, "message": "how about comedy" },
-        { "turn": 3, "message": "forget it" },
-        { "turn": 4, "message": "more" }
+        {
+          "turn": 1,
+          "message": "east village"
+        },
+        {
+          "turn": 2,
+          "message": "how about comedy"
+        },
+        {
+          "turn": 3,
+          "message": "forget it"
+        },
+        {
+          "turn": 4,
+          "message": "more"
+        }
       ],
       "assertions": [
         {
@@ -3292,12 +3307,27 @@
     {
       "name": "P10: pre-router full clear — 'nvm' clears all filters",
       "category": "edge_case",
-      "tests_principles": ["P10", "P7"],
+      "tests_principles": [
+        "P10",
+        "P7"
+      ],
       "user_turns": [
-        { "turn": 1, "message": "williamsburg" },
-        { "turn": 2, "message": "free" },
-        { "turn": 3, "message": "nvm" },
-        { "turn": 4, "message": "1" }
+        {
+          "turn": 1,
+          "message": "williamsburg"
+        },
+        {
+          "turn": 2,
+          "message": "free"
+        },
+        {
+          "turn": 3,
+          "message": "nvm"
+        },
+        {
+          "turn": 4,
+          "message": "1"
+        }
       ],
       "assertions": [
         {
@@ -3326,12 +3356,27 @@
     {
       "name": "P10: LLM semantic clear — 'just show me what's good'",
       "category": "edge_case",
-      "tests_principles": ["P10", "P7"],
+      "tests_principles": [
+        "P10",
+        "P7"
+      ],
       "user_turns": [
-        { "turn": 1, "message": "bushwick" },
-        { "turn": 2, "message": "any jazz" },
-        { "turn": 3, "message": "just show me whats good" },
-        { "turn": 4, "message": "more" }
+        {
+          "turn": 1,
+          "message": "bushwick"
+        },
+        {
+          "turn": 2,
+          "message": "any jazz"
+        },
+        {
+          "turn": 3,
+          "message": "just show me whats good"
+        },
+        {
+          "turn": 4,
+          "message": "more"
+        }
       ],
       "assertions": [
         {
@@ -3360,12 +3405,27 @@
     {
       "name": "P10: pre-router clear then re-apply new filter",
       "category": "edge_case",
-      "tests_principles": ["P10", "P1"],
+      "tests_principles": [
+        "P10",
+        "P1"
+      ],
       "user_turns": [
-        { "turn": 1, "message": "lower east side" },
-        { "turn": 2, "message": "how about comedy" },
-        { "turn": 3, "message": "show me everything" },
-        { "turn": 4, "message": "how about jazz" }
+        {
+          "turn": 1,
+          "message": "lower east side"
+        },
+        {
+          "turn": 2,
+          "message": "how about comedy"
+        },
+        {
+          "turn": 3,
+          "message": "show me everything"
+        },
+        {
+          "turn": 4,
+          "message": "how about jazz"
+        }
       ],
       "assertions": [
         {
@@ -3394,12 +3454,27 @@
     {
       "name": "P10: LLM semantic clear — 'I'm open to anything'",
       "category": "edge_case",
-      "tests_principles": ["P10", "P7"],
+      "tests_principles": [
+        "P10",
+        "P7"
+      ],
       "user_turns": [
-        { "turn": 1, "message": "greenpoint" },
-        { "turn": 2, "message": "free comedy" },
-        { "turn": 3, "message": "im open to anything" },
-        { "turn": 4, "message": "2" }
+        {
+          "turn": 1,
+          "message": "greenpoint"
+        },
+        {
+          "turn": 2,
+          "message": "free comedy"
+        },
+        {
+          "turn": 3,
+          "message": "im open to anything"
+        },
+        {
+          "turn": 4,
+          "message": "2"
+        }
       ],
       "assertions": [
         {
@@ -3428,12 +3503,28 @@
     {
       "name": "P10: pre-router 'drop it' with compound filters",
       "category": "edge_case",
-      "tests_principles": ["P10", "P1", "P7"],
+      "tests_principles": [
+        "P10",
+        "P1",
+        "P7"
+      ],
       "user_turns": [
-        { "turn": 1, "message": "east village" },
-        { "turn": 2, "message": "free jazz" },
-        { "turn": 3, "message": "drop it" },
-        { "turn": 4, "message": "1" }
+        {
+          "turn": 1,
+          "message": "east village"
+        },
+        {
+          "turn": 2,
+          "message": "free jazz"
+        },
+        {
+          "turn": 3,
+          "message": "drop it"
+        },
+        {
+          "turn": 4,
+          "message": "1"
+        }
       ],
       "assertions": [
         {
@@ -3462,15 +3553,40 @@
     {
       "name": "Extended: exhaustion triggers Tavily fallback via MORE",
       "category": "edge_case",
-      "tests_principles": ["P6", "P7", "P8"],
+      "tests_principles": [
+        "P6",
+        "P7",
+        "P8"
+      ],
       "user_turns": [
-        { "turn": 1, "message": "greenpoint" },
-        { "turn": 2, "message": "more" },
-        { "turn": 3, "message": "more" },
-        { "turn": 4, "message": "more" },
-        { "turn": 5, "message": "more" },
-        { "turn": 6, "message": "more" },
-        { "turn": 7, "message": "1" }
+        {
+          "turn": 1,
+          "message": "greenpoint"
+        },
+        {
+          "turn": 2,
+          "message": "more"
+        },
+        {
+          "turn": 3,
+          "message": "more"
+        },
+        {
+          "turn": 4,
+          "message": "more"
+        },
+        {
+          "turn": 5,
+          "message": "more"
+        },
+        {
+          "turn": 6,
+          "message": "more"
+        },
+        {
+          "turn": 7,
+          "message": "1"
+        }
       ],
       "assertions": [
         {
@@ -3513,13 +3629,33 @@
     {
       "name": "Extended: re-visiting exhausted neighborhood triggers Tavily fallback",
       "category": "edge_case",
-      "tests_principles": ["P6", "P7", "P8", "P1"],
+      "tests_principles": [
+        "P6",
+        "P7",
+        "P8",
+        "P1"
+      ],
       "user_turns": [
-        { "turn": 1, "message": "greenpoint" },
-        { "turn": 2, "message": "more" },
-        { "turn": 3, "message": "more" },
-        { "turn": 4, "message": "lets try williamsburg" },
-        { "turn": 5, "message": "back to greenpoint" }
+        {
+          "turn": 1,
+          "message": "greenpoint"
+        },
+        {
+          "turn": 2,
+          "message": "more"
+        },
+        {
+          "turn": 3,
+          "message": "more"
+        },
+        {
+          "turn": 4,
+          "message": "lets try williamsburg"
+        },
+        {
+          "turn": 5,
+          "message": "back to greenpoint"
+        }
       ],
       "assertions": [
         {
@@ -3548,14 +3684,37 @@
     {
       "name": "Extended: filtered exhaustion triggers Tavily with filter-aware query",
       "category": "edge_case",
-      "tests_principles": ["P6", "P1", "P3", "P8"],
+      "tests_principles": [
+        "P6",
+        "P1",
+        "P3",
+        "P8"
+      ],
       "user_turns": [
-        { "turn": 1, "message": "east village" },
-        { "turn": 2, "message": "jazz" },
-        { "turn": 3, "message": "more" },
-        { "turn": 4, "message": "more" },
-        { "turn": 5, "message": "more" },
-        { "turn": 6, "message": "more" }
+        {
+          "turn": 1,
+          "message": "east village"
+        },
+        {
+          "turn": 2,
+          "message": "jazz"
+        },
+        {
+          "turn": 3,
+          "message": "more"
+        },
+        {
+          "turn": 4,
+          "message": "more"
+        },
+        {
+          "turn": 5,
+          "message": "more"
+        },
+        {
+          "turn": 6,
+          "message": "more"
+        }
       ],
       "assertions": [
         {
@@ -3592,6 +3751,800 @@
           "principle": "P8",
           "check": "If web-sourced results are served, provenance is signaled appropriately",
           "anti_pattern": "Web results presented as curated editorial picks"
+        }
+      ]
+    },
+    {
+      "name": "Extended: greeting opener to filtered session",
+      "category": "happy_path",
+      "tests_principles": [
+        "P6",
+        "P7"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "hi"
+        },
+        {
+          "turn": 2,
+          "message": "east village"
+        },
+        {
+          "turn": 3,
+          "message": "free"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "LL1",
+          "principle": "P7",
+          "check": "Greeting gets a warm response asking what neighborhood the user wants to explore — session starts cleanly",
+          "anti_pattern": "Returns events from a random neighborhood, or responds with a robotic 'please specify a neighborhood'"
+        },
+        {
+          "after_turn": 2,
+          "id": "LL2",
+          "principle": "P7",
+          "check": "East Village picks served, session established with EV as the active neighborhood",
+          "anti_pattern": "Asks for neighborhood again, or returns picks from a different neighborhood"
+        },
+        {
+          "after_turn": 3,
+          "id": "LL3",
+          "principle": "P1",
+          "check": "Free filter applied on top of East Village — all picks are free events in EV",
+          "anti_pattern": "Free filter replaces the neighborhood, or returns paid events"
+        },
+        {
+          "after_turn": 3,
+          "id": "LL4",
+          "principle": "P7",
+          "check": "Still in East Village — neighborhood persists through the free filter application",
+          "anti_pattern": "Neighborhood resets or changes after applying free filter"
+        }
+      ]
+    },
+    {
+      "name": "Extended: category-only opener preserves filter",
+      "category": "happy_path",
+      "tests_principles": [
+        "P3",
+        "P7"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "jazz"
+        },
+        {
+          "turn": 2,
+          "message": "west village"
+        },
+        {
+          "turn": 3,
+          "message": "more"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "MM1",
+          "principle": "P3",
+          "check": "Pulse serves citywide jazz picks — the category-only opener gets event_picks (not ask_neighborhood) because citywide events are available. Picks should be jazz-focused with neighborhoods labeled.",
+          "anti_pattern": "Asks for a neighborhood instead of serving citywide picks, or returns random non-jazz events"
+        },
+        {
+          "after_turn": 2,
+          "id": "MM2",
+          "principle": "P3",
+          "check": "West Village picks are served. Jazz context from the opener may carry via conversation history — this is LLM-dependent, not deterministic filter persistence.",
+          "anti_pattern": "Error, no events, or still showing citywide picks instead of WV"
+        },
+        {
+          "after_turn": 2,
+          "id": "MM3",
+          "principle": "P7",
+          "check": "Session transitions to West Village as active neighborhood — citywide context is replaced",
+          "anti_pattern": "Still showing events from other neighborhoods labeled as West Village"
+        },
+        {
+          "after_turn": 3,
+          "id": "MM4",
+          "principle": "P7",
+          "check": "'More' returns fresh West Village picks. No repeats from turn 2 list.",
+          "anti_pattern": "MORE fails, returns error, or repeats the same picks from turn 2"
+        }
+      ]
+    },
+    {
+      "name": "Extended: surprise me citywide to neighborhood",
+      "category": "happy_path",
+      "tests_principles": [
+        "P7",
+        "P12"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "surprise me"
+        },
+        {
+          "turn": 2,
+          "message": "1"
+        },
+        {
+          "turn": 3,
+          "message": "bushwick"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "NN1",
+          "principle": "P12",
+          "check": "Pulse interprets 'surprise me' as a citywide request and returns curated picks with variety across categories and neighborhoods",
+          "anti_pattern": "Asks 'what do you mean?' or returns an error, or asks for a neighborhood without offering any picks"
+        },
+        {
+          "after_turn": 2,
+          "id": "NN2",
+          "principle": "P7",
+          "check": "Details returned for pick #1 from the citywide 'surprise me' list — session correctly tracks the pick list",
+          "anti_pattern": "Returns details for a different event, or says 'I don't have a pick list'"
+        },
+        {
+          "after_turn": 3,
+          "id": "NN3",
+          "principle": "P7",
+          "check": "Session transitions cleanly to Bushwick — picks are Bushwick events, previous citywide context is replaced",
+          "anti_pattern": "Still showing citywide picks, or asks for clarification about switching from citywide to Bushwick"
+        }
+      ]
+    },
+    {
+      "name": "Extended: this weekend multi-day opener",
+      "category": "happy_path",
+      "tests_principles": [
+        "P5",
+        "P7"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "this weekend"
+        },
+        {
+          "turn": 2,
+          "message": "east village"
+        },
+        {
+          "turn": 3,
+          "message": "tomorrow night"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "OO1",
+          "principle": "P5",
+          "check": "Pulse serves citywide weekend picks — the time-only opener gets event_picks because citywide events are available. Response should reference the weekend timeframe with days labeled.",
+          "anti_pattern": "Asks for a neighborhood instead of serving citywide weekend picks, or only shows tonight's events"
+        },
+        {
+          "after_turn": 2,
+          "id": "OO2",
+          "principle": "P7",
+          "check": "East Village picks served — session transitions from citywide to EV. Weekend context may or may not persist (LLM-dependent).",
+          "anti_pattern": "Error, no events, or still showing citywide picks"
+        },
+        {
+          "after_turn": 3,
+          "id": "OO3",
+          "principle": "P5",
+          "check": "Picks respond to the 'tomorrow night' time filter — events should be for tomorrow, not today or the full weekend",
+          "anti_pattern": "Ignores the time refinement and still shows today's events or the full weekend"
+        }
+      ]
+    },
+    {
+      "name": "Extended: vibe opener compounds with filter",
+      "category": "edge_case",
+      "tests_principles": [
+        "P1",
+        "P7",
+        "P12"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "something chill"
+        },
+        {
+          "turn": 2,
+          "message": "prospect heights"
+        },
+        {
+          "turn": 3,
+          "message": "free only"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "PP1",
+          "principle": "P12",
+          "check": "Pulse interprets 'something chill' as a vibe and serves citywide chill-oriented picks — jazz, acoustic, art openings, wine bars, lounge events. Neighborhoods labeled.",
+          "anti_pattern": "Asks for a neighborhood instead of serving citywide chill picks, or returns high-energy events (techno, punk, warehouse)"
+        },
+        {
+          "after_turn": 2,
+          "id": "PP2",
+          "principle": "P12",
+          "check": "Prospect Heights picks are served. Chill vibe from opener may carry via conversation history — picks should lean mellow/relaxed if context is retained.",
+          "anti_pattern": "Error, no events, or still showing citywide picks instead of Prospect Heights"
+        },
+        {
+          "after_turn": 3,
+          "id": "PP3",
+          "principle": "P1",
+          "check": "'Free only' sets a free filter. Picks should be free events in Prospect Heights. If chill vibe also persists, picks are free AND chill.",
+          "anti_pattern": "Returns paid events after explicit 'free only' request"
+        }
+      ]
+    },
+    {
+      "name": "Extended: free stuff tonight persists through hood",
+      "category": "happy_path",
+      "tests_principles": [
+        "P3",
+        "P7"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "free stuff tonight"
+        },
+        {
+          "turn": 2,
+          "message": "williamsburg"
+        },
+        {
+          "turn": 3,
+          "message": "how about bushwick"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "QQ1",
+          "principle": "P3",
+          "check": "Pulse serves citywide free picks — the price opener gets event_picks because citywide events are available. All picks should be free events with neighborhoods labeled.",
+          "anti_pattern": "Asks for a neighborhood instead of serving citywide free picks, or returns paid events"
+        },
+        {
+          "after_turn": 2,
+          "id": "QQ2",
+          "principle": "P7",
+          "check": "Williamsburg picks served. Free context from opener may carry via conversation history — picks should lean free if context is retained, but this is not deterministically guaranteed.",
+          "anti_pattern": "Error, no events, or still showing citywide picks"
+        },
+        {
+          "after_turn": 3,
+          "id": "QQ3",
+          "principle": "P7",
+          "check": "Bushwick picks served — neighborhood switch works. Free context may persist through the switch via conversation history.",
+          "anti_pattern": "Still showing Williamsburg events after explicit neighborhood switch"
+        }
+      ]
+    },
+    {
+      "name": "Extended: category replacement from opener",
+      "category": "edge_case",
+      "tests_principles": [
+        "P3",
+        "P7",
+        "P10"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "comedy"
+        },
+        {
+          "turn": 2,
+          "message": "les"
+        },
+        {
+          "turn": 3,
+          "message": "actually jazz"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "RR1",
+          "principle": "P3",
+          "check": "Pulse serves citywide comedy picks — the category-only opener gets event_picks because citywide events are available. Picks should be comedy-focused with neighborhoods labeled.",
+          "anti_pattern": "Asks for a neighborhood instead of serving citywide comedy picks, or returns non-comedy events"
+        },
+        {
+          "after_turn": 2,
+          "id": "RR2",
+          "principle": "P7",
+          "check": "LES picks served. Comedy context from opener may carry via conversation history.",
+          "anti_pattern": "Error, no events, or still showing citywide picks"
+        },
+        {
+          "after_turn": 3,
+          "id": "RR3",
+          "principle": "P10",
+          "check": "'Actually jazz' signals the user wants jazz instead of comedy — picks should shift to jazz events. The 'actually' signals an explicit category replacement.",
+          "anti_pattern": "Still returns comedy events, or returns a mix of comedy and jazz"
+        },
+        {
+          "after_turn": 3,
+          "id": "RR4",
+          "principle": "P7",
+          "check": "Still in LES — neighborhood persists through the category change",
+          "anti_pattern": "Switches neighborhood or serves citywide picks"
+        }
+      ]
+    },
+    {
+      "name": "Extended: activity intent to compound filters",
+      "category": "edge_case",
+      "tests_principles": [
+        "P1",
+        "P3",
+        "P12"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "I want to dance"
+        },
+        {
+          "turn": 2,
+          "message": "bushwick"
+        },
+        {
+          "turn": 3,
+          "message": "free only"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "SS1",
+          "principle": "P12",
+          "check": "Pulse interprets 'I want to dance' as nightlife/DJ/club activity and serves citywide dance picks — DJ sets, club nights, dance parties, electronic music. Neighborhoods labeled.",
+          "anti_pattern": "Asks what the user means by 'dance', serves non-dance events, or asks for a neighborhood instead of serving picks"
+        },
+        {
+          "after_turn": 2,
+          "id": "SS2",
+          "principle": "P12",
+          "check": "Bushwick picks served. Dance/nightlife context from opener may carry via conversation history — picks should lean dance-oriented if context is retained.",
+          "anti_pattern": "Error, no events, or still showing citywide picks"
+        },
+        {
+          "after_turn": 3,
+          "id": "SS3",
+          "principle": "P1",
+          "check": "'Free only' sets a free filter on top of Bushwick. Picks should be free events. If dance context also persists, picks are free AND dance-oriented.",
+          "anti_pattern": "Returns paid events after explicit 'free only' request"
+        }
+      ]
+    },
+    {
+      "name": "Extended: whats good citywide to neighborhood with off-topic",
+      "category": "edge_case",
+      "tests_principles": [
+        "P7",
+        "P9"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "whats good"
+        },
+        {
+          "turn": 2,
+          "message": "bushwick"
+        },
+        {
+          "turn": 3,
+          "message": "who won the knicks game"
+        },
+        {
+          "turn": 4,
+          "message": "more"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "TT1",
+          "principle": "P7",
+          "check": "Pulse responds with citywide picks or asks for a neighborhood in a warm, conversational way",
+          "anti_pattern": "Returns an error, or responds with 'I don't understand'"
+        },
+        {
+          "after_turn": 2,
+          "id": "TT2",
+          "principle": "P7",
+          "check": "Bushwick picks served, session established with Bushwick as active neighborhood",
+          "anti_pattern": "Asks for neighborhood again, or returns picks from a different area"
+        },
+        {
+          "after_turn": 3,
+          "id": "TT3",
+          "principle": "P9",
+          "check": "Off-topic Knicks question deflected warmly — Pulse stays in character and does not attempt to answer the sports question. Session context (Bushwick, pick list) survives.",
+          "anti_pattern": "Tries to answer the sports question, or resets the session"
+        },
+        {
+          "after_turn": 4,
+          "id": "TT4",
+          "principle": "P7",
+          "check": "'More' returns fresh Bushwick picks — session survived the off-topic interruption. No repeats from turn 2.",
+          "anti_pattern": "Asks 'what neighborhood?' again, or repeats turn 2 picks, or says 'I don't have context'"
+        }
+      ]
+    },
+    {
+      "name": "Extended: repeated greetings before engaging",
+      "category": "edge_case",
+      "tests_principles": [
+        "P6",
+        "P7",
+        "P11"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "hey"
+        },
+        {
+          "turn": 2,
+          "message": "hey"
+        },
+        {
+          "turn": 3,
+          "message": "east village"
+        },
+        {
+          "turn": 4,
+          "message": "1"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "UU1",
+          "principle": "P7",
+          "check": "Pre-router greeting: warm canned response asking what the user is in the mood for (vibe, category, or neighborhood)",
+          "anti_pattern": "Error, no response, or broken greeting handling"
+        },
+        {
+          "after_turn": 2,
+          "id": "UU2",
+          "principle": "P11",
+          "check": "Second 'hey' also hits pre-router greeting regex — gets the same canned response. This is acceptable (not broken), though the identical repetition is a known UX limitation of the pre-router's exact-match design.",
+          "anti_pattern": "Error, session breaks, or the second greeting causes a crash. Note: identical canned response is expected behavior, not a failure."
+        },
+        {
+          "after_turn": 3,
+          "id": "UU3",
+          "principle": "P7",
+          "check": "East Village picks served normally — the repeated greetings did not prevent a normal session from starting",
+          "anti_pattern": "Asks for neighborhood again, or returns an error"
+        },
+        {
+          "after_turn": 4,
+          "id": "UU4",
+          "principle": "P7",
+          "check": "Details returned for pick #1 from the EV list — session correctly tracks the pick list despite the greeting preamble",
+          "anti_pattern": "Returns details for a different event, or says 'I don't have a pick list'"
+        }
+      ]
+    },
+    {
+      "name": "Extended: date night vibe through neighborhood switch",
+      "category": "edge_case",
+      "tests_principles": [
+        "P2",
+        "P7",
+        "P12"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "date night"
+        },
+        {
+          "turn": 2,
+          "message": "west village"
+        },
+        {
+          "turn": 3,
+          "message": "how about cobble hill"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "VV1",
+          "principle": "P12",
+          "check": "Pulse interprets 'date night' as a vibe and serves citywide date-appropriate picks — intimate venues, nice vibes, wine bars, jazz, art. Neighborhoods labeled.",
+          "anti_pattern": "Asks for a neighborhood instead of serving picks, or returns high-energy party/rave events for a date request"
+        },
+        {
+          "after_turn": 2,
+          "id": "VV2",
+          "principle": "P12",
+          "check": "West Village picks served. Date night vibe from opener may carry via conversation history — picks should lean romantic/intimate if context is retained.",
+          "anti_pattern": "Error, no events, or still showing citywide picks"
+        },
+        {
+          "after_turn": 3,
+          "id": "VV3",
+          "principle": "P2",
+          "check": "Picks are from Cobble Hill, not West Village — neighborhood switch respected",
+          "anti_pattern": "Still showing West Village events after user asked for Cobble Hill"
+        },
+        {
+          "after_turn": 3,
+          "id": "VV4",
+          "principle": "P7",
+          "check": "Date night vibe may persist through neighborhood switch via conversation history. Either date-oriented Cobble Hill picks or general Cobble Hill picks are acceptable.",
+          "anti_pattern": "Error or session breaks on neighborhood switch"
+        }
+      ]
+    },
+    {
+      "name": "Extended: help opener then full flow",
+      "category": "happy_path",
+      "tests_principles": [
+        "P7"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "help"
+        },
+        {
+          "turn": 2,
+          "message": "williamsburg"
+        },
+        {
+          "turn": 3,
+          "message": "more"
+        },
+        {
+          "turn": 4,
+          "message": "thanks"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "WW1",
+          "principle": "P7",
+          "check": "Help response explaining how Pulse works — mentions texting a neighborhood name to get started",
+          "anti_pattern": "Returns events instead of help, or gives a generic 'I don't understand'"
+        },
+        {
+          "after_turn": 2,
+          "id": "WW2",
+          "principle": "P7",
+          "check": "Williamsburg picks served normally after the help message — help did not break the session flow",
+          "anti_pattern": "Asks for neighborhood again, or returns an error, or still in help mode"
+        },
+        {
+          "after_turn": 3,
+          "id": "WW3",
+          "principle": "P7",
+          "check": "'More' returns fresh Williamsburg picks — session survived the help opener. No repeats from turn 2.",
+          "anti_pattern": "Asks 'what neighborhood?' again, or repeats turn 2 picks"
+        },
+        {
+          "after_turn": 4,
+          "id": "WW4",
+          "principle": "P7",
+          "check": "Pulse recognizes the thanks as a sign-off and closes gracefully",
+          "anti_pattern": "Serves more picks, or asks unnecessary follow-up questions"
+        }
+      ]
+    },
+    {
+      "name": "Extended: greeting then category then neighborhood",
+      "category": "happy_path",
+      "tests_principles": [
+        "P3",
+        "P7"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "hi"
+        },
+        {
+          "turn": 2,
+          "message": "jazz"
+        },
+        {
+          "turn": 3,
+          "message": "west village"
+        },
+        {
+          "turn": 4,
+          "message": "1"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "XX1",
+          "principle": "P7",
+          "check": "Pre-router greeting: canned response inviting vibe, category, or neighborhood. No session state set (no lastPicks, no lastNeighborhood).",
+          "anti_pattern": "Error, no response, or unexpected event picks on a bare greeting"
+        },
+        {
+          "after_turn": 2,
+          "id": "XX2",
+          "principle": "P3",
+          "check": "'jazz' on turn 2 has no session state from the canned greeting, so it falls to unified with citywide events. Should serve citywide jazz picks with neighborhoods labeled — NOT ask_neighborhood (events are available).",
+          "anti_pattern": "Asks for a neighborhood instead of serving jazz picks, or returns non-jazz events"
+        },
+        {
+          "after_turn": 3,
+          "id": "XX3",
+          "principle": "P7",
+          "check": "West Village picks served. Session transitions from citywide to WV. Jazz context may carry via conversation history.",
+          "anti_pattern": "Error, still showing citywide picks, or no events served"
+        },
+        {
+          "after_turn": 4,
+          "id": "XX4",
+          "principle": "P7",
+          "check": "Detail for pick #1 from the West Village list (turn 3), not from the citywide list (turn 2).",
+          "anti_pattern": "Returns details for a citywide pick or a pick from a different list"
+        }
+      ]
+    },
+    {
+      "name": "Extended: citywide picks then more then details",
+      "category": "happy_path",
+      "tests_principles": [
+        "P7"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "surprise me"
+        },
+        {
+          "turn": 2,
+          "message": "more"
+        },
+        {
+          "turn": 3,
+          "message": "1"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "YY1",
+          "principle": "P7",
+          "check": "Citywide curated picks served — 'surprise me' gets event_picks with variety across NYC, neighborhoods labeled.",
+          "anti_pattern": "Asks for a neighborhood, returns error, or serves picks from only one neighborhood"
+        },
+        {
+          "after_turn": 2,
+          "id": "YY2",
+          "principle": "P7",
+          "check": "'More' returns fresh citywide picks — no repeats from turn 1. The MORE command works in citywide mode.",
+          "anti_pattern": "MORE fails, errors, asks for a neighborhood, or repeats the same picks from turn 1"
+        },
+        {
+          "after_turn": 3,
+          "id": "YY3",
+          "principle": "P7",
+          "check": "Detail for pick #1 from the MORE list (turn 2), not from the original list (turn 1). Pick numbering resets on MORE.",
+          "anti_pattern": "Returns details for a turn 1 pick, or errors on detail lookup after citywide MORE"
+        }
+      ]
+    },
+    {
+      "name": "Extended: hola pre-router greeting to full session",
+      "category": "edge_case",
+      "tests_principles": [
+        "P7"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "hola"
+        },
+        {
+          "turn": 2,
+          "message": "bushwick"
+        },
+        {
+          "turn": 3,
+          "message": "more"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "ZZ1",
+          "principle": "P7",
+          "check": "'hola' matches the pre-router greeting regex — gets the canned English greeting response. Response asks what the user is in the mood for.",
+          "anti_pattern": "Responds in Spanish, falls to unified, or returns an error"
+        },
+        {
+          "after_turn": 2,
+          "id": "ZZ2",
+          "principle": "P7",
+          "check": "Bushwick picks served normally — the canned greeting didn't break session initialization. Neighborhood established.",
+          "anti_pattern": "Error, no events, or session confused by the 'hola' greeting"
+        },
+        {
+          "after_turn": 3,
+          "id": "ZZ3",
+          "principle": "P7",
+          "check": "'More' returns fresh Bushwick picks — session survived the pre-router greeting start. No repeats from turn 2.",
+          "anti_pattern": "MORE fails, returns error, or repeats picks"
+        }
+      ]
+    },
+    {
+      "name": "Extended: citywide detail then neighborhood narrowing",
+      "category": "happy_path",
+      "tests_principles": [
+        "P3",
+        "P7"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "comedy tonight"
+        },
+        {
+          "turn": 2,
+          "message": "2"
+        },
+        {
+          "turn": 3,
+          "message": "east village"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "AAA1",
+          "principle": "P3",
+          "check": "Citywide comedy picks served with neighborhoods labeled — category opener with events available gets event_picks.",
+          "anti_pattern": "Asks for a neighborhood, returns non-comedy events, or errors"
+        },
+        {
+          "after_turn": 2,
+          "id": "AAA2",
+          "principle": "P7",
+          "check": "Detail for pick #2 from the citywide comedy list. Detail card has venue info, time, and price.",
+          "anti_pattern": "Returns wrong pick, errors on detail lookup, or returns pick #1 instead of #2"
+        },
+        {
+          "after_turn": 3,
+          "id": "AAA3",
+          "principle": "P7",
+          "check": "East Village picks served — session transitions from citywide to EV. Comedy context may carry via conversation history.",
+          "anti_pattern": "Still showing citywide picks, error on neighborhood transition, or session broken by prior detail lookup"
         }
       ]
     }

@@ -469,6 +469,49 @@ All five root causes (A-E) are now fixed. Gap 3 (pool padding) and handleZeroMat
 
 **Fix strategy:** Scraper-level improvements per source. Some sources have price data on detail pages but not list pages (would require extra fetches). Others genuinely don't expose pricing. Low priority — `is_free` boolean is more reliably populated than `price_display`.
 
+### Medium Priority — Pre-Router Mechanical Paths Don't Save Session State (2026-03-01)
+
+**Status:** Open. Discovered during eval scenario expansion for non-neighborhood openers.
+
+**Root cause:** Pre-router mechanical shortcuts (greetings, help, thanks, bye, declines, acknowledgments) go through `handleConversational` or `handleHelp` in intent-handlers.js. These handlers send the canned reply and call `finalizeTrace` — but never call `saveResponseFrame`. The result:
+
+- **Conversation history IS saved** — `addToHistory` runs for both user message (handler.js:707) and assistant reply (finalizeTrace:672). The LLM on subsequent turns sees the full exchange.
+- **Deterministic session state is NOT saved** — no `lastPicks`, no `lastNeighborhood`, no `lastFilters`, no `allOfferedIds`, no `visitedHoods`. The pre-router's filter detection guard (pre-router.js:185) requires `lastNeighborhood || lastPicks`, so it won't fire on the turn after a canned greeting.
+
+**What works today:** A user says "hi" → gets canned greeting → says "jazz" → unified LLM sees citywide events + conversation history with the greeting. The LLM correctly serves citywide jazz picks. The conversation history bridge is sufficient for the LLM to maintain context.
+
+**What breaks (3 gaps):**
+
+| Gap | Example flow | What happens | Impact |
+|-----|-------------|--------------|--------|
+| **No deterministic filter state from opener context** | "hi" → "jazz" → "west village" | Turn 2 "jazz" gets citywide jazz (correct). Turn 3 "west village" has `lastFilters={}` — no jazz filter carried deterministically. LLM may or may not serve jazz in WV based on conversation memory alone. | Category/vibe context from opener is fragile — works via LLM memory, not guaranteed. |
+| **Pre-router category detection skipped** | "hi" → "jazz" → "how about comedy" | Turn 2 "jazz" sets no session state. Turn 3 "how about comedy" fails the pre-router guard (`!lastNeighborhood && !lastPicks`), falls to unified. Works but costs $0.001 instead of $0 pre-router path. | Minor cost increase, no UX impact. |
+| **Citywide picks don't set `visitedHoods`** | "surprise me" → citywide picks → "bushwick" → more → more → more | Citywide turn doesn't save `visitedHoods`. When user narrows to Bushwick, it's treated as first visit. Tavily fallback (which requires `visitedHoods.includes(hood)`) won't fire on exhaustion. | Tavily fallback unreachable for users who start citywide then narrow. |
+
+**Impact if fixed — what "nailing memory" enables:**
+
+1. **Deterministic filter persistence from openers** — "jazz" → "west village" would set `lastFilters: {category: 'live_music', subcategory: 'jazz'}` after the citywide response. Turn 3 WV picks would get a `[MATCH]`-tagged jazz pool instead of relying on LLM conversation memory. This is the difference between P1-compliant (code owns state) and LLM-dependent (hope it remembers). Expected improvement: ~10-15% lift on filter-through-narrowing eval scenarios.
+
+2. **Pre-router fires on turn 2+ after canned greeting** — "hi" → canned greeting → "free" would hit the pre-router free detection (if `lastNeighborhood` were set from a prior citywide response) instead of falling to unified. Saves ~$0.001/message on these paths. At scale this is meaningful.
+
+3. **Full session continuity from any entry point** — users who start with greetings, help, category-only, or vibe openers would have the same session quality as users who start with a neighborhood. Today there's a hidden quality gap: neighborhood-first users get deterministic filters, everyone else gets LLM-dependent context. This affects 20-40% of users.
+
+4. **Tavily fallback works for narrowed sessions** — citywide → neighborhood → exhaustion would correctly trigger Tavily because `visitedHoods` would be populated from the citywide response.
+
+5. **Preference profiles capture opener signals** — `updateProfile` (fire-and-forget after `saveResponseFrame`) captures categories, price, and time preferences. Canned greeting paths skip this entirely. Users who reveal preferences in openers ("jazz", "free stuff", "late night") don't contribute to their profile.
+
+**Fix strategy:** Two options, increasing complexity:
+
+| Option | Change | Effort | Tradeoff |
+|--------|--------|--------|----------|
+| **A: Save conversation-only frame after canned responses** | Add `saveResponseFrame` call to `handleConversational`/`handleHelp` with empty picks but valid conversation state. Sets `lastFilters: {}` and triggers `updateProfile`. | Small | Doesn't capture filter intent from the opener message |
+| **B: Route opener-with-intent through unified instead of pre-router** | Messages like "hi" stay pre-router. But "jazz", "comedy tonight", "surprise me" with no session → skip pre-router, go to unified, which already saves full state via `saveResponseFrame`. | Medium | Already works this way today (these fall through to unified). The gap is only that canned-greeting turns don't save state. Option A is sufficient. |
+| **C: Extract filter intent from canned-path messages and save** | After canned greeting, inspect the user's next message for category/vibe/time signals before routing. Save detected filters to session even on the canned path. | Medium | Most complete but adds complexity to the pre-router; risks P6 violations |
+
+**Recommended:** Option A first (quick win — save conversation frame on all canned paths), then evaluate whether the filter gap matters enough for Option C. The citywide flow already works well via conversation history; the main value is making it deterministic.
+
+**Principles:** P1 (code owns state — opener filters should be deterministic, not LLM-dependent), P4 (one save path — canned responses should also save via `saveResponseFrame`).
+
 ### Deferred (post-MVP)
 
 | Issue | Why deferred |
