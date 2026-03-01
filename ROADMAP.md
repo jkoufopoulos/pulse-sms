@@ -698,7 +698,7 @@ Scenario pass rate is low because each scenario requires ALL assertions to pass 
 - **Eventbrite `__SERVER_DATA__`:** Detects free from `OrganizerTag/Free` tags + extracts `$XX` from name/summary text. 0% → 19%.
 - **BrooklynVegan:** Extracts lowest `$XX` from `ticket_info` instead of using raw text (was dumping "21+" or "All Ages" as price). 0% → 20%.
 - **SmallsLIVE:** All events marked "Cover charge" (known paid venues). 0% → 100%.
-- **RA:** Broadened free detection to catch "Free Entry"/"FREE RSVP" in titles.
+- **RA:** Added `cost` field to GraphQL query + `parseRACost()` parser. Handles ranges (`$7-$15`), singles (`$20`), and zero (`0` → free). Falls back to title regex when cost is null. Result: 108/180 events with price (was 0), 34 free (was 2).
 
 **Result:** Price coverage 27% → **79%** (1,323/1,677 events). Remaining 21% unknown is structurally unavailable: DoNYC detail pages without price (143), Yutori LLM extraction misses (74), BAM no price in API (49), Songkick no offers in JSON-LD (35), Eventbrite no price in summary (29).
 
@@ -710,7 +710,7 @@ Scenario pass rate is low because each scenario requires ALL assertions to pass 
 
 **NYC Parks fix:** The scraper passed only `borough` to `resolveNeighborhood()`, which returns null for boroughs by design. Added `lookupVenue()` call before borough fallback (same pattern as `ra.js`), so parks in `VENUE_MAP` resolve to neighborhoods via coords. Added 10 missing park entries to `VENUE_MAP` (The High Line, Brooklyn Bridge Park, Pier 6, Marine Park, etc.). Result: 46/97 NYC Parks events now resolve neighborhoods (was 31).
 
-**RA price fix (attempted then reverted):** `isTicketed` was fetched in the GraphQL query but never used. Initially set `is_free: true` when `isTicketed === false`. Source eval revealed 3 false positives (DakhaBrakha at Pioneer Works, Vinyl Sundays, Sorry Records) — `isTicketed` on RA means "tickets sold through RA," not "free admission." Paid events with tickets sold elsewhere have `isTicketed: false`. Reverted to title-only free detection (`/\bfree\b/i` on event title). Result: 2 RA events correctly marked free, RA completeness 64% → 99% pass.
+**RA price fix:** `isTicketed` was attempted for free detection but reverted — it means "tickets sold through RA," not "free admission." Later added the `cost` GraphQL field with `parseRACost()` parser (see Price Analytics section above), which correctly handles free (`cost: "0"`), ranges, and singles. Result: 108/180 with price, 34 free.
 
 **DoNYC price fix:** Expanded free detection regex to catch `$0`/`$0.00` patterns alongside `\bfree\b`.
 
