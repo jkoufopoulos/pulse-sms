@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bestie Events</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -228,17 +230,9 @@
 
   /* Borough map */
   .borough-map-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px; }
-  .borough-bubbles { position: relative; height: 200px; }
-  .borough-bubble {
-    position: absolute; border-radius: 50%; cursor: pointer;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    transition: transform 0.15s, box-shadow 0.15s; border: 2px solid rgba(255,255,255,0.1);
-  }
-  .borough-bubble:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(255,255,255,0.1); }
-  .borough-bubble.active { border-color: #fff; }
-  .borough-bubble-name { font-size: 11px; font-weight: 700; color: #fff; line-height: 1; }
-  .borough-bubble-count { font-size: 10px; color: rgba(255,255,255,0.8); line-height: 1; margin-top: 2px; }
-  .borough-bubble-pct { font-size: 18px; font-weight: 800; color: #fff; line-height: 1; }
+  #borough-map { height: 320px; border-radius: 6px; background: #111; }
+  .leaflet-container { background: #111 !important; }
+  .hood-tooltip { font-size: 11px; font-weight: 600; background: #1a1a1a !important; color: #e0e0e0 !important; border: 1px solid #444 !important; border-radius: 4px !important; padding: 4px 8px !important; }
 
   /* Gaps callout */
   .analytics-gaps {
@@ -400,7 +394,7 @@
       <div id="analytics-boroughs"></div>
     </div>
     <div class="analytics-card">
-      <h4>Borough Map</h4>
+      <h4>Event Map</h4>
       <div id="borough-map"></div>
     </div>
   </div>
@@ -833,7 +827,10 @@ function toggleAnalytics() {
   analyticsOpen = !analyticsOpen;
   document.getElementById('analytics-panel').classList.toggle('open', analyticsOpen);
   document.getElementById('analytics-tri').classList.toggle('open', analyticsOpen);
-  if (analyticsOpen) updateAnalytics();
+  if (analyticsOpen) {
+    updateAnalytics();
+    if (leafletMap) setTimeout(() => leafletMap.invalidateSize(), 150);
+  }
 }
 
 function computeDistribution(events, field) {
@@ -1082,49 +1079,100 @@ function renderBoroughBars(container, dist, total) {
   container.innerHTML = html;
 }
 
+// Neighborhood coordinates for map circles
+const HOOD_COORDS = {
+  // Manhattan
+  'East Village': [40.7264, -73.9818], 'West Village': [40.7336, -73.9999],
+  'Lower East Side': [40.7150, -73.9843], 'Chelsea': [40.7465, -74.0014],
+  'SoHo': [40.7233, -73.9985], 'NoHo': [40.7290, -73.9937],
+  'Tribeca': [40.7163, -74.0086], 'Midtown': [40.7549, -73.9840],
+  'Midtown East': [40.7527, -73.9723], 'Murray Hill': [40.7486, -73.9773],
+  'Kips Bay': [40.7428, -73.9800], 'Gramercy': [40.7382, -73.9860],
+  'Flatiron': [40.7395, -73.9903], 'Upper West Side': [40.7870, -73.9754],
+  'Upper East Side': [40.7736, -73.9566], 'Carnegie Hill': [40.7845, -73.9562],
+  'Harlem': [40.8116, -73.9465], 'East Harlem': [40.7957, -73.9389],
+  'Hamilton Heights': [40.8256, -73.9481], 'Morningside Heights': [40.8097, -73.9625],
+  'Washington Heights': [40.8417, -73.9393], "Hell's Kitchen": [40.7638, -73.9918],
+  'Greenwich Village': [40.7308, -73.9973], 'Financial District': [40.7075, -74.0089],
+  'Battery Park City': [40.7115, -74.0167],
+  // Brooklyn
+  'Williamsburg': [40.7081, -73.9571], 'Bushwick': [40.6944, -73.9213],
+  'Greenpoint': [40.7274, -73.9514], 'Park Slope': [40.6710, -73.9814],
+  'South Slope': [40.6604, -73.9868], 'Downtown Brooklyn': [40.6934, -73.9867],
+  'DUMBO': [40.7033, -73.9890], 'Fort Greene': [40.6892, -73.9742],
+  'Clinton Hill': [40.6891, -73.9654], 'Prospect Heights': [40.6775, -73.9692],
+  'Crown Heights': [40.6694, -73.9422], 'Bed-Stuy': [40.6872, -73.9418],
+  'Cobble Hill': [40.6860, -73.9957], 'Gowanus': [40.6734, -73.9880],
+  'Red Hook': [40.6734, -74.0080], 'Brooklyn Heights': [40.6958, -73.9936],
+  'Sunset Park': [40.6514, -74.0027],
+  // Queens
+  'Astoria': [40.7723, -73.9301], 'Long Island City': [40.7425, -73.9561],
+  'Sunnyside': [40.7434, -73.9180], 'Jackson Heights': [40.7557, -73.8831],
+  'Flushing': [40.7580, -73.8317], 'Ridgewood': [40.7043, -73.9056],
+};
+
+let leafletMap = null;
+let mapCircles = [];
+
 function renderBoroughMap(container, boroughDist) {
-  const distMap = Object.fromEntries(boroughDist);
-  const total = boroughDist.reduce((s, [, c]) => s + c, 0) || 1;
-  const boroughs = ['Manhattan', 'Brooklyn', 'Queens'].filter(b => (distMap[b] || 0) > 0);
-  const unknownCount = distMap['unknown'] || 0;
-  if (boroughs.length === 0) { container.innerHTML = '<div style="color:#555;font-size:12px">No data</div>'; return; }
-
-  const maxCount = Math.max(...boroughs.map(b => distMap[b] || 0), 1);
-  const minSize = 60, maxSize = 140;
-
-  // Approximate geographic positions (% of container)
-  const positions = {
-    'Manhattan': { left: 15, top: 20 },
-    'Brooklyn':  { left: 42, top: 55 },
-    'Queens':    { left: 65, top: 15 },
-  };
-
-  const activeBoro = document.getElementById('f-search')?.dataset?.boroughFilter || '';
-
-  let html = '<div class="borough-bubbles">';
-  for (const name of boroughs) {
-    const count = distMap[name] || 0;
-    const pct = ((count / total) * 100).toFixed(0);
-    const ratio = count / maxCount;
-    const size = minSize + ratio * (maxSize - minSize);
-    const color = BOROUGH_COLORS[name];
-    const pos = positions[name];
-    const isActive = activeBoro === name;
-    html += `<div class="borough-bubble${isActive ? ' active' : ''}" onclick="filterByBorough('${name}')"
-      style="width:${size}px;height:${size}px;left:${pos.left}%;top:${pos.top}%;
-      background:radial-gradient(circle at 35% 35%, ${color}cc, ${color}55);
-      transform:translate(-50%,-50%)${isActive ? ' scale(1.05)' : ''}">
-      <span class="borough-bubble-pct">${pct}%</span>
-      <span class="borough-bubble-name">${name}</span>
-      <span class="borough-bubble-count">${count} events</span>
-    </div>`;
+  // Compute per-neighborhood counts from filtered events
+  const hoodCounts = {};
+  const events = filteredEvents.length < allEvents.length ? filteredEvents : allEvents;
+  for (const e of events) {
+    const h = e.neighborhood || 'unknown';
+    hoodCounts[h] = (hoodCounts[h] || 0) + 1;
   }
-  if (unknownCount > 0) {
-    const unknownPct = ((unknownCount / total) * 100).toFixed(0);
-    html += `<div style="position:absolute;bottom:4px;right:4px;font-size:11px;color:#666">${unknownCount} unknown (${unknownPct}%)</div>`;
+
+  const maxCount = Math.max(...Object.values(hoodCounts), 1);
+
+  // Initialize map once
+  if (!leafletMap) {
+    leafletMap = L.map(container, {
+      zoomControl: false, attributionControl: false,
+      scrollWheelZoom: true, dragging: true,
+    }).setView([40.730, -73.955], 12);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+      maxZoom: 16, minZoom: 10,
+    }).addTo(leafletMap);
+
+    // Add minimal labels on top
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+      maxZoom: 16, minZoom: 10, pane: 'overlayPane',
+    }).addTo(leafletMap);
+
+    L.control.zoom({ position: 'topright' }).addTo(leafletMap);
+
+    // Fix Leaflet render on hidden container
+    setTimeout(() => leafletMap.invalidateSize(), 100);
   }
-  html += '</div>';
-  container.innerHTML = html;
+
+  // Clear old circles
+  for (const c of mapCircles) leafletMap.removeLayer(c);
+  mapCircles = [];
+
+  // Add circles for each neighborhood with events
+  for (const [hood, coords] of Object.entries(HOOD_COORDS)) {
+    const count = hoodCounts[hood] || 0;
+    if (count === 0) continue;
+    const borough = HOOD_TO_BOROUGH[hood] || 'unknown';
+    const color = BOROUGH_COLORS[borough] || '#444';
+    const radius = 200 + (count / maxCount) * 800;
+
+    const circle = L.circleMarker(coords, {
+      radius: 5 + (count / maxCount) * 20,
+      fillColor: color, fillOpacity: 0.7,
+      color: color, weight: 1, opacity: 0.9,
+    }).addTo(leafletMap);
+
+    const pct = ((count / events.length) * 100).toFixed(1);
+    circle.bindTooltip(`<b>${hood}</b><br>${count} events (${pct}%)`, { className: 'hood-tooltip' });
+    circle.on('click', () => {
+      document.getElementById('f-neighborhood').value = hood;
+      applyFilters();
+    });
+    mapCircles.push(circle);
+  }
 }
 
 function filterByBorough(borough) {
