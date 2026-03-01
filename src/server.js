@@ -31,7 +31,7 @@ app.use(express.urlencoded({ extended: false, limit: '5kb' }));
 app.use(express.json({ limit: '5mb' }));
 
 // Public health check — no internal details (L10 fix)
-const BUILD_SHA = '19e107a';
+const BUILD_SHA = 'af6d8c8';
 app.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'bestie', build: BUILD_SHA });
 });
