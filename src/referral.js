@@ -8,6 +8,12 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+function atomicWriteSync(filePath, data) {
+  const tmp = filePath + '.tmp';
+  fs.writeFileSync(tmp, data);
+  fs.renameSync(tmp, filePath);
+}
+
 const REFERRALS_PATH = path.join(__dirname, '../data/referrals.json');
 const CODE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const CLEANUP_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
@@ -103,7 +109,7 @@ function scheduleDiskWrite() {
           attributedAt: entry.attributedAt,
         };
       }
-      fs.writeFileSync(REFERRALS_PATH, JSON.stringify(data, null, 2));
+      atomicWriteSync(REFERRALS_PATH, JSON.stringify(data, null, 2));
     } catch (err) {
       console.error('Referral persist error:', err.message);
     }

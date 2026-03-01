@@ -174,26 +174,26 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 
 ## Pre-Launch Fragility Audit
 
-### High Priority — Open
+### High Priority
 
-| # | Issue | Location | What Breaks | Fix Effort |
-|---|-------|----------|-------------|------------|
-| 5 | `visitedHoods` resets on every new neighborhood | pipeline.js, handler.js | Multi-neighborhood exploration history lost; Tavily fallback never triggers for revisited hoods | Quick |
-| 6 | Hanging scraper blocks all future cache refreshes | events.js timedFetch | One hung fetch() permanently blocks refreshCache; cache goes stale until restart | Quick |
-| 7 | Anthropic fallback max_tokens: 512 truncation | ai.js | Gemini→Anthropic fallback produces truncated JSON → parse failure → dead-end response | Quick |
-| 8 | Pre-router false-positives on common words | pre-router.js | "sorry I'm late" sets time_after:22:00; "I'll rock up" sets category:live_music | Structural |
+| # | Issue | Location | Status |
+|---|-------|----------|--------|
+| 5 | `visitedHoods` resets on every new neighborhood | pipeline.js | **Fixed 2026-03-01** — default now accumulates from prevSession |
+| 6 | Hanging scraper blocks all future cache refreshes | events.js timedFetch | **Fixed 2026-03-01** — 60s Promise.race timeout in timedFetch |
+| 7 | Anthropic fallback max_tokens: 512 truncation | ai.js | **Fixed 2026-03-01** — both Anthropic paths now use max_tokens: 1024 |
+| 8 | Pre-router false-positives on common words | pre-router.js | Open — Structural fix needed |
 
-### Medium Priority — Open
+### Medium Priority
 
-| # | Issue | Location | What Breaks | Fix Effort |
-|---|-------|----------|-------------|------------|
-| 9 | `isLastBatch`/`exhaustionSuggestion` skills dropped in MORE path | intent-handlers.js | Last-batch MORE still says "Reply MORE" (compensated by regex strip) | Quick |
-| 10 | `tonightPriority` and `conversationAwareness` conflict on "tomorrow" queries | compose-skills.js | Both skills active with contradictory time instructions | Quick |
-| 11 | Prompt injection via unbounded `short_detail` | ai.js | Event descriptions interpolated into prompt with no length cap | Quick |
-| 12 | Graceful shutdown kills in-flight handlers after 5s | server.js | Railway SIGTERM during Tavily fallback kills handler mid-flight | Medium |
-| 13 | Gemini finishReason logged but not acted on | ai.js | MAX_TOKENS/SAFETY finish reasons produce truncated response | Quick |
-| 14 | `extractEvents` returns unvalidated JSON shape | ai.js | LLM returns `{venues: [...]}` instead of `{events: [...]}` | Quick |
-| 15 | Non-atomic disk writes for cache/sessions | events.js, session.js | Process kill during writeFileSync → corrupted JSON → empty cache on boot | Quick |
+| # | Issue | Location | Status |
+|---|-------|----------|--------|
+| 9 | `isLastBatch`/`exhaustionSuggestion` skills dropped | pipeline.js, ai.js | **Fixed 2026-03-01** — forwarded through executeQuery and unifiedRespond to skillOptions |
+| 10 | `tonightPriority` conflicts with "tomorrow" queries | build-compose-prompt.js | **Fixed 2026-03-01** — future-query regex skips tonightPriority |
+| 11 | Unbounded `short_detail` in prompt | ai.js | **Fixed 2026-03-01** — capped to 120 chars, name capped to 80 via shared cap() helper |
+| 12 | Graceful shutdown kills in-flight handlers after 5s | server.js | Open — Medium fix needed |
+| 13 | Gemini finishReason logged but not acted on | ai.js | **Fixed 2026-03-01** — checkGeminiFinish() throws on SAFETY/MAX_TOKENS in all 3 Gemini functions |
+| 14 | `extractEvents` returns unvalidated JSON shape | ai.js | **Fixed 2026-03-01** — normalizes venues/array/object shapes to events array |
+| 15 | Non-atomic disk writes for cache/sessions | events.js, session.js, preference-profile.js, referral.js | **Fixed 2026-03-01** — atomicWriteSync (write .tmp + rename) on all 6 critical write sites |
 
 ### Deferred
 

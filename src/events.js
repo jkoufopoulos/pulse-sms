@@ -11,6 +11,12 @@ const { runExtractionAudit } = require('./evals/extraction-audit');
 const { checkSourceCompleteness } = require('./evals/source-completeness');
 const { captureExtractionInput, getExtractionInputs, clearExtractionInputs } = require('./extraction-capture');
 
+function atomicWriteSync(filePath, data) {
+  const tmp = filePath + '.tmp';
+  fs.writeFileSync(tmp, data);
+  fs.renameSync(tmp, filePath);
+}
+
 // Load persisted learned venues on boot
 try {
   const data = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/venues-learned.json'), 'utf8'));
@@ -68,10 +74,17 @@ if (eventCache.length === 0) {
 // Timed fetch wrapper — captures duration + status per source
 // ============================================================
 
+const SCRAPER_TIMEOUT_MS = 60000;
+
 async function timedFetch(fetchFn, label, weight) {
   const start = Date.now();
   try {
-    const events = await fetchFn();
+    const events = await Promise.race([
+      fetchFn(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`${label} scraper timeout`)), SCRAPER_TIMEOUT_MS)
+      ),
+    ]);
     const durationMs = Date.now() - start;
     // Stamp canonical weight + new fields from registry
     for (const e of events) {
@@ -208,7 +221,7 @@ async function refreshCache() {
 
     // Persist JSON cache for backward compat / fallback
     try {
-      fs.writeFileSync(CACHE_FILE, JSON.stringify({ events: eventCache, timestamp: cacheTimestamp }));
+      atomicWriteSync(CACHE_FILE, JSON.stringify({ events: eventCache, timestamp: cacheTimestamp }));
       console.log(`Persisted ${eventCache.length} events to cache file`);
     } catch (err) { console.error('Failed to persist event cache:', err.message); }
 
@@ -364,7 +377,7 @@ async function refreshSources(sourceNames, { reprocess = false } = {}) {
 
   // Persist JSON cache for backward compat
   try {
-    fs.writeFileSync(CACHE_FILE, JSON.stringify({ events: eventCache, timestamp: cacheTimestamp }, null, 2));
+    atomicWriteSync(CACHE_FILE, JSON.stringify({ events: eventCache, timestamp: cacheTimestamp }, null, 2));
   } catch (err) {
     console.warn('Failed to persist cache after selective refresh:', err.message);
   }

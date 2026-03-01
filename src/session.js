@@ -7,6 +7,12 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+function atomicWriteSync(filePath, data) {
+  const tmp = filePath + '.tmp';
+  fs.writeFileSync(tmp, data);
+  fs.renameSync(tmp, filePath);
+}
+
 const sessions = new Map();
 const SESSION_TTL = 2 * 60 * 60 * 1000; // 2 hours
 const SESSIONS_PATH = path.join(__dirname, '../data/sessions.json');
@@ -116,7 +122,7 @@ function scheduleDiskWrite() {
           timestamp: session.timestamp,
         };
       }
-      fs.writeFileSync(SESSIONS_PATH, JSON.stringify(data, null, 2));
+      atomicWriteSync(SESSIONS_PATH, JSON.stringify(data, null, 2));
     } catch (err) {
       console.error('Session persist error:', err.message);
     }
@@ -177,7 +183,7 @@ function flushSessions() {
         timestamp: session.timestamp,
       };
     }
-    fs.writeFileSync(SESSIONS_PATH, JSON.stringify(data, null, 2));
+    atomicWriteSync(SESSIONS_PATH, JSON.stringify(data, null, 2));
   } catch (err) {
     console.error('Session flush error:', err.message);
   }

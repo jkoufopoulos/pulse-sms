@@ -23,14 +23,15 @@ function buildUnifiedPrompt(events, options = {}) {
     parts.push(skills.sourceTiers.text);
   }
 
-  // Tonight priority
+  // Tonight priority — skip for future-oriented queries (tomorrow, weekend, etc.)
   if (events && events.length > 0) {
     const todayNyc = getNycDateString(0);
     const hasToday = events.some(e => {
       const d = e.date_local || e.day;
       return d === todayNyc || d === 'TODAY';
     });
-    if (hasToday) {
+    const isFutureQuery = /\b(tomorrow|tmrw|this weekend|next week|saturday|sunday|friday)\b/i.test(options.userMessage || '');
+    if (hasToday && !isFutureQuery) {
       parts.push(skills.tonightPriority.text);
     }
   }

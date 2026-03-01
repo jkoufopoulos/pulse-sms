@@ -70,7 +70,7 @@ function saveResponseFrame(phone, { mode = 'fresh', picks = [], prevSession,
       ? visitedHoods
       : isMore
         ? [...new Set([...(prevSession?.visitedHoods || []), neighborhood])]
-        : (neighborhood ? [neighborhood] : []),
+        : [...new Set([...(prevSession?.visitedHoods || []), neighborhood].filter(Boolean))],
     pendingNearby: pending?.neighborhood || null,
     pendingNearbyEvents: pending?.nearbyEvents || null,
     pendingFilters: pending?.filters || null,
@@ -449,6 +449,8 @@ async function executeQuery(message, events, options = {}) {
     excludeIds: options.excludeIds,
     suggestedNeighborhood: options.suggestedNeighborhood,
     userHoodAlias: options.userHoodAlias,
+    isLastBatch: options.isLastBatch,
+    exhaustionSuggestion: options.exhaustionSuggestion,
     model: options.model,
   });
 

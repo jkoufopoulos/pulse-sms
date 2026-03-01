@@ -18,6 +18,8 @@ function withTimeout(promise, ms, label) {
   return Promise.race([promise, timeout]);
 }
 
+const cap = (s, n) => s && s.length > n ? s.slice(0, n - 3) + '...' : s;
+
 let geminiClient = null;
 function getGeminiClient() {
   if (!geminiClient) {
@@ -34,6 +36,16 @@ const MODELS = {
 };
 
 // Safety settings for all Gemini calls — block dangerous content but allow normal event text
+function checkGeminiFinish(response, label) {
+  const reason = response.candidates?.[0]?.finishReason;
+  if (reason && reason !== 'STOP') {
+    console.warn(`${label}: finishReason=${reason}`);
+    if (reason === 'SAFETY' || reason === 'MAX_TOKENS') {
+      throw new Error(`Gemini ${label}: ${reason}`);
+    }
+  }
+}
+
 const GEMINI_SAFETY = [
   { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
   { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
@@ -90,10 +102,7 @@ async function unifiedWithGemini(systemPrompt, userPrompt, modelName) {
     15_000, 'unifiedWithGemini'
   );
   const response = result.response;
-  const finishReason = response.candidates?.[0]?.finishReason;
-  if (finishReason && finishReason !== 'STOP') {
-    console.warn(`unifiedWithGemini: finishReason=${finishReason}, tokens=${response.usageMetadata?.candidatesTokenCount}`);
-  }
+  checkGeminiFinish(response, 'unifiedWithGemini');
   const text = response.text() || '';
   const usageMetadata = response.usageMetadata;
   const usage = usageMetadata ? {
@@ -121,6 +130,7 @@ async function extractWithGemini(systemPrompt, userPrompt) {
     90_000, 'extractWithGemini'
   );
   const response = result.response;
+  checkGeminiFinish(response, 'extractWithGemini');
   const text = response.text() || '';
   const usageMetadata = response.usageMetadata;
   const usage = usageMetadata ? {
@@ -148,6 +158,7 @@ async function detailsWithGemini(systemPrompt, userPrompt) {
     15_000, 'detailsWithGemini'
   );
   const response = result.response;
+  checkGeminiFinish(response, 'detailsWithGemini');
   const text = response.text() || '';
   const usageMetadata = response.usageMetadata;
   const usage = usageMetadata ? {
@@ -216,7 +227,14 @@ Extract all events and venues into the JSON format specified in your instruction
     return { events: [], _usage: usage || null, _provider: provider };
   }
 
-  return { ...parsed, _usage: usage || null, _provider: provider };
+  const events = Array.isArray(parsed.events) ? parsed.events
+    : Array.isArray(parsed.venues) ? parsed.venues
+    : Array.isArray(parsed) ? parsed
+    : [];
+  if (!Array.isArray(parsed.events) && events.length > 0) {
+    console.warn(`extractEvents (${provider}): non-standard shape, found ${events.length} events`);
+  }
+  return { events, _usage: usage || null, _provider: provider };
 }
 
 /**
@@ -408,7 +426,7 @@ Write the details text. Include this URL: ${bestUrl}`;
  *
  * Returns { type, sms_text, picks, clear_filters }
  */
-async function unifiedRespond(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime, validNeighborhoods, activeFilters, isSparse, isCitywide, matchCount, hardCount, softCount, excludeIds, suggestedNeighborhood, userHoodAlias, model } = {}) {
+async function unifiedRespond(message, { session, events, neighborhood, nearbyHoods, conversationHistory, currentTime, validNeighborhoods, activeFilters, isSparse, isCitywide, matchCount, hardCount, softCount, excludeIds, suggestedNeighborhood, userHoodAlias, isLastBatch, exhaustionSuggestion, model } = {}) {
   const now = currentTime || new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   const todayNyc = getNycDateString(0);
@@ -431,7 +449,7 @@ async function unifiedRespond(message, { session, events, neighborhood, nearbyHo
       const nearbyTag = (neighborhood && e.neighborhood && e.neighborhood !== neighborhood) ? '[NEARBY] ' : '';
       return tag + nearbyTag + JSON.stringify({
         id: e.id,
-        name: e.name && e.name.length > 80 ? e.name.slice(0, 77) + '...' : e.name,
+        name: cap(e.name, 80),
         venue_name: e.venue_name,
         neighborhood: e.neighborhood,
         date_local: eventDate,
@@ -441,7 +459,7 @@ async function unifiedRespond(message, { session, events, neighborhood, nearbyHo
         is_free: e.is_free,
         price_display: e.price_display,
         category: e.category,
-        short_detail: e.short_detail || e.description_short,
+        short_detail: cap(e.short_detail || e.description_short, 120),
         source_name: e.source_name,
         source_tier: e.source_tier || 'secondary',
         extraction_confidence: e.extraction_confidence,
@@ -508,6 +526,8 @@ Respond now.`;
     poolSize: events?.length || 0,
     isFree: activeFilters?.free_only,
     hasActiveCategory: !!activeFilters?.category,
+    isLastBatch: options.isLastBatch,
+    exhaustionSuggestion: options.exhaustionSuggestion,
   };
   const systemPrompt = buildUnifiedPrompt(events || [], skillOptions);
 
@@ -521,7 +541,7 @@ Respond now.`;
       console.warn(`Gemini unifiedRespond failed, falling back to Anthropic: ${err.message}`);
       const response = await withTimeout(getClient().messages.create({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 512,
+        max_tokens: 1024,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
       }, { timeout: 12000 }), 15000, 'unifiedRespond');
@@ -532,7 +552,7 @@ Respond now.`;
   } else {
     const response = await withTimeout(getClient().messages.create({
       model: resolvedModel,
-      max_tokens: 512,
+      max_tokens: 1024,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
     }, { timeout: 12000 }), 15000, 'unifiedRespond');
