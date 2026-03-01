@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-02-28 (Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout)
+> Last updated: 2026-02-28 (Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
 
 ---
 
@@ -150,6 +150,65 @@ All 5 are pre-LLM staging — they set up state that the downstream `saveRespons
 
 ---
 
+## Resilience Gaps — Transition Zone Vulnerabilities
+
+The architecture principles (P1-P7) and migration steps address the core design. The remaining quality failures cluster at four transition zones — places where deterministic code hands off to the LLM or where the system has no fallback. These gaps explain why eval pass rates plateau even as individual bugs get fixed.
+
+### Gap 1: `clear_filters` — Last P1 Bridge (LLM → Code State)
+
+**What:** The LLM returns `clear_filters: true` and the handler uses it to wipe session filter state. This is the only remaining path where LLM output directly mutates code-owned state, violating P1.
+
+**Current mitigation:** `CLEAR_SIGNALS` regex in `handler.js` gates the LLM's claim — `clear_filters: true` is only honored if the user message matches `/\b(everything|all|fresh|reset|forget|nvm|...)\b/i`. This reduces but doesn't eliminate the surface: any new clear-like phrase the LLM detects but the regex doesn't match gets silently ignored, and any hallucinated `clear_filters: true` on a matching message passes through.
+
+**Impact:** Filter state can be unexpectedly wiped on conversational turns where the user didn't intend to clear. Conversely, semantic clearing ("just show me what's good") only works if the regex happens to cover the phrase. This is a P1 violation with a code-level guardrail — an improvement over raw LLM state writes, but not a principled solution.
+
+**Fix direction:** Move all filter clearing to the pre-router (P6). Expand the clear-intent regex to cover the semantic cases currently delegated to the LLM. Remove `clear_filters` from the LLM output schema entirely, completing P1. This also reduces the output contract from 4 fields to 3 (P5).
+
+**Related:** Filter Drift Fix #3 (2026-02-24), P1 anti-pattern note.
+
+### Gap 2: Unified Call Couples Reasoning and Rendering (P2 Not Realized)
+
+**What:** `unifiedRespond` produces both structured fields (`type`, `picks`, `clear_filters`) and natural language (`sms_text`) in a single call. The LLM simultaneously decides what to recommend and writes the SMS copy.
+
+**Impact:** When the model makes a poor selection (e.g., picks unmatched events despite filter instructions), there's no checkpoint to catch it before the copy is written. The structured output and prose are entangled — you can't validate picks without also paying for rendering, and you can't re-render without also re-reasoning. This coupling is the root cause of Theme A (category filter drift) and Root Cause C (zero-match fallback): the LLM sees unmatched events in the pool, decides to recommend them, and writes persuasive copy about them, all in one pass.
+
+**Fix direction:** Migration Step 4 — split into reasoning call (`type`, `picks`, `clear_filters` via `tool_use`) and rendering call (`sms_text` from validated picks). Code validates picks between calls. Needs A/B eval to confirm no quality regression.
+
+**Related:** P2 principle, Migration Step 4, Theme A (category filter drift), Root Cause C (zero-match fallback).
+
+### Gap 3: Pool Padding Gives LLM Material to Violate Filter Intent
+
+**What:** `buildTaggedPool` includes up to 5 unmatched events as padding when filter matches are thin. These events are visible to the LLM with no `[MATCH]` tag, intended as context. But the LLM can and does pick from them — especially Gemini Flash, which is less disciplined about respecting `[MATCH]` boundaries.
+
+**Impact:** This is the structural enabler of filter drift. The deterministic filter machinery works correctly — `mergeFilters` compounds filters, `eventMatchesFilters` classifies correctly, matched events are tagged `[MATCH]`. But then the pool hands the LLM 5+ tempting alternatives with no tag, and the LLM writes copy recommending them. Theme A (6 failures), Root Cause C (25% of filter drift), and Theme F (thin coverage) all trace back to this: the LLM has access to events it shouldn't recommend.
+
+**Fix direction:** Three options, not mutually exclusive: (1) Reduce or eliminate unmatched padding — if filters match 3 events, send 3, not 15. This is the simplest and most P1-aligned fix. (2) Add an explicit `[NO_PICK]` tag to unmatched events so the prompt constraint is reinforced structurally. (3) Complete Gap 2 / Step 4 (reasoning/rendering split) so code validates picks against filter matches before rendering.
+
+**Related:** Theme A (category filter drift), Root Cause C (zero-match fallback), Theme F (thin coverage).
+
+### Gap 4: No Degraded-Mode Recovery When LLM Fails
+
+**What:** If the unified LLM call fails (timeout, parse error, provider outage), the only fallback is a generic "Bestie, hit a snag" message. There's no intermediate recovery — no cached-response replay, no deterministic pick-from-pool, no retry with a simpler prompt.
+
+**Impact:** Root Cause A (35% of filter eval failures) showed that a single failed turn cascades into the entire session. The user gets "hit a snag," the session may not save cleanly, and subsequent turns hit stale or missing state. The Gemini-fallback-to-Haiku pattern in `ai.js` is a provider hedge, not graceful degradation — if both fail, the user is stuck. System reliability is fully coupled to LLM provider uptime.
+
+**Fix direction:** Add a deterministic fallback response path: when the LLM call fails, compose a minimal SMS from the tagged pool using code (top 3 `[MATCH]` events, formatted mechanically via `formatters.js`). This preserves session state and gives the user something useful. The fallback won't have the LLM's tone, but it maintains conversation flow. Also: ensure `saveResponseFrame` runs on error paths so sessions aren't corrupted by failures.
+
+**Related:** Root Cause A (502/crashes), Deferred: "No processing ack during slow Claude calls."
+
+### Gap Impact Summary
+
+| Gap | Principle violated | Eval impact | Fix effort |
+|-----|-------------------|-------------|------------|
+| 1: `clear_filters` bridge | P1 (code owns state) | Filter wipe on non-clearing turns; semantic clearing misses | Medium — expand pre-router regex, remove LLM field |
+| 2: Reasoning/rendering coupling | P2 (separate concerns) | Category drift, zero-match fallback (Theme A + Root Cause C) | High — Step 4 A/B eval required |
+| 3: Pool padding | P1 (code owns state) | Structural enabler of filter drift (Theme A, C, F) | Low-Medium — reduce padding or add `[NO_PICK]` tag |
+| 4: No degraded-mode recovery | (No principle yet) | 35% of eval failures cascade from single LLM failure | Medium — deterministic fallback formatter |
+
+Gaps 2 and 3 are the primary blockers for filter drift improvement beyond the current plateau. Gap 1 is the last P1 violation. Gap 4 is the biggest operational risk.
+
+---
+
 ## Open Issues
 
 ### Gemini Flash Migration — Eval Results + Remaining Work (2026-02-28)
@@ -201,7 +260,7 @@ When `[MATCH]` events are sparse, Gemini fills with unmatched events without ack
 
 Scenarios: progressive filter refinement (comedy drops on hood switch), time range + comedy + free stacking (comedy silently dropped), Astoria live music (karaoke/DJ returned for "live music"), Sunset Park live music (karaoke returned), Hell's Kitchen theater (MORE returns comedy/orchestra), Washington Heights music (MORE drops music filter).
 
-**Fix:** Prompt-level. Strengthen the `SPARSE` / zero-match rules in `UNIFIED_SYSTEM` — make the "You MUST lead with 'No [filter] in [neighborhood]'" instruction more emphatic. Possibly add a `COMPOSE_SYSTEM` equivalent rule for the `handleMore` path.
+**Fix:** Prompt-level hardening is a mitigation. The structural fix is Gap 3 (reduce pool padding) + Gap 2 (reasoning/rendering split with pick validation). See Resilience Gaps section.
 
 #### Theme B: Neighborhood expansion not transparent (5 failures)
 
@@ -292,7 +351,7 @@ Same pattern in: free+comedy stacking (compound applied, nothing matched, LLM sh
 
 **Design question, not a code bug.** When filters match zero events, should Pulse: (a) show nothing and say "nothing matches" (strict, frustrating UX), (b) show alternatives with explanation (current behavior, scored as filter failure), or (c) distinguish in the eval between "filter dropped" vs "filter applied, no results"?
 
-**Fixed (2026-02-28):** Prompt hardening in `UNIFIED_SYSTEM` — zero-match instruction now says: "You MUST lead with 'No [filter] in [neighborhood] tonight'. Do NOT show numbered picks from unmatched events." LLM should acknowledge the filter and suggest nearby neighborhoods instead of silently showing non-matching events.
+**Partial fix (2026-02-28):** Prompt hardening in `UNIFIED_SYSTEM` — zero-match instruction now says: "You MUST lead with 'No [filter] in [neighborhood] tonight'. Do NOT show numbered picks from unmatched events." This is a prompt-level mitigation. The structural cause is Gap 3 (pool padding gives the LLM unmatched events to recommend). See Resilience Gaps section.
 
 #### Root Cause D: Nudge-accept ambiguity — "ok"/"sure" resets context (~10% of failures)
 
@@ -380,7 +439,7 @@ Fixing A+B+C+E (done) should address ~90% of failures. Root Cause D (nudge-accep
 |-------|-------------|
 | Concurrent session race conditions | Rare at current traffic |
 | ~~All in-memory state lost on restart~~ | ~~Mitigated: events persist in SQLite, sessions still in-memory~~ **Fixed (2026-02-28):** sessions now persist to `data/sessions.json` |
-| No processing ack during slow Claude calls | Adds extra Twilio cost |
+| No processing ack during slow Claude calls | Adds extra Twilio cost. See Gap 4 (degraded-mode recovery) for broader fallback strategy |
 | No horizontal scalability | Single-process fine at current traffic |
 | No structured logging or correlation IDs | Operational improvement for scale |
 | No integration tests or mocking | Important eventually, not blocking |
