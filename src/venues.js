@@ -355,6 +355,12 @@ const VENUE_MAP = {
   'Singers': { lat: 40.6895, lng: -73.9515 },
   'Salon on Kingston': { lat: 40.6750, lng: -73.9475 },
   'Brooklyn Community Pride Center': { lat: 40.6822, lng: -73.9567 },
+
+  // === Cultural Venues — Nonsense NYC Recurring ===
+  'Fabrik Dumbo': { lat: 40.7036, lng: -73.9870 },
+  'Fabrik': { lat: 40.7036, lng: -73.9870 },
+  'The Sailboat': { lat: 40.7087, lng: -73.9246 },
+  'Studios 797': { lat: 40.7440, lng: -73.9485 },
 };
 
 // Build normalized lookup map at module load
