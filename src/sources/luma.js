@@ -90,35 +90,43 @@ async function fetchLumaEvents() {
 
     console.log(`Luma: ${allEntries.length} raw entries fetched`);
 
+    // Debug: log date boundaries for first run
+    if (allEntries.length > 0) {
+      const sampleStart = allEntries[0].event?.start_at;
+      const sampleDate = sampleStart ? new Date(sampleStart).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) : 'none';
+      console.log(`Luma debug: today=${today} endDate=${endDate} sampleStart=${sampleStart} sampleDate=${sampleDate}`);
+    }
+
     const events = [];
     const seen = new Set();
+    let skipReasons = { virtual: 0, obfuscated: 0, bbox: 0, noStart: 0, dateRange: 0 };
 
     for (const entry of allEntries) {
       const ev = entry.event;
       if (!ev || !ev.name) continue;
 
       // Skip virtual/online events
-      if (ev.location_type !== 'offline') continue;
+      if (ev.location_type !== 'offline') { skipReasons.virtual++; continue; }
 
       // Skip obfuscated locations (no usable venue info)
       const geo = ev.geo_address_info;
       const coord = ev.coordinate;
-      if (geo?.mode === 'obfuscated' && !coord) continue;
+      if (geo?.mode === 'obfuscated' && !coord) { skipReasons.obfuscated++; continue; }
 
       // NYC bounding box filter — the API's city param isn't strict
       if (coord?.latitude && coord?.longitude) {
         const cLat = coord.latitude, cLng = coord.longitude;
-        if (cLat < 40.49 || cLat > 40.92 || cLng < -74.26 || cLng > -73.70) continue;
+        if (cLat < 40.49 || cLat > 40.92 || cLng < -74.26 || cLng > -73.70) { skipReasons.bbox++; continue; }
       }
 
       // Extract date in NYC timezone
-      if (!ev.start_at) continue;
+      if (!ev.start_at) { skipReasons.noStart++; continue; }
       const startAt = new Date(ev.start_at);
-      if (isNaN(startAt.getTime())) continue;
+      if (isNaN(startAt.getTime())) { skipReasons.noStart++; continue; }
       const dateLocal = startAt.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); // YYYY-MM-DD
 
       // Date filter: only keep events within 7-day window
-      if (dateLocal < today || dateLocal > endDate) continue;
+      if (dateLocal < today || dateLocal > endDate) { skipReasons.dateRange++; continue; }
       const startTimeLocal = ev.start_at; // already ISO 8601
 
       let endTimeLocal = null;
@@ -184,7 +192,7 @@ async function fetchLumaEvents() {
       });
     }
 
-    console.log(`Luma: ${events.length} events (after date/location filter)`);
+    console.log(`Luma: ${events.length} events (after date/location filter). Skipped: ${JSON.stringify(skipReasons)}`);
     return events;
   } catch (err) {
     console.error('Luma error:', err.message);
