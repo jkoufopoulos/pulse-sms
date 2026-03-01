@@ -211,4 +211,34 @@ function backfillDateTimes(events) {
   return events;
 }
 
-module.exports = { FETCH_HEADERS, makeEventId, normalizeExtractedEvent, normalizeEventName, computeCompleteness, backfillEvidence, backfillDateTimes };
+/**
+ * Strip HTML to plain text, preserving <a href> URLs as "text (URL)" format.
+ */
+function stripHtml(html) {
+  return html
+    // Convert <a href="url">text</a> to "text (url)"
+    .replace(/<a\s[^>]*href=["']([^"']*)["'][^>]*>(.*?)<\/a>/gi, (_, url, text) => {
+      const cleanText = text.replace(/<[^>]*>/g, '').trim();
+      // If the link text is the URL itself, just keep the URL
+      if (cleanText === url || !cleanText) return url;
+      return `${cleanText} (${url})`;
+    })
+    // Convert <br> and block elements to newlines
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|h[1-6]|li|tr)>/gi, '\n')
+    // Strip remaining tags
+    .replace(/<[^>]*>/g, '')
+    // Decode common HTML entities
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    // Collapse whitespace but preserve paragraph breaks
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+module.exports = { FETCH_HEADERS, makeEventId, normalizeExtractedEvent, normalizeEventName, computeCompleteness, backfillEvidence, backfillDateTimes, stripHtml };
