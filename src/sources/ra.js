@@ -4,13 +4,31 @@ const { lookupVenue } = require('../venues');
 
 const RA_NYC_AREA_ID = 8;
 
+function parseRACost(cost) {
+  if (cost == null || cost === '') return null;
+  const s = String(cost).trim();
+  if (s === '0') return { is_free: true, price_display: 'free' };
+  // Range like "7-15"
+  const range = s.match(/^(\$?)(\d+(?:\.\d+)?)\s*-\s*(\$?)(\d+(?:\.\d+)?)(\+?)$/);
+  if (range) {
+    return { is_free: false, price_display: `$${range[2]}-$${range[4]}${range[5]}` };
+  }
+  // Single price like "$20", "20", "$20+", "$54"
+  const single = s.match(/^\$?(\d+(?:\.\d+)?)(\+?)$/);
+  if (single) {
+    return { is_free: false, price_display: `$${single[1]}${single[2]}` };
+  }
+  // Unrecognized format — pass through as-is
+  return { is_free: false, price_display: s };
+}
+
 const RA_QUERY = `query GET_EVENT_LISTINGS($filters: FilterInputDtoInput, $filterOptions: FilterOptionsInputDtoInput, $page: Int, $pageSize: Int) {
   eventListings(filters: $filters, filterOptions: $filterOptions, pageSize: $pageSize, page: $page) {
     data {
       id
       listingDate
       event {
-        id title date startTime endTime contentUrl isTicketed
+        id title date startTime endTime contentUrl isTicketed cost
         venue { id name contentUrl }
         artists { id name }
         pick { blurb }
@@ -117,8 +135,8 @@ async function fetchRAEvents() {
           end_time_local: endTime,
           date_local: dateLocal,
           time_window: null,
-          is_free: /\bfree\b/i.test(e.title || ''),
-          price_display: /\bfree\b/i.test(e.title || '') ? 'free' : null,
+          is_free: parseRACost(e.cost)?.is_free ?? /\bfree\b/i.test(e.title || ''),
+          price_display: parseRACost(e.cost)?.price_display ?? (/\bfree\b/i.test(e.title || '') ? 'free' : null),
           category: 'nightlife',
           subcategory: null,
           ticket_url: e.contentUrl ? `https://ra.co${e.contentUrl}` : null,
