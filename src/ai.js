@@ -77,7 +77,10 @@ async function unifiedWithGemini(systemPrompt, userPrompt) {
     },
   });
 
-  const result = await gemModel.generateContent({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }] });
+  const result = await withTimeout(
+    gemModel.generateContent({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }] }),
+    15_000, 'unifiedWithGemini'
+  );
   const response = result.response;
   const finishReason = response.candidates?.[0]?.finishReason;
   if (finishReason && finishReason !== 'STOP') {
@@ -105,7 +108,10 @@ async function extractWithGemini(systemPrompt, userPrompt) {
     generationConfig: { maxOutputTokens: 4096, temperature: 0, responseMimeType: 'application/json' },
   });
 
-  const result = await gemModel.generateContent({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }] });
+  const result = await withTimeout(
+    gemModel.generateContent({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }] }),
+    90_000, 'extractWithGemini'
+  );
   const response = result.response;
   const text = response.text() || '';
   const usageMetadata = response.usageMetadata;
@@ -129,7 +135,10 @@ async function detailsWithGemini(systemPrompt, userPrompt) {
     generationConfig: { maxOutputTokens: 1024, temperature: 0.8 },
   });
 
-  const result = await gemModel.generateContent({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }] });
+  const result = await withTimeout(
+    gemModel.generateContent({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }] }),
+    15_000, 'detailsWithGemini'
+  );
   const response = result.response;
   const text = response.text() || '';
   const usageMetadata = response.usageMetadata;
