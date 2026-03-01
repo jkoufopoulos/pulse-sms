@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-01 (Gap 3 pool padding fix, 3-model comparison eval, Yutori junk event filter, eval trajectory & trends, Skint ongoing events scraper, Friday/Saturday newsletter event loss fix, systemic failure fixes, handler.js events bug, Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
+> Last updated: 2026-03-01 (NYC Parks neighborhood resolution, price extraction gaps, refreshSources bug fix, post-Gap-3 eval findings — dead handleZeroMatch, session contamination, conversational-with-pool; Gap 3 pool padding fix, 3-model comparison eval, Yutori junk event filter, eval trajectory & trends, Skint ongoing events scraper, Friday/Saturday newsletter event loss fix, systemic failure fixes, handler.js events bug, Haiku baseline, codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout, resilience gap analysis)
 
 ---
 
@@ -315,6 +315,49 @@ Scenarios: Astoria MORE (says "that's everything" with 0 new picks, then detail 
 
 **Haiku baseline confirmed (2026-02-28):** Themes A, B, E, and F are systemic — Haiku fails the same scenarios. Only 7 of the 20 Gemini failures are Gemini-specific regressions. See Haiku baseline section above for full breakdown.
 
+### Post-Gap 3 Eval Findings — 0/26 filter_drift (2026-03-01)
+
+**Status:** Gap 3 pool padding fix landed and works correctly — filtered pools no longer include unmatched events. But 0/26 filter_drift scenarios pass. Post-fix eval against Railway (1421 events cached, judge off, code evals only: 96.9% pass at 2118/2185) revealed 5 issues.
+
+**Pool size distribution across 115 response turns:**
+
+| Pool Size | Turns | % |
+|-----------|-------|---|
+| 0 (empty) | 47 | 41% |
+| 1-5 (sparse) | 44 | 38% |
+| 6-9 | 22 | 19% |
+| 14-15 (full) | 2 | 2% |
+
+**Code eval failure breakdown:** latency_under_10s (30), off_topic_redirect (21), neighborhood_accuracy (7), neighborhood_expansion_transparency (3), day_label_accuracy (2), schema_compliance (2), category_adherence (1), compound_filter_accuracy (1).
+
+#### Issue 1: `handleZeroMatch` is dead code (HIGHEST IMPACT — 41% of turns)
+
+`handleZeroMatch` exists at handler.js:613 but is never called. The main flow at handler.js:735-738 goes `resolveUnifiedContext → callUnified → handleUnifiedResponse` with no `matchCount` check. When the pool is empty, the LLM receives 0 events, wastes $0.001, and generates repetitive "No X in Y — got X in Z" responses. Every follow-up ("paid is fine too", "forget jazz") hits the same empty pool → same LLM response → inescapable loop.
+
+Fully stuck scenarios (100% zero-pool): 7, 16, 20, 24. Partially stuck (some turns zero-pool): 19 more.
+
+**Fix:** Add `if (matchCount === 0 && hasActiveFilters) return handleZeroMatch(...)` before `callUnified`. Saves $0.001/turn, gives deterministic non-repetitive responses, breaks the loop.
+
+#### Issue 2: Eval runner session contamination (3 scenarios)
+
+Scenarios 1 ("east village" → jazz filter) and 3 ("les" → comedy filter) start with filters the first user message couldn't have set. Phone numbers are deterministic (hash-based) and Railway's session store retains sessions from previous runs. The session clear request may succeed but sessions from other concurrent scenarios in the same run could also contaminate via hash collision.
+
+**Fix:** Add run-unique prefix to eval phone numbers so each run gets clean sessions.
+
+#### Issue 3: LLM returns conversational despite having events (15 scenarios)
+
+15 scenarios have turns where pool > 0 but LLM intent = "conversational" — it decides the soft matches aren't good enough and says "nothing here, try elsewhere?" instead of picking from available events.
+
+**Fix:** Investigate which events are in the pool vs what the LLM declines. May need prompt tuning for sparse/soft-match pools.
+
+#### Issue 4: Latency from Tavily fallback (30 code eval failures)
+
+When pool is sparse and user has visited the hood before, Tavily fires adding 5-15s. Accounts for all 30 `latency_under_10s` failures. Acceptable tradeoff for last-resort fallback, but inflates failure count.
+
+#### Issue 5: Trace gap on MORE/details paths (cosmetic)
+
+`trace.composition.active_filters` only set in `callUnified`. Pre-router paths (more, details) show `filters: null` in trace_debug. Filters are preserved in session — this is a reporting gap, not filter loss.
+
 ### Filter Drift — Root Cause Analysis (updated 2026-02-28)
 
 **Status:** 59/130 scenario evals passing (45%), 7/47 regression evals passing (15%). Updated analysis below based on 47 filter persistence failures from 2026-02-28 eval run against Railway. **The deterministic filter machinery (`mergeFilters`, `buildTaggedPool`) is working correctly.** Failures are upstream (infrastructure), downstream (LLM compose), and at the edges (nudge-accept, pre-router session requirements).
@@ -381,7 +424,7 @@ Two sub-cases: (1) Overlap with Root Cause C — compound filter matches nothing
 | **D: Nudge-accept** | ~10% | Yes (missing field) | Add `neighborhood` to `ask_neighborhood` pending object | **Fixed (2026-03-01)** |
 | **E: Stacking via pre-router** | ~15% | Yes (pre-router edge case) | Remove `lastPicks.length > 0` gate from filter detection | **Fixed (2026-02-28)** |
 
-All five root causes (A-E) are now fixed. Remaining filter_drift failures are likely LLM compose-time issues (picking non-matching events from padded pool — Gap 3).
+All five root causes (A-E) are now fixed. Gap 3 (pool padding) is also fixed. However, post-Gap-3 eval (2026-03-01, 0/26 filter_drift) revealed `handleZeroMatch` is dead code — never called in the request flow. See "Post-Gap 3 Eval Findings" open issue below.
 
 ### P5 — Temporal Accuracy (was 25%, expected fixed)
 
@@ -487,7 +530,10 @@ The extraction audit shows 82-100% pass rates on most days, but this is misleadi
 
 | Action | Expected Impact | Effort | Status |
 |--------|----------------|--------|--------|
-| Reduce pool padding for zero-match filters (Gap 3) | +10-15% filter_drift (structural fix) | Medium | **Done (2026-03-01)** |
+| Wire up `handleZeroMatch` bypass | +20-30% filter_drift (41% of turns are zero-pool) | Low | **In progress** |
+| Fix eval runner session contamination | Cleaner eval signal (3 scenarios contaminated) | Low | **In progress** |
+| Reduce pool padding for zero-match filters (Gap 3) | +10-15% filter_drift (structural fix) | Medium | **Done (2026-03-01)** — exposed dead handleZeroMatch |
+| Investigate LLM conversational-with-pool (15 scenarios) | +10% filter_drift | Medium | Planned |
 | Stabilize eval judge (pin Sonnet, add deterministic assertions) | Reduces noise, enables real A/B | Low | Planned |
 | Tavily fallback for thin neighborhoods | +5-10% happy_path, poor_experience | Done (2026-03-01) | Verify in next run |
 | Nudge-accept flow (`pendingNearby` + pre-router) | +5% filter_drift (Root Cause D) | Low | **Done (2026-03-01)** |
@@ -497,13 +543,27 @@ The extraction audit shows 82-100% pass rates on most days, but this is misleadi
 
 ## Completed Work
 
+### NYC Parks Neighborhood Resolution + Price Extraction + refreshSources Bug Fix (2026-03-01)
+
+**Problem:** 68 free events with unknown neighborhoods (94% from NYC Parks), 1,037 non-free events with no `price_display`, and a `refreshSources` bug preventing selective scrapes from replacing stale events.
+
+**NYC Parks fix:** The scraper passed only `borough` to `resolveNeighborhood()`, which returns null for boroughs by design. Added `lookupVenue()` call before borough fallback (same pattern as `ra.js`), so parks in `VENUE_MAP` resolve to neighborhoods via coords. Added 10 missing park entries to `VENUE_MAP` (The High Line, Brooklyn Bridge Park, Pier 6, Marine Park, etc.). Result: 46/97 NYC Parks events now resolve neighborhoods (was 31).
+
+**RA price fix:** `isTicketed` was fetched in the GraphQL query but never used. Now `is_free: true` when `isTicketed === false`. Result: 63 RA events correctly marked free.
+
+**DoNYC price fix:** Expanded free detection regex to catch `$0`/`$0.00` patterns alongside `\bfree\b`.
+
+**refreshSources bug fix:** `refreshSources` used direct string comparison (`e.source_name === t.label.toLowerCase()`) to remove old events before merging new ones. This failed for sources with underscores — `'nyc_parks' !== 'nycparks'`. Old events stayed in cache, new ones deduped against them. Fixed by reusing the existing `normalize()` function (strips non-alpha) that was already used for input matching.
+
+**Changes:** `src/sources/nyc-parks.js` (lookupVenue import + venue coord lookup), `src/venues.js` (10 park entries + geocode miss logging), `src/sources/ra.js` (isTicketed → is_free), `src/sources/donyc.js` ($0 regex), `src/events.js` (normalize-based source matching in refreshSources).
+
 ### Gap 3 Fix: Remove Unmatched Pool Padding When Filters Active (2026-03-01)
 
 Eliminated unmatched event padding from `buildTaggedPool` when filters are active. Previously, the pool was padded to 15 events with unmatched events, giving the LLM material to violate filter intent (the structural root cause of remaining filter_drift failures). Now the LLM only sees hard + soft matched events. Perennial picks (also unmatched) are skipped when filters have matches.
 
 **Changes:** `buildTaggedPool` in pipeline.js (removed `unmatchedSlice` line), `resolveUnifiedContext` in handler.js (conditional perennial padding), 8 test assertions updated in pipeline.test.js. No-filter path unchanged (still 15 diverse events). Zero-match bypass (`handleZeroMatch`) unchanged.
 
-**Expected impact:** +10-15% filter_drift pass rate. Needs eval verification.
+**Eval verification (2026-03-01):** 0/26 filter_drift passing. Pool padding removal worked as intended (pool now correctly empty when no matches), but exposed a critical issue: `handleZeroMatch` was never wired into the request flow — the function exists but is never called. 41% of response turns send 0 events to the LLM, which wastes an API call and generates repetitive dead-end responses. See "Post-Gap 3 Eval Findings" open issue below.
 
 ### Step 7: executeQuery Pipeline — Single Prompt Path (2026-03-01)
 
