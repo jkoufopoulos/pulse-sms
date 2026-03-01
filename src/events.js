@@ -479,12 +479,8 @@ async function refreshSources(sourceNames, { reprocess = false } = {}) {
   );
 
   // Remove old events from targeted sources, keep everything else
-  const kept = eventCache.filter(e => {
-    for (const t of targets) {
-      if (e.source_name === t.label.toLowerCase() || e.source_name === t.label) return false;
-    }
-    return true;
-  });
+  const targetNorms = new Set(targets.map(t => normalize(t.label)));
+  const kept = eventCache.filter(e => !targetNorms.has(normalize(e.source_name)));
 
   // Merge in new events
   const seen = new Set(kept.map(e => e.id));
