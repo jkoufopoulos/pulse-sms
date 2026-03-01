@@ -500,17 +500,22 @@ All five root causes (A-E) are now fixed. Gap 3 (pool padding) and handleZeroMat
 
 5. **Preference profiles capture opener signals** — `updateProfile` (fire-and-forget after `saveResponseFrame`) captures categories, price, and time preferences. Canned greeting paths skip this entirely. Users who reveal preferences in openers ("jazz", "free stuff", "late night") don't contribute to their profile.
 
-**Fix strategy:** Two options, increasing complexity:
+**Fix (2026-03-01) — Prompt-level filter_intent for bare openers:**
 
-| Option | Change | Effort | Tradeoff |
-|--------|--------|--------|----------|
-| **A: Save conversation-only frame after canned responses** | Add `saveResponseFrame` call to `handleConversational`/`handleHelp` with empty picks but valid conversation state. Sets `lastFilters: {}` and triggers `updateProfile`. | Small | Doesn't capture filter intent from the opener message |
-| **B: Route opener-with-intent through unified instead of pre-router** | Messages like "hi" stay pre-router. But "jazz", "comedy tonight", "surprise me" with no session → skip pre-router, go to unified, which already saves full state via `saveResponseFrame`. | Medium | Already works this way today (these fall through to unified). The gap is only that canned-greeting turns don't save state. Option A is sufficient. |
-| **C: Extract filter intent from canned-path messages and save** | After canned greeting, inspect the user's next message for category/vibe/time signals before routing. Save detected filters to session even on the canned path. | Medium | Most complete but adds complexity to the pre-router; risks P6 violations |
+Option A (save empty `saveResponseFrame` on canned paths) was analyzed and rejected — the pre-router guard (`lastNeighborhood || lastPicks.length > 0`) still fails with empty picks and null hood, so it doesn't unlock filter detection on subsequent turns. The conversation history bridge already works via `addToHistory` in `finalizeTrace`.
 
-**Recommended:** Option A first (quick win — save conversation frame on all canned paths), then evaluate whether the filter gap matters enough for Option C. The citywide flow already works well via conversation history; the main value is making it deterministic.
+The real gap was that the UNIFIED_SYSTEM prompt only showed `filter_intent` examples for compound openers ("comedy in the EV") and time constraints ("late night stuff"), not bare category/price openers. The handler already processes `filter_intent.action === 'modify'` and saves normalized filters to `lastFilters` — but the LLM wasn't reporting it for "jazz", "free stuff", "comedy tonight" etc.
 
-**Principles:** P1 (code owns state — opener filters should be deterministic, not LLM-dependent), P4 (one save path — canned responses should also save via `saveResponseFrame`).
+**Change:** Expanded `INITIAL FILTER PREFERENCES` instruction in prompts.js to cover all openers (bare category, price, time, vibe). Added 3 explicit examples: "live jazz" → `{ category: "jazz" }`, "free stuff" → `{ free_only: true }`, "comedy tonight" → `{ category: "comedy" }`. The normalizer maps "jazz" → `{ category: "live_music", subcategory: "jazz" }` via `CATEGORY_NORMALIZE`.
+
+**Result:** Filter persistence through citywide→neighborhood is now P1-compliant. Verified: "jazz" → citywide jazz picks + `lastFilters: {category: live_music, subcategory: jazz}` → "west village" → `mergeFilters(jazzFilters, null)` preserves jazz → `buildTaggedPool` tags WV jazz with `[MATCH]` → "free" → pre-router compounds `{free_only: true}` on top.
+
+**Remaining gaps (lower priority):**
+- Gap 2 (pre-router skipped after canned greeting) — unchanged, minor cost impact only
+- Gap 3 (citywide `visitedHoods`) — unchanged, Tavily fallback unreachable for citywide→narrow flows
+- Gap 5 (preference profiles on canned paths) — unchanged, greeting-only turns don't capture preferences
+
+**Principles:** P1 (code owns state — opener filters now deterministic via filter_intent), P5 (minimal LLM output — filter_intent is a structured field the handler already processes).
 
 ### Deferred (post-MVP)
 
