@@ -650,6 +650,14 @@ Scenario pass rate is low because each scenario requires ALL assertions to pass 
 
 ## Completed Work
 
+### Remove OhMyRockness source (2026-03-01)
+
+**Problem:** OhMyRockness scraped 15 events but only 3 survived into the final cache (80% loss rate). Investigation showed most events were duplicates of higher-weight sources (BrooklynVegan, Songkick). The 3 survivors (Cat Power @ Brooklyn Steel, The Hives @ Brooklyn Paramount, Courtney Barnett @ Rough Trade) were all major shows already covered elsewhere.
+
+**Fix:** Removed OhMyRockness from SOURCES array in `source-registry.js`, SOURCE_TIERS, scrape audit minimums, and extraction completeness set. Scraper file (`sources/ohmyrockness.js`) preserved for potential re-enablement. Active sources: 18 → 17.
+
+**Changes:** `src/source-registry.js`, `src/evals/scrape-audit.js`, `src/evals/source-completeness.js`.
+
 ### Scrape audit dashboards + data quality fixes (2026-03-01)
 
 **Problem:** The scrape audit module (`src/evals/scrape-audit.js`) was generating reports but the data wasn't visible in any dashboard. Additionally, the `time_format_valid` check rejected valid ISO 8601 variants (timezone suffixes, milliseconds) used by 12 of 15 structured sources, inflating the failure rate.
