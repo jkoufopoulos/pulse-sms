@@ -1,6 +1,7 @@
 const express = require('express');
 const twilio = require('twilio');
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
+const { formatTime, smartTruncate } = require('./formatters');
 const { startTrace, saveTrace, getLatestTraceForPhone, recordAICost } = require('./traces');
 const { getSession, setSession, clearSession, addToHistory, clearSessionInterval } = require('./session');
 const { preRoute } = require('./pre-router');
@@ -8,7 +9,7 @@ const { handleHelp, handleConversational, handleDetails, handleMore } = require(
 const { sendRuntimeAlert } = require('./alerts');
 const { getEventById } = require('./events');
 const { lookupReferralCode, recordAttribution } = require('./referral');
-const { saveResponseFrame } = require('./pipeline');
+const { saveResponseFrame, buildEventMap } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
 const { routeModel } = require('./model-router');
 const { processedMessages, OPT_OUT_KEYWORDS, isOverBudget, trackAICost, getCostSummary, getBudgetUsedPct, ipRateLimits, IP_RATE_LIMIT, IP_RATE_WINDOW, clearGuardIntervals } = require('./request-guard');
@@ -333,10 +334,86 @@ async function handleMessageAI(phone, message) {
   });
   trace.routing.model_routing = routing;
 
-  const result = await callUnified(message, unifiedCtx, session, history, phone, trace, { model: routing.model });
-  await handleUnifiedResponse(result, unifiedCtx, phone, session, trace, message, finalizeTrace);
-  // Clear lastZeroMatch after LLM turn so zero-match bypass can fire on the next turn
-  if (session?.lastZeroMatch) setSession(phone, { lastZeroMatch: false });
+  try {
+    const result = await callUnified(message, unifiedCtx, session, history, phone, trace, { model: routing.model });
+    await handleUnifiedResponse(result, unifiedCtx, phone, session, trace, message, finalizeTrace);
+    // Clear lastZeroMatch after LLM turn so zero-match bypass can fire on the next turn
+    if (session?.lastZeroMatch) setSession(phone, { lastZeroMatch: false });
+  } catch (llmErr) {
+    console.error('LLM failed, degraded fallback:', llmErr.message);
+    await handleDegradedFallback(unifiedCtx, phone, session, trace, finalizeTrace, llmErr);
+  }
+}
+
+/**
+ * Degraded-mode fallback: compose deterministic picks from the pre-resolved
+ * tagged pool when the LLM call fails. $0 AI cost, session saved (P4).
+ */
+async function handleDegradedFallback(unifiedCtx, phone, session, trace, finalizeTrace, err) {
+  const { hood, activeFilters, events, curated } = unifiedCtx;
+
+  // Pick top 3, preferring filter-matched events
+  const matched = events.filter(e => e.filter_match === 'hard' || e.filter_match === 'soft');
+  const pool = matched.length > 0 ? matched : events;
+  const top = pool.slice(0, 3);
+
+  if (top.length === 0) {
+    trace.composition.latency_ms = 0;
+    trace.composition.degraded_mode = true;
+    trace.composition.degraded_error = err.message;
+    const sms = "I'm having a moment — try again in a sec!";
+    await sendSMS(phone, sms);
+    finalizeTrace(sms, 'events');
+    return;
+  }
+
+  // Format numbered picks deterministically
+  const header = hood ? `Here's what's happening in ${hood}:` : "Here's what's happening tonight:";
+  const lines = top.map((e, i) => {
+    let line = `${i + 1}. ${e.name}`;
+    if (e.venue_name && e.venue_name !== 'TBA') line += ` at ${e.venue_name}`;
+    if (e.start_time_local) line += ` — ${formatTime(e.start_time_local)}`;
+    if (e.is_free) line += ' (Free!)';
+    return line;
+  });
+  const footer = 'Reply a number for details, or "more" for more picks.';
+  const sms = smartTruncate(`${header}\n\n${lines.join('\n')}\n\n${footer}`);
+
+  // P4: one save path — save session with fallback picks
+  const eventMap = buildEventMap(curated);
+  for (const e of events) eventMap[e.id] = e;
+  const picks = top.map(e => ({ event_id: e.id, why: 'degraded fallback' }));
+
+  saveResponseFrame(phone, {
+    picks,
+    eventMap,
+    neighborhood: hood,
+    filters: activeFilters,
+    offeredIds: top.map(e => e.id),
+    visitedHoods: [...new Set([...(session?.visitedHoods || []), hood].filter(Boolean))],
+  });
+
+  trace.routing.latency_ms = trace.routing.latency_ms || 0;
+  trace.composition.latency_ms = 0;
+  trace.composition.degraded_mode = true;
+  trace.composition.degraded_error = err.message;
+  trace.composition.picks = top.map(e => ({
+    event_id: e.id, why: 'degraded fallback',
+    event_name: e.name, venue_name: e.venue_name,
+    neighborhood: e.neighborhood, category: e.category,
+  }));
+
+  await sendSMS(phone, sms);
+  finalizeTrace(sms, 'events');
+
+  // Fire-and-forget runtime alert
+  sendRuntimeAlert('llm_failure', {
+    error: err.message,
+    phone_masked: maskPhone(phone),
+    hood,
+    event_count: events.length,
+    degraded_picks: top.length,
+  });
 }
 
 // Cleanup intervals (for graceful shutdown)

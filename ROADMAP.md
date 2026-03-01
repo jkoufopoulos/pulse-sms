@@ -568,6 +568,16 @@ The real gap was that the UNIFIED_SYSTEM prompt only showed `filter_intent` exam
 
 - **Outer-borough scenarios are cache-dependent, not code-dependent:** Scenarios for thin neighborhoods (Washington Heights, Red Hook, Sunset Park) fail when the daily cache has few/no events there. These aren't code bugs — they're coverage gaps. The Tavily live-search fallback (landed 2026-03-01) may improve these, but the eval doesn't account for fallback latency.
 
+### Degraded-Mode LLM Fallback + MORE Dedup Hardening (2026-03-01)
+
+**Gap 4 fixed:** When `callUnified` fails (timeout, API error, parse failure), the handler now composes deterministic picks from the already-resolved tagged pool at $0 AI cost. Picks top 3 events (preferring `[MATCH]`-tagged), formats numbered picks with venue/time/free, saves session via `saveResponseFrame` (P4), marks trace as `degraded_mode: true`, fires `sendRuntimeAlert('llm_failure', ...)`. If zero events available, sends "I'm having a moment" message. Previously users got "Bestie hit a snag" with no session save, no trace, and no useful content.
+
+**MORE dedup hardened:** Added pre-compose name dedup in `handleMore` — builds a set of all previously offered event names from `allShownIds` and filters the remaining pool before composing. Catches cross-source duplicates with different IDs but same event name (e.g. same show on Dice and BrooklynVegan). Falls back to unfiltered pool if dedup would empty it. Existing post-compose name dedup stays as second layer. Also fixes "later tonight" repeating events — same dedup applies after time filtering.
+
+**Also confirmed already handled:** "live music" pre-router detection (catMap covers it), "anything tonight?" openers (pre-router + unified LLM), "nah im good" (pre-router conversational).
+
+**Changes:** `src/handler.js` (try/catch + `handleDegradedFallback` function, new imports), `src/intent-handlers.js` (pre-compose name dedup in `handleMore`).
+
 ### Extraction Audit — Evidence Coverage (2026-03-01)
 
 **Before:** 7.4% pass rate (26/349) — deterministic parsers (Skint, Yutori trivia/general) skipped evidence blocks, and Haiku omits evidence in extraction responses.

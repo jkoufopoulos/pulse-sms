@@ -211,9 +211,17 @@ async function handleMore(ctx) {
       ? filterByTimeAfter(inHoodRemaining, activeFilters.time_after)
       : inHoodRemaining;
 
-    if (timeGated.length > 0) {
-      const composeRemaining = timeGated.slice(0, 8);
-      const isLastBatch = timeGated.length <= 8;
+    // Pre-compose name dedup: exclude events whose name matches any previously offered event
+    // Catches cross-source duplicates with different IDs but same event name
+    const offeredNames = new Set(
+      [...allShownIds].map(id => ctx.session.lastEvents[id]?.name?.toLowerCase()).filter(Boolean)
+    );
+    const nameDeduped = timeGated.filter(e => !offeredNames.has(e.name?.toLowerCase()));
+    const dedupedPool = nameDeduped.length > 0 ? nameDeduped : timeGated;
+
+    if (dedupedPool.length > 0) {
+      const composeRemaining = dedupedPool.slice(0, 8);
+      const isLastBatch = dedupedPool.length <= 8;
       const exhaust = isLastBatch ? buildExhaustionMessage(hood, {
         adjacentHoods: getAdjacentNeighborhoods(hood, 3),
         visitedHoods: ctx.session?.visitedHoods || [],
@@ -221,8 +229,8 @@ async function handleMore(ctx) {
       }) : null;
 
       ctx.trace.events.cache_size = Object.keys(ctx.session.lastEvents).length;
-      ctx.trace.events.candidates_count = timeGated.length;
-      ctx.trace.events.candidate_ids = timeGated.map(e => e.id);
+      ctx.trace.events.candidates_count = dedupedPool.length;
+      ctx.trace.events.candidate_ids = dedupedPool.map(e => e.id);
       const skills = isLastBatch ? { isLastBatch: true, exhaustionSuggestion: exhaust.message } : {};
       const result = await composeViaExecuteQuery(composeRemaining, ctx, { hood, activeFilters, excludeIds: [...allShownIds], skills });
 
@@ -255,7 +263,7 @@ async function handleMore(ctx) {
         .catch(err => console.error('profile update failed:', err.message));
       await sendComposeWithLinks(ctx.phone, result, ctx.session.lastEvents);
 
-      console.log(`More sent to ${ctx.masked} (${timeGated.length} remaining in ${hood}${isLastBatch ? ', last batch' : ''})`);
+      console.log(`More sent to ${ctx.masked} (${dedupedPool.length} remaining in ${hood}${isLastBatch ? ', last batch' : ''})`);
       ctx.finalizeTrace(result.sms_text, 'more');
       return;
     }
