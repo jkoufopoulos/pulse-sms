@@ -2,6 +2,18 @@ const { makeEventId, FETCH_HEADERS } = require('./shared');
 const { getNycDateString, resolveNeighborhood, inferCategory } = require('../geo');
 const { learnVenueCoords } = require('../venues');
 
+const DICE_BASE = 'https://dice.fm/browse/new_york-5bbf4db0f06331478e9b2c59';
+
+// Category pages to fetch — covers the main event types on Dice NYC
+const DICE_CATEGORIES = [
+  'music/gig',
+  'music/dj',
+  'music/party',
+  'culture/comedy',
+  'culture/theatre',
+  'culture/social',
+];
+
 function mapDiceCategory(tagTypes) {
   if (!Array.isArray(tagTypes) || tagTypes.length === 0) return null;
   const all = tagTypes.map(t => (t.value || t.title || '').toLowerCase()).join(' ');
@@ -16,32 +28,44 @@ function mapDiceCategory(tagTypes) {
   return null;
 }
 
+async function fetchDicePage(url) {
+  const res = await fetch(url, {
+    headers: FETCH_HEADERS,
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) return [];
+
+  const html = await res.text();
+  const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  if (!match) return [];
+
+  let nextData;
+  try { nextData = JSON.parse(match[1]); } catch { return []; }
+
+  return nextData?.props?.pageProps?.events || [];
+}
+
 async function fetchDiceEvents() {
   console.log('Fetching Dice...');
   try {
-    const res = await fetch('https://dice.fm/browse/new_york-5bbf4db0f06331478e9b2c59', {
-      headers: FETCH_HEADERS,
-      signal: AbortSignal.timeout(10000),
-    });
+    // Fetch all category pages in parallel
+    const urls = DICE_CATEGORIES.map(cat => `${DICE_BASE}/${cat}`);
+    const results = await Promise.allSettled(urls.map(fetchDicePage));
 
-    if (!res.ok) {
-      console.error(`Dice fetch failed: ${res.status}`);
-      return [];
+    // Dedup raw events by Dice event ID before parsing
+    const seenDiceIds = new Set();
+    const rawEvents = [];
+    for (const result of results) {
+      if (result.status !== 'fulfilled') continue;
+      for (const e of result.value) {
+        if (!e.id || seenDiceIds.has(e.id)) continue;
+        seenDiceIds.add(e.id);
+        rawEvents.push(e);
+      }
     }
 
-    const html = await res.text();
-    const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-    if (!match) {
-      console.warn('Dice: __NEXT_DATA__ not found');
-      return [];
-    }
-
-    let nextData;
-    try { nextData = JSON.parse(match[1]); } catch { return []; }
-
-    const rawEvents = nextData?.props?.pageProps?.events;
-    if (!Array.isArray(rawEvents) || rawEvents.length === 0) {
-      console.warn('Dice: no events found in __NEXT_DATA__');
+    if (rawEvents.length === 0) {
+      console.warn('Dice: no events found across category pages');
       return [];
     }
 
@@ -97,7 +121,7 @@ async function fetchDiceEvents() {
       });
     }
 
-    console.log(`Dice: ${events.length} events`);
+    console.log(`Dice: ${events.length} events (from ${rawEvents.length} unique across ${DICE_CATEGORIES.length} categories)`);
     return events;
   } catch (err) {
     console.error('Dice error:', err.message);
