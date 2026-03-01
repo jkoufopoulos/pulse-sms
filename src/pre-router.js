@@ -250,10 +250,11 @@ function preRoute(message, session) {
   // fall back to existing session filters (compounding). Including all keys from
   // base.filters would overwrite existing filters with null — causing the
   // "free replaces comedy" stacking bug.
-  // Guard: requires active session (picks loaded OR neighborhood set). lastNeighborhood
-  // is NOT required — misspelled neighborhoods leave it null but filters should still detect.
+  // Guard: requires active session (picks loaded OR neighborhood set OR active filters).
+  // Active filters covers the case where first-message compounds (e.g. "jazz") get
+  // ask_neighborhood responses — no hood/picks saved, but filters are in session.
   const sessionHood = session?.lastNeighborhood || null;
-  if (sessionHood || session?.lastPicks?.length > 0) {
+  if (sessionHood || session?.lastPicks?.length > 0 || hasActiveFilters) {
     // Free — permissive: any message centered on "free", with optional category compound
     // Catches "free", "free comedy", "free jazz stuff", "how about free comedy"
     if (/^(?:how about |what about |ok |any )?(?:anything |something )?free/i.test(msg)) {

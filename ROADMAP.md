@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-01 (fragility audit #16-#19 complete)
+> Last updated: 2026-03-01 (pre-router gaps fixed, Yutori series events, Gemini A/B blocked by quota)
 
 ---
 
@@ -129,9 +129,9 @@ Files: `src/prompts.js` (REASON_SYSTEM, RENDER_SYSTEM), `src/skills/build-compos
 
 ## Open Issues
 
-### Gemini Flash Model Strategy (pending post-fix comparison)
+### ~~Gemini Flash Model Strategy~~ — **Blocked** (API quota exhausted)
 
-Gemini 2.5 Flash is the production model (50% pass rate, best of 3 models tested, ~10x cheaper than Haiku). Haiku baseline was 42%. A fresh post-fix comparison is needed — the 13 both-fail systemic scenarios have been addressed since the original comparison.
+Gemini 2.5 Flash was the production model (50% pass rate, best of 3 models tested, ~10x cheaper than Haiku). A/B eval attempted 2026-03-01 but Gemini API returns 429 with `limit: 0` for `generate_requests_per_model_per_day`. All 15 test cases fell back to Haiku. Fixed `run-ab-eval.js` to actually pass `model` parameter to `executeQuery` (was missing — both arms used the same default model). Re-run when Gemini billing is restored.
 
 ### ~~Pre-Router False Positives on Common Words (#8)~~ — **Fixed 2026-03-01**
 
@@ -141,26 +141,26 @@ Ambiguous words (rock, funk, soul, house, swing, rap, dance, music, art) now req
 
 Code guardrail overrides `type: conversational` → `event_picks` when pool has `matchCount > 0`, using top 3 matched events.
 
-### Yutori Extraction — Remaining Gaps
+### ~~Yutori Extraction — Remaining Gaps~~ — **Fixed 2026-03-01**
 
-- Non-recurring series events ("running through March") not yet handled by recurrence system
+- ~~Non-recurring series events ("running through March") not yet handled by recurrence system~~ — **Fixed:** `detectDateRange()` in `general-parser.js` expands date ranges ("Mar 3-8", "through March 31") into individual dated events at parse time. Three patterns: same-month range, cross-month range, "through" end date. Capped at 14 dates. Deterministic expansion, no LLM needed.
 - One-off events with dates >7 days out stored in SQLite but only surface when date falls within 7-day serving window (correct behavior)
 
-### Pre-Router Mechanical Paths Don't Save Session State
+### ~~Pre-Router Mechanical Paths Don't Save Session State~~ — **Fixed 2026-03-01**
 
 Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handleConversational`/`handleHelp` which never call `saveResponseFrame`. Conversation history IS saved (via `addToHistory`), but deterministic session state (lastPicks, lastNeighborhood, lastFilters) is NOT.
 
 **What works today:** "hi" → canned greeting → "jazz" → unified LLM sees conversation history, serves citywide jazz correctly. The conversation history bridge is sufficient.
 
-**Three gaps:**
+**Three gaps (all resolved):**
 
-| Gap | Example | Impact |
+| Gap | Example | Status |
 |-----|---------|--------|
-| No deterministic filter state from opener context | "hi" → "jazz" → "west village" — jazz filter not carried deterministically | Category context fragile — works via LLM memory, not guaranteed |
-| Pre-router category detection skipped | "hi" → "jazz" → "how about comedy" — falls to unified instead of $0 pre-router path | Minor cost increase, no UX impact |
-| Citywide picks don't set `visitedHoods` | "surprise me" → citywide → "bushwick" → exhaust → no Tavily fallback | Tavily fallback unreachable for citywide→narrow flows |
+| No deterministic filter state from opener context | "hi" → "jazz" → "west village" — jazz filter not carried deterministically | **Works correctly** — `saveResponseFrame` persists filters, `mergeFilters` compounds them. No fix needed. |
+| Pre-router category detection skipped when no hood/picks in session | "jazz" → ask_neighborhood → "how about comedy" — falls to unified instead of $0 pre-router | **Fixed** — Added `\|\| hasActiveFilters` to filter follow-up guard in `pre-router.js`. Filters saved by prior turn now enable $0 detection. |
+| Citywide picks don't set `visitedHoods` | "surprise me" → citywide → "bushwick" → exhaust → no suggestion | **Fixed** — `visitedHoods` now uses `'citywide'` sentinel instead of filtering out null. Updated in `pipeline.js`, `unified-flow.js`, `handler.js`. |
 
-**Partial fix (2026-03-01):** Expanded `filter_intent` prompt for bare openers — "jazz", "free stuff", "comedy tonight" now report `filter_intent: modify` on turn 1, enabling P1-compliant filter persistence through citywide→neighborhood flows.
+**Earlier partial fix (2026-03-01):** Expanded `filter_intent` prompt for bare openers — "jazz", "free stuff", "comedy tonight" now report `filter_intent: modify` on turn 1, enabling P1-compliant filter persistence through citywide→neighborhood flows.
 
 ### Deferred (post-MVP)
 
@@ -378,6 +378,10 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 
 | Date | What | Key Impact |
 |------|------|------------|
+| Mar 1 | Pre-router filter follow-up guard fix | Added `hasActiveFilters` to pre-router guard — filter follow-ups work after ask_neighborhood flows ($0 path) |
+| Mar 1 | Citywide visitedHoods tracking fix | `'citywide'` sentinel replaces null filtering in pipeline.js, unified-flow.js, handler.js — citywide visits tracked for exhaustion suggestions |
+| Mar 1 | Yutori series event date range expansion | `detectDateRange()` in general-parser.js expands "Mar 3-8", "through March 31" into individual dated events (P6 deterministic, capped at 14) |
+| Mar 1 | A/B eval script model routing fix | `run-ab-eval.js` now passes `MODEL_A`/`MODEL_B` to `executeQuery` — was comparing same model against itself |
 | Mar 1 | Fragility audit #16-#19 | Per-phone mutex (#16), dead `core` skill removed (#17), `makeEventId` includes startTime for same-venue dedup (#18), neighborhood gap accepted as structural (#19) |
 | Mar 1 | Quick wins: dead skill cleanup, stale docs, TCPA evals | Removed `cityScan` + `venueFraming` dead skills, fixed architecture.html stale two-call refs, added 2 TCPA regression scenarios (7 assertions) |
 | Mar 1 | Neighborhood resolution gap fix (#19) | 171 → ~80 missing neighborhoods (53% reduction). +40 venues in map, NYC bbox filter on 4 scrapers, Rockaway + St. George neighborhoods added, Staten Island borough support |
