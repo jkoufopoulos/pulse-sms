@@ -184,12 +184,15 @@ function buildUnifiedPrompt(events, options = {}) {
     parts.push(`\nUser's original request: "${options.pendingMessage}". Prioritize events matching that intent.`);
   }
 
-  // Activity adherence
-  if (options.userMessage) {
-    const ACTIVITY_KEYWORDS = /\b(trivia|karaoke|bingo|open mic|drag|burlesque|poetry|salsa|bachata|swing|vinyl|happy hour|game night|pub quiz|board game)\b/i;
-    if (ACTIVITY_KEYWORDS.test(options.userMessage)) {
-      parts.push(skills.activityAdherence.text);
+  // Activity adherence — for specific activities AND active category filters
+  {
+    let needsAdherence = false;
+    if (options.userMessage) {
+      const ACTIVITY_KEYWORDS = /\b(trivia|karaoke|bingo|open mic|drag|burlesque|poetry|salsa|bachata|swing|vinyl|happy hour|game night|pub quiz|board game)\b/i;
+      if (ACTIVITY_KEYWORDS.test(options.userMessage)) needsAdherence = true;
     }
+    if (options.hasActiveCategory) needsAdherence = true;
+    if (needsAdherence) parts.push(skills.activityAdherence.text);
   }
 
   // Conversation awareness

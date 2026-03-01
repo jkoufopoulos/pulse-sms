@@ -350,8 +350,8 @@
           "after_turn": 6,
           "id": "F6",
           "principle": "P1",
-          "check": "Free filter applied to Greenpoint — all picks are free events in Greenpoint",
-          "anti_pattern": "Returns paid events, or searches all neighborhoods instead of just Greenpoint"
+          "check": "Free filter applied to Greenpoint. If free events exist, all picks are free. If none, Pulse names the free filter and Greenpoint honestly.",
+          "anti_pattern": "Silently drops free filter to show paid events, or ignores neighborhood"
         },
         {
           "after_turn": 6,
@@ -531,8 +531,8 @@
           "after_turn": 5,
           "id": "I7",
           "principle": "P1",
-          "check": "Three filters are simultaneously active: Greenpoint + later tonight + art. All picks match all three.",
-          "anti_pattern": "Any filter dropped — wrong neighborhood, wrong time, or wrong category"
+          "check": "Three filters active: Greenpoint + later tonight + art. If matches exist, all picks match all three. If none, Pulse names all three filters honestly.",
+          "anti_pattern": "Silently drops any filter to show non-matching events"
         },
         {
           "after_turn": 6,
@@ -1144,8 +1144,8 @@
           "after_turn": 5,
           "id": "Q6",
           "principle": "P1",
-          "check": "Free stacks as fourth filter: free + DJ + late-night + Williamsburg. All picks match all four.",
-          "anti_pattern": "Any filter dropped to make room for 'free'"
+          "check": "Free stacks as fourth filter: free + DJ + late-night + Williamsburg. If matches exist, all picks match all four. If none, Pulse names the compound filter honestly.",
+          "anti_pattern": "Silently drops any filter to show non-matching events"
         },
         {
           "after_turn": 6,
@@ -1551,8 +1551,8 @@
           "after_turn": 6,
           "id": "V6",
           "principle": "P1",
-          "check": "Free filter applied to Park Slope",
-          "anti_pattern": "Paid events returned"
+          "check": "Free filter applied to Park Slope. If free events exist, all picks are free. If none, Pulse names the free filter and Park Slope honestly.",
+          "anti_pattern": "Silently drops free filter to show paid events"
         }
       ]
     },
@@ -2636,8 +2636,8 @@
           "after_turn": 3,
           "id": "AO3",
           "principle": "P1",
-          "check": "Free filter stacks on group vibe + Williamsburg. All picks are free AND group-friendly.",
-          "anti_pattern": "Paid events, or group context dropped"
+          "check": "Free filter stacks on group vibe + Williamsburg. If matches exist, all picks are free AND group-friendly. If none, Pulse names both filters honestly.",
+          "anti_pattern": "Silently drops free or group filter to show non-matching events"
         },
         {
           "after_turn": 4,
@@ -3142,8 +3142,8 @@
           "after_turn": 7,
           "id": "BA7",
           "principle": "P1",
-          "check": "Bushwick picks with BOTH late-night AND comedy filters persisting through neighborhood switch.",
-          "anti_pattern": "Either filter dropped on neighborhood switch"
+          "check": "Bushwick picks with late-night + comedy filters persisting through neighborhood switch. If matches exist, all picks match both. If none, Pulse names both filters and Bushwick honestly.",
+          "anti_pattern": "Silently drops either filter to show non-matching events"
         },
         {
           "after_turn": 8,
@@ -3304,8 +3304,8 @@
           "after_turn": 2,
           "id": "DD1",
           "principle": "P1",
-          "check": "Free filter applied. Picks are free events in Williamsburg.",
-          "anti_pattern": "Paid events shown"
+          "check": "Free filter applied to Williamsburg. If free events exist, all picks are free. If none, Pulse names the free filter honestly.",
+          "anti_pattern": "Silently drops free filter to show paid events"
         },
         {
           "after_turn": 3,
@@ -3440,8 +3440,8 @@
           "after_turn": 2,
           "id": "HH1",
           "principle": "P1",
-          "check": "Free + jazz compound filter applied. Picks are free jazz/live_music in East Village.",
-          "anti_pattern": "Paid events or non-jazz events"
+          "check": "Free + jazz compound filter applied to East Village. If matches exist, all picks are free jazz/live_music. If none, Pulse names both filters honestly.",
+          "anti_pattern": "Silently drops free or jazz filter to show non-matching events"
         },
         {
           "after_turn": 3,

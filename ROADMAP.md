@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-02-28 (filter drift 5-cause analysis, session persistence, test endpoint timeout)
+> Last updated: 2026-02-28 (codebase audit, Gemini Flash migration eval, filter drift 5-cause analysis, session persistence, test endpoint timeout)
 
 ---
 
@@ -152,6 +152,93 @@ All 5 are pre-LLM staging — they set up state that the downstream `saveRespons
 
 ## Open Issues
 
+### Gemini Flash Migration — Eval Results + Remaining Work (2026-02-28)
+
+**Status:** `src/ai.js` switched to Gemini 2.5 Flash for all pipeline calls (`unifiedRespond`, `composeResponse`, `extractEvents`, `composeDetails`). Eval: 28/48 happy_path passing (58%). Code evals 96.1% (on par with Haiku). Defaults can be reverted via env vars `PULSE_MODEL_COMPOSE` / `PULSE_MODEL_EXTRACT`.
+
+**Why:** Gemini Flash is ~10x cheaper than Haiku ($0.10/$0.40 vs $1.00/$5.00 per M tokens). Eval suite drops from ~$7-10/run to ~$1-2/run. Production pipeline cost drops from ~$0.004/session to ~$0.0004/session.
+
+**What's done (ai.js only):**
+- `unifiedWithGemini()` — temp=0.5, topP=0.9, maxOutputTokens=4096, `responseSchema` enforcing `{type, sms_text, picks[], clear_filters}`
+- `composeWithGemini()` — temp=0.5, topP=0.9, maxOutputTokens=8192 (already existed, params tuned)
+- `extractWithGemini()` — temp=0, maxOutputTokens=4096
+- `detailsWithGemini()` — temp=0.8, maxOutputTokens=1024
+- All four functions fall back to Anthropic Haiku on error
+- Default models changed: `compose` and `extract` default to `gemini-2.5-flash`
+- `_provider` field set correctly for cost tracking
+
+**Tuning progression:**
+
+| Run | Change | Pass Rate |
+|-----|--------|-----------|
+| 1 | Naive port (temp=1.0, 512 tokens) | 0% — all responses truncated mid-JSON |
+| 2 | Fixed maxOutputTokens to 4096 | 50% |
+| 3 | Added responseSchema + temp=0.7 + cleared stale sessions | 62.5% |
+| 4 | temp=0.5 + topP=0.9 | 58% (28/48) |
+
+**20 remaining failures — 6 root cause themes:**
+
+#### Theme A: Category filter drift on thin pools (6 failures)
+
+When `[MATCH]` events are sparse, Gemini fills with unmatched events without acknowledging the departure. Haiku says "no comedy in Bushwick tonight" — Gemini silently serves nightlife.
+
+Scenarios: progressive filter refinement (comedy drops on hood switch), time range + comedy + free stacking (comedy silently dropped), Astoria live music (karaoke/DJ returned for "live music"), Sunset Park live music (karaoke returned), Hell's Kitchen theater (MORE returns comedy/orchestra), Washington Heights music (MORE drops music filter).
+
+**Fix:** Prompt-level. Strengthen the `SPARSE` / zero-match rules in `UNIFIED_SYSTEM` — make the "You MUST lead with 'No [filter] in [neighborhood]'" instruction more emphatic. Possibly add a `COMPOSE_SYSTEM` equivalent rule for the `handleMore` path.
+
+#### Theme B: Neighborhood expansion not transparent (5 failures)
+
+Gemini expands to nearby neighborhoods without the "not much in X, but nearby Y has..." framing the judge expects. In one case (UES → Astoria), it expands far across the city.
+
+Scenarios: SoHo → NoHo without framing, Tribeca → Greenwich Village/NoHo (×2), UES → Astoria (geographically wrong), BK treated as serveable instead of narrowed.
+
+**Fix:** Prompt-level (`nearbySuggestion` skill + `UNIFIED_SYSTEM` expansion rules). Also a pool issue — `buildTaggedPool` shouldn't include Astoria events for a UES request. The BK case is a pre-router gap (no borough-narrowing logic).
+
+#### Theme C: Sign-off over-engagement (4 failures)
+
+Satisfied exit signals ("cool", "sick", "perfect", "perfect thanks") get re-engagement prompts instead of warm sign-offs. Gemini doesn't recognize these as conversation closers.
+
+Scenarios: LIC brief browse ("cool"), Cobble Hill late night ("sick"), Bed-Stuy details ("perfect"), UES dance ("perfect thanks").
+
+**Fix:** Prompt-level. The conversational handling rules could emphasize brief sign-offs for satisfied signals. Alternatively, the pre-router's conversational handler could detect satisfied-exit patterns and use a fixed warm sign-off (zero AI cost).
+
+#### Theme D: Details failures (4 failures)
+
+Mixed: (1) "tell me more" misinterpreted as "more picks" instead of "details on recommendation", (2) `composeDetails` returned "I can't give details" (system error — session lost picks), (3) details truncated mid-sentence at 1024 tokens, (4) details too hyperbolic / lacking venue character.
+
+Scenarios: recommend flow ("tell me more" ambiguity), West Village (system error), Bed-Stuy (truncation), Tribeca (hyperbolic tone).
+
+**Fix:** Bump `detailsWithGemini` maxOutputTokens to 2048 for truncation. Lower details temp to 0.6 for tone. The "tell me more" ambiguity is a pre-router issue — could add a pattern for "tell me more" when `lastPicks` exists to route to details. The system error needs investigation (session not saving picks).
+
+#### Theme E: Alias / borough recognition (2 failures)
+
+Not model-related. Pre-router / `neighborhoods.js` gaps.
+
+Scenarios: "bk" not recognized as needing borough narrowing, Boerum Hill and Carroll Gardens not mapped as Cobble Hill aliases.
+
+**Fix:** Add aliases to `neighborhoods.js`. Add borough-narrowing logic to pre-router.
+
+#### Theme F: Thin coverage dead ends (3 failures)
+
+When the event pool is genuinely empty for a filter+neighborhood combo, Gemini's handling is awkward — gives up too quickly, asks permission instead of delivering, or returns unrelated events.
+
+Scenarios: Astoria MORE (says "that's everything" with 0 new picks, then detail fails), SoHo early (no early events, asks permission to show late), Washington Heights (no live music, returns comedy/salsa).
+
+**Fix:** Partially overlaps with Theme A (filter drift). The `handleMore` exhaustion path could be improved to better communicate thin coverage. The permission-asking pattern ("want me to show late picks?") is a Gemini behavioral tendency — prompt could address it.
+
+#### Summary: Fix priority for Gemini production readiness
+
+| Theme | Count | Fix area | Effort |
+|-------|-------|----------|--------|
+| A: Category filter drift | 6 | Prompt (`UNIFIED_SYSTEM`, `COMPOSE_SYSTEM`) | Medium — prompt hardening |
+| B: Expansion transparency | 5 | Prompt + `buildTaggedPool` geographic limits | Medium |
+| C: Sign-off over-engagement | 4 | Prompt or pre-router exit detection | Low |
+| D: Details failures | 4 | Token limit + temp + pre-router + debug | Mixed |
+| E: Alias recognition | 2 | `neighborhoods.js` | Low |
+| F: Thin coverage handling | 3 | Prompt + handler logic | Medium |
+
+**Note:** Several of these themes (A, B, C, F) likely also affect Haiku to some degree — the eval was only run against Gemini. A Haiku baseline on the same scenarios would clarify which failures are Gemini-specific vs systemic.
+
 ### Filter Drift — Root Cause Analysis (updated 2026-02-28)
 
 **Status:** 59/130 scenario evals passing (45%), 7/47 regression evals passing (15%). Updated analysis below based on 47 filter persistence failures from 2026-02-28 eval run against Railway. **The deterministic filter machinery (`mergeFilters`, `buildTaggedPool`) is working correctly.** Failures are upstream (infrastructure), downstream (LLM compose), and at the edges (nudge-accept, pre-router session requirements).
@@ -284,6 +371,31 @@ Fixing A+B+C+E (done) should address ~90% of failures. Root Cause D (nudge-accep
 ---
 
 ## Completed Work
+
+### Deterministic Yutori Non-Trivia Parser (2026-02-28)
+
+Added `parseGeneralEventLine()` and `parseNonTriviaEvents()` to `src/sources/yutori.js` — deterministic extraction for non-trivia Yutori event emails (P6: deterministic extraction covers common cases). Previously only trivia emails (84% capture) used deterministic parsing; non-trivia (film, underground, indie, comedy) went through LLM extraction where completeness/confidence gates dropped ~98% of events.
+
+**Parser approach:** Ordered field extraction from `[Event]` lines — strip prefix → extract tags `[UPPERCASE]` → price → URL → time (with "doors close" neutralization) → date → venue/address (6 patterns: quoted-title-at, at-keyword, Venue:-KV, colon-prefix, standalone, parenthetical) → neighborhood → title → category inference. No format detection needed; heuristics work across numbered, venue-colon, em-dash, and field-labeled formats.
+
+**Integration:** Non-trivia path sits between trivia check and LLM fallback in `fetchYutoriEvents()`. If the parser captures ≥40% of `[Event]` lines, the file skips LLM extraction. LLM completeness gate lowered from 0.35 to 0.25 for fallback path. Drop logging added for visibility.
+
+**Results against 38 non-trivia processed emails:** 273/295 event lines parsed (92.5%), 28/38 files use deterministic path (no LLM cost), 0 false positives, all 274 events pass completeness ≥0.4. Expected total Yutori capture: ~285 events (up from ~118, or 32% → ~76%).
+
+### Gemini Flash Pipeline Switch (2026-02-28)
+
+Switched all pipeline LLM calls from Claude Haiku to Gemini 2.5 Flash in `src/ai.js`. ~10x cost reduction. All four call sites (`unifiedRespond`, `composeResponse`, `extractEvents`, `composeDetails`) now check if the model name starts with `gemini-` and dispatch to Gemini wrappers, falling back to Anthropic Haiku on error.
+
+**Key tuning decisions:**
+- `maxOutputTokens` must be much higher for Gemini than Haiku (4096 vs 512 for unified, 1024 vs 256 for details). Gemini's tokenizer counts differently — 512 Gemini tokens truncated mid-JSON every time.
+- `responseSchema` enforcement on `unifiedWithGemini` (type/sms_text/picks/clear_filters) eliminated wrong-type responses (e.g. first message treated as MORE or detail request).
+- `temperature: 0.5` + `topP: 0.9` for unified/compose (was 1.0). At temp=1.0, Gemini hallucinated neighborhoods and misinterpreted intents. 0.5 brought reliability close to Haiku.
+- `temperature: 0.8` for details (prose needs some warmth), `temperature: 0` for extraction (needs determinism).
+- Stale sessions from prior eval runs caused false failures — cleared `data/sessions.json` between runs.
+
+**Files changed:** `src/ai.js` only. Prompts, handler, cost tracking all unchanged.
+
+**Eval result:** 28/48 happy_path passing (58%), code evals 96.1%. 20 failures analyzed into 6 themes — see Open Issues for remediation plan.
 
 ### Session Persistence + Test Endpoint Timeout (2026-02-28)
 
@@ -641,6 +753,65 @@ First full 130-scenario eval run showed 35.4% pass rate (46/130). Analysis found
 3. **Difficulty downgrades** — 4 cache-dependent scenarios moved from `must_pass` to `should_pass`: Harlem jazz, FiDi→Brooklyn Heights, Prospect Heights MORE, Greenpoint quick pick. Tiers now: 26 must_pass, 72 should_pass, 32 stretch.
 
 **Post-fix eval results (2026-02-23):** 70/130 passed (53.8%), consistent with estimated ~54% true pass rate. must_pass: 81% (21/26). By category: abuse_off_topic 100%, happy_path 69%, edge_case 61%, poor_experience 35%, filter_drift 23%. The 5 remaining must_pass failures are real product bugs (MORE errors, LIC not recognized). filter_drift at 23% was the dominant real product problem — addressed by filter drift fix (2026-02-24): `mergeFilters` explicit-key semantics, targeted clearing, `CLEAR_SIGNALS` guard, bare category detection, handleMore exhaustion fix. Target: 80%+ filter_drift pass rate.
+
+---
+
+## Codebase Audit (2026-02-28)
+
+### By the Numbers
+
+| Metric | Value |
+|--------|-------|
+| Source files (`src/`) | ~30 files, ~7,500 lines |
+| Scrapers | 18 sources |
+| Eval scenarios | 174 (130 multi-turn + 44 regression) |
+| Code evals | 19 deterministic checks |
+| Unit tests | 77+ (smoke, no API calls) |
+| Architecture principles | 7 (P1-P7), actively enforced |
+| Completed roadmap items | 20+ shipped, 5 open issues |
+
+### Strengths
+
+- **Architecture principles actively enforced** — P1-P7 referenced in code decisions, eval assertions, and revert decisions (P1 `filters_used` merge tried and reverted). Roadmap captures *why* decisions were made, not just what.
+- **Eval system is production-grade** — Three-layer grading (deterministic assertions → 19 code evals → LLM judge), 174 golden scenarios with difficulty tiers, automated reports. More thorough than most startups' test suites.
+- **Cost control is tight** — Per-user daily budgets ($0.10 prod, $10 test), provider-aware pricing, pre-router handling ~15% of messages at $0 AI cost. Typical session: ~$0.044 total (90% Twilio, not AI).
+- **Data pipeline is resilient** — SQLite + JSON fallback, cross-source dedup via content hashing, venue auto-learning across sources, quality gates at extraction boundary, recurring pattern detection. 18 sources with weight-based conflict resolution.
+- **Session architecture is sound** — Atomic `saveResponseFrame`, explicit-key `mergeFilters`, deterministic filter state ownership (P1). Filter drift root cause analysis (5 causes identified, 4 fixed) shows systematic debugging.
+
+### Priority Issues
+
+#### Priority 1 — Gemini Flash quality gap (blocks cost savings)
+
+58% happy_path pass rate. 6 failure themes documented, none fixed. Quick wins (E+C+D truncation) would move from 28/48 → ~35/48 (73%). A+B+F need prompt work. **Critical missing step:** Haiku baseline on same scenarios to isolate Gemini-specific failures from systemic gaps.
+
+#### Priority 2 — `handleMore` legacy divergence
+
+Uses old two-call flow (`routeMessage` → `composeResponse` with `COMPOSE_SYSTEM`) while main path uses single-call `unifiedRespond` with `UNIFIED_SYSTEM`. Different prompts, different behavior, different skill activation. Any prompt improvement must be done twice. This is step 7 in the migration (`executeQuery` pipeline).
+
+#### Priority 3 — Root Cause D (nudge-accept)
+
+~10% of filter persistence failures. LLM mentions nearby neighborhoods conversationally but `pendingNearby` never set, so "ok"/"sure" falls through. Fix: prompt instruction to use `ask_neighborhood` type, or pre-router detection of affirmative + recent neighborhood mention.
+
+#### Priority 4 — Dead code and divergence risks
+
+- `cityScan` skill defined but handler activation uses `cityScanResults` — verify working or remove
+- `buildComposePrompt` and `buildUnifiedPrompt` share ~90% of skill-selection logic with no shared function — divergence risk
+- `ROUTE_SYSTEM` prompt may reference stale intents from before pre-router
+
+### Tech Debt
+
+| Item | Risk | Notes |
+|------|------|-------|
+| `annotateTrace()` is O(n) | Low (current traffic) | Rewrites entire JSONL file for one trace update |
+| No integration tests | Medium | No way to test handler → AI → session flow without live API calls |
+| `eval.js` scores events sequentially | Low | Not parallelized; slow for large caches |
+| Price data gap (71.6% missing) | Medium | `is_free` boolean more reliable than `price_display` |
+| No horizontal scalability | Low (current traffic) | Single-process, in-memory sessions |
+| Preference learning not yet active | Low | Profiles captured but not injected into prompts |
+
+### Strategic Position
+
+The project is at an inflection point between "works for testing" and "works for users." Architecture, eval suite, and data pipeline are production-quality. Gaps are mostly UX polish (sign-offs, alias recognition, thin coverage messaging) and model quality (Gemini vs Haiku). Cost structure is favorable — even on Haiku, AI is ~10% of per-session cost. The bigger Gemini win is eval suite cost ($7-10 → $1-2/run) enabling faster iteration. The eval suite is the strongest asset — it makes model switching, prompt changes, and architectural refactors safe.
 
 ---
 

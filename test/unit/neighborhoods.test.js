@@ -27,10 +27,18 @@ check('detectBorough queens', detectBorough('queens')?.borough === 'queens');
 check('detectBorough brooklyn has hoods', detectBorough('brooklyn tonight')?.neighborhoods?.includes('Williamsburg'));
 check('detectBorough non-borough', detectBorough('east village') === null);
 // detectUnsupported tests
-check('detectUnsupported bay ridge', detectUnsupported('bay ridge')?.name === 'Bay Ridge');
-check('detectUnsupported bay ridge has nearby', detectUnsupported('bay ridge')?.nearby?.includes('Sunset Park'));
+check('detectUnsupported hoboken', detectUnsupported('hoboken')?.name === 'Hoboken');
+check('detectUnsupported hoboken has no nearby', detectUnsupported('hoboken')?.nearby?.length === 0);
 check('detectUnsupported known hood returns null', detectUnsupported('east village') === null);
+check('detectUnsupported bay ridge now supported', detectUnsupported('bay ridge') === null);
 check('detectUnsupported gibberish returns null', detectUnsupported('asdfjkl') === null);
+// New neighborhoods
+check('extractNeighborhood gramercy', extractNeighborhood('gramercy tonight') === 'Gramercy');
+check('extractNeighborhood clinton hill', extractNeighborhood('clinton hill bars') === 'Clinton Hill');
+check('extractNeighborhood bay ridge', extractNeighborhood('bay ridge') === 'Bay Ridge');
+check('extractNeighborhood sunnyside', extractNeighborhood('sunnyside') === 'Sunnyside');
+check('extractNeighborhood mott haven', extractNeighborhood('mott haven') === 'Mott Haven');
+check('detectBorough bronx', detectBorough('the bronx')?.borough === 'bronx');
 // New aliases
 check('union sq', extractNeighborhood('union sq tonight') === 'Flatiron');
 check('nolita', extractNeighborhood('nolita drinks') === 'SoHo');

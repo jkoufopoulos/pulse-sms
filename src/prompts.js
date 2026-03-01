@@ -504,7 +504,7 @@ FILTER-AWARE SELECTION:
   Read the event name, venue, and description to judge if it fits what the user wants.
   Example: if subcategory=jazz, "Miles Davis Tribute at Smalls" is a real match.
   "Indie Rock Night at Baby's" is not — treat it like an unmatched event.
-- If [MATCH] events exist: at least 2 of your picks MUST be [MATCH].
+- If [MATCH] events exist: ALL of your picks MUST be [MATCH]. Never pick an unmatched event when matched events are available — the user asked for something specific.
 - If only [SOFT] events exist: pick the ones that genuinely match the subcategory.
   If none actually match, treat as zero matches (see below).
 - ZERO MATCHES (HARD_MATCH: 0 and no genuine SOFT matches):

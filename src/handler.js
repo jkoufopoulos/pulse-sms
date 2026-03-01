@@ -537,6 +537,8 @@ async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, 
   }
 
   const eventMap = buildEventMap([...curated, ...taggedPerennials]);
+  // Merge tagged pool events into eventMap so filter_match is available for validation
+  for (const e of events) eventMap[e.id] = e;
 
   if (result.type === 'conversational' || !result.picks || result.picks.length === 0) {
     // Conversational or empty picks — save atomically, preserving existing picks/events for details/more
@@ -559,14 +561,32 @@ async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, 
   // Validate event IDs against pool (P7: catch hallucinated IDs before save)
   const validPicks = (result.picks || []).filter(p => eventMap[p.event_id]);
 
+  // Filter compliance validation — strip non-matching picks when matches exist
+  let filterCompliantPicks = validPicks;
+  const hasActiveFilter = activeFilters && Object.values(activeFilters).some(Boolean);
+  if (hasActiveFilter) {
+    const poolEvents = Object.values(eventMap);
+    const hasMatches = poolEvents.some(e => e.filter_match === 'hard' || e.filter_match === 'soft');
+    if (hasMatches) {
+      filterCompliantPicks = validPicks.filter(p => {
+        const evt = eventMap[p.event_id];
+        return evt?.filter_match === 'hard' || evt?.filter_match === 'soft';
+      });
+      if (filterCompliantPicks.length < validPicks.length) {
+        console.warn(`Filter compliance: ${validPicks.length - filterCompliantPicks.length} non-matching picks stripped`);
+        trace.composition.filter_violations = validPicks.length - filterCompliantPicks.length;
+      }
+    }
+  }
+
   // Send SMS first — ensures user always gets a response even if session save fails
   await sendSMS(phone, result.sms_text);
   saveResponseFrame(phone, {
-    picks: validPicks,
+    picks: filterCompliantPicks,
     eventMap,
     neighborhood: hood,
     filters: activeFilters,
-    offeredIds: validPicks.map(p => p.event_id),
+    offeredIds: filterCompliantPicks.map(p => p.event_id),
     pending: suggestedHood ? {
       neighborhood: suggestedHood,
       filters: activeFilters,
