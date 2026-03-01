@@ -527,6 +527,7 @@ The extraction audit shows 82-100% pass rates on most days, but this is misleadi
 | Action | Expected Impact | Effort | Status |
 |--------|----------------|--------|--------|
 | Replace regex routing with LLM filter_intent | +27% filter_drift (7 of 15 failures) | Medium | **Done (2026-03-01)** — supersedes regex expansion |
+| Fix filter-active dismissal prompt ambiguity | +17% P10 (12/18 → 15/18) | Small | **Done (2026-03-01)** — examples fixed Haiku consistency |
 | Add "live music" to pre-router category detection | +8% filter_drift (2 scenarios) | Small | **Next priority** |
 | Fix 502 timeouts (Tavily circuit breaker) | +27% filter_drift (7 scenarios untestable) | Medium | Planned |
 | Investigate conversational-with-pool | +12% filter_drift (3 scenarios) | Medium | Planned |
@@ -539,6 +540,26 @@ The extraction audit shows 82-100% pass rates on most days, but this is misleadi
 ---
 
 ## Completed Work
+
+### Fix filter-active dismissal prompt ambiguity (2026-03-01)
+
+**Problem:** Short dismissals ("nvm", "nevermind", "forget it") with an active filter were classified as conversational declines instead of filter clears. Both Gemini Flash and Haiku consistently returned `filter_intent: { action: "none" }` and `type: "conversational"` for these messages. The prompt's DECLINE HANDLING examples ("nah", "no thanks", "im good") dominated over the filter_intent clear_all examples, which only showed explicit filter language ("forget the comedy", "drop the filter"). P10 regression evals at 66.7% (12/18 assertions).
+
+**Root cause:** Not a model capability issue — both models correctly handled "nah forget the free thing" and "actually nvm on the free filter." The prompt actively told them to classify bare dismissals as declines regardless of filter state.
+
+**Fix (prompts.js, 3 changes):**
+1. **DECLINE HANDLING** — scoped to "NO active filter" and added explicit carve-out: "nvm", "nevermind", "forget it" are NOT declines when ACTIVE_FILTER is set.
+2. **SESSION AWARENESS** — added FILTER-ACTIVE DISMISSALS rule: when ACTIVE_FILTER is set and user sends a short dismissal, return `event_picks` with `filter_intent: "clear_all"`.
+3. **Examples** — added concrete examples showing "nvm" (with active filter) → `clear_all` + re-serve picks, and "nah im good" (no filter) → conversational. Examples proved critical for Haiku consistency — rules alone got Flash to 6/6 but Haiku stayed at 0/6 until examples were added.
+
+**Model consistency (controlled test, n=3 per message per model):**
+- Before: Flash 0/6, Haiku 0/6 on "nvm"/"forget it"
+- After: Flash 6/6, Haiku 6/6
+- True declines ("nah im good", "no thanks") correctly stayed conversational — no regression
+
+**Production note:** These messages route to Flash via model-router (complexity score ~35, below threshold 40), where consistency is 100%.
+
+**P10 regression eval result:** 66.7% → 83.3% (12/18 → 15/18 assertions). DD "nvm" scenario flipped from fail to pass. CC "forget it" improved 1/3 → 2-3/3 (stochastic). Remaining failures: GG (data scarcity — no free comedy in Greenpoint), CC (stochastic LLM composition variance).
 
 ### Replace Regex Semantic Routing with LLM filter_intent (2026-03-01)
 
