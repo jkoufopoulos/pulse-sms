@@ -191,17 +191,21 @@ async function dispatchPreRouterIntent(route, ctx) {
         filters: referredEvent?.category ? { category: referredEvent.category } : {},
         responseType: 'referral',
       }).catch(err => console.error('profile update failed:', err.message));
-      const sms = referredEvent?.neighborhood
-        ? `Hey! I'm Bestie — tell me what you're looking for or try "${referredEvent.neighborhood}" to get started!`
-        : "Hey! I'm Bestie — tell me what you're looking for or text a neighborhood.";
+      const msg1 = "Hey! I'm Bestie — I dig through the best of what's happening in NYC daily that you'll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.";
+      const msg2 = referredEvent?.neighborhood
+        ? `Text me a vibe like "jazz tonight" or try "${referredEvent.neighborhood}" to start exploring. I'll send picks — reply a number for details, "more" to keep going, or just tell me what you're looking for.`
+        : 'Text me a neighborhood like "Bushwick" or a vibe like "jazz tonight" to start exploring. I\'ll send picks — reply a number for details, "more" to keep going, or just tell me what you\'re looking for.';
       saveResponseFrame(phone, { picks: [], eventMap: {}, neighborhood: null, filters: null, offeredIds: [] });
-      await sendSMS(phone, sms);
-      finalizeTrace(sms, 'referral');
+      await sendSMS(phone, msg1);
+      await sendSMS(phone, msg2);
+      finalizeTrace(msg1 + '\n' + msg2, 'referral');
       return;
     }
-    const sms = "Hey! I'm Bestie — tell me what you're looking for or text a neighborhood.";
-    await sendSMS(phone, sms);
-    finalizeTrace(sms, 'referral_expired');
+    const msg1 = "Hey! I'm Bestie — I dig through the best of what's happening in NYC daily that you'll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.";
+    const msg2 = 'Text me a neighborhood like "Bushwick" or a vibe like "jazz tonight" to start exploring. I\'ll send picks — reply a number for details, "more" to keep going, or just tell me what you\'re looking for.';
+    await sendSMS(phone, msg1);
+    await sendSMS(phone, msg2);
+    finalizeTrace(msg1 + '\n' + msg2, 'referral_expired');
     return;
   }
 

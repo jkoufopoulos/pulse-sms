@@ -36,12 +36,13 @@ function stripMoreReferences(text) {
 
 // --- Help ---
 async function handleHelp(ctx) {
-  const reply = ctx.route.reply || "Hey! I'm Bestie — tell me what you're in the mood for and I'll find it across NYC.\n\nTry: \"live jazz tonight\", \"something weird\", \"free comedy\", \"this weekend\", or a neighborhood like \"Williamsburg\".\n\nReply a number for details, or \"more\" for more options.";
-  const sms = smartTruncate(reply);
-  await sendSMS(ctx.phone, sms);
+  const msg1 = "Hey! I'm Bestie — I dig through the best of what's happening in NYC daily that you'll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.";
+  const msg2 = 'Text me a neighborhood like "Bushwick" or a vibe like "jazz tonight" to start exploring. I\'ll send picks — reply a number for details, "more" to keep going, or just tell me what you\'re looking for. The more you text, the better it gets.';
+  await sendSMS(ctx.phone, msg1);
+  await sendSMS(ctx.phone, msg2);
   setSession(ctx.phone, { lastResponseHadPicks: false });
   console.log(`Help sent to ${ctx.masked}`);
-  ctx.finalizeTrace(sms, 'help');
+  ctx.finalizeTrace(msg1 + '\n' + msg2, 'help');
 }
 
 // --- Conversational ---

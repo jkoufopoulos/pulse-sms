@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bestie — NYC Events, One Text Away</title>
-  <meta name="description" content="Tell me what you're in the mood for — jazz, comedy, this weekend — and I'll find it across NYC. No app needed. Bestie is your SMS guide to NYC nightlife, music, and more.">
+  <meta name="description" content="The best of what's happening in NYC that you'll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness. No app — just text Bestie.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
@@ -944,11 +944,17 @@
     // Timestamp
     addEl('div', 'sms-time', 'Today, 6:42 PM');
 
-    // Welcome message from Pulse
+    // Welcome messages from Bestie (two-bubble intro)
     showTyping();
     await wait(1200);
     hideTyping();
-    addRawBubble("Hey! Text me a neighborhood and I'll find you something good tonight.", 'sms-recv');
+    addRawBubble("Hey! I\u2019m Bestie \u2014 I dig through the best of what\u2019s happening in NYC daily that you\u2019ll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.", 'sms-recv');
+
+    await wait(600);
+    showTyping();
+    await wait(800);
+    hideTyping();
+    addRawBubble('Text me a neighborhood like \u201cBushwick\u201d or a vibe like \u201csomething weird tonight\u201d to start exploring.', 'sms-recv');
 
     await wait(1400);
 

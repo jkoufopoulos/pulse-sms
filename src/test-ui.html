@@ -304,7 +304,8 @@
 
   <div class="messages" id="messages">
     <div class="msg system">SMS Simulator &mdash; messages hit the live pipeline (~$0.001/msg AI cost)</div>
-    <div class="msg received">Hey! I'm Bestie — tell me what you're in the mood for and I'll find it across NYC. Try "jazz tonight", "something weird", "free comedy this weekend", or a neighborhood like "Williamsburg". Reply a number for details or "more" for more picks.</div>
+    <div class="msg received">Hey! I'm Bestie — I dig through the best of what's happening in NYC daily that you'll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.</div>
+    <div class="msg received">Text me a neighborhood like "Bushwick" or a vibe like "jazz tonight" to start exploring. I'll send picks — reply a number for details, "more" to keep going, or just tell me what you're looking for. The more you text, the better it gets.</div>
   </div>
 
   <div class="typing-indicator" id="typing">
@@ -333,7 +334,8 @@ let SESSION_PHONE = '+1555' + String(Math.floor(Math.random() * 9000000 + 100000
 function newSession() {
   SESSION_PHONE = '+1555' + String(Math.floor(Math.random() * 9000000 + 1000000));
   messagesEl.innerHTML = '<div class="msg system">SMS Simulator \u2014 messages hit the live pipeline (~$0.001/msg AI cost)</div>' +
-    '<div class="msg received">Hey! I\u2019m Bestie \u2014 tell me what you\u2019re in the mood for and I\u2019ll find it across NYC. Try \u201cjazz tonight\u201d, \u201csomething weird\u201d, \u201cfree comedy this weekend\u201d, or a neighborhood like \u201cWilliamsburg\u201d. Reply a number for details or \u201cmore\u201d for more picks.</div>';
+    '<div class="msg received">Hey! I\u2019m Bestie \u2014 I dig through the best of what\u2019s happening in NYC daily that you\u2019ll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.</div>' +
+    '<div class="msg received">Text me a neighborhood like \u201cBushwick\u201d or a vibe like \u201cjazz tonight\u201d to start exploring. I\u2019ll send picks \u2014 reply a number for details, \u201cmore\u201d to keep going, or just tell me what you\u2019re looking for. The more you text, the better it gets.</div>';
 }
 
 function updateClock() {

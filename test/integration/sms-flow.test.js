@@ -16,9 +16,9 @@ module.exports.runAsync = async function() {
   // 1. Help flow
   hClearSession(intPhone);
   let msgs = await sendAndCapture(intPhone, 'help');
-  check('help: sends 1 message', msgs.length === 1);
-  check('help: mentions neighborhoods', msgs[0]?.body.includes('Williamsburg'));
-  check('help: mentions details', msgs[0]?.body.includes('details'));
+  check('help: sends 2 messages', msgs.length === 2);
+  check('help: mentions neighborhoods', msgs[1]?.body.includes('Bushwick'));
+  check('help: mentions details', msgs[1]?.body.includes('details'));
 
   // 2. Greeting flow
   hClearSession(intPhone);
@@ -106,7 +106,7 @@ module.exports.runAsync = async function() {
     lastEvents: { pn_evt1: { id: 'pn_evt1', name: 'Test Event' } },
   });
   msgs = await sendAndCapture(intPhone, 'help');
-  check('stale nudge: help still works', msgs.length === 1);
+  check('stale nudge: help still works', msgs.length === 2);
   const { getSession: hGetSession } = require('../../src/session');
   const sessionAfter = hGetSession(intPhone);
   check('stale nudge: pendingNearby cleared', sessionAfter?.pendingNearby === null || sessionAfter?.pendingNearby === undefined);
