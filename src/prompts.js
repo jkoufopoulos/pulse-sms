@@ -186,7 +186,7 @@ OUTPUT:
 const SHARED_UNDERSTANDING = (verb) => `STEP 1 — Classify what the user wants:
 
 EVENT PICKS: User wants event recommendations. They mention a place, want to go out, ask what's happening, modify filters (category/time/vibe/date), mention an activity or vibe, or want more options. When events are provided (even without a neighborhood), ${verb} picks from them.
-Examples: "what's going on in bushwick", "any jazz tonight", "something chill", "underground techno in bushwick", "any more free comedy stuff", "live jazz", "this weekend", "surprise me", "something weird", "free comedy this weekend", "I want to dance"
+Examples: "what's going on in bushwick", "any jazz tonight", "something chill", "underground techno in bushwick", "any more free comedy stuff", "live jazz", "this weekend", "tomorrow", "parties this week", "surprise me", "something weird", "free comedy this weekend", "I want to dance"
 
 ASK NEIGHBORHOOD: Last resort — only use when the message is truly ambiguous AND no filters were detected AND no events are provided. If you have events to recommend (even citywide), return event_picks instead.
 Examples: "where should I go" (no session, no events, no filters)
@@ -301,6 +301,8 @@ DATE AWARENESS:
 - Further out → mention the day (e.g. "this Friday")
 - Events that have started are still worth recommending — concerts/DJ sets/comedy run for hours. Only skip if end_time has clearly passed.
 
+MULTI-DAY DATA: You have up to 7 days of events. When users ask for "this week", "this weekend", or "tomorrow", serve events from those days — do not say you only have tonight's events. Label each pick with its day.
+
 HONESTY:
 - Select only from events in the provided list. Do not invent events.
 - If nothing is worth recommending, be honest and a little funny — "Slim pickings tonight." Then suggest an adjacent neighborhood.
@@ -392,6 +394,9 @@ USER: "forget the free thing" (ACTIVE_FILTER: free_only+category=comedy, session
 
 USER: "this weekend" (no session, multi-day citywide events provided)
 → type: "event_picks" with weekend events across the city, days labeled
+
+USER: "parties this week" (no session, citywide nightlife events provided)
+→ type: "event_picks", filter_intent: { "action": "modify", "updates": { "category": "nightlife" } }, citywide nightlife picks with days labeled
 </examples>`;
 
 module.exports = { EXTRACTION_PROMPT, DETAILS_SYSTEM, UNIFIED_SYSTEM };

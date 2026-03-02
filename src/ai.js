@@ -31,9 +31,16 @@ function getGeminiClient() {
 }
 
 const MODELS = {
-  compose: process.env.PULSE_MODEL_COMPOSE || 'gemini-2.5-flash-lite',
-  extract: process.env.PULSE_MODEL_EXTRACT || 'gemini-2.5-flash-lite',
+  compose: process.env.PULSE_MODEL_COMPOSE || 'gemini-2.5-flash',
+  extract: process.env.PULSE_MODEL_EXTRACT || 'gemini-2.5-flash',
 };
+
+// Gemini fallback chain: flash → flash-lite → Haiku
+// On quota/rate-limit errors (429), try the next Gemini model before falling to Anthropic.
+const GEMINI_FALLBACK = 'gemini-2.5-flash-lite';
+function isQuotaError(err) {
+  return err.message && (err.message.includes('429') || err.message.includes('quota') || err.message.includes('Too Many Requests'));
+}
 
 // Safety settings for all Gemini calls — block dangerous content but allow normal event text
 function checkGeminiFinish(response, label) {
@@ -116,10 +123,10 @@ async function unifiedWithGemini(systemPrompt, userPrompt, modelName) {
 /**
  * Extract events via Google Gemini Flash.
  */
-async function extractWithGemini(systemPrompt, userPrompt) {
+async function extractWithGemini(systemPrompt, userPrompt, modelName) {
   const genAI = getGeminiClient();
   const gemModel = genAI.getGenerativeModel({
-    model: MODELS.extract,
+    model: modelName || MODELS.extract,
     systemInstruction: systemPrompt,
     safetySettings: GEMINI_SAFETY,
     generationConfig: { maxOutputTokens: 4096, temperature: 0, responseMimeType: 'application/json' },
@@ -196,17 +203,27 @@ Extract all events and venues into the JSON format specified in your instruction
       const result = await extractWithGemini(EXTRACTION_PROMPT, userPrompt);
       text = result.text; usage = result.usage; provider = 'gemini';
     } catch (err) {
-      console.warn(`Gemini extractEvents failed, falling back to Anthropic: ${err.message}`);
-      const timeout = sourceName === 'yutori' ? 90000 : 60000;
-      const response = await getClient().messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 8192,
-        system: EXTRACTION_PROMPT,
-        messages: [{ role: 'user', content: userPrompt }],
-      }, { timeout, maxRetries: 0 });
-      text = response.content?.[0]?.text || '';
-      usage = response.usage || null;
-      provider = 'anthropic';
+      if (isQuotaError(err) && resolvedModel !== GEMINI_FALLBACK) {
+        try {
+          console.warn(`Gemini ${resolvedModel} extractEvents quota hit, trying ${GEMINI_FALLBACK}`);
+          const result = await extractWithGemini(EXTRACTION_PROMPT, userPrompt, GEMINI_FALLBACK);
+          text = result.text; usage = result.usage; provider = 'gemini';
+        } catch (err2) {
+          console.warn(`Gemini fallback extractEvents also failed, falling back to Anthropic: ${err2.message}`);
+          const timeout = sourceName === 'yutori' ? 90000 : 60000;
+          const response = await getClient().messages.create({ model: 'claude-haiku-4-5-20251001', max_tokens: 8192, system: EXTRACTION_PROMPT, messages: [{ role: 'user', content: userPrompt }] }, { timeout, maxRetries: 0 });
+          text = response.content?.[0]?.text || '';
+          usage = response.usage || null;
+          provider = 'anthropic';
+        }
+      } else {
+        console.warn(`Gemini extractEvents failed, falling back to Anthropic: ${err.message}`);
+        const timeout = sourceName === 'yutori' ? 90000 : 60000;
+        const response = await getClient().messages.create({ model: 'claude-haiku-4-5-20251001', max_tokens: 8192, system: EXTRACTION_PROMPT, messages: [{ role: 'user', content: userPrompt }] }, { timeout, maxRetries: 0 });
+        text = response.content?.[0]?.text || '';
+        usage = response.usage || null;
+        provider = 'anthropic';
+      }
     }
   } else {
     const timeout = sourceName === 'yutori' ? 90000 : 60000;
@@ -544,20 +561,46 @@ Respond now.`;
       raw = result.text; usage = result.usage; provider = 'gemini';
       parsed = parseJsonFromResponse(raw);
     } catch (err) {
-      console.warn(`Gemini unifiedRespond failed, falling back to Anthropic: ${err.message}`);
-      const response = await withTimeout(getClient().messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
-        system: systemPrompt,
-        tools: [UNIFIED_TOOL],
-        tool_choice: { type: 'tool', name: 'unified_response' },
-        messages: [{ role: 'user', content: userPrompt }],
-      }, { timeout: 12000 }), 15000, 'unifiedRespond');
-      raw = JSON.stringify(response.content);
-      usage = response.usage || null;
-      provider = 'anthropic';
-      const toolBlock = response.content.find(b => b.type === 'tool_use');
-      parsed = toolBlock ? toolBlock.input : parseJsonFromResponse(raw);
+      // Try Flash Lite before falling to Haiku (only on quota/rate-limit errors)
+      if (isQuotaError(err) && resolvedModel !== GEMINI_FALLBACK) {
+        try {
+          console.warn(`Gemini ${resolvedModel} quota hit, trying ${GEMINI_FALLBACK}`);
+          const result = await unifiedWithGemini(systemPrompt, userPrompt, GEMINI_FALLBACK);
+          raw = result.text; usage = result.usage; provider = 'gemini';
+          parsed = parseJsonFromResponse(raw);
+        } catch (err2) {
+          console.warn(`Gemini fallback also failed, falling back to Anthropic: ${err2.message}`);
+          const response = await withTimeout(getClient().messages.create({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 1024,
+            system: systemPrompt,
+            tools: [UNIFIED_TOOL],
+            tool_choice: { type: 'tool', name: 'unified_response' },
+            messages: [{ role: 'user', content: userPrompt }],
+          }, { timeout: 12000 }), 15000, 'unifiedRespond');
+          raw = JSON.stringify(response.content);
+          usage = response.usage || null;
+          provider = 'anthropic';
+          const toolBlock2 = response.content.find(b => b.type === 'tool_use');
+          parsed = toolBlock2 ? toolBlock2.input : parseJsonFromResponse(raw);
+        }
+      } else {
+        // Non-quota error (SAFETY, timeout, etc.) — fall directly to Haiku
+        console.warn(`Gemini unifiedRespond failed, falling back to Anthropic: ${err.message}`);
+        const response = await withTimeout(getClient().messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1024,
+          system: systemPrompt,
+          tools: [UNIFIED_TOOL],
+          tool_choice: { type: 'tool', name: 'unified_response' },
+          messages: [{ role: 'user', content: userPrompt }],
+        }, { timeout: 12000 }), 15000, 'unifiedRespond');
+        raw = JSON.stringify(response.content);
+        usage = response.usage || null;
+        provider = 'anthropic';
+        const toolBlock = response.content.find(b => b.type === 'tool_use');
+        parsed = toolBlock ? toolBlock.input : parseJsonFromResponse(raw);
+      }
     }
   } else {
     // Anthropic path: use tool_use for guaranteed structured output

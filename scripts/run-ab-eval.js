@@ -56,6 +56,7 @@ const COSTS = {
   'claude-haiku-4-5-20251001': { input: 0.80, output: 4.00 },
   'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00 },
   'gemini-2.5-flash': { input: 0.15, output: 0.60 },
+  'gemini-2.5-flash-lite': { input: 0.075, output: 0.30 },
 };
 
 function estimateCost(modelId, inputTokens, outputTokens) {

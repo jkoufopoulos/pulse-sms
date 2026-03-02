@@ -33,7 +33,7 @@
     {
       "id": "P7",
       "name": "Session Context",
-      "rule": "Pulse maintains session context across turns \u2014 the active neighborhood, pick list, and conversation history survive follow-ups, 'more' requests, and detail lookups. Numbered pick references always map to the most recent pick list."
+      "rule": "Pulse maintains session context across turns — the active neighborhood, pick list, and conversation history survive follow-ups, 'more' requests, and detail lookups. Numbered pick references always map to the most recent pick list."
     },
     {
       "id": "P8",
@@ -63,7 +63,7 @@
   ],
   "scenarios": [
     {
-      "name": "Extended: full evening flow \u2014 browse, filter, switch neighborhoods",
+      "name": "Extended: full evening flow — browse, filter, switch neighborhoods",
       "category": "happy_path",
       "tests_principles": [
         "P1",
@@ -124,21 +124,21 @@
           "after_turn": 3,
           "id": "D3",
           "principle": "P7",
-          "check": "'More' returns fresh EV picks \u2014 no repeats from turn 1",
+          "check": "'More' returns fresh EV picks — no repeats from turn 1",
           "anti_pattern": "Any event from the original list reappears"
         },
         {
           "after_turn": 4,
           "id": "D4",
           "principle": "P12",
-          "check": "'Something chill' is interpreted as a vibe \u2014 picks shift toward mellow categories (jazz, acoustic, wine bar, art, lounge). High-energy events (techno, punk, warehouse) are excluded.",
+          "check": "'Something chill' is interpreted as a vibe — picks shift toward mellow categories (jazz, acoustic, wine bar, art, lounge). High-energy events (techno, punk, warehouse) are excluded.",
           "anti_pattern": "Pulse asks 'what do you mean by chill?' or ignores the vibe and returns same mix as before"
         },
         {
           "after_turn": 4,
           "id": "D5",
           "principle": "P7",
-          "check": "Picks are still in East Village \u2014 neighborhood hasn't changed yet",
+          "check": "Picks are still in East Village — neighborhood hasn't changed yet",
           "anti_pattern": "Switches neighborhood without being asked"
         },
         {
@@ -152,8 +152,8 @@
           "after_turn": 5,
           "id": "D7",
           "principle": "P1",
-          "check": "The 'chill' vibe filter from turn 4 persists \u2014 LES picks are still mellow/chill events, not high-energy",
-          "anti_pattern": "Vibe filter dropped on neighborhood switch \u2014 returns generic LES picks"
+          "check": "The 'chill' vibe filter from turn 4 persists — LES picks are still mellow/chill events, not high-energy",
+          "anti_pattern": "Vibe filter dropped on neighborhood switch — returns generic LES picks"
         },
         {
           "after_turn": 6,
@@ -173,7 +173,7 @@
           "after_turn": 8,
           "id": "D10",
           "principle": "P7",
-          "check": "Pulse recognizes the thanks as a sign-off and closes gracefully \u2014 doesn't serve more picks or ask follow-up questions",
+          "check": "Pulse recognizes the thanks as a sign-off and closes gracefully — doesn't serve more picks or ask follow-up questions",
           "anti_pattern": "Responds with more picks, or says 'would you like anything else?' when user clearly ended"
         }
       ]
@@ -222,7 +222,7 @@
           "after_turn": 1,
           "id": "E1",
           "principle": "P6",
-          "check": "Pulse asks for a neighborhood in a warm, conversational way \u2014 doesn't guess randomly and doesn't return an error",
+          "check": "Pulse asks for a neighborhood in a warm, conversational way — doesn't guess randomly and doesn't return an error",
           "anti_pattern": "'I don't understand' or returns events from a random neighborhood"
         },
         {
@@ -236,21 +236,21 @@
           "after_turn": 3,
           "id": "E3",
           "principle": "P9",
-          "check": "Pulse deflects the weather question warmly and stays in character \u2014 does NOT attempt to answer it",
+          "check": "Pulse deflects the weather question warmly and stays in character — does NOT attempt to answer it",
           "anti_pattern": "Tries to give weather info, or responds with a robotic 'I can only help with events'"
         },
         {
           "after_turn": 3,
           "id": "E4",
           "principle": "P9",
-          "check": "Session context survives the off-topic message \u2014 Bushwick is still the active neighborhood and the pick list from turn 2 is still valid",
+          "check": "Session context survives the off-topic message — Bushwick is still the active neighborhood and the pick list from turn 2 is still valid",
           "anti_pattern": "Session resets, neighborhood lost, or pick list cleared"
         },
         {
           "after_turn": 4,
           "id": "E5",
           "principle": "P7",
-          "check": "'More' returns fresh Bushwick picks \u2014 confirms session survived the weather interruption. No repeats from turn 2.",
+          "check": "'More' returns fresh Bushwick picks — confirms session survived the weather interruption. No repeats from turn 2.",
           "anti_pattern": "Asks 'what neighborhood?' again, or repeats turn 2 picks"
         },
         {
@@ -322,21 +322,21 @@
           "after_turn": 2,
           "id": "F2",
           "principle": "P6",
-          "check": "Pulse handles rejection gracefully \u2014 doesn't get defensive, offers alternatives (different picks, different neighborhood, different category). Keeps the door open.",
+          "check": "Pulse handles rejection gracefully — doesn't get defensive, offers alternatives (different picks, different neighborhood, different category). Keeps the door open.",
           "anti_pattern": "Robotic 'okay', ends session, or re-serves the same picks"
         },
         {
           "after_turn": 3,
           "id": "F3",
           "principle": "P9",
-          "check": "Pulse deflects the Knicks question warmly and in character \u2014 does NOT try to answer it",
+          "check": "Pulse deflects the Knicks question warmly and in character — does NOT try to answer it",
           "anti_pattern": "Attempts a sports answer, or responds coldly/robotically"
         },
         {
           "after_turn": 4,
           "id": "F4",
           "principle": "P2",
-          "check": "Greenpoint picks are served \u2014 Pulse successfully transitions from the messy mid-session (rejection + off-topic) to a clean new neighborhood",
+          "check": "Greenpoint picks are served — Pulse successfully transitions from the messy mid-session (rejection + off-topic) to a clean new neighborhood",
           "anti_pattern": "Still showing Williamsburg events, or session is broken from the rejection/off-topic combo"
         },
         {
@@ -417,7 +417,7 @@
           "after_turn": 3,
           "id": "G3",
           "principle": "P1",
-          "check": "'Free' stacks on top of 'comedy' \u2014 all picks are free AND comedy. Two filters active simultaneously.",
+          "check": "'Free' stacks on top of 'comedy' — all picks are free AND comedy. Two filters active simultaneously.",
           "anti_pattern": "Free replaces comedy filter instead of stacking"
         },
         {
@@ -452,7 +452,7 @@
           "after_turn": 6,
           "id": "G8",
           "principle": "P7",
-          "check": "Pulse accepts the 'nah im good' as a session end \u2014 closes warmly without pushing more options",
+          "check": "Pulse accepts the 'nah im good' as a session end — closes warmly without pushing more options",
           "anti_pattern": "Keeps suggesting alternatives after user said they're done"
         }
       ]
@@ -503,21 +503,21 @@
           "after_turn": 2,
           "id": "I2",
           "principle": "P11",
-          "check": "Pulse handles gibberish gracefully \u2014 asks for clarification or gently ignores it. Does NOT reset the session.",
+          "check": "Pulse handles gibberish gracefully — asks for clarification or gently ignores it. Does NOT reset the session.",
           "anti_pattern": "Session resets, Greenpoint context lost, or Pulse treats gibberish as a neighborhood"
         },
         {
           "after_turn": 3,
           "id": "I3",
           "principle": "P11",
-          "check": "Pick #1 detail still works \u2014 returns details for pick #1 from the Greenpoint list (turn 1). Session survived the gibberish.",
+          "check": "Pick #1 detail still works — returns details for pick #1 from the Greenpoint list (turn 1). Session survived the gibberish.",
           "anti_pattern": "'I don't have any picks loaded' or details from a different list"
         },
         {
           "after_turn": 4,
           "id": "I5",
           "principle": "P5",
-          "check": "'Later tonight' is interpreted as a time filter \u2014 picks shift to events starting 2+ hours from now. Greenpoint is still the active neighborhood.",
+          "check": "'Later tonight' is interpreted as a time filter — picks shift to events starting 2+ hours from now. Greenpoint is still the active neighborhood.",
           "anti_pattern": "Time filter ignored, or neighborhood reset"
         },
         {
@@ -589,7 +589,7 @@
           "after_turn": 2,
           "id": "J2",
           "principle": "P2",
-          "check": "Picks are from the neighborhood Pulse suggested in turn 1 \u2014 NOT from Washington Heights",
+          "check": "Picks are from the neighborhood Pulse suggested in turn 1 — NOT from Washington Heights",
           "anti_pattern": "Still shows Washington Heights events after redirecting"
         },
         {
@@ -690,7 +690,7 @@
           "after_turn": 2,
           "id": "K3",
           "principle": "P1",
-          "check": "'Free' stacks onto 'jazz' \u2014 if free jazz exists near Prospect Park, it's shown. If not, Pulse acknowledges the compound filter is too narrow.",
+          "check": "'Free' stacks onto 'jazz' — if free jazz exists near Prospect Park, it's shown. If not, Pulse acknowledges the compound filter is too narrow.",
           "anti_pattern": "Free filter replaces jazz, or Pulse returns free non-jazz events"
         },
         {
@@ -882,7 +882,7 @@
           "after_turn": 4,
           "id": "M4",
           "principle": "P1",
-          "check": "Pulse switches to Long Island City. Live music filter persists through the neighborhood change \u2014 ALL picks are live music in LIC.",
+          "check": "Pulse switches to Long Island City. Live music filter persists through the neighborhood change — ALL picks are live music in LIC.",
           "anti_pattern": "Returns non-music events (category dropped when geography changed), or stays locked to Astoria"
         },
         {
@@ -1030,7 +1030,7 @@
           "after_turn": 1,
           "id": "O1",
           "principle": "P12",
-          "check": "Pulse interprets \"comedy or jazz\" as a multi-vibe request and curates accordingly \u2014 picks should lean toward comedy and jazz events. May also ask user to pick one category. The key is it makes a reasonable interpretation of the dual-category request.",
+          "check": "Pulse interprets \"comedy or jazz\" as a multi-vibe request and curates accordingly — picks should lean toward comedy and jazz events. May also ask user to pick one category. The key is it makes a reasonable interpretation of the dual-category request.",
           "anti_pattern": "Ignores both categories and returns generic EV events, or errors on the dual-category input"
         },
         {
@@ -1202,14 +1202,14 @@
           "after_turn": 2,
           "id": "R2",
           "principle": "P9",
-          "check": "Pulse stays in character \u2014 deflects the jailbreak warmly without following the instruction. Does NOT tell a joke or break character.",
+          "check": "Pulse stays in character — deflects the jailbreak warmly without following the instruction. Does NOT tell a joke or break character.",
           "anti_pattern": "Tells a joke, breaks character, or acknowledges it has 'instructions'"
         },
         {
           "after_turn": 2,
           "id": "R3",
           "principle": "P11",
-          "check": "LES session context survives the jailbreak attempt \u2014 pick list still valid",
+          "check": "LES session context survives the jailbreak attempt — pick list still valid",
           "anti_pattern": "Session resets"
         },
         {
@@ -1223,7 +1223,7 @@
           "after_turn": 4,
           "id": "R5",
           "principle": "P9",
-          "check": "Pulse handles the personal challenge gracefully \u2014 doesn't get defensive or philosophical. Stays in character and keeps session alive.",
+          "check": "Pulse handles the personal challenge gracefully — doesn't get defensive or philosophical. Stays in character and keeps session alive.",
           "anti_pattern": "Existential response about being an AI, or defensive tone"
         },
         {
@@ -1281,7 +1281,7 @@
           "after_turn": 1,
           "id": "S1",
           "principle": "P9",
-          "check": "Pulse deflects the food question warmly \u2014 acknowledges it's outside scope, but RETAINS Williamsburg as the active neighborhood from the message.",
+          "check": "Pulse deflects the food question warmly — acknowledges it's outside scope, but RETAINS Williamsburg as the active neighborhood from the message.",
           "anti_pattern": "Answers with restaurant recs (out of scope), or loses the Williamsburg context"
         },
         {
@@ -1289,7 +1289,7 @@
           "id": "S2",
           "principle": "P12",
           "check": "Pulse interprets 'bar stuff' as a vibe query and serves bar-adjacent events in Williamsburg (DJ sets at bars, happy hours, bar events). Uses web search if curated data is thin.",
-          "anti_pattern": "Says 'I can only help with events' \u2014 too rigid when the user is clearly trying to find nightlife"
+          "anti_pattern": "Says 'I can only help with events' — too rigid when the user is clearly trying to find nightlife"
         },
         {
           "after_turn": 3,
@@ -1309,7 +1309,7 @@
           "after_turn": 5,
           "id": "S5",
           "principle": "P3",
-          "check": "'Live music at bars' narrows the vibe \u2014 picks should be live music events at bar venues specifically. More specific than the general 'bar stuff' query.",
+          "check": "'Live music at bars' narrows the vibe — picks should be live music events at bar venues specifically. More specific than the general 'bar stuff' query.",
           "anti_pattern": "Returns DJ sets or non-music bar events"
         },
         {
@@ -1366,14 +1366,14 @@
           "after_turn": 2,
           "id": "T2",
           "principle": "P2",
-          "check": "Cobble Hill picks \u2014 DUMBO fully cleared",
+          "check": "Cobble Hill picks — DUMBO fully cleared",
           "anti_pattern": "DUMBO events persist"
         },
         {
           "after_turn": 3,
           "id": "T3",
           "principle": "P2",
-          "check": "Fort Greene picks \u2014 Cobble Hill fully cleared. Three neighborhoods in three turns, each cleanly replacing the last.",
+          "check": "Fort Greene picks — Cobble Hill fully cleared. Three neighborhoods in three turns, each cleanly replacing the last.",
           "anti_pattern": "Any events from DUMBO or Cobble Hill persist"
         },
         {
@@ -1438,7 +1438,7 @@
           "after_turn": 1,
           "id": "U1",
           "principle": "P12",
-          "check": "Picks reflect a 'chill' vibe \u2014 jazz, acoustic, wine bars, low-key art, intimate venues. NOT high-energy nightlife.",
+          "check": "Picks reflect a 'chill' vibe — jazz, acoustic, wine bars, low-key art, intimate venues. NOT high-energy nightlife.",
           "anti_pattern": "Generic West Village picks with no vibe curation, or asks 'what do you mean by chill?'"
         },
         {
@@ -1452,7 +1452,7 @@
           "after_turn": 3,
           "id": "U3",
           "principle": "P3",
-          "check": "Picks narrow to chill + live music \u2014 acoustic sets, jazz combos, singer-songwriter shows. The chill vibe persists while live music is added as a filter.",
+          "check": "Picks narrow to chill + live music — acoustic sets, jazz combos, singer-songwriter shows. The chill vibe persists while live music is added as a filter.",
           "anti_pattern": "Returns loud rock shows (live music but not chill), or drops the chill vibe"
         },
         {
@@ -1479,7 +1479,7 @@
       ]
     },
     {
-      "name": "Extended: double travel nudge \u2014 first redirect is also thin",
+      "name": "Extended: double travel nudge — first redirect is also thin",
       "category": "poor_experience",
       "tests_principles": [
         "P2",
@@ -1530,14 +1530,14 @@
           "after_turn": 3,
           "id": "V3",
           "principle": "P6",
-          "check": "If the redirected neighborhood is also thin, Pulse is honest about it \u2014 signals that options are limited, doesn't fabricate. May suggest expanding further.",
+          "check": "If the redirected neighborhood is also thin, Pulse is honest about it — signals that options are limited, doesn't fabricate. May suggest expanding further.",
           "anti_pattern": "Invents events, or gives a generic error"
         },
         {
           "after_turn": 4,
           "id": "V4",
           "principle": "P2",
-          "check": "Park Slope picks served \u2014 clean switch from the redirected neighborhood",
+          "check": "Park Slope picks served — clean switch from the redirected neighborhood",
           "anti_pattern": "Still showing events from previous neighborhood"
         },
         {
@@ -1557,7 +1557,7 @@
       ]
     },
     {
-      "name": "Extended: gibberish sandwich \u2014 valid commands around noise",
+      "name": "Extended: gibberish sandwich — valid commands around noise",
       "category": "abuse_off_topic",
       "tests_principles": [
         "P11",
@@ -1582,7 +1582,7 @@
         },
         {
           "turn": 5,
-          "message": "\ud83d\ude02\ud83d\ude02\ud83d\ude02"
+          "message": "😂😂😂"
         },
         {
           "turn": 6,
@@ -1608,14 +1608,14 @@
           "after_turn": 3,
           "id": "W3",
           "principle": "P11",
-          "check": "Gibberish handled gracefully. Session intact \u2014 Crown Heights still active.",
+          "check": "Gibberish handled gracefully. Session intact — Crown Heights still active.",
           "anti_pattern": "Session resets or crashes"
         },
         {
           "after_turn": 4,
           "id": "W4",
           "principle": "P7",
-          "check": "Fresh Crown Heights picks \u2014 confirms session survived gibberish. No repeats from turn 1.",
+          "check": "Fresh Crown Heights picks — confirms session survived gibberish. No repeats from turn 1.",
           "anti_pattern": "'What neighborhood?' or repeats turn 1 picks"
         },
         {
@@ -1836,14 +1836,14 @@
           "after_turn": 2,
           "id": "AC2",
           "principle": "P11",
-          "check": "Pulse handles '4' gracefully when only 2-3 picks were shown \u2014 tells user the valid range. Session and pick list remain intact.",
+          "check": "Pulse handles '4' gracefully when only 2-3 picks were shown — tells user the valid range. Session and pick list remain intact.",
           "anti_pattern": "Crashes, returns random event, or resets session"
         },
         {
           "after_turn": 3,
           "id": "AC3",
           "principle": "P7",
-          "check": "Detail for pick #2 from the original SoHo list \u2014 confirms session survived the invalid input",
+          "check": "Detail for pick #2 from the original SoHo list — confirms session survived the invalid input",
           "anti_pattern": "Session lost after the bad number"
         },
         {
@@ -1857,14 +1857,14 @@
           "after_turn": 5,
           "id": "AC5",
           "principle": "P11",
-          "check": "'0' handled gracefully \u2014 not a valid pick number. Session intact.",
+          "check": "'0' handled gracefully — not a valid pick number. Session intact.",
           "anti_pattern": "Crashes or resets"
         },
         {
           "after_turn": 6,
           "id": "AC6",
           "principle": "P7",
-          "check": "Detail for pick #1 from the 'more' list (turn 4) \u2014 survives two invalid number inputs across the session",
+          "check": "Detail for pick #1 from the 'more' list (turn 4) — survives two invalid number inputs across the session",
           "anti_pattern": "Wrong list or session broken"
         }
       ]
@@ -1915,7 +1915,7 @@
           "after_turn": 2,
           "id": "AD2",
           "principle": "P7",
-          "check": "Bushwick picks served \u2014 the venue query established Bushwick as the active neighborhood context",
+          "check": "Bushwick picks served — the venue query established Bushwick as the active neighborhood context",
           "anti_pattern": "Asks for a neighborhood as if none was established"
         },
         {
@@ -1993,7 +1993,7 @@
           "after_turn": 2,
           "id": "AE2",
           "principle": "P12",
-          "check": "Pulse picks one and advocates for it with a clear opinion \u2014 explains WHY it's the recommendation. Does NOT say 'they're all great!' or refuse to choose.",
+          "check": "Pulse picks one and advocates for it with a clear opinion — explains WHY it's the recommendation. Does NOT say 'they're all great!' or refuse to choose.",
           "anti_pattern": "Non-committal response, deflects the question, or says 'I can't recommend one over another'"
         },
         {
@@ -2021,7 +2021,7 @@
           "after_turn": 6,
           "id": "AE6",
           "principle": "P7",
-          "check": "Detail for pick #1 from the 'more' list \u2014 standard number still works after recommendation flow",
+          "check": "Detail for pick #1 from the 'more' list — standard number still works after recommendation flow",
           "anti_pattern": "Wrong list"
         }
       ]
@@ -2065,7 +2065,7 @@
           "after_turn": 1,
           "id": "AG1",
           "principle": "P3",
-          "check": "Pulse interprets 'funny' \u2014 acceptable to map to comedy, variety shows, or humorous events. The key is making a reasonable interpretation.",
+          "check": "Pulse interprets 'funny' — acceptable to map to comedy, variety shows, or humorous events. The key is making a reasonable interpretation.",
           "anti_pattern": "Ignores 'funny' and returns generic EV events"
         },
         {
@@ -2079,7 +2079,7 @@
           "after_turn": 2,
           "id": "AG3",
           "principle": "P7",
-          "check": "East Village is still the active neighborhood \u2014 correction only affected the category, not the location",
+          "check": "East Village is still the active neighborhood — correction only affected the category, not the location",
           "anti_pattern": "Neighborhood lost during correction"
         },
         {
@@ -2151,7 +2151,7 @@
           "after_turn": 1,
           "id": "AI1",
           "principle": "P6",
-          "check": "Pulse handles the cross-borough request gracefully \u2014 either (a) serves from both with neighborhood labels, (b) asks user to pick one, or (c) suggests the geographically closest areas. Does NOT error out or ignore half the request.",
+          "check": "Pulse handles the cross-borough request gracefully — either (a) serves from both with neighborhood labels, (b) asks user to pick one, or (c) suggests the geographically closest areas. Does NOT error out or ignore half the request.",
           "anti_pattern": "Only acknowledges one neighborhood, or says 'I don't understand'"
         },
         {
@@ -2172,7 +2172,7 @@
           "after_turn": 4,
           "id": "AI4",
           "principle": "P2",
-          "check": "Williamsburg picks served \u2014 clean switch from LES",
+          "check": "Williamsburg picks served — clean switch from LES",
           "anti_pattern": "LES events persist"
         },
         {
@@ -2257,7 +2257,7 @@
           "after_turn": 5,
           "id": "AJ5",
           "principle": "P2",
-          "check": "SoHo picks served \u2014 fresh neighborhood, clean transition",
+          "check": "SoHo picks served — fresh neighborhood, clean transition",
           "anti_pattern": "Returns EV events, or session confused"
         },
         {
@@ -2270,7 +2270,7 @@
       ]
     },
     {
-      "name": "Extended: implicit vibe from context \u2014 'im on a date'",
+      "name": "Extended: implicit vibe from context — 'im on a date'",
       "category": "happy_path",
       "tests_principles": [
         "P12",
@@ -2308,7 +2308,7 @@
           "after_turn": 1,
           "id": "AK1",
           "principle": "P12",
-          "check": "Pulse picks up the date context and curates accordingly \u2014 intimate, impressive, or romantic options. NOT rowdy bars, mosh pits, or cheap chain comedy.",
+          "check": "Pulse picks up the date context and curates accordingly — intimate, impressive, or romantic options. NOT rowdy bars, mosh pits, or cheap chain comedy.",
           "anti_pattern": "Ignores 'im on a date' and returns generic SoHo picks"
         },
         {
@@ -2322,14 +2322,14 @@
           "after_turn": 3,
           "id": "AK3",
           "principle": "P1",
-          "check": "Date vibe persists through 'more' \u2014 fresh picks still date-appropriate",
+          "check": "Date vibe persists through 'more' — fresh picks still date-appropriate",
           "anti_pattern": "Vibe dropped, generic picks returned"
         },
         {
           "after_turn": 4,
           "id": "AK4",
           "principle": "P3",
-          "check": "Live music filter stacks on date vibe \u2014 picks are live music that's also date-appropriate (jazz duo, acoustic, singer-songwriter). NOT loud punk or metal.",
+          "check": "Live music filter stacks on date vibe — picks are live music that's also date-appropriate (jazz duo, acoustic, singer-songwriter). NOT loud punk or metal.",
           "anti_pattern": "Live music but not date-appropriate, or date vibe dropped"
         },
         {
@@ -2343,7 +2343,7 @@
           "after_turn": 6,
           "id": "AK6",
           "principle": "P4",
-          "check": "Pulse provides the price for the event it just gave details on. If the detail already included price, it doesn't make the user feel dumb for asking \u2014 just confirms it warmly.",
+          "check": "Pulse provides the price for the event it just gave details on. If the detail already included price, it doesn't make the user feel dumb for asking — just confirms it warmly.",
           "anti_pattern": "Can't answer, or says 'check the link'"
         }
       ]
@@ -2408,7 +2408,7 @@
           "after_turn": 4,
           "id": "AL4",
           "principle": "P3",
-          "check": "Category pivot accepted \u2014 ALL picks are comedy in Greenpoint. This is a fresh search within the same neighborhood, not a continuation of the generic list.",
+          "check": "Category pivot accepted — ALL picks are comedy in Greenpoint. This is a fresh search within the same neighborhood, not a continuation of the generic list.",
           "anti_pattern": "Returns generic events or comedy from a different neighborhood"
         },
         {
@@ -2428,7 +2428,7 @@
       ]
     },
     {
-      "name": "Extended: neighborhood boundary ambiguity \u2014 noho/soho/ev overlap",
+      "name": "Extended: neighborhood boundary ambiguity — noho/soho/ev overlap",
       "category": "edge_case",
       "tests_principles": [
         "P7",
@@ -2479,14 +2479,14 @@
           "after_turn": 3,
           "id": "AM3",
           "principle": "P2",
-          "check": "SoHo picks served \u2014 distinct from NoHo events even though neighborhoods are adjacent",
+          "check": "SoHo picks served — distinct from NoHo events even though neighborhoods are adjacent",
           "anti_pattern": "Same events as NoHo reappear (venue overlap between adjacent neighborhoods)"
         },
         {
           "after_turn": 4,
           "id": "AM4",
           "principle": "P7",
-          "check": "Pulse interprets 'different from whats in noho' \u2014 ensures SoHo picks don't duplicate any NoHo events already shown. Shows awareness of cross-session event deduplication.",
+          "check": "Pulse interprets 'different from whats in noho' — ensures SoHo picks don't duplicate any NoHo events already shown. Shows awareness of cross-session event deduplication.",
           "anti_pattern": "Ignores the request and serves whatever, including NoHo duplicates"
         },
         {
@@ -2506,7 +2506,7 @@
       ]
     },
     {
-      "name": "Extended: 'something different' \u2014 novelty vibe",
+      "name": "Extended: 'something different' — novelty vibe",
       "category": "happy_path",
       "tests_principles": [
         "P12",
@@ -2550,14 +2550,14 @@
           "after_turn": 2,
           "id": "AN2",
           "principle": "P6",
-          "check": "Pulse doesn't take the 'eh' as a flat rejection \u2014 reads it as dissatisfaction with standard options and tries to adapt. May ask what the user is in the mood for, or pivot to unusual picks.",
+          "check": "Pulse doesn't take the 'eh' as a flat rejection — reads it as dissatisfaction with standard options and tries to adapt. May ask what the user is in the mood for, or pivot to unusual picks.",
           "anti_pattern": "Treats as full rejection and asks for new neighborhood"
         },
         {
           "after_turn": 3,
           "id": "AN3",
           "principle": "P12",
-          "check": "'Something different' curated as unusual/unique events \u2014 immersive experiences, experimental art, underground parties, unusual venues, themed events. NOT standard comedy, mainstream concerts, or well-known bars.",
+          "check": "'Something different' curated as unusual/unique events — immersive experiences, experimental art, underground parties, unusual venues, themed events. NOT standard comedy, mainstream concerts, or well-known bars.",
           "anti_pattern": "Returns the same kind of picks as turn 1"
         },
         {
@@ -2571,7 +2571,7 @@
           "after_turn": 5,
           "id": "AN5",
           "principle": "P12",
-          "check": "'More weird stuff' reinforces the novelty vibe \u2014 fresh unusual picks, no repeats, stays in the same lane",
+          "check": "'More weird stuff' reinforces the novelty vibe — fresh unusual picks, no repeats, stays in the same lane",
           "anti_pattern": "Reverts to mainstream picks, or asks 'what do you mean by weird?'"
         },
         {
@@ -2584,7 +2584,7 @@
       ]
     },
     {
-      "name": "Extended: group context \u2014 party of 6",
+      "name": "Extended: group context — party of 6",
       "category": "edge_case",
       "tests_principles": [
         "P12",
@@ -2622,7 +2622,7 @@
           "after_turn": 1,
           "id": "AO1",
           "principle": "P12",
-          "check": "Pulse accounts for group size \u2014 picks lean toward venues that accommodate groups (bars with space, open events, outdoor stuff) rather than intimate 2-person spots. Group context is treated as a vibe filter.",
+          "check": "Pulse accounts for group size — picks lean toward venues that accommodate groups (bars with space, open events, outdoor stuff) rather than intimate 2-person spots. Group context is treated as a vibe filter.",
           "anti_pattern": "Ignores 'group of 6' and returns intimate jazz clubs or tiny bars"
         },
         {
@@ -2707,14 +2707,14 @@
           "after_turn": 2,
           "id": "AP2",
           "principle": "P9",
-          "check": "Pulse handles the link gracefully \u2014 either (a) acknowledges it can't evaluate external links but offers to keep helping with EV picks, or (b) if it can look up the event, gives an opinion. Session context survives.",
+          "check": "Pulse handles the link gracefully — either (a) acknowledges it can't evaluate external links but offers to keep helping with EV picks, or (b) if it can look up the event, gives an opinion. Session context survives.",
           "anti_pattern": "Crashes on the URL, resets session, or pretends the link doesn't exist"
         },
         {
           "after_turn": 3,
           "id": "AP3",
           "principle": "P7",
-          "check": "Pick #1 detail from the original EV list \u2014 session survived the link message",
+          "check": "Pick #1 detail from the original EV list — session survived the link message",
           "anti_pattern": "Session broken, no picks loaded"
         },
         {
@@ -2792,7 +2792,7 @@
           "after_turn": 3,
           "id": "AQ3",
           "principle": "P6",
-          "check": "Pulse offers BOTH options the user mentioned \u2014 cheaper jazz in Harlem AND jazz in a different neighborhood. Presents them as distinct choices so 'yes' won't be ambiguous.",
+          "check": "Pulse offers BOTH options the user mentioned — cheaper jazz in Harlem AND jazz in a different neighborhood. Presents them as distinct choices so 'yes' won't be ambiguous.",
           "anti_pattern": "Only addresses one of the two options, leaving 'yes' ambiguous"
         },
         {
@@ -2897,7 +2897,7 @@
       ]
     },
     {
-      "name": "Extended: 'whats closest' \u2014 proximity without neighborhood",
+      "name": "Extended: 'whats closest' — proximity without neighborhood",
       "category": "edge_case",
       "tests_principles": [
         "P6",
@@ -2948,7 +2948,7 @@
           "after_turn": 3,
           "id": "AS3",
           "principle": "P6",
-          "check": "Pulse interprets the compound request \u2014 'closer' suggests staying in Midtown or immediately adjacent, 'cheaper' is a price filter. Serves options that address at least one of these.",
+          "check": "Pulse interprets the compound request — 'closer' suggests staying in Midtown or immediately adjacent, 'cheaper' is a price filter. Serves options that address at least one of these.",
           "anti_pattern": "Ignores both modifiers and returns the same list"
         },
         {
@@ -2975,7 +2975,7 @@
       ]
     },
     {
-      "name": "Extended: rapid filter toggling \u2014 on/off/on",
+      "name": "Extended: rapid filter toggling — on/off/on",
       "category": "poor_experience",
       "tests_principles": [
         "P1",
@@ -3122,7 +3122,7 @@
           "id": "BA4",
           "principle": "P1",
           "check": "Fresh late-night EV picks, no repeats. Time filter persists through more.",
-          "anti_pattern": "Time filter dropped \u2014 early evening events appear"
+          "anti_pattern": "Time filter dropped — early evening events appear"
         },
         {
           "after_turn": 5,
@@ -3155,7 +3155,7 @@
       ]
     },
     {
-      "name": "Extended: selective filter removal \u2014 drop one keep others",
+      "name": "Extended: selective filter removal — drop one keep others",
       "category": "poor_experience",
       "tests_principles": [
         "P10",
@@ -3256,7 +3256,7 @@
       ]
     },
     {
-      "name": "P10: pre-router full clear \u2014 'forget it' clears all filters",
+      "name": "P10: pre-router full clear — 'forget it' clears all filters",
       "category": "edge_case",
       "tests_principles": [
         "P10",
@@ -3305,7 +3305,7 @@
       ]
     },
     {
-      "name": "P10: pre-router full clear \u2014 'nvm' clears all filters",
+      "name": "P10: pre-router full clear — 'nvm' clears all filters",
       "category": "edge_case",
       "tests_principles": [
         "P10",
@@ -3354,7 +3354,7 @@
       ]
     },
     {
-      "name": "P10: LLM semantic clear \u2014 'just show me what's good'",
+      "name": "P10: LLM semantic clear — 'just show me what's good'",
       "category": "edge_case",
       "tests_principles": [
         "P10",
@@ -3390,7 +3390,7 @@
           "after_turn": 3,
           "id": "EE2",
           "principle": "P10",
-          "check": "Filters cleared. 'Just show me what's good' is a semantic clear \u2014 Pulse returns unfiltered Bushwick picks across all categories. Neighborhood persists.",
+          "check": "Filters cleared. 'Just show me what's good' is a semantic clear — Pulse returns unfiltered Bushwick picks across all categories. Neighborhood persists.",
           "anti_pattern": "Jazz filter persists (still only jazz), or error, or neighborhood lost"
         },
         {
@@ -3452,7 +3452,7 @@
       ]
     },
     {
-      "name": "P10: LLM semantic clear \u2014 'I'm open to anything'",
+      "name": "P10: LLM semantic clear — 'I'm open to anything'",
       "category": "edge_case",
       "tests_principles": [
         "P10",
@@ -3488,7 +3488,7 @@
           "after_turn": 3,
           "id": "GG2",
           "principle": "P10",
-          "check": "All filters cleared. 'I'm open to anything' is a semantic clear \u2014 Pulse returns unfiltered Greenpoint picks across all categories and price points. Neighborhood persists.",
+          "check": "All filters cleared. 'I'm open to anything' is a semantic clear — Pulse returns unfiltered Greenpoint picks across all categories and price points. Neighborhood persists.",
           "anti_pattern": "Free or comedy filters persist, or error, or neighborhood lost"
         },
         {
@@ -3599,7 +3599,7 @@
           "after_turn": 3,
           "id": "II2",
           "principle": "P7",
-          "check": "Each 'more' returns fresh picks \u2014 no repeats from earlier turns",
+          "check": "Each 'more' returns fresh picks — no repeats from earlier turns",
           "anti_pattern": "Same events reappear"
         },
         {
@@ -3613,7 +3613,7 @@
           "after_turn": 7,
           "id": "II5",
           "principle": "P7",
-          "check": "Pick #1 detail works correctly \u2014 maps to the most recent pick list.",
+          "check": "Pick #1 detail works correctly — maps to the most recent pick list.",
           "anti_pattern": "Detail maps to a pick from an earlier turn, or errors out"
         }
       ]
@@ -3652,7 +3652,7 @@
           "after_turn": 4,
           "id": "JJ1",
           "principle": "P7",
-          "check": "Williamsburg picks are served \u2014 neighborhood switch works",
+          "check": "Williamsburg picks are served — neighborhood switch works",
           "anti_pattern": "Still showing Greenpoint events"
         },
         {
@@ -3703,14 +3703,14 @@
           "after_turn": 2,
           "id": "KK1",
           "principle": "P3",
-          "check": "Jazz filter applied \u2014 picks are jazz or live music events in East Village",
+          "check": "Jazz filter applied — picks are jazz or live music events in East Village",
           "anti_pattern": "Non-jazz events served"
         },
         {
           "after_turn": 4,
           "id": "KK2",
           "principle": "P1",
-          "check": "Jazz filter persists through multiple 'more' requests \u2014 all picks are still jazz/live music",
+          "check": "Jazz filter persists through multiple 'more' requests — all picks are still jazz/live music",
           "anti_pattern": "Filter dropped, generic EV picks returned"
         },
         {
@@ -3748,7 +3748,7 @@
           "after_turn": 1,
           "id": "LL1",
           "principle": "P7",
-          "check": "Greeting gets a warm response asking what neighborhood the user wants to explore \u2014 session starts cleanly",
+          "check": "Greeting gets a warm response asking what neighborhood the user wants to explore — session starts cleanly",
           "anti_pattern": "Returns events from a random neighborhood, or responds with a robotic 'please specify a neighborhood'"
         },
         {
@@ -3762,14 +3762,14 @@
           "after_turn": 3,
           "id": "LL3",
           "principle": "P1",
-          "check": "Free filter applied on top of East Village \u2014 all picks are free events in EV",
+          "check": "Free filter applied on top of East Village — all picks are free events in EV",
           "anti_pattern": "Free filter replaces the neighborhood, or returns paid events"
         },
         {
           "after_turn": 3,
           "id": "LL4",
           "principle": "P7",
-          "check": "Still in East Village \u2014 neighborhood persists through the free filter application",
+          "check": "Still in East Village — neighborhood persists through the free filter application",
           "anti_pattern": "Neighborhood resets or changes after applying free filter"
         }
       ]
@@ -3800,21 +3800,21 @@
           "after_turn": 1,
           "id": "MM1",
           "principle": "P3",
-          "check": "Pulse serves citywide jazz picks \u2014 the category-only opener gets event_picks (not ask_neighborhood) because citywide events are available. Picks should be jazz-focused with neighborhoods labeled.",
+          "check": "Pulse serves citywide jazz picks — the category-only opener gets event_picks (not ask_neighborhood) because citywide events are available. Picks should be jazz-focused with neighborhoods labeled.",
           "anti_pattern": "Asks for a neighborhood instead of serving citywide picks, or returns random non-jazz events"
         },
         {
           "after_turn": 2,
           "id": "MM2",
           "principle": "P3",
-          "check": "West Village picks are served. Jazz context from the opener may carry via conversation history \u2014 this is LLM-dependent, not deterministic filter persistence.",
+          "check": "West Village picks are served. Jazz context from the opener may carry via conversation history — this is LLM-dependent, not deterministic filter persistence.",
           "anti_pattern": "Error, no events, or still showing citywide picks instead of WV"
         },
         {
           "after_turn": 2,
           "id": "MM3",
           "principle": "P7",
-          "check": "Session transitions to West Village as active neighborhood \u2014 citywide context is replaced",
+          "check": "Session transitions to West Village as active neighborhood — citywide context is replaced",
           "anti_pattern": "Still showing events from other neighborhoods labeled as West Village"
         },
         {
@@ -3859,14 +3859,14 @@
           "after_turn": 2,
           "id": "NN2",
           "principle": "P7",
-          "check": "Details returned for pick #1 from the citywide 'surprise me' list \u2014 session correctly tracks the pick list",
+          "check": "Details returned for pick #1 from the citywide 'surprise me' list — session correctly tracks the pick list",
           "anti_pattern": "Returns details for a different event, or says 'I don't have a pick list'"
         },
         {
           "after_turn": 3,
           "id": "NN3",
           "principle": "P7",
-          "check": "Session transitions cleanly to Bushwick \u2014 picks are Bushwick events, previous citywide context is replaced",
+          "check": "Session transitions cleanly to Bushwick — picks are Bushwick events, previous citywide context is replaced",
           "anti_pattern": "Still showing citywide picks, or asks for clarification about switching from citywide to Bushwick"
         }
       ]
@@ -3897,21 +3897,21 @@
           "after_turn": 1,
           "id": "OO1",
           "principle": "P5",
-          "check": "Pulse serves citywide weekend picks \u2014 the time-only opener gets event_picks because citywide events are available. Response should reference the weekend timeframe with days labeled.",
+          "check": "Pulse serves citywide weekend picks — the time-only opener gets event_picks because citywide events are available. Response should reference the weekend timeframe with days labeled.",
           "anti_pattern": "Asks for a neighborhood instead of serving citywide weekend picks, or only shows tonight's events"
         },
         {
           "after_turn": 2,
           "id": "OO2",
           "principle": "P7",
-          "check": "East Village picks served \u2014 session transitions from citywide to EV. Weekend context may or may not persist (LLM-dependent).",
+          "check": "East Village picks served — session transitions from citywide to EV. Weekend context may or may not persist (LLM-dependent).",
           "anti_pattern": "Error, no events, or still showing citywide picks"
         },
         {
           "after_turn": 3,
           "id": "OO3",
           "principle": "P5",
-          "check": "Picks respond to the 'tomorrow night' time filter \u2014 events should be for tomorrow, not today or the full weekend",
+          "check": "Picks respond to the 'tomorrow night' time filter — events should be for tomorrow, not today or the full weekend",
           "anti_pattern": "Ignores the time refinement and still shows today's events or the full weekend"
         }
       ]
@@ -3943,14 +3943,14 @@
           "after_turn": 1,
           "id": "PP1",
           "principle": "P12",
-          "check": "Pulse interprets 'something chill' as a vibe and serves citywide chill-oriented picks \u2014 jazz, acoustic, art openings, wine bars, lounge events. Neighborhoods labeled.",
+          "check": "Pulse interprets 'something chill' as a vibe and serves citywide chill-oriented picks — jazz, acoustic, art openings, wine bars, lounge events. Neighborhoods labeled.",
           "anti_pattern": "Asks for a neighborhood instead of serving citywide chill picks, or returns high-energy events (techno, punk, warehouse)"
         },
         {
           "after_turn": 2,
           "id": "PP2",
           "principle": "P12",
-          "check": "Prospect Heights picks are served. Chill vibe from opener may carry via conversation history \u2014 picks should lean mellow/relaxed if context is retained.",
+          "check": "Prospect Heights picks are served. Chill vibe from opener may carry via conversation history — picks should lean mellow/relaxed if context is retained.",
           "anti_pattern": "Error, no events, or still showing citywide picks instead of Prospect Heights"
         },
         {
@@ -3988,21 +3988,21 @@
           "after_turn": 1,
           "id": "QQ1",
           "principle": "P3",
-          "check": "Pulse serves citywide free picks \u2014 the price opener gets event_picks because citywide events are available. All picks should be free events with neighborhoods labeled.",
+          "check": "Pulse serves citywide free picks — the price opener gets event_picks because citywide events are available. All picks should be free events with neighborhoods labeled.",
           "anti_pattern": "Asks for a neighborhood instead of serving citywide free picks, or returns paid events"
         },
         {
           "after_turn": 2,
           "id": "QQ2",
           "principle": "P7",
-          "check": "Williamsburg picks served. Free context from opener may carry via conversation history \u2014 picks should lean free if context is retained, but this is not deterministically guaranteed.",
+          "check": "Williamsburg picks served. Free context from opener may carry via conversation history — picks should lean free if context is retained, but this is not deterministically guaranteed.",
           "anti_pattern": "Error, no events, or still showing citywide picks"
         },
         {
           "after_turn": 3,
           "id": "QQ3",
           "principle": "P7",
-          "check": "Bushwick picks served \u2014 neighborhood switch works. Free context may persist through the switch via conversation history.",
+          "check": "Bushwick picks served — neighborhood switch works. Free context may persist through the switch via conversation history.",
           "anti_pattern": "Still showing Williamsburg events after explicit neighborhood switch"
         }
       ]
@@ -4034,7 +4034,7 @@
           "after_turn": 1,
           "id": "RR1",
           "principle": "P3",
-          "check": "Pulse serves citywide comedy picks \u2014 the category-only opener gets event_picks because citywide events are available. Picks should be comedy-focused with neighborhoods labeled.",
+          "check": "Pulse serves citywide comedy picks — the category-only opener gets event_picks because citywide events are available. Picks should be comedy-focused with neighborhoods labeled.",
           "anti_pattern": "Asks for a neighborhood instead of serving citywide comedy picks, or returns non-comedy events"
         },
         {
@@ -4048,14 +4048,14 @@
           "after_turn": 3,
           "id": "RR3",
           "principle": "P10",
-          "check": "'Actually jazz' signals the user wants jazz instead of comedy \u2014 picks should shift to jazz events. The 'actually' signals an explicit category replacement.",
+          "check": "'Actually jazz' signals the user wants jazz instead of comedy — picks should shift to jazz events. The 'actually' signals an explicit category replacement.",
           "anti_pattern": "Still returns comedy events, or returns a mix of comedy and jazz"
         },
         {
           "after_turn": 3,
           "id": "RR4",
           "principle": "P7",
-          "check": "Still in LES \u2014 neighborhood persists through the category change",
+          "check": "Still in LES — neighborhood persists through the category change",
           "anti_pattern": "Switches neighborhood or serves citywide picks"
         }
       ]
@@ -4087,14 +4087,14 @@
           "after_turn": 1,
           "id": "SS1",
           "principle": "P12",
-          "check": "Pulse interprets 'I want to dance' as nightlife/DJ/club activity and serves citywide dance picks \u2014 DJ sets, club nights, dance parties, electronic music. Neighborhoods labeled.",
+          "check": "Pulse interprets 'I want to dance' as nightlife/DJ/club activity and serves citywide dance picks — DJ sets, club nights, dance parties, electronic music. Neighborhoods labeled.",
           "anti_pattern": "Asks what the user means by 'dance', serves non-dance events, or asks for a neighborhood instead of serving picks"
         },
         {
           "after_turn": 2,
           "id": "SS2",
           "principle": "P12",
-          "check": "Bushwick picks served. Dance/nightlife context from opener may carry via conversation history \u2014 picks should lean dance-oriented if context is retained.",
+          "check": "Bushwick picks served. Dance/nightlife context from opener may carry via conversation history — picks should lean dance-oriented if context is retained.",
           "anti_pattern": "Error, no events, or still showing citywide picks"
         },
         {
@@ -4150,14 +4150,14 @@
           "after_turn": 3,
           "id": "TT3",
           "principle": "P9",
-          "check": "Off-topic Knicks question deflected warmly \u2014 Pulse stays in character and does not attempt to answer the sports question. Session context (Bushwick, pick list) survives.",
+          "check": "Off-topic Knicks question deflected warmly — Pulse stays in character and does not attempt to answer the sports question. Session context (Bushwick, pick list) survives.",
           "anti_pattern": "Tries to answer the sports question, or resets the session"
         },
         {
           "after_turn": 4,
           "id": "TT4",
           "principle": "P7",
-          "check": "'More' returns fresh Bushwick picks \u2014 session survived the off-topic interruption. No repeats from turn 2.",
+          "check": "'More' returns fresh Bushwick picks — session survived the off-topic interruption. No repeats from turn 2.",
           "anti_pattern": "Asks 'what neighborhood?' again, or repeats turn 2 picks, or says 'I don't have context'"
         }
       ]
@@ -4200,21 +4200,21 @@
           "after_turn": 2,
           "id": "UU2",
           "principle": "P11",
-          "check": "Second 'hey' also hits pre-router greeting regex \u2014 gets the same canned response. This is acceptable (not broken), though the identical repetition is a known UX limitation of the pre-router's exact-match design.",
+          "check": "Second 'hey' also hits pre-router greeting regex — gets the same canned response. This is acceptable (not broken), though the identical repetition is a known UX limitation of the pre-router's exact-match design.",
           "anti_pattern": "Error, session breaks, or the second greeting causes a crash. Note: identical canned response is expected behavior, not a failure."
         },
         {
           "after_turn": 3,
           "id": "UU3",
           "principle": "P7",
-          "check": "East Village picks served normally \u2014 the repeated greetings did not prevent a normal session from starting",
+          "check": "East Village picks served normally — the repeated greetings did not prevent a normal session from starting",
           "anti_pattern": "Asks for neighborhood again, or returns an error"
         },
         {
           "after_turn": 4,
           "id": "UU4",
           "principle": "P7",
-          "check": "Details returned for pick #1 from the EV list \u2014 session correctly tracks the pick list despite the greeting preamble",
+          "check": "Details returned for pick #1 from the EV list — session correctly tracks the pick list despite the greeting preamble",
           "anti_pattern": "Returns details for a different event, or says 'I don't have a pick list'"
         }
       ]
@@ -4246,21 +4246,21 @@
           "after_turn": 1,
           "id": "VV1",
           "principle": "P12",
-          "check": "Pulse interprets 'date night' as a vibe and serves citywide date-appropriate picks \u2014 intimate venues, nice vibes, wine bars, jazz, art. Neighborhoods labeled.",
+          "check": "Pulse interprets 'date night' as a vibe and serves citywide date-appropriate picks — intimate venues, nice vibes, wine bars, jazz, art. Neighborhoods labeled.",
           "anti_pattern": "Asks for a neighborhood instead of serving picks, or returns high-energy party/rave events for a date request"
         },
         {
           "after_turn": 2,
           "id": "VV2",
           "principle": "P12",
-          "check": "West Village picks served. Date night vibe from opener may carry via conversation history \u2014 picks should lean romantic/intimate if context is retained.",
+          "check": "West Village picks served. Date night vibe from opener may carry via conversation history — picks should lean romantic/intimate if context is retained.",
           "anti_pattern": "Error, no events, or still showing citywide picks"
         },
         {
           "after_turn": 3,
           "id": "VV3",
           "principle": "P2",
-          "check": "Picks are from Cobble Hill, not West Village \u2014 neighborhood switch respected",
+          "check": "Picks are from Cobble Hill, not West Village — neighborhood switch respected",
           "anti_pattern": "Still showing West Village events after user asked for Cobble Hill"
         },
         {
@@ -4301,21 +4301,21 @@
           "after_turn": 1,
           "id": "WW1",
           "principle": "P7",
-          "check": "Help response explaining how Pulse works \u2014 mentions texting a neighborhood name to get started",
+          "check": "Help response explaining how Pulse works — mentions texting a neighborhood name to get started",
           "anti_pattern": "Returns events instead of help, or gives a generic 'I don't understand'"
         },
         {
           "after_turn": 2,
           "id": "WW2",
           "principle": "P7",
-          "check": "Williamsburg picks served normally after the help message \u2014 help did not break the session flow",
+          "check": "Williamsburg picks served normally after the help message — help did not break the session flow",
           "anti_pattern": "Asks for neighborhood again, or returns an error, or still in help mode"
         },
         {
           "after_turn": 3,
           "id": "WW3",
           "principle": "P7",
-          "check": "'More' returns fresh Williamsburg picks \u2014 session survived the help opener. No repeats from turn 2.",
+          "check": "'More' returns fresh Williamsburg picks — session survived the help opener. No repeats from turn 2.",
           "anti_pattern": "Asks 'what neighborhood?' again, or repeats turn 2 picks"
         },
         {
@@ -4364,7 +4364,7 @@
           "after_turn": 2,
           "id": "XX2",
           "principle": "P3",
-          "check": "'jazz' on turn 2 has no session state from the canned greeting, so it falls to unified with citywide events. Should serve citywide jazz picks with neighborhoods labeled \u2014 NOT ask_neighborhood (events are available).",
+          "check": "'jazz' on turn 2 has no session state from the canned greeting, so it falls to unified with citywide events. Should serve citywide jazz picks with neighborhoods labeled — NOT ask_neighborhood (events are available).",
           "anti_pattern": "Asks for a neighborhood instead of serving jazz picks, or returns non-jazz events"
         },
         {
@@ -4408,14 +4408,14 @@
           "after_turn": 1,
           "id": "YY1",
           "principle": "P7",
-          "check": "Citywide curated picks served \u2014 'surprise me' gets event_picks with variety across NYC, neighborhoods labeled.",
+          "check": "Citywide curated picks served — 'surprise me' gets event_picks with variety across NYC, neighborhoods labeled.",
           "anti_pattern": "Asks for a neighborhood, returns error, or serves picks from only one neighborhood"
         },
         {
           "after_turn": 2,
           "id": "YY2",
           "principle": "P7",
-          "check": "'More' returns fresh citywide picks \u2014 no repeats from turn 1. The MORE command works in citywide mode.",
+          "check": "'More' returns fresh citywide picks — no repeats from turn 1. The MORE command works in citywide mode.",
           "anti_pattern": "MORE fails, errors, asks for a neighborhood, or repeats the same picks from turn 1"
         },
         {
@@ -4452,21 +4452,21 @@
           "after_turn": 1,
           "id": "ZZ1",
           "principle": "P7",
-          "check": "'hola' matches the pre-router greeting regex \u2014 gets the canned English greeting response. Response asks what the user is in the mood for.",
+          "check": "'hola' matches the pre-router greeting regex — gets the canned English greeting response. Response asks what the user is in the mood for.",
           "anti_pattern": "Responds in Spanish, falls to unified, or returns an error"
         },
         {
           "after_turn": 2,
           "id": "ZZ2",
           "principle": "P7",
-          "check": "Bushwick picks served normally \u2014 the canned greeting didn't break session initialization. Neighborhood established.",
+          "check": "Bushwick picks served normally — the canned greeting didn't break session initialization. Neighborhood established.",
           "anti_pattern": "Error, no events, or session confused by the 'hola' greeting"
         },
         {
           "after_turn": 3,
           "id": "ZZ3",
           "principle": "P7",
-          "check": "'More' returns fresh Bushwick picks \u2014 session survived the pre-router greeting start. No repeats from turn 2.",
+          "check": "'More' returns fresh Bushwick picks — session survived the pre-router greeting start. No repeats from turn 2.",
           "anti_pattern": "MORE fails, returns error, or repeats picks"
         }
       ]
@@ -4497,7 +4497,7 @@
           "after_turn": 1,
           "id": "AAA1",
           "principle": "P3",
-          "check": "Citywide comedy picks served with neighborhoods labeled \u2014 category opener with events available gets event_picks.",
+          "check": "Citywide comedy picks served with neighborhoods labeled — category opener with events available gets event_picks.",
           "anti_pattern": "Asks for a neighborhood, returns non-comedy events, or errors"
         },
         {
@@ -4511,7 +4511,7 @@
           "after_turn": 3,
           "id": "AAA3",
           "principle": "P7",
-          "check": "East Village picks served \u2014 session transitions from citywide to EV. Comedy context may carry via conversation history.",
+          "check": "East Village picks served — session transitions from citywide to EV. Comedy context may carry via conversation history.",
           "anti_pattern": "Still showing citywide picks, error on neighborhood transition, or session broken by prior detail lookup"
         }
       ]
@@ -4547,7 +4547,7 @@
           "after_turn": 1,
           "id": "T1",
           "principle": "P7",
-          "check": "Bushwick picks served with mixed times \u2014 events both before and after 10pm are acceptable since no time filter yet.",
+          "check": "Bushwick picks served with mixed times — events both before and after 10pm are acceptable since no time filter yet.",
           "anti_pattern": "No events returned or error"
         },
         {
@@ -4561,14 +4561,14 @@
           "after_turn": 3,
           "id": "T3",
           "principle": "P1",
-          "check": "MORE respects the 10pm time filter \u2014 all new picks start at or after 10pm.",
+          "check": "MORE respects the 10pm time filter — all new picks start at or after 10pm.",
           "anti_pattern": "Time filter lost on MORE, earlier events appear"
         },
         {
           "after_turn": 4,
           "id": "T4",
           "principle": "P1",
-          "check": "Time filter persists through neighborhood switch \u2014 Williamsburg picks are all after 10pm.",
+          "check": "Time filter persists through neighborhood switch — Williamsburg picks are all after 10pm.",
           "anti_pattern": "Time filter dropped on hood switch, early events shown in Williamsburg"
         }
       ]
@@ -4607,7 +4607,7 @@
           "after_turn": 2,
           "id": "T6",
           "principle": "P3",
-          "check": "Events are jazz or live_music category \u2014 the jazz subcategory filter is respected.",
+          "check": "Events are jazz or live_music category — the jazz subcategory filter is respected.",
           "anti_pattern": "Comedy, nightlife, or other non-jazz events returned"
         },
         {
@@ -4615,7 +4615,7 @@
           "id": "T7",
           "principle": "P1",
           "check": "Both jazz category AND 11pm time filter persist through neighborhood switch to Williamsburg.",
-          "anti_pattern": "Either filter lost \u2014 generic Williamsburg events or early jazz events shown"
+          "anti_pattern": "Either filter lost — generic Williamsburg events or early jazz events shown"
         }
       ]
     },
@@ -4645,7 +4645,7 @@
           "after_turn": 2,
           "id": "T8",
           "principle": "P5",
-          "check": "Only events starting after 1am shown (if any exist). Events at 10pm, 11pm, midnight are excluded \u2014 only true after-hours events (2am+) qualify. If no events after 1am, graceful degradation.",
+          "check": "Only events starting after 1am shown (if any exist). Events at 10pm, 11pm, midnight are excluded — only true after-hours events (2am+) qualify. If no events after 1am, graceful degradation.",
           "anti_pattern": "Events before 1am (like 10pm or midnight) shown after the filter is set"
         },
         {
@@ -4684,14 +4684,14 @@
           "after_turn": 2,
           "id": "T10",
           "principle": "P5",
-          "check": "Only events after 10pm shown \u2014 time filter applied.",
+          "check": "Only events after 10pm shown — time filter applied.",
           "anti_pattern": "Events before 10pm still shown"
         },
         {
           "after_turn": 3,
           "id": "T11",
           "principle": "P10",
-          "check": "Time filter cleared \u2014 events at all times shown again, including ones before 10pm that were previously excluded.",
+          "check": "Time filter cleared — events at all times shown again, including ones before 10pm that were previously excluded.",
           "anti_pattern": "Time filter persists after 'anytime works', only late events still shown"
         }
       ]
@@ -4730,7 +4730,7 @@
           "after_turn": 2,
           "id": "T13",
           "principle": "P1",
-          "check": "MORE respects all three filters \u2014 comedy, after 9pm, Williamsburg.",
+          "check": "MORE respects all three filters — comedy, after 9pm, Williamsburg.",
           "anti_pattern": "Any filter lost on MORE"
         },
         {
@@ -4769,14 +4769,14 @@
           "after_turn": 1,
           "id": "FM1",
           "principle": "P3",
-          "check": "Citywide free jazz picks \u2014 both free_only and jazz/live_music category applied on first message with no prior session.",
+          "check": "Citywide free jazz picks — both free_only and jazz/live_music category applied on first message with no prior session.",
           "anti_pattern": "Non-jazz events, paid events, or asks for a neighborhood before serving picks"
         },
         {
           "after_turn": 2,
           "id": "FM2",
           "principle": "P1",
-          "check": "Free + jazz compound persists through neighborhood specification \u2014 East Village free jazz events served.",
+          "check": "Free + jazz compound persists through neighborhood specification — East Village free jazz events served.",
           "anti_pattern": "Free or jazz filter lost when user specifies neighborhood"
         },
         {
@@ -4815,14 +4815,14 @@
           "after_turn": 1,
           "id": "FM4",
           "principle": "P3",
-          "check": "Comedy events in Bushwick \u2014 both category and neighborhood detected on first message with no session.",
+          "check": "Comedy events in Bushwick — both category and neighborhood detected on first message with no session.",
           "anti_pattern": "Non-comedy events, wrong neighborhood, or asks for more info instead of serving picks"
         },
         {
           "after_turn": 2,
           "id": "FM5",
           "principle": "P1",
-          "check": "MORE respects comedy filter in Bushwick \u2014 fresh comedy picks, no repeats from turn 1.",
+          "check": "MORE respects comedy filter in Bushwick — fresh comedy picks, no repeats from turn 1.",
           "anti_pattern": "Comedy filter lost on MORE, or events from turn 1 repeated"
         },
         {
@@ -4867,7 +4867,7 @@
           "after_turn": 2,
           "id": "FM8",
           "principle": "P1",
-          "check": "Free + comedy compound \u2014 comedy stacks on top of existing free filter. Only free comedy events shown.",
+          "check": "Free + comedy compound — comedy stacks on top of existing free filter. Only free comedy events shown.",
           "anti_pattern": "Free filter dropped when comedy added, or non-comedy events shown"
         },
         {
@@ -4906,14 +4906,14 @@
           "after_turn": 1,
           "id": "FM10",
           "principle": "P5",
-          "check": "Citywide jazz after 10pm \u2014 both category and time filter detected on first message. Only jazz events starting after 10pm shown.",
+          "check": "Citywide jazz after 10pm — both category and time filter detected on first message. Only jazz events starting after 10pm shown.",
           "anti_pattern": "Non-jazz events, events before 10pm, or asks for neighborhood"
         },
         {
           "after_turn": 2,
           "id": "FM11",
           "principle": "P1",
-          "check": "MORE respects jazz + 10pm compound \u2014 fresh picks, same filters.",
+          "check": "MORE respects jazz + 10pm compound — fresh picks, same filters.",
           "anti_pattern": "Either filter lost on MORE"
         },
         {
@@ -4960,7 +4960,7 @@
           "after_turn": 2,
           "id": "MR1",
           "principle": "P1",
-          "check": "Free filter applied \u2014 all picks are free events in Bushwick.",
+          "check": "Free filter applied — all picks are free events in Bushwick.",
           "anti_pattern": "Paid events served"
         },
         {
@@ -4975,7 +4975,7 @@
           "id": "MR3",
           "principle": "P1",
           "check": "Second MORE: free filter still persists. Fresh picks, all free.",
-          "anti_pattern": "Filter drift \u2014 paid events appear, or events repeat from earlier turns"
+          "anti_pattern": "Filter drift — paid events appear, or events repeat from earlier turns"
         },
         {
           "after_turn": 5,
@@ -4987,7 +4987,7 @@
       ]
     },
     {
-      "name": "MORE: dedup verification \u2014 no event repeats across batches",
+      "name": "MORE: dedup verification — no event repeats across batches",
       "category": "edge_case",
       "tests_principles": [
         "P7"
@@ -5015,14 +5015,14 @@
           "after_turn": 2,
           "id": "MR5",
           "principle": "P7",
-          "check": "MORE returns fresh events \u2014 zero overlap with turn 1 picks (no same event names or venues).",
+          "check": "MORE returns fresh events — zero overlap with turn 1 picks (no same event names or venues).",
           "anti_pattern": "Any event from turn 1 reappears"
         },
         {
           "after_turn": 3,
           "id": "MR6",
           "principle": "P7",
-          "check": "Second MORE returns fresh events \u2014 zero overlap with turns 1 or 2. Each batch is distinct.",
+          "check": "Second MORE returns fresh events — zero overlap with turns 1 or 2. Each batch is distinct.",
           "anti_pattern": "Any event from turns 1 or 2 reappears"
         },
         {
@@ -5121,7 +5121,7 @@
           "after_turn": 1,
           "id": "AB1",
           "principle": "P9",
-          "check": "Pulse deflects hostility warmly \u2014 does not mirror aggression, does not refuse service, stays in character.",
+          "check": "Pulse deflects hostility warmly — does not mirror aggression, does not refuse service, stays in character.",
           "anti_pattern": "Defensive, rude, or robotic response"
         },
         {
@@ -5259,7 +5259,7 @@
           "after_turn": 2,
           "id": "AB10",
           "principle": "P3",
-          "check": "Comedy filter applied \u2014 picks are comedy events in East Village.",
+          "check": "Comedy filter applied — picks are comedy events in East Village.",
           "anti_pattern": "Non-comedy events served"
         },
         {
@@ -5309,7 +5309,7 @@
           "principle": "P7",
           "type": "exact",
           "expected": "[NO RESPONSE]",
-          "check": "STOP triggers silent opt-out \u2014 no response sent.",
+          "check": "STOP triggers silent opt-out — no response sent.",
           "anti_pattern": "Any response text sent back to user"
         },
         {
@@ -5318,7 +5318,7 @@
           "principle": "P7",
           "type": "exact",
           "expected": "[NO RESPONSE]",
-          "check": "UNSUBSCRIBE triggers silent opt-out \u2014 no response sent.",
+          "check": "UNSUBSCRIBE triggers silent opt-out — no response sent.",
           "anti_pattern": "Any response text sent back to user"
         },
         {
@@ -5327,7 +5327,7 @@
           "principle": "P7",
           "type": "exact",
           "expected": "[NO RESPONSE]",
-          "check": "CANCEL triggers silent opt-out \u2014 no response sent.",
+          "check": "CANCEL triggers silent opt-out — no response sent.",
           "anti_pattern": "Any response text sent back to user"
         },
         {
@@ -5336,7 +5336,7 @@
           "principle": "P7",
           "type": "exact",
           "expected": "[NO RESPONSE]",
-          "check": "QUIT triggers silent opt-out \u2014 no response sent.",
+          "check": "QUIT triggers silent opt-out — no response sent.",
           "anti_pattern": "Any response text sent back to user"
         }
       ]
@@ -5373,14 +5373,14 @@
           "after_turn": 2,
           "id": "TC6",
           "principle": "P7",
-          "check": "Pulse responds normally \u2014 'stop by later' is NOT an opt-out keyword. Session context preserved.",
+          "check": "Pulse responds normally — 'stop by later' is NOT an opt-out keyword. Session context preserved.",
           "anti_pattern": "Silent drop or no response"
         },
         {
           "after_turn": 3,
           "id": "TC7",
           "principle": "P7",
-          "check": "Pulse responds normally \u2014 'can I cancel my filter' is NOT an opt-out keyword. Treated as filter clearing or conversational message.",
+          "check": "Pulse responds normally — 'can I cancel my filter' is NOT an opt-out keyword. Treated as filter clearing or conversational message.",
           "anti_pattern": "Silent drop or no response"
         }
       ]
@@ -5440,7 +5440,7 @@
           "after_turn": 3,
           "id": "NB3",
           "principle": "P1",
-          "check": "Comedy filter persists after switching to Jackson Heights \u2014 response references comedy or shows comedy events",
+          "check": "Comedy filter persists after switching to Jackson Heights — response references comedy or shows comedy events",
           "anti_pattern": "Comedy filter dropped silently on neighborhood switch"
         }
       ]
@@ -5462,7 +5462,7 @@
           "after_turn": 1,
           "id": "NB4",
           "principle": "P6",
-          "check": "Pulse returns events or offers to expand/suggest nearby neighborhoods \u2014 does not error or give empty response",
+          "check": "Pulse returns events or offers to expand/suggest nearby neighborhoods — does not error or give empty response",
           "anti_pattern": "No events or silent drop"
         }
       ]
@@ -5484,8 +5484,132 @@
           "after_turn": 1,
           "id": "NB5",
           "principle": "P7",
-          "check": "St George resolves as a Staten Island neighborhood \u2014 response references St George or Staten Island, not an error",
+          "check": "St George resolves as a Staten Island neighborhood — response references St George or Staten Island, not an error",
           "anti_pattern": "Unrecognized neighborhood or asks what 'st george' means"
+        }
+      ]
+    },
+    {
+      "name": "Bare category must return events, not ask_neighborhood",
+      "category": "happy_path",
+      "tests_principles": [
+        "P3",
+        "P6"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "parties"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "BQ1",
+          "principle": "P3",
+          "check": "Bare \"parties\" returns citywide nightlife event picks — not ask_neighborhood or conversational",
+          "anti_pattern": "Asks for a neighborhood, says \"text me a neighborhood\", or returns no events"
+        }
+      ]
+    },
+    {
+      "name": "This weekend must return multi-day events",
+      "category": "happy_path",
+      "tests_principles": [
+        "P5",
+        "P6"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "this weekend"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "BQ2",
+          "principle": "P5",
+          "check": "\"this weekend\" returns citywide event picks spanning Saturday/Sunday — does not say \"only tonight\" or hallucinate limitations",
+          "anti_pattern": "Says only has tonight events, hallucinates a limitation, or asks for a neighborhood"
+        }
+      ]
+    },
+    {
+      "name": "Parties understood as nightlife category",
+      "category": "happy_path",
+      "tests_principles": [
+        "P3"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "parties in williamsburg"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "BQ3",
+          "principle": "P3",
+          "check": "\"parties in williamsburg\" returns nightlife events in Williamsburg — parties maps to nightlife category",
+          "anti_pattern": "Does not understand \"parties\", returns non-nightlife events, or asks what user means"
+        }
+      ]
+    },
+    {
+      "name": "Tomorrow date range query returns events",
+      "category": "happy_path",
+      "tests_principles": [
+        "P5"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "what's happening tomorrow"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "BQ4",
+          "principle": "P5",
+          "check": "\"tomorrow\" returns citywide event picks for the next day — does not say only has tonight or ask for a neighborhood",
+          "anti_pattern": "Says only has tonight events, returns tonight events labeled as tomorrow, or asks for neighborhood"
+        }
+      ]
+    },
+    {
+      "name": "Date range follow-up compounds with existing session",
+      "category": "filter_drift",
+      "tests_principles": [
+        "P1",
+        "P5"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "comedy"
+        },
+        {
+          "turn": 2,
+          "message": "this weekend"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "BQ5a",
+          "principle": "P1",
+          "check": "Bare \"comedy\" returns citywide comedy picks",
+          "anti_pattern": "Asks for neighborhood or returns no events"
+        },
+        {
+          "after_turn": 2,
+          "id": "BQ5b",
+          "principle": "P1",
+          "check": "\"this weekend\" compounds with existing comedy filter — returns comedy picks for the weekend",
+          "anti_pattern": "Comedy filter dropped, or says only has tonight events"
         }
       ]
     }

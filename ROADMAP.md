@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-01 (prompt audit: tool_use, self-verification, tone reduction, shared sections)
+> Last updated: 2026-03-02 (broad query support: date range detection, filter-aware citywide pool, borough resolution)
 
 ---
 
@@ -279,7 +279,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 | 8 | **Neighborhood skew** — EV 13x, Bushwick 7x, Wburg 5x. Many outer-borough neighborhoods absent. Failures are cache-dependent, not code-dependent. | Low | **Done** — 8 multi-turn + 4 regression scenarios added (Mott Haven, Fordham, Staten Island, Jackson Heights, Flushing, Bay Ridge, Washington Heights, Ridgewood) |
 | 9 | Trace fetch race condition — could grab wrong trace under concurrent load | Low | **Done** — `handleMessageAI` returns `trace.id`, test endpoint uses `getTraceById` |
 
-**Distribution assessment:** happy_path 35.9%, edge_case 26.6%, filter_drift 18.5%, poor_experience 14.1%, abuse_off_topic 4.9%. All categories in healthy range. 184 multi-turn + 85 regression = **269 total** golden scenarios.
+**Distribution assessment:** happy_path 35.9%, edge_case 26.6%, filter_drift 18.5%, poor_experience 14.1%, abuse_off_topic 4.9%. All categories in healthy range. 196 multi-turn + 90 regression = **286 total** golden scenarios.
 
 ---
 
@@ -375,6 +375,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 
 | Date | What | Key Impact |
 |------|------|------------|
+| Mar 2 | Broad query support (citywide category + date range) | party/parties + film/films/cinema/movie/movies in catMap, `parseDateRange()` for "this week"/"this weekend"/"tomorrow", filter-aware citywide pool (`filterAwareSort`), borough+neighborhood resolution fix ("brooklyn/williamsburg"), MULTI-DAY DATA prompt, 12 multi-turn + 5 regression scenarios |
 | Mar 1 | Prompt audit: best practices overhaul | tool_use for unified path (guaranteed JSON), self-verification checklist, tone reduction (31 ALL-CAPS → rationale-based), examples trimmed 18→8, negative→positive rewrites, shared prompt sections extracted (`SHARED_UNDERSTANDING`/`SHARED_GEOGRAPHY`), XML skill tags, user prompt restructured (data top, query bottom) |
 | Mar 1 | Pre-router filter follow-up guard fix | Added `hasActiveFilters` to pre-router guard — filter follow-ups work after ask_neighborhood flows ($0 path) |
 | Mar 1 | Citywide visitedHoods tracking fix | `'citywide'` sentinel replaces null filtering in pipeline.js, unified-flow.js, handler.js — citywide visits tracked for exhaustion suggestions |

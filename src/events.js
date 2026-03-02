@@ -405,6 +405,29 @@ function applyQualityGates(events) {
   );
 }
 
+/**
+ * Sort events with filter awareness: matching events first, padded with unmatched.
+ * When no filters are active, falls back to plain sortFn.
+ * Only checks category and free_only — time/vibe are handled downstream by buildTaggedPool.
+ */
+function filterAwareSort(events, filters, sortFn) {
+  const hasCat = filters?.category;
+  const hasFree = filters?.free_only;
+  if (!hasCat && !hasFree) return [...events].sort(sortFn);
+
+  const matching = [];
+  const rest = [];
+  for (const e of events) {
+    const catOk = !hasCat || e.category === hasCat;
+    const freeOk = !hasFree || e.is_free;
+    if (catOk && freeOk) matching.push(e);
+    else rest.push(e);
+  }
+  matching.sort(sortFn);
+  rest.sort(sortFn);
+  return [...matching, ...rest];
+}
+
 async function getEvents(neighborhood, { dateRange } = {}) {
   if (eventCache.length === 0) {
     await refreshCache();
@@ -432,7 +455,7 @@ async function getEvents(neighborhood, { dateRange } = {}) {
  * Get events for a borough — filters to neighborhoods within the borough.
  * Applies quality gates, date filtering, and neighborhood diversity (max 3 per hood).
  */
-async function getEventsForBorough(borough, { dateRange } = {}) {
+async function getEventsForBorough(borough, { dateRange, filters } = {}) {
   if (eventCache.length === 0) {
     await refreshCache();
   }
@@ -455,7 +478,7 @@ async function getEventsForBorough(borough, { dateRange } = {}) {
 
   // Sort by date proximity x source tier (same as citywide)
   const tierOrder = { unstructured: 0, primary: 1, secondary: 2 };
-  const sorted = dateFiltered.sort((a, b) => {
+  const sortFn = (a, b) => {
     const dateA = getEventDate(a) || rangeEnd;
     const dateB = getEventDate(b) || rangeEnd;
     if (dateA !== dateB) return dateA < dateB ? -1 : 1;
@@ -465,7 +488,10 @@ async function getEventsForBorough(borough, { dateRange } = {}) {
     const confA = a.extraction_confidence ?? 1;
     const confB = b.extraction_confidence ?? 1;
     return confB - confA;
-  });
+  };
+
+  // Filter-aware pool: matching events first, padded with unmatched
+  const sorted = filterAwareSort(dateFiltered, filters, sortFn);
 
   // Apply neighborhood diversity: max 3 per hood
   const diverse = [];
@@ -485,7 +511,7 @@ async function getEventsForBorough(borough, { dateRange } = {}) {
  * Get events citywide — no geographic anchor. Returns best events across all neighborhoods.
  * Applies same quality gates as getEvents.
  */
-async function getEventsCitywide({ dateRange } = {}) {
+async function getEventsCitywide({ dateRange, filters } = {}) {
   if (eventCache.length === 0) {
     await refreshCache();
   }
@@ -505,7 +531,7 @@ async function getEventsCitywide({ dateRange } = {}) {
 
   // Rank by: date proximity (today first) x source tier quality
   const tierOrder = { unstructured: 0, primary: 1, secondary: 2 };
-  const sorted = dateFiltered.sort((a, b) => {
+  const sortFn = (a, b) => {
     const dateA = getEventDate(a) || rangeEnd;
     const dateB = getEventDate(b) || rangeEnd;
     if (dateA !== dateB) return dateA < dateB ? -1 : 1;
@@ -515,7 +541,10 @@ async function getEventsCitywide({ dateRange } = {}) {
     const confA = a.extraction_confidence ?? 1;
     const confB = b.extraction_confidence ?? 1;
     return confB - confA;
-  });
+  };
+
+  // Filter-aware pool: matching events first, padded with unmatched
+  const sorted = filterAwareSort(dateFiltered, filters, sortFn);
 
   console.log(`Citywide: ${sorted.length} events (range ${rangeStart}..${rangeEnd}, cache: ${eventCache.length})`);
   return sorted.slice(0, 30);
