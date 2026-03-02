@@ -100,6 +100,13 @@ function renderEventCard(event, formattedPhone, bestiePhone, domain, refCode) {
   const detail = escapeHtml(event.description_short || event.short_detail || '');
   const ticketUrl = event.ticket_url || event.source_url || '';
   const sourceLabel = escapeHtml(getSourceLabel(event));
+  // Fallback: Google Maps link when no event URL exists
+  const mapsQuery = event.venue_address
+    ? `${event.venue_name}, ${event.venue_address}`
+    : `${event.venue_name}, NYC`;
+  const mapsUrl = event.venue_name && event.venue_name !== 'TBA'
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`
+    : '';
   const sms = smsUri(bestiePhone, `ref:${refCode}`);
   const phoneFmt = formattedPhone;
 
@@ -247,7 +254,9 @@ function renderEventCard(event, formattedPhone, bestiePhone, domain, refCode) {
       ${hood ? `<span class="meta-tag">${hood}</span>` : ''}
     </div>
     ${detail ? `<p class="event-detail">${detail}</p>` : ''}
-    ${ticketUrl ? `<a class="cta-btn" href="${escapeHtml(ticketUrl)}">View on ${sourceLabel}</a>` : ''}
+    ${ticketUrl
+      ? `<a class="cta-btn" href="${escapeHtml(ticketUrl)}">View on ${sourceLabel}</a>`
+      : (mapsUrl ? `<a class="cta-btn" href="${escapeHtml(mapsUrl)}">View on Google Maps</a>` : '')}
     <div class="divider"></div>
     <div class="bestie-promo">
       <p>Discover more events like this via text</p>
