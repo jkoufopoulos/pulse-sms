@@ -14,7 +14,7 @@ const BUDGET_DOWNGRADE_PCT = 0.70; // downgrade Haiku-eligible when >70% budget 
 
 const MODELS = {
   haiku: 'claude-haiku-4-5-20251001',
-  flash: 'gemini-2.5-flash',
+  flash: 'gemini-2.5-flash-lite',
 };
 
 /**

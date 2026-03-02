@@ -34,6 +34,7 @@ const MODEL_MAP = {
   haiku: 'claude-haiku-4-5-20251001',
   sonnet: 'claude-sonnet-4-5-20250929',
   'gemini-flash': 'gemini-2.5-flash',
+  'gemini-flash-lite': 'gemini-2.5-flash-lite',
 };
 
 const modelALabel = getArg('model-a') || 'haiku';

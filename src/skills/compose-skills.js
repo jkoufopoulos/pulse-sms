@@ -7,37 +7,46 @@
 const tonightPriority = {
   id: 'tonight-priority',
   text: `
-TONIGHT PRIORITY: A decent tonight event beats a great tomorrow event — the user is asking what's happening now.`,
+<skill name="tonight-priority">
+A decent tonight event beats a great tomorrow event — the user is asking what's happening now.
+</skill>`,
 };
 
 const sourceTiers = {
   id: 'source-tiers',
   text: `
-SOURCE TIERS — use source_tier to break ties between similar events:
+<skill name="source-tiers">
+Use source_tier to break ties between similar events:
 - "unstructured" (Skint, Nonsense NYC, Oh My Rockness, Yutori): curated editorial picks — trust these, they've been hand-selected.
 - "primary" (RA, Dice, BrooklynVegan, BAM, SmallsLIVE): structured high-quality listings.
 - "secondary" (NYC Parks, DoNYC, Songkick, Ticketmaster, Eventbrite, NYPL, Tavily): broader aggregators.
 Prefer unstructured and primary over secondary when choosing between similar events.
-When extraction_confidence is present, prefer events with 0.8+ (reliable data) over 0.5-0.7 (uncertain). null means structured source — treat as reliable.`,
+When extraction_confidence is present, prefer events with 0.8+ (reliable data) over 0.5-0.7 (uncertain). null means structured source — treat as reliable.
+</skill>`,
 };
 
 const neighborhoodMismatch = {
   id: 'neighborhood-mismatch',
   text: `
-NEIGHBORHOOD MISMATCH: NONE of the events are in the requested neighborhood. You MUST acknowledge this upfront by naming the user's REQUESTED neighborhood (from the "Neighborhood:" field) — e.g. "Not much tonight in [requested neighborhood], but nearby:" or "Slim pickings in [requested neighborhood] — here's what's close by:". NEVER substitute a different neighborhood name. Never silently show events from a different neighborhood.`,
+<skill name="neighborhood-mismatch">
+None of the events are in the requested neighborhood. Acknowledge this upfront by naming the user's requested neighborhood (from the "Neighborhood:" field) — e.g. "Not much tonight in [requested neighborhood], but nearby:" or "Slim pickings in [requested neighborhood] — here's what's close by:". Do not substitute a different neighborhood name or silently show events from a different neighborhood.
+</skill>`,
 };
 
 const lastBatch = {
   id: 'last-batch',
   text: `
-NOTE: This is the LAST batch of events I have.
-OVERRIDE CLOSING LINE: Instead of "Reply 1-N for details, MORE for extra picks", use "Reply 1-N for details" (no MORE option).`,
+<skill name="last-batch">
+This is the last batch of events available. Instead of "Reply 1-N for details, MORE for extra picks", use "Reply 1-N for details" (no MORE option).
+</skill>`,
 };
 
 const freeEmphasis = {
   id: 'free-emphasis',
   text: `
-User asked for free events. ALWAYS list them with numbers even if they seem niche — the user specifically wants free.`,
+<skill name="free-emphasis">
+User asked for free events. List them with numbers even if they seem niche — the user specifically wants free.
+</skill>`,
 };
 
 const pendingIntent = {
@@ -49,53 +58,61 @@ const pendingIntent = {
 const activityAdherence = {
   id: 'activity-adherence',
   text: `
-ACTIVITY ADHERENCE: The user asked for a specific type of activity. If NONE of the events match that activity type, do NOT recommend unrelated events as alternatives. Instead, say honestly you don't have that tonight — e.g. "No trivia in Fort Greene tonight." Then suggest trying a different neighborhood or event type.
-DAY-SPECIFIC CLAIMS: NEVER say an event happens on a particular day (e.g. "trivia on Thursdays") unless you can verify from the event data that today IS that day. Check "Current time (NYC)" above.`,
+<skill name="activity-adherence">
+The user asked for a specific type of activity. If none of the events match that activity type, say honestly you don't have that tonight — e.g. "No trivia in Fort Greene tonight." Then suggest trying a different neighborhood or event type. Do not recommend unrelated events as alternatives.
+Only claim an event happens on a particular day (e.g. "trivia on Thursdays") if you can verify from the event data that today is that day. Check "Current time (NYC)" above.
+</skill>`,
 };
 
 const conversationAwareness = {
   id: 'conversation-awareness',
   text: `
-CONVERSATION AWARENESS:
+<skill name="conversation-awareness">
 - Use conversation history to understand what the user has been asking about.
 - TEMPORAL INTENT: If user asks about "tomorrow", prefer TOMORROW events. For a "tomorrow" query, a great tomorrow event beats a decent tonight event — override the "tonight first" rule.
-- FILTER PERSISTENCE: If user asked for "free comedy" earlier and is now accepting a redirect or saying "yes", maintain BOTH "free" AND "comedy" as constraints. Do not silently drop filters across turns.
-- REPEAT AVOIDANCE: Do not recommend events already mentioned in conversation history.`,
+- FILTER PERSISTENCE: If user asked for "free comedy" earlier and is now accepting a redirect or saying "yes", maintain both "free" and "comedy" as constraints. Do not silently drop filters across turns.
+- REPEAT AVOIDANCE: Do not recommend events already mentioned in conversation history.
+</skill>`,
 };
 
 const nearbySuggestion = {
   id: 'nearby-suggestion',
   text: `
-NEARBY NEIGHBORHOODS: When picks are thin (< 2 good options) or nothing matches the user's request, suggest a nearby neighborhood conversationally — e.g. "Slim pickings in Fort Greene tonight — Park Slope is right nearby, want picks from there?"`,
+<skill name="nearby-suggestion">
+When picks are thin (< 2 good options) or nothing matches the user's request, suggest a nearby neighborhood conversationally — e.g. "Slim pickings in Fort Greene tonight — Park Slope is right nearby, want picks from there?"
+</skill>`,
 };
 
 const singlePick = {
   id: 'single-pick',
   text: `
-SINGLE PICK OVERRIDE:
+<skill name="single-pick">
 There is only one matching event. Override the normal numbered format:
-- Do NOT number it with "1)". Write it naturally — e.g. "There's a great jazz show at Smalls tonight at 9pm, $20 cover — always a vibe."
-- Do NOT use "Reply 1-N for details". Instead, close with something like "Reply for details, or want picks from [nearby neighborhood]?" using the nearby neighborhood if available.
-- Keep the same voice and character limit (480 chars).`,
+- Write it naturally without numbering — e.g. "There's a great jazz show at Smalls tonight at 9pm, $20 cover — always a vibe."
+- Close with something like "Reply for details, or want picks from [nearby neighborhood]?" using the nearby neighborhood if available.
+- Keep the same voice and character limit (480 chars).
+</skill>`,
 };
 
 const citywide = {
   id: 'citywide',
   text: `
-CITYWIDE MODE:
+<skill name="citywide">
 You're serving events from across NYC — no specific neighborhood was requested.
-- ALWAYS include the neighborhood in parentheses for every pick: "1) Jazz at Smalls (West Village) — ..."
+- Include the neighborhood in parentheses for every pick: "1) Jazz at Smalls (West Village) — ..."
 - Prefer geographic diversity — avoid all picks being from the same neighborhood.
-- Lead with "Here's what's good tonight:" or similar — NOT "Tonight in [hood]:".
-- Close with "Reply 1-N for details, MORE for extra picks, or try a neighborhood for local picks."`,
+- Lead with "Here's what's good tonight:" or similar — not "Tonight in [hood]:".
+- Close with "Reply 1-N for details, MORE for extra picks, or try a neighborhood for local picks."
+</skill>`,
 };
 
 const multiDay = {
   id: 'multi-day',
   text: `
-MULTI-DAY EVENTS:
+<skill name="multi-day">
 Events in this pool span multiple days. State the day for each pick — "tomorrow night", "this Friday", "Saturday".
-If all picks happen to fall on the same day, mention it once in the intro instead of repeating.`,
+If all picks happen to fall on the same day, mention it once in the intro instead of repeating.
+</skill>`,
 };
 
 const ALL_SKILLS = { tonightPriority, sourceTiers, neighborhoodMismatch, lastBatch, freeEmphasis, pendingIntent, activityAdherence, conversationAwareness, nearbySuggestion, singlePick, citywide, multiDay };

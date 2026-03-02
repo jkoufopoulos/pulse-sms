@@ -553,6 +553,29 @@ const evals = {
       }
     }
     // Unified mode: try to parse the raw response
+    // Supports both tool_use format (Anthropic) and plain JSON (Gemini)
+    try {
+      const parsed = JSON.parse(raw);
+      // Anthropic tool_use: array of content blocks
+      if (Array.isArray(parsed)) {
+        const toolBlock = parsed.find(b => b.type === 'tool_use');
+        if (toolBlock && toolBlock.input?.sms_text) {
+          return { name: 'schema_compliance', pass: true, detail: 'valid tool_use with sms_text' };
+        }
+        if (toolBlock && !toolBlock.input?.sms_text) {
+          return { name: 'schema_compliance', pass: false, detail: `tool_use missing sms_text (has: ${Object.keys(toolBlock.input || {}).join(', ')})` };
+        }
+      }
+      // Direct JSON object (Gemini or legacy)
+      if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+        if (typeof parsed.sms_text === 'string') {
+          return { name: 'schema_compliance', pass: true, detail: 'valid JSON with required fields' };
+        }
+        return { name: 'schema_compliance', pass: false, detail: `missing sms_text field (has: ${Object.keys(parsed).join(', ')})` };
+      }
+    } catch {
+      // Not valid JSON — try legacy code-fence extraction
+    }
     try {
       const fenceMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
       const jsonStr = fenceMatch ? fenceMatch[1].trim() : raw;
@@ -561,9 +584,7 @@ const evals = {
         return { name: 'schema_compliance', pass: false, detail: 'no JSON object in raw response' };
       }
       const parsed = JSON.parse(jsonStr.slice(start));
-      const hasType = typeof parsed.type === 'string';
-      const hasSmsText = typeof parsed.sms_text === 'string';
-      if (!hasSmsText) {
+      if (typeof parsed.sms_text !== 'string') {
         return { name: 'schema_compliance', pass: false, detail: `missing sms_text field (has: ${Object.keys(parsed).join(', ')})` };
       }
       return { name: 'schema_compliance', pass: true, detail: 'valid JSON with required fields' };

@@ -17,19 +17,19 @@ console.log('\nbuildUnifiedPrompt:');
 const coreOnly = buildUnifiedPrompt([], {});
 check('core-only includes role tag', coreOnly.includes('<role>'));
 check('core-only includes output_format', coreOnly.includes('<output_format>'));
-check('core-only does NOT include tonight-priority', !coreOnly.includes('TONIGHT PRIORITY'));
-check('core-only does NOT include last-batch', !coreOnly.includes('LAST batch'));
-check('core-only does NOT include free-emphasis', !coreOnly.includes('asked for free'));
+check('core-only does NOT include tonight-priority', !coreOnly.includes('tonight-priority'));
+check('core-only does NOT include last-batch', !coreOnly.includes('last-batch'));
+check('core-only does NOT include free-emphasis', !coreOnly.includes('free-emphasis'));
 
 // With today events
 const todayEvents = [{ date_local: null, day: 'TODAY', source_name: 'dice' }];
 const withToday = buildUnifiedPrompt(todayEvents, {});
-check('today events includes tonight-priority', withToday.includes('TONIGHT PRIORITY'));
-check('today events includes source tiers', withToday.includes('SOURCE TIERS'));
+check('today events includes tonight-priority', withToday.includes('tonight-priority'));
+check('today events includes source tiers', withToday.includes('source-tiers'));
 
 // With isLastBatch
 const withLastBatch = buildUnifiedPrompt([], { isLastBatch: true });
-check('isLastBatch includes last-batch text', withLastBatch.includes('LAST batch'));
+check('isLastBatch includes last-batch text', withLastBatch.includes('last-batch'));
 
 // With exhaustionSuggestion
 const withExhaustion = buildUnifiedPrompt([], { isLastBatch: true, exhaustionSuggestion: 'Try Bushwick!' });
@@ -47,10 +47,10 @@ check('pendingMessage has prioritize framing', withPending.includes('Prioritize 
 // Neighborhood mismatch
 const mismatchEvents = [{ neighborhood: 'Bushwick', source_name: 'dice' }];
 const withMismatch = buildUnifiedPrompt(mismatchEvents, { requestedNeighborhood: 'East Village' });
-check('neighborhood mismatch detected', withMismatch.includes('NEIGHBORHOOD MISMATCH'));
+check('neighborhood mismatch detected', withMismatch.includes('neighborhood-mismatch'));
 
 const noMismatch = buildUnifiedPrompt(mismatchEvents, { requestedNeighborhood: 'Bushwick' });
-check('no mismatch when neighborhoods match', !noMismatch.includes('NEIGHBORHOOD MISMATCH'));
+check('no mismatch when neighborhoods match', !noMismatch.includes('neighborhood-mismatch'));
 
 // Prompt always includes UNIFIED_SYSTEM base
 check('unified prompt includes UNIFIED_SYSTEM content', coreOnly.includes('You are Bestie'));
