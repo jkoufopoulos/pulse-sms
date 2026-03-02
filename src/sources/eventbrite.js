@@ -202,12 +202,33 @@ async function fetchEventbritePage(url, label, categoryOverride) {
   }
 }
 
-function fetchEventbriteComedy() {
-  return fetchEventbritePage(
-    'https://www.eventbrite.com/d/ny--new-york/comedy--this-week/',
-    'Comedy',
-    'comedy'
+async function fetchEventbriteComedy() {
+  // Fetch 3 comedy-specific search pages in parallel — the old comedy--this-week
+  // URL returned generic popular events, not comedy. These URLs return actual comedy.
+  const pages = [
+    ['comedy-shows', 'https://www.eventbrite.com/d/ny--new-york/comedy-shows/'],
+    ['open-mic-comedy', 'https://www.eventbrite.com/d/ny--new-york/open-mic-comedy/'],
+    ['stand-up-comedy', 'https://www.eventbrite.com/d/ny--new-york/stand-up-comedy/'],
+  ];
+
+  const results = await Promise.all(
+    pages.map(([label, url]) => fetchEventbritePage(url, label, 'comedy'))
   );
+
+  // Deduplicate by event ID (same event may appear in multiple search pages)
+  const seen = new Set();
+  const events = [];
+  for (const batch of results) {
+    for (const e of batch) {
+      if (!seen.has(e.id)) {
+        seen.add(e.id);
+        events.push(e);
+      }
+    }
+  }
+
+  console.log(`EventbriteComedy: ${events.length} unique events from ${pages.length} pages`);
+  return events;
 }
 
 function fetchEventbriteArts() {

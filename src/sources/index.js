@@ -18,6 +18,7 @@ const { fetchYutoriEvents } = require('./yutori');
 const { fetchScreenSlateEvents } = require('./screenslate');
 const { fetchLumaEvents } = require('./luma');
 const { fetchTinyCupboardEvents } = require('./tinycupboard');
+const { fetchBrooklynCCEvents } = require('./brooklyncc');
 
 module.exports = {
   fetchSkintEvents,
@@ -46,4 +47,5 @@ module.exports = {
   fetchScreenSlateEvents,
   fetchLumaEvents,
   fetchTinyCupboardEvents,
+  fetchBrooklynCCEvents,
 };

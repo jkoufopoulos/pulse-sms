@@ -35,6 +35,8 @@ const SOURCE_MINIMUMS = {
   BAM: 2,
   NYCParks: 2,
   EventbriteComedy: 2,
+  TinyCupboard: 5,
+  BrooklynCC: 5,
   // Intermittent — no minimum enforced
   // SkintOngoing: 0, Yutori: 0, NYPL: 0, EventbriteArts: 0,
 };

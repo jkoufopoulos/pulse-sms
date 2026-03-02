@@ -313,6 +313,10 @@ const VENUE_MAP = {
   'Paris Theater': { lat: 40.7642, lng: -73.9726 },
   'The Paris Theater': { lat: 40.7642, lng: -73.9726 },
 
+  // === Comedy Venues ===
+  'The Tiny Cupboard': { lat: 40.6878, lng: -73.9181 },
+  'Brooklyn Comedy Collective': { lat: 40.7109, lng: -73.9445 },
+
   // === Cultural Venues — Bookstores & Literary ===
   'Greenlight Bookstore': { lat: 40.6862, lng: -73.9746 },
   'Greenlight Bookstore Fort Greene': { lat: 40.6862, lng: -73.9746 },
