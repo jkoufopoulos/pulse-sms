@@ -122,9 +122,9 @@ Steps 1-3, 6-7 are done. Step 4 was implemented but abandoned — the unified pa
 
 ## Open Issues
 
-### Gemini Flash Model Strategy — **Blocked** (API quota)
+### ~~Gemini Flash Model Strategy~~ — **Resolved 2026-03-02**
 
-A/B eval script (`run-ab-eval.js`) is functional — compares Haiku vs Gemini Flash by default. Blocked on Gemini API quota (`limit: 0` for `generate_requests_per_model_per_day`). Re-run when Gemini billing is restored.
+Implemented three-tier fallback chain: Gemini 2.5 Flash → Gemini 2.5 Flash Lite → Claude Haiku. All three Gemini call sites (`unifiedRespond`, `extractEvents`, `composeDetails`) detect 429/quota errors via `isQuotaError()` and cascade to the next model. Non-quota errors skip Flash Lite and fall directly to Haiku. A/B eval (Flash Lite vs Haiku): 53% Haiku preference but Flash Lite is 13x cheaper ($0.006 vs $0.078 per 15-case run).
 
 ### ~~Pre-Router False Positives on Common Words (#8)~~ — **Fixed 2026-03-01**
 
@@ -375,6 +375,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 
 | Date | What | Key Impact |
 |------|------|------------|
+| Mar 2 | Gemini Flash → Flash Lite → Haiku fallback chain | Three-tier model cascade on quota errors across all 3 Gemini call sites; `isQuotaError()` helper; Flash default restored (was Flash Lite) |
 | Mar 2 | Broad query support (citywide category + date range) | party/parties + film/films/cinema/movie/movies in catMap, `parseDateRange()` for "this week"/"this weekend"/"tomorrow", filter-aware citywide pool (`filterAwareSort`), borough+neighborhood resolution fix ("brooklyn/williamsburg"), MULTI-DAY DATA prompt, 12 multi-turn + 5 regression scenarios |
 | Mar 1 | Prompt audit: best practices overhaul | tool_use for unified path (guaranteed JSON), self-verification checklist, tone reduction (31 ALL-CAPS → rationale-based), examples trimmed 18→8, negative→positive rewrites, shared prompt sections extracted (`SHARED_UNDERSTANDING`/`SHARED_GEOGRAPHY`), XML skill tags, user prompt restructured (data top, query bottom) |
 | Mar 1 | Pre-router filter follow-up guard fix | Added `hasActiveFilters` to pre-router guard — filter follow-ups work after ask_neighborhood flows ($0 path) |

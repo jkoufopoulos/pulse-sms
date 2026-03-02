@@ -151,10 +151,10 @@ async function extractWithGemini(systemPrompt, userPrompt, modelName) {
 /**
  * Compose details via Google Gemini Flash (plain text, not JSON).
  */
-async function detailsWithGemini(systemPrompt, userPrompt) {
+async function detailsWithGemini(systemPrompt, userPrompt, modelName) {
   const genAI = getGeminiClient();
   const gemModel = genAI.getGenerativeModel({
-    model: MODELS.compose,
+    model: modelName || MODELS.compose,
     systemInstruction: systemPrompt,
     safetySettings: GEMINI_SAFETY,
     generationConfig: { maxOutputTokens: 1024, temperature: 0.8 },
@@ -399,16 +399,35 @@ Write the details text. Include this URL: ${bestUrl}`;
       const result = await detailsWithGemini(DETAILS_SYSTEM, userPrompt);
       text = result.text; usage = result.usage; provider = 'gemini';
     } catch (err) {
-      console.warn(`Gemini composeDetails failed, falling back to Anthropic: ${err.message}`);
-      const response = await withTimeout(getClient().messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 256,
-        system: DETAILS_SYSTEM,
-        messages: [{ role: 'user', content: userPrompt }],
-      }, { timeout: 8000 }), 10000, 'composeDetails');
-      text = response.content?.[0]?.text || '';
-      usage = response.usage || null;
-      provider = 'anthropic';
+      if (isQuotaError(err) && MODELS.compose !== GEMINI_FALLBACK) {
+        try {
+          console.warn(`Gemini ${MODELS.compose} composeDetails quota hit, trying ${GEMINI_FALLBACK}`);
+          const result = await detailsWithGemini(DETAILS_SYSTEM, userPrompt, GEMINI_FALLBACK);
+          text = result.text; usage = result.usage; provider = 'gemini';
+        } catch (err2) {
+          console.warn(`Gemini fallback composeDetails also failed, falling back to Anthropic: ${err2.message}`);
+          const response = await withTimeout(getClient().messages.create({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 256,
+            system: DETAILS_SYSTEM,
+            messages: [{ role: 'user', content: userPrompt }],
+          }, { timeout: 8000 }), 10000, 'composeDetails');
+          text = response.content?.[0]?.text || '';
+          usage = response.usage || null;
+          provider = 'anthropic';
+        }
+      } else {
+        console.warn(`Gemini composeDetails failed, falling back to Anthropic: ${err.message}`);
+        const response = await withTimeout(getClient().messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 256,
+          system: DETAILS_SYSTEM,
+          messages: [{ role: 'user', content: userPrompt }],
+        }, { timeout: 8000 }), 10000, 'composeDetails');
+        text = response.content?.[0]?.text || '';
+        usage = response.usage || null;
+        provider = 'anthropic';
+      }
     }
   } else {
     const response = await withTimeout(getClient().messages.create({
