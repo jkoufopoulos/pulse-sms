@@ -231,7 +231,8 @@ const freeStuffNoSession = preRoute('free stuff', null);
 check('free stuff (no session) → events', freeStuffNoSession?.intent === 'events');
 check('free stuff (no session) → free_only', freeStuffNoSession?.filters?.free_only === true);
 
-// Bare tonight without category → still falls through (no category word)
+// Bare tonight without category → falls through to LLM (too common in off-topic messages)
+// "tonight" only triggers date_range when paired with a category (e.g. "comedy tonight")
 check('bare tonight (no session) → null (LLM)', preRoute('tonight', null) === null);
 
 // Specific time follow-ups (single-dimension, session-aware)

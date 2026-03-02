@@ -351,7 +351,8 @@ const CATEGORY_NORMALIZE = {
   dance: 'nightlife', salsa: 'nightlife', bachata: 'nightlife', swing: 'nightlife',
   standup: 'comedy', 'stand-up': 'comedy', improv: 'comedy',
   theatre: 'theater',
-  trivia: 'community', karaoke: 'community', drag: 'community',
+  films: 'film', movie: 'film', movies: 'film', cinema: 'film',
+  karaoke: 'community', drag: 'community',
   burlesque: 'community', bingo: 'community', 'open mic': 'community', poetry: 'community',
 };
 

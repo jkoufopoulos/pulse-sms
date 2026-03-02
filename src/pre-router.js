@@ -1,4 +1,5 @@
 const { NEIGHBORHOODS, BOROUGHS, extractNeighborhood } = require('./neighborhoods');
+const { getNycDateString } = require('./geo');
 
 // Build reverse map: neighborhood → borough
 const HOOD_TO_BOROUGH = {};
@@ -57,6 +58,49 @@ function parseTimeExpr(text) {
   return null;
 }
 
+// --- Parse date range expressions → { start, end } (YYYY-MM-DD) or null ---
+function parseDateRange(text) {
+  const lower = text.toLowerCase();
+  const now = Date.now();
+  const today = getNycDateString(0, now);
+
+  // "this weekend" / "weekend"
+  if (/\b(?:this\s+)?weekend\b/i.test(lower)) {
+    // Find the day-of-week in NYC time
+    const nycDay = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' })).getDay();
+    // 0=Sun, 6=Sat
+    if (nycDay === 6) {
+      // Saturday: weekend = today + tomorrow
+      return { start: today, end: getNycDateString(1, now) };
+    } else if (nycDay === 0) {
+      // Sunday: weekend = today
+      return { start: today, end: today };
+    } else {
+      // Weekday: weekend = next Saturday + Sunday
+      const daysToSat = 6 - nycDay;
+      return { start: getNycDateString(daysToSat, now), end: getNycDateString(daysToSat + 1, now) };
+    }
+  }
+
+  // "this week" / "this whole week"
+  if (/\bthis\s+week\b/i.test(lower)) {
+    return { start: today, end: getNycDateString(6, now) };
+  }
+
+  // "tomorrow" / "tmrw" / "tmr"
+  if (/\b(?:tomorrow|tmrw|tmr)\b/i.test(lower)) {
+    const tmrw = getNycDateString(1, now);
+    return { start: tmrw, end: tmrw };
+  }
+
+  // "tonight" / "today" → today only (narrows from default 7-day window)
+  if (/\b(?:tonight|today)\b/i.test(lower)) {
+    return { start: today, end: today };
+  }
+
+  return null;
+}
+
 // --- Deterministic pre-router (mechanical shortcuts only) ---
 // All semantic understanding (neighborhoods, categories, time, vibes, free,
 // nudge accepts, boroughs, off-topic) goes through the unified LLM call.
@@ -64,7 +108,7 @@ function preRoute(message, session) {
   const trimmed = message.trim();
   const msg = /^[!?.]+$/.test(trimmed) ? trimmed : trimmed.replace(/(?<=\S)[!?.]+$/, '');
   const lower = msg.toLowerCase();
-  const base = { filters: { free_only: false, category: null, subcategory: null, vibe: null, time_after: null }, event_reference: null, reply: null, confidence: 1.0 };
+  const base = { filters: { free_only: false, category: null, subcategory: null, vibe: null, time_after: null, date_range: null }, event_reference: null, reply: null, confidence: 1.0 };
 
   // Referral code intake
   const refMatch = msg.match(/^ref:([a-zA-Z0-9_-]{6,12})$/i);
@@ -164,11 +208,13 @@ function preRoute(message, session) {
     'theater|theatre': { category: 'theater' },
     'jazz': { category: 'live_music', subcategory: 'jazz' },
     'music|rock|punk|metal|folk|indie|hip-hop|r&b|soul|funk|rap': { category: 'live_music' },
-    'techno|house|electronic|dj': { category: 'nightlife' },
+    'techno|house|electronic|dj|party|parties': { category: 'nightlife' },
+    'film|films|cinema|movie|movies': { category: 'film' },
     'art': { category: 'art' },
     'nightlife': { category: 'nightlife' },
     'dance': { category: 'nightlife' },
-    'trivia|bingo|poetry|karaoke|drag|burlesque': { category: 'community' },
+    'trivia': { category: 'trivia' },
+    'bingo|poetry|karaoke|drag|burlesque': { category: 'community' },
     'salsa|bachata|swing': { category: 'nightlife' },
   };
   // Multi-word patterns tested with \s+ instead of literal space
@@ -207,11 +253,12 @@ function preRoute(message, session) {
     // "late" only counts as time intent with explicit event context
     const isLate = !time && /\blate\b/i.test(msg) && /\b(?:night|tonight|stuff|events?|shows?)\b/i.test(msg);
     const isMidnight = !time && /\bafter\s*midnight\b/i.test(msg);
+    const dateRange = parseDateRange(msg);
 
     if (catMatch) {
       // Check if the matched word is ambiguous and needs a second signal
       const needsCompound = AMBIGUOUS_CAT_WORDS.test(msg) && !catMatch.pattern.includes('\\s+');
-      const hasSecondSignal = extractedHood || isFree || time || isLate || isMidnight
+      const hasSecondSignal = extractedHood || isFree || time || isLate || isMidnight || dateRange
         || /\b(?:stuff|shows?|events?|picks?|tonight|night)\b/i.test(msg);
 
       if (!needsCompound || hasSecondSignal) {
@@ -220,8 +267,22 @@ function preRoute(message, session) {
         if (time) filters.time_after = time;
         else if (isLate) filters.time_after = '22:00';
         else if (isMidnight) filters.time_after = '00:00';
+        if (dateRange) filters.date_range = dateRange;
         return { ...base, intent: 'events', neighborhood: extractedHood || null, filters };
       }
+    }
+    // Bare date range queries on first message: "this weekend", "what's happening tomorrow"
+    // These are event-seeking intents even without a category or "free" keyword.
+    // Exclude "tonight"/"today" — too common in off-topic messages ("whats the weather like tonight").
+    // "tonight"/"today" only trigger date_range when paired with a category (handled above).
+    const isBroadDateRange = dateRange && !/\b(?:tonight|today)\b/i.test(msg);
+    if (isBroadDateRange) {
+      const filters = { date_range: dateRange };
+      if (isFree) filters.free_only = true;
+      if (time) filters.time_after = time;
+      else if (isLate) filters.time_after = '22:00';
+      else if (isMidnight) filters.time_after = '00:00';
+      return { ...base, intent: 'events', neighborhood: extractedHood || null, filters };
     }
     // Bare "free stuff/events" on first message (with optional time compound)
     if (isFree && /\b(?:stuff|events?|shows?|things?|picks?)\b/i.test(msg)) {
@@ -255,12 +316,14 @@ function preRoute(message, session) {
   // ask_neighborhood responses — no hood/picks saved, but filters are in session.
   const sessionHood = session?.lastNeighborhood || null;
   if (sessionHood || session?.lastPicks?.length > 0 || hasActiveFilters) {
-    // Free — permissive: any message centered on "free", with optional category compound
-    // Catches "free", "free comedy", "free jazz stuff", "how about free comedy"
+    // Free — permissive: any message centered on "free", with optional category/date_range compound
+    // Catches "free", "free comedy", "free jazz stuff", "how about free comedy", "free stuff this weekend"
     if (/^(?:how about |what about |ok |any )?(?:anything |something )?free/i.test(msg)) {
       const filters = { free_only: true };
       const catMatch = matchCategory(msg);
       if (catMatch) Object.assign(filters, catMatch.catInfo);
+      const dateRange = parseDateRange(msg);
+      if (dateRange) filters.date_range = dateRange;
       return { ...base, intent: 'events', neighborhood: sessionHood, filters };
     }
 
@@ -272,7 +335,10 @@ function preRoute(message, session) {
       const afterPrefix = msg.slice(prefixMatch[0].length);
       const catMatch = matchCategory(afterPrefix.replace(suffixRegex, ''));
       if (catMatch) {
-        return { ...base, intent: 'events', neighborhood: sessionHood, filters: { ...catMatch.catInfo } };
+        const filters = { ...catMatch.catInfo };
+        const dateRange = parseDateRange(msg);
+        if (dateRange) filters.date_range = dateRange;
+        return { ...base, intent: 'events', neighborhood: sessionHood, filters };
       }
     }
 
@@ -310,9 +376,23 @@ function preRoute(message, session) {
     if (vibeMatch) {
       return { ...base, intent: 'events', neighborhood: sessionHood, filters: { vibe: vibeMatch[1].toLowerCase() } };
     }
+
+    // Date range follow-ups: "this weekend", "how about tomorrow", "what about this week"
+    // Compounds with optional category/free
+    const dateRange = parseDateRange(msg);
+    if (dateRange) {
+      const filters = { date_range: dateRange };
+      const catMatch = matchCategory(msg);
+      if (catMatch) Object.assign(filters, catMatch.catInfo);
+      if (/\bfree\b/i.test(msg)) filters.free_only = true;
+      const specificTime = parseTimeExpr(msg);
+      if (specificTime) filters.time_after = specificTime;
+      else if (!specificTime && /\blate\b/i.test(msg) && /\b(?:night|tonight|stuff|events?|shows?)\b/i.test(msg)) filters.time_after = '22:00';
+      return { ...base, intent: 'events', neighborhood: sessionHood, filters };
+    }
   }
 
   return null; // Fall through to unified LLM
 }
 
-module.exports = { getAdjacentNeighborhoods, preRoute };
+module.exports = { getAdjacentNeighborhoods, preRoute, parseDateRange };

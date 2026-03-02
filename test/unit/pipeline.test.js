@@ -320,7 +320,7 @@ check('standup → subcategory standup', normalizeFilters({ category: 'standup' 
 check('improv → comedy', normalizeFilters({ category: 'improv' }).category === 'comedy');
 check('theatre → theater', normalizeFilters({ category: 'theatre' }).category === 'theater');
 check('theatre → subcategory theatre', normalizeFilters({ category: 'theatre' }).subcategory === 'theatre');
-check('trivia → community', normalizeFilters({ category: 'trivia' }).category === 'community');
+check('trivia stays trivia', normalizeFilters({ category: 'trivia' }).category === 'trivia');
 check('karaoke → community', normalizeFilters({ category: 'karaoke' }).category === 'community');
 check('drag → community', normalizeFilters({ category: 'drag' }).category === 'community');
 
