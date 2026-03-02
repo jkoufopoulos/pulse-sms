@@ -1,4 +1,4 @@
-const { extractNeighborhood, NEIGHBORHOODS, detectBorough } = require('./neighborhoods');
+const { extractNeighborhood, NEIGHBORHOODS, BOROUGHS, detectBorough } = require('./neighborhoods');
 const { sendSMS } = require('./twilio');
 const { recordAICost } = require('./traces');
 const { getSession, setSession } = require('./session');
@@ -25,9 +25,19 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
   }
 
   // Resolve neighborhood: explicit in message > affirmative nudge response > session fallback
+  // Also check for borough — "brooklyn/williamsburg" or "yeah brooklyn" should use borough-level serving
   const extracted = extractNeighborhood(message);
+  const boroughInMessage = detectBorough(message);
   let hood = extracted || null;
-  if (!hood && session?.pendingNearby) {
+
+  // If message contains both a neighborhood AND its parent borough (e.g. "brooklyn/williamsburg"),
+  // prefer borough-level serving — the user is being broad, not narrow
+  if (hood && boroughInMessage && BOROUGHS[boroughInMessage.borough]?.includes(hood)) {
+    hood = null; // Let borough branch below handle it
+  }
+
+  // Nudge-accept: only when no explicit borough/neighborhood was given
+  if (!hood && !boroughInMessage && session?.pendingNearby) {
     if (/^(yes|yeah|ya|yep|yup|sure|ok|okay|down|bet|absolutely|definitely|why not|i'm down|im down)\b/i.test(message.trim())) {
       hood = session.pendingNearby;
     }
@@ -97,7 +107,7 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
       isBorough = true;
       borough = boroughResult.borough;
       const eventsStart = Date.now();
-      const raw = await getEventsForBorough(borough, { dateRange: activeFilters.date_range });
+      const raw = await getEventsForBorough(borough, { dateRange: activeFilters.date_range, filters: activeFilters });
       trace.events.getEvents_ms = Date.now() - eventsStart;
       trace.events.cache_size = getCacheStatus().cache_size;
       curated = filterKidsEvents(raw);
@@ -113,7 +123,7 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
       // Citywide flow — serve best events across all neighborhoods
       isCitywide = true;
       const eventsStart = Date.now();
-      const raw = await getEventsCitywide({ dateRange: activeFilters.date_range });
+      const raw = await getEventsCitywide({ dateRange: activeFilters.date_range, filters: activeFilters });
       trace.events.getEvents_ms = Date.now() - eventsStart;
       trace.events.cache_size = getCacheStatus().cache_size;
       curated = filterKidsEvents(raw);
@@ -360,6 +370,15 @@ async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, 
 
   // Send SMS first — ensures user always gets a response even if session save fails
   await sendSMS(phone, result.sms_text);
+
+  // One-time preference tip after first successful picks response
+  const isFirstPicks = filterCompliantPicks.length > 0
+    && !session?.shownPreferenceTip
+    && (session?.conversationHistory?.length || 0) <= 1;
+  if (isFirstPicks) {
+    await sendSMS(phone, 'Tip: Tell me what you\u2019re into \u2014 "I love comedy and late-night stuff" or "mostly free events" \u2014 and I\u2019ll start prioritizing those for you.');
+  }
+
   saveResponseFrame(phone, {
     picks: filterCompliantPicks,
     eventMap,
@@ -373,6 +392,8 @@ async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, 
       filters: activeFilters,
     } : null,
   });
+  // Persist tip flag via merge (setResponseState wipes non-frame fields)
+  if (isFirstPicks) setSession(phone, { shownPreferenceTip: true });
   updateProfile(phone, { neighborhood: hood, filters: activeFilters, responseType: 'event_picks' })
     .catch(err => console.error('profile update failed:', err.message));
   finalizeTrace(result.sms_text, 'events');
