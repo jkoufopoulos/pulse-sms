@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-01 (pre-router gaps fixed, Yutori series events, Gemini A/B blocked by quota)
+> Last updated: 2026-03-01 (prompt audit: tool_use, self-verification, tone reduction, shared sections)
 
 ---
 
@@ -21,7 +21,7 @@ The LLM is never the system of record for structured data. Session state, filter
 
 If the LLM must both understand intent and write compelling copy, those should be separate operations. The reasoning pass returns a small validated struct. The rendering pass takes well-formed data and returns text.
 
-**Current state:** One unified Haiku call does both. Its output contract has 4 structured fields — `type`, `sms_text`, `picks`, `filter_intent`. Step 3 removed the 4 redundant state-management fields. The `filter_intent` migration (2026-03-01) replaced the `clear_filters` boolean with a granular `{ action, updates }` object.
+**Current state:** One unified Haiku call does both. Its output contract has 4 structured fields — `type`, `sms_text`, `picks`, `filter_intent`. Step 3 removed the 4 redundant state-management fields. The `filter_intent` migration (2026-03-01) replaced the `clear_filters` boolean with a granular `{ action, updates }` object. The unified path now uses `tool_use` with `tool_choice` for guaranteed structured output (2026-03-01 prompt audit).
 
 **Target state:** Reasoning call → `{ type, picks[], filter_intent }` (3 fields, validated via tool_use). Rendering call → `sms_text` (pure copy, lightweight parser). Everything else derived by code.
 
@@ -45,7 +45,7 @@ Every code path that sends an SMS must end with the same atomic session save fun
 
 Every structured field in the LLM output is a surface for hallucination and drift. Fields the code already knows before calling the LLM should never be in the LLM's output schema.
 
-**Current:** Contract has 4 fields: `type`, `sms_text`, `picks`, `filter_intent` (was 8 fields before Step 3). `filter_intent: { action: "none"|"clear_all"|"modify", updates }` enables granular filter modifications from LLM, not just clear-all.
+**Current:** Contract has 4 fields: `type`, `sms_text`, `picks`, `filter_intent` (was 8 fields before Step 3). `filter_intent: { action: "none"|"clear_all"|"modify", updates }` enables granular filter modifications from LLM, not just clear-all. Schema enforced via `tool_use` with `tool_choice` on unified path (2026-03-01 prompt audit) — eliminates JSON parsing failures.
 
 ### P6. Deterministic Extraction Covers Common Cases
 
@@ -93,15 +93,15 @@ message → pre-router (compound extraction) → filter merge → tagged pool
 | 2 | Compound pre-router extraction — "free comedy", "late jazz" | P1, P6 | **Done** |
 | 2b | Structural filter drift fix — gate `filter_intent`, expand compounds, validate categories | P1, P3, P6 | **Done** |
 | 3 | Derive state fields deterministically — remove 4 redundant LLM fields (8→4) | P1, P5 | **Done** |
-| 4 | Reasoning/rendering split — separate intent+selection from copywriting | P2, P5 | **Implemented** — A/B eval pending |
+| 4 | Reasoning/rendering split — separate intent+selection from copywriting | P2, P5 | **Abandoned** — code exists (`REASON_SYSTEM`, `RENDER_SYSTEM`, `reasonIntent`, `renderSms`) but never called; no feature flag; dead code. Unified path with `tool_use` covers the structured output need. |
 | 5 | *(merged into step 3)* | — | **Done** |
 | 6 | Finer category taxonomy — three-tier soft match | — | **Done** |
-| 7 | `executeQuery` pipeline — single prompt path, ~550 lines deleted | P4 | **Done** |
+| 7 | `executeQuery` pipeline — single prompt path for unified flow | P4 | **Done** (unified path). Legacy `routeMessage`, `composeResponse`, `ROUTE_SYSTEM`, `COMPOSE_SYSTEM` still exist for `handleMore` path. |
 | 8 | Scoped event fetching — `neighborhood`/`borough` scope | — | Planned |
 
-Steps 1-4, 6-7 are done. Step 4 is behind `PULSE_SPLIT_MODE=true` feature flag, awaiting A/B eval. Step 8 builds on the foundation.
+Steps 1-3, 6-7 are done. Step 4 was implemented but abandoned — the unified path with `tool_use` achieves structured output without the complexity of two calls. Step 8 is planned.
 
-**Key decision:** Use `tool_use` for reasoning call (step 4). Nothing from reasoning passes to rendering except event data. Rendering always uses Gemini Flash (cheap copy task). Feature flag `PULSE_SPLIT_MODE=true` enables split; default off (unified path unchanged).
+**Key decision:** The unified path uses `tool_use` with `tool_choice` for guaranteed structured output (prompt audit, 2026-03-01). This eliminates the primary motivation for the reasoning/rendering split (P2) — schema compliance is now enforced without a separate reasoning call.
 
 ---
 
@@ -110,28 +110,21 @@ Steps 1-4, 6-7 are done. Step 4 is behind `PULSE_SPLIT_MODE=true` feature flag, 
 | Gap | What | Principle | Status |
 |-----|------|-----------|--------|
 | 1 | `clear_filters` — LLM → code state bridge | P1 | **Superseded** — replaced with `filter_intent` schema (2026-03-01) |
-| 2 | Unified call couples reasoning and rendering | P2 | **Implemented** — `PULSE_SPLIT_MODE=true`, A/B eval pending |
+| 2 | Unified call couples reasoning and rendering | P2 | **Abandoned** — split code exists but unused; `tool_use` on unified path mitigates the schema risk |
 | 3 | Pool padding gives LLM material to violate filter intent | P1 | **Fixed** — eliminated unmatched padding (2026-03-01) |
 | 4 | No degraded-mode recovery when LLM fails | — | **Fixed** — deterministic fallback from tagged pool (2026-03-01) |
 
-### Gap 2: Reasoning/Rendering Coupling (Implemented — A/B eval pending)
+### Gap 2: Reasoning/Rendering Coupling (Abandoned)
 
-`unifiedRespond` produces both structured fields (`type`, `picks`, `filter_intent`) and natural language (`sms_text`) in a single call. When the model makes a poor selection (e.g., picks unmatched events despite filter instructions), there's no checkpoint to catch it before the copy is written.
-
-**Implementation (2026-03-01):** `PULSE_SPLIT_MODE=true` enables a two-call pipeline:
-1. `reasonIntent()` — classifies intent, selects events via `tool_use` (Anthropic) or JSON schema (Gemini). No formatting.
-2. Code validation — strips filter-noncompliant picks, applies conversational override guardrail.
-3. `renderSms()` — writes SMS copy from validated picks only. Always Gemini Flash (cheap).
-
-Files: `src/prompts.js` (REASON_SYSTEM, RENDER_SYSTEM), `src/skills/build-compose-prompt.js` (buildReasonPrompt, buildRenderPrompt), `src/ai.js` (reasonIntent, renderSms), `src/unified-flow.js` (callSplitUnified). Conversational/ask_neighborhood responses use `reply_text` from reasoning (1 call). Event picks use both calls. Trace captures `split_mode`, `reason_raw`, `render_raw`, `split_filter_violations`. New eval: `split_validation_effective` (informational).
+`unifiedRespond` produces both structured fields (`type`, `picks`, `filter_intent`) and natural language (`sms_text`) in a single call. The split-mode implementation (`REASON_SYSTEM`, `RENDER_SYSTEM`, `reasonIntent`, `renderSms`, `callSplitUnified`) exists in code but is never called — no feature flag activates it. The prompt audit (2026-03-01) added `tool_use` with `tool_choice` to the unified path, which enforces schema compliance without a separate reasoning call. The split code is dead code that can be cleaned up.
 
 ---
 
 ## Open Issues
 
-### ~~Gemini Flash Model Strategy~~ — **Blocked** (API quota exhausted)
+### Gemini Flash Model Strategy — **Blocked** (API quota)
 
-Gemini 2.5 Flash was the production model (50% pass rate, best of 3 models tested, ~10x cheaper than Haiku). A/B eval attempted 2026-03-01 but Gemini API returns 429 with `limit: 0` for `generate_requests_per_model_per_day`. All 15 test cases fell back to Haiku. Fixed `run-ab-eval.js` to actually pass `model` parameter to `executeQuery` (was missing — both arms used the same default model). Re-run when Gemini billing is restored.
+A/B eval script (`run-ab-eval.js`) is functional — compares Haiku vs Gemini Flash by default. Blocked on Gemini API quota (`limit: 0` for `generate_requests_per_model_per_day`). Re-run when Gemini billing is restored.
 
 ### ~~Pre-Router False Positives on Common Words (#8)~~ — **Fixed 2026-03-01**
 
@@ -164,13 +157,13 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 
 ### Deferred (post-MVP)
 
-| Issue | Why deferred |
-|-------|-------------|
-| Concurrent session race conditions | Rare at current traffic |
-| No processing ack during slow Claude calls | Adds extra Twilio cost; degraded-mode fallback covers the worst case |
-| No horizontal scalability | Single-process fine at current traffic |
-| No structured logging or correlation IDs | Operational improvement for scale |
-| No integration tests or mocking | Important eventually, not blocking |
+| Issue | Why deferred | Status |
+|-------|-------------|--------|
+| ~~Concurrent session race conditions~~ | ~~Rare at current traffic~~ | **Fixed** — per-phone mutex in session.js (fragility audit #16) |
+| No processing ack during slow Claude calls | Adds extra Twilio cost; degraded-mode fallback covers the worst case | Deferred |
+| No horizontal scalability | Single-process fine at current traffic | Deferred |
+| No structured logging or correlation IDs | Operational improvement for scale | Deferred |
+| ~~No integration tests or mocking~~ | ~~Important eventually, not blocking~~ | **Done** — `test/integration/sms-flow.test.js` (12+ integration tests) |
 
 ---
 
@@ -345,7 +338,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 
 - Scout worker — Background process to fill neighborhood gaps after daily scrape
 - Perennial picks evolution — Auto-detect candidates from scrape data
-- Second daily scrape — 5pm ET pass catches events posted mid-day (6pm scrape already added for newsletters)
+- ~~Second daily scrape~~ — **Done**: `SCRAPE_HOURS = [10, 18]` — 10am ET + 6pm ET catches same-day evening newsletters
 
 ### Long-term — Infrastructure + Product
 
@@ -363,14 +356,18 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 
 | Item | Risk | Notes |
 |------|------|-------|
-| `annotateTrace()` is O(n) | Low | Rewrites entire JSONL file for one trace update |
-| No integration tests | Medium | No way to test handler → AI → session flow without live API calls |
-| `eval.js` scores events sequentially | Low | Not parallelized; slow for large caches |
+| ~~`annotateTrace()` is O(n)~~ | ~~Low~~ | **Stale** — `annotateTrace` no longer exists; traces are write-once append to JSONL |
+| ~~No integration tests~~ | ~~Medium~~ | **Done** — `test/integration/sms-flow.test.js` covers help, greetings, TCPA, details, filters, off-topic |
+| ~~`eval.js` scores events sequentially~~ | ~~Low~~ | **Done** — parallelized via `Promise.all` (2026-03-01) |
 | Price data gap (21% unknown) | Low | Down from 71.6% after scraper improvements; remaining is structurally unavailable |
 | No horizontal scalability | Low | Single-process, in-memory sessions |
+| ~~Dead split-mode code~~ | ~~Low~~ | **Done** — deleted `REASON_SYSTEM`, `RENDER_SYSTEM`, `reasonIntent`, `renderSms`, `buildReasonPrompt`, `buildRenderPrompt`, `callSplitUnified`, `REASON_TOOL`, `REASON_GEMINI_SCHEMA`, `PULSE_SPLIT_MODE` gate (2026-03-01) |
+| ~~Legacy `handleMore` prompts~~ | ~~Low~~ | **Already done** — `routeMessage`, `composeResponse`, `ROUTE_SYSTEM`, `COMPOSE_SYSTEM` were already removed; `handleMore` uses `unifiedRespond` via `executeQuery` |
 | Preference learning not yet active | Low | Profiles captured but not injected into prompts |
 | ~~`cityScan` skill activation mismatch~~ | ~~Low~~ | **Removed** — dead code (`cityScan` + `venueFraming`), never activated |
 | ~~`architecture.html` references deleted flow~~ | ~~Low~~ | **Fixed** — removed two-call flow refs, updated session field description |
+| ~~UNIFIED/REASON prompt duplication~~ | ~~Low~~ | **Fixed** — extracted `SHARED_UNDERSTANDING(verb)` + `SHARED_GEOGRAPHY` constants (prompt audit, 2026-03-01) |
+| ~~31 ALL-CAPS directives in prompts~~ | ~~Low~~ | **Fixed** — rewritten as rationale-based constraints for Claude 4.5/4.6 (prompt audit, 2026-03-01) |
 
 ---
 
@@ -378,6 +375,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 
 | Date | What | Key Impact |
 |------|------|------------|
+| Mar 1 | Prompt audit: best practices overhaul | tool_use for unified path (guaranteed JSON), self-verification checklist, tone reduction (31 ALL-CAPS → rationale-based), examples trimmed 18→8, negative→positive rewrites, shared prompt sections extracted (`SHARED_UNDERSTANDING`/`SHARED_GEOGRAPHY`), XML skill tags, user prompt restructured (data top, query bottom) |
 | Mar 1 | Pre-router filter follow-up guard fix | Added `hasActiveFilters` to pre-router guard — filter follow-ups work after ask_neighborhood flows ($0 path) |
 | Mar 1 | Citywide visitedHoods tracking fix | `'citywide'` sentinel replaces null filtering in pipeline.js, unified-flow.js, handler.js — citywide visits tracked for exhaustion suggestions |
 | Mar 1 | Yutori series event date range expansion | `detectDateRange()` in general-parser.js expands "Mar 3-8", "through March 31" into individual dated events (P6 deterministic, capped at 14) |
@@ -395,7 +393,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 | Mar 1 | Model router filter interaction signal | Ambiguous filter messages (+35 complexity) route to Haiku for semantic understanding |
 | Mar 1 | Fix time filter persistence + details filter compliance | Compound first messages persist time via `filter_intent`; details handler rejects stale picks violating active filters |
 | Mar 1 | Gap 3 fix — remove unmatched pool padding | LLM only sees matched events when filters active; structural fix for filter drift |
-| Mar 1 | Step 7: `executeQuery` pipeline | All paths unified; deleted ~550 lines (routeMessage, composeResponse, ROUTE_SYSTEM, COMPOSE_SYSTEM) |
+| Mar 1 | Step 7: `executeQuery` pipeline | Unified flow uses single prompt path. Legacy `routeMessage`/`composeResponse`/`ROUTE_SYSTEM`/`COMPOSE_SYSTEM` retained for `handleMore` path only |
 | Mar 1 | Model comparison eval (Haiku/Flash/Flash-Lite) | Flash best (50%), Flash-Lite ties Haiku (42%) but weaker on neighborhood/price accuracy |
 | Mar 1 | Zero-match bypass + cascade protection | `handleZeroMatch` wired up; happy_path 50% → 90% |
 | Mar 1 | Nudge-accept flow fix (Root Cause D) | Added `neighborhood` to `ask_neighborhood` pending object — one-line fix for ~10% of filter failures |

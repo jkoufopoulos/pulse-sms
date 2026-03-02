@@ -57,9 +57,7 @@ async function scoreEvents(events) {
     batches.push(events.slice(i, i + BATCH_SIZE));
   }
 
-  const results = [];
-
-  for (const batch of batches) {
+  const batchResults = await Promise.all(batches.map(async (batch) => {
     const eventsForPrompt = batch.map(e => ({
       id: e.id,
       name: e.name,
@@ -89,29 +87,28 @@ async function scoreEvents(events) {
       const parsed = parseJsonArray(text);
 
       if (parsed) {
-        results.push(...parsed);
+        return parsed;
       } else {
         console.error('scoreEvents: failed to parse batch response');
-        // Return unscored entries for this batch
-        results.push(...batch.map(e => ({
+        return batch.map(e => ({
           event_id: e.id,
           score: null,
           flags: [],
           note: 'Scoring failed',
-        })));
+        }));
       }
     } catch (err) {
       console.error('scoreEvents batch error:', err.message);
-      results.push(...batch.map(e => ({
+      return batch.map(e => ({
         event_id: e.id,
         score: null,
         flags: [],
         note: `Error: ${err.message}`,
-      })));
+      }));
     }
-  }
+  }));
 
-  return results;
+  return batchResults.flat();
 }
 
 /**
