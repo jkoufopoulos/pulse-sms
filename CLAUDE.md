@@ -56,7 +56,7 @@ Daily scrape (10am ET)              Incoming SMS
         │                                │
         ▼                                ▼
    sources/                         handler.js
-   (21 source entries)               (request-guard.js:           $0
+   (22 source entries)               (request-guard.js:           $0
         │                            TCPA, dedup, budget)
         │                                │
         ├─► venues.js              pre-router.js ◄── session.js
@@ -150,7 +150,7 @@ All paths are relative to `src/` unless prefixed with a directory.
 |------|---------|
 | `events.js` | Daily event cache with disk persistence (`data/events-cache.json`), cross-source dedup, venue persistence, scrape-time date filtering (today through 7 days out) + kids filtering, `getEvents()`, `isCacheFresh()` (skips startup scrape when <20hr old) |
 | `db.js` | SQLite database layer (better-sqlite3, WAL mode) — event upsert with source-weight-based dedup, recurring pattern storage/generation, `importFromJsonCache`. Parallel persistence alongside JSON cache |
-| `source-registry.js` | Single source of truth for all 21 active source entries — `SOURCES` array (label, fetch fn, weight, mergeRank, endpoint), `SOURCE_TIERS` (unstructured/primary/secondary), `SOURCE_LABELS`, `MERGE_ORDER`, boot-time validation |
+| `source-registry.js` | Single source of truth for all 22 active source entries — `SOURCES` array (label, fetch fn, weight, mergeRank, endpoint), `SOURCE_TIERS` (unstructured/primary/secondary), `SOURCE_LABELS`, `MERGE_ORDER`, boot-time validation |
 | `source-health.js` | Per-source scrape tracking (status, event count, duration, errors, history sparklines), aggregate scrape metrics, persistence to `data/health-cache.json`, alerts on 3+ consecutive zero-event scrapes. `updateSourceHealth`, `getHealthStatus`, `alertOnFailingSources` |
 | `model-router.js` | Complexity-based model routing — scores requests 0-100 on deterministic signals (complexity tier, citywide, pre-detected filters, budget), routes high-complexity to Claude Haiku (~$0.001), simple to Gemini Flash (~$0.0001). `scoreComplexity`, `routeModel` |
 | `curation.js` | Pre-compose deterministic filters — `filterKidsEvents` (drops children's events from all sources), `filterIncomplete` (below completeness threshold) |
@@ -182,7 +182,7 @@ All paths are relative to `src/` unless prefixed with a directory.
 
 | File | Purpose |
 |------|---------|
-| `sources/` | 21 source entries (defined in `source-registry.js`) across 17 scraper modules with barrel `index.js` |
+| `sources/` | 22 source entries (defined in `source-registry.js`) across 18 scraper modules with barrel `index.js` |
 | `sources/shared.js` | `FETCH_HEADERS`, `makeEventId`, `normalizeExtractedEvent`, `backfillEvidence` |
 | `sources/skint.js` | Skint + SkintOngoing (HTML→Claude extraction, skips past-day sections, resolves day headers to explicit dates) |
 | `sources/eventbrite.js` | Eventbrite (JSON-LD + __SERVER_DATA__), Comedy (3 search pages: comedy-shows, open-mic-comedy, stand-up-comedy), Arts — 5 functions, 2 internal parsers |
@@ -200,6 +200,7 @@ All paths are relative to `src/` unless prefixed with a directory.
 | `sources/ticketmaster.js` | Ticketmaster Discovery API (indie filter: large-venue blocklist + $100 price cap) |
 | `sources/tinycupboard.js` | The Tiny Cupboard (JSON-LD ComedyEvent schema — Bushwick comedy venue, open mics, standup, improv) |
 | `sources/brooklyncc.js` | Brooklyn Comedy Collective (Squarespace HTML — East Williamsburg comedy theater, improv/sketch/standup across 4 stages) |
+| `sources/nyctrivia.js` | NYC Trivia League (Cheerio HTML — weekly bar trivia schedule across 30+ neighborhoods, 165 events/week, all free, Mixtape Bingo subcategory) |
 | `sources/ohmyrockness.js` | Oh My Rockness (HTML→Claude extraction) — **inactive**, removed from SOURCES array (80% loss rate, all duplicates) |
 | `sources/tavily.js` | Tavily (web search) — **inactive**, removed from SOURCES array and hot path |
 | `gmail.js` | Gmail OAuth client — `getGmailService`, `fetchYutoriEmails`, `fetchEmails` (generic sender query) |
@@ -308,7 +309,7 @@ npm run eval:gen       # generate synthetic test scenarios
 - **Single-call AI flow**: `unifiedRespond` handles both routing and composition in one Claude Haiku call. This replaced the old two-call flow (route + compose) which had filter state disagreements between calls. A/B eval showed Haiku matches or beats Sonnet on compose quality (71% preference, 89% tone pass) at 73% lower cost. The `handleMore` path still uses the legacy `composeResponse` two-call flow.
 - **No Tavily in hot path**: Tavily was removed from the live request path. All event data comes from the daily scrape.
 - **Cross-source dedup**: Event IDs are hashed from name + venue + date (not source), so the same event from Dice and BrooklynVegan merges automatically. Sources are processed in weight order, so the higher-trust version wins.
-- **Source trust** (weight 0.7-0.9): Controls dedup merge order — higher-weight source wins when the same event appears in multiple sources. Skint (0.9) = Nonsense NYC (0.9) = Screen Slate (0.9) > RA (0.85) > Dice (0.8) = BrooklynVegan (0.8) = BAM (0.8) = SmallsLIVE (0.8) = Yutori (0.8) > NYC Parks (0.75) = DoNYC (0.75) = Songkick (0.75) = Ticketmaster (0.75) = TinyCupboard (0.75) = BrooklynCC (0.75) > Eventbrite (0.7) = NYPL (0.7) = Luma (0.7). Not visible to compose Claude.
+- **Source trust** (weight 0.7-0.9): Controls dedup merge order — higher-weight source wins when the same event appears in multiple sources. Skint (0.9) = Nonsense NYC (0.9) = Screen Slate (0.9) > RA (0.85) > Dice (0.8) = BrooklynVegan (0.8) = BAM (0.8) = SmallsLIVE (0.8) = Yutori (0.8) > NYC Parks (0.75) = DoNYC (0.75) = Songkick (0.75) = Ticketmaster (0.75) = TinyCupboard (0.75) = BrooklynCC (0.75) = NYCTrivia (0.75) > Eventbrite (0.7) = NYPL (0.7) = Luma (0.7). Not visible to compose Claude.
 - **Event quality gates** (`extraction_confidence` + `completeness` + `needs_review`): Hard filter in `getEvents()` — events below 0.4 confidence, flagged needs_review, or below 0.4 completeness are dropped before reaching compose Claude. Structured sources (Dice, Eventbrite, etc.) have null confidence and pass through. Extracted sources (Skint, Nonsense NYC, etc.) get 0-1 confidence from the extraction prompt.
 - **Source tiers** (unstructured/primary/secondary): Soft signal passed to compose Claude via `source_tier` field. Claude prefers unstructured and primary over secondary when choosing between similar events. `extraction_confidence` is also passed as a soft signal for tie-breaking.
 - **Venue auto-learning**: Sources with lat/lng (BrooklynVegan, Dice, Songkick, Eventbrite, Ticketmaster) teach venue coords to the shared venue map at scrape time. This helps sources without geo data (RA, Skint, Nonsense NYC) resolve neighborhoods.
