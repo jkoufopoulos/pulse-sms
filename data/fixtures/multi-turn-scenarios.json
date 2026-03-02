@@ -8214,6 +8214,1926 @@
         "Tomorrow ignored"
       ],
       "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: bare film category opener",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "film"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "details",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Bare film category returns citywide film/cinema picks",
+      "expected_behavior": "Pulse recognizes film as a category, returns citywide film events or asks for neighborhood",
+      "failure_modes": [
+        "Film not recognized as category",
+        "No events returned",
+        "Error message"
+      ],
+      "difficulty": "must_pass"
+    },
+    {
+      "name": "Happy path: bare techno category opener",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "techno"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Bare techno category recognized, narrows to neighborhood",
+      "expected_behavior": "Techno recognized as category. When neighborhood provided, techno filter persists.",
+      "failure_modes": [
+        "Techno not recognized",
+        "Filter lost on neighborhood entry",
+        "Returns non-techno events"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: bare theater category opener",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "theater"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Bare theater category with MORE follow-up",
+      "expected_behavior": "Theater recognized as category. MORE returns additional theater events.",
+      "failure_modes": [
+        "Theater not recognized",
+        "MORE loses category filter",
+        "No additional picks"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: bare art category opener",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "art"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "west village"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Bare art category recognized despite being ambiguous word",
+      "expected_behavior": "Art recognized — may ask for neighborhood or return citywide art picks. When neighborhood given, art filter persists.",
+      "failure_modes": [
+        "Art treated as ambiguous and rejected",
+        "Filter lost on neighborhood",
+        "Non-art events returned"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: bare DJ category opener",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "dj sets"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "DJ sets recognized as category",
+      "expected_behavior": "DJ/electronic category recognized. Neighborhood narrows with filter persisting.",
+      "failure_modes": [
+        "DJ not recognized as category",
+        "Returns non-DJ events",
+        "Filter lost"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: bare trivia category opener",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "trivia"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "details",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Bare trivia category returns trivia night picks",
+      "expected_behavior": "Trivia recognized as first-class category, returns citywide trivia picks or asks for neighborhood",
+      "failure_modes": [
+        "Trivia not recognized",
+        "Returns non-trivia events",
+        "No events"
+      ],
+      "difficulty": "must_pass"
+    },
+    {
+      "name": "Edge case: bare open mic category opener",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "open mic"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Multi-word category 'open mic' recognized",
+      "expected_behavior": "Open mic recognized as multi-word category. Neighborhood narrows with filter.",
+      "failure_modes": [
+        "Open mic not recognized",
+        "Only 'open' or 'mic' matched",
+        "Filter lost on neighborhood"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Edge case: bare spoken word category opener",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "spoken word"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Spoken word recognized as a category or gracefully handled",
+      "expected_behavior": "Pulse either returns spoken word/poetry events or acknowledges the category and offers alternatives",
+      "failure_modes": [
+        "Error message",
+        "Completely ignores the category",
+        "Returns random events"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Edge case: bare hip hop category opener",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "hip hop"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "harlem"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Multi-word category 'hip hop' recognized",
+      "expected_behavior": "Hip hop recognized as multi-word category. Harlem narrows with filter persisting.",
+      "failure_modes": [
+        "Hip hop not recognized",
+        "Only partial match",
+        "Filter lost on neighborhood"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: bare stand up category opener",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "stand up"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "LES"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "details",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Multi-word category 'stand up' with full flow",
+      "expected_behavior": "Stand up → comedy category. Neighborhood narrows. Details work.",
+      "failure_modes": [
+        "Stand up not recognized",
+        "Filter lost",
+        "Details fail"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: chill jazz compound opener",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "chill jazz"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "west village"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Vibe + category compound recognized from opener",
+      "expected_behavior": "Jazz filter set, chill vibe interpreted. Picks lean mellow jazz. Neighborhood narrows with filters persisting.",
+      "failure_modes": [
+        "Only jazz recognized, chill ignored",
+        "Neither recognized",
+        "Filters lost on neighborhood"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: free theater tonight compound",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "free theater tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Triple compound: free + theater + tonight from first message",
+      "expected_behavior": "All three filters detected and applied. Returns free theater events for tonight.",
+      "failure_modes": [
+        "Only one or two filters detected",
+        "Returns paid events",
+        "Returns non-theater events"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: outdoor music compound",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "outdoor music"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Outdoor + music compound query",
+      "expected_behavior": "Music category with outdoor vibe. Neighborhood narrows with filters.",
+      "failure_modes": [
+        "Outdoor not understood as context",
+        "Music filter lost",
+        "Returns indoor events only"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Happy path: late night techno compound",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "late night techno"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Time + category compound from opener",
+      "expected_behavior": "Late night time filter + techno category both detected. Bushwick narrows with both persisting.",
+      "failure_modes": [
+        "Only one filter detected",
+        "Returns early events",
+        "Returns non-techno"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Edge case: art this weekend compound",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "art this weekend"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "chelsea"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Category + date range compound",
+      "expected_behavior": "Art category + this weekend date range. Both persist through neighborhood.",
+      "failure_modes": [
+        "Art ambiguous word rejected",
+        "Weekend range not parsed",
+        "Filters lost on neighborhood"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Edge case: comedy after 10 compound",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "comedy after 10"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Category + specific time compound",
+      "expected_behavior": "Comedy + after 10pm time filter. Both persist through neighborhood entry.",
+      "failure_modes": [
+        "Time filter not detected",
+        "Comedy lost on neighborhood",
+        "Returns events before 10pm"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: free live music tonight compound",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "free live music tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "greenpoint"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "details",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Triple compound: free + live music + tonight, full flow",
+      "expected_behavior": "All three constraints detected. Neighborhood narrows with all persisting. Details work.",
+      "failure_modes": [
+        "Missing any filter",
+        "Returns paid events",
+        "Returns non-music",
+        "Details fail"
+      ],
+      "difficulty": "must_pass"
+    },
+    {
+      "name": "Edge case: cheap drinks and dancing compound",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "cheap drinks and dancing"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Natural language compound with vibe and activity",
+      "expected_behavior": "Pulse interprets as nightlife/party with free or cheap preference. Returns relevant picks.",
+      "failure_modes": [
+        "Does not understand the request",
+        "Returns expensive events",
+        "Error message"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Poor experience: family friendly stuff compound",
+      "category": "poor_experience",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "family friendly stuff"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Family-friendly request — Pulse filters kids events so this may be thin",
+      "expected_behavior": "Pulse acknowledges the request but may have limited family-friendly events since kids events are filtered. Should handle gracefully.",
+      "failure_modes": [
+        "Returns adult nightlife events",
+        "Error or crash",
+        "No acknowledgment of the constraint"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Happy path: acoustic sets tonight compound",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "acoustic sets tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "park slope"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Acoustic + tonight compound",
+      "expected_behavior": "Music category with acoustic vibe + tonight. Neighborhood narrows with filters.",
+      "failure_modes": [
+        "Acoustic not interpreted",
+        "Tonight lost",
+        "Returns non-music events"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: anything fun tonight exploratory",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "anything fun tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "details",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Vague exploratory opener returns citywide picks",
+      "expected_behavior": "Pulse returns curated citywide picks or asks for neighborhood. Full flow works.",
+      "failure_modes": [
+        "No response",
+        "Asks too many clarifying questions",
+        "Error"
+      ],
+      "difficulty": "must_pass"
+    },
+    {
+      "name": "Happy path: entertain me exploratory",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "entertain me"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "greenpoint"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Playful exploratory opener",
+      "expected_behavior": "Pulse matches the playful tone, returns picks or asks for neighborhood",
+      "failure_modes": [
+        "Robotic response",
+        "Does not understand intent",
+        "Error"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: what should I do exploratory",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "what should I do tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Question-format exploratory opener",
+      "expected_behavior": "Pulse interprets as a general event request, returns picks or asks for neighborhood",
+      "failure_modes": [
+        "Tries to answer philosophically",
+        "Does not connect to events",
+        "Error"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Edge case: got any ideas exploratory",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "got any ideas"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "comedy"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Casual exploratory with category follow-up",
+      "expected_behavior": "Pulse offers citywide picks or asks for neighborhood. Comedy follow-up sets filter.",
+      "failure_modes": [
+        "Does not understand casual phrasing",
+        "Comedy filter not set",
+        "Error"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Edge case: recommend something exploratory",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "recommend something good"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "LES"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "free"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Recommendation request with progressive filtering",
+      "expected_behavior": "Pulse interprets as general request. Neighborhood narrows. Free filter applies.",
+      "failure_modes": [
+        "Does not understand recommendation request",
+        "Filters don't stack",
+        "Error"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Edge case: what do you have exploratory",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "what do you have"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Bare exploratory question",
+      "expected_behavior": "Pulse responds with citywide picks or asks for neighborhood. Does not get confused by the meta-question.",
+      "failure_modes": [
+        "Responds with a description of itself instead of events",
+        "Error",
+        "No events"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Edge case: anything outdoors exploratory",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "anything outdoors"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "prospect park"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Outdoor vibe exploratory with landmark follow-up",
+      "expected_behavior": "Pulse interprets outdoors as a vibe/preference. Prospect Park resolves to nearby neighborhood.",
+      "failure_modes": [
+        "Outdoors not understood",
+        "Prospect Park not resolved",
+        "Error"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Happy path: whats good right now exploratory",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "whats good right now"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Time-implicit exploratory opener",
+      "expected_behavior": "Pulse treats 'right now' as tonight/current time. Returns picks or asks for neighborhood.",
+      "failure_modes": [
+        "Ignores time signal",
+        "Error",
+        "Returns future events"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Edge case: just landed in NYC exploratory",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "i just landed in nyc"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "midtown"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Tourist/visitor exploratory opener",
+      "expected_behavior": "Pulse welcomes the visitor and returns picks or asks for neighborhood. Full flow works.",
+      "failure_modes": [
+        "Does not understand visitor context",
+        "Returns tourist traps",
+        "Error"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Edge case: new to the city exploratory",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "new to the city whats good"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "New resident exploratory opener",
+      "expected_behavior": "Pulse interprets as general request, provides helpful picks or asks for neighborhood",
+      "failure_modes": [
+        "Overly long welcome instead of events",
+        "Error",
+        "Ignores the question"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Happy path: best night out exploratory",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "best night out"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "details",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Quality-seeking exploratory with full flow",
+      "expected_behavior": "Pulse interprets as best-of request. Returns top picks. Full flow works.",
+      "failure_modes": [
+        "Does not understand quality intent",
+        "Returns mediocre events",
+        "Error"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Edge case: plans fell through exploratory",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "plans fell through what now"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "soho"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Context-rich exploratory opener",
+      "expected_behavior": "Pulse picks up on urgency, returns tonight picks or asks for neighborhood",
+      "failure_modes": [
+        "Tries to console user instead of giving events",
+        "Error",
+        "Ignores context"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Edge case: manhattan borough opener",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "manhattan"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Manhattan borough narrows to neighborhood",
+      "expected_behavior": "Pulse asks which Manhattan neighborhood or returns citywide Manhattan picks",
+      "failure_modes": [
+        "Returns Brooklyn events",
+        "Error",
+        "Does not recognize manhattan"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Edge case: queens borough opener",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "queens"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "astoria"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Queens borough narrows to neighborhood",
+      "expected_behavior": "Pulse asks which Queens neighborhood. Astoria narrows correctly.",
+      "failure_modes": [
+        "Queens not recognized as borough",
+        "Error",
+        "Returns Manhattan events"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Edge case: the bronx borough opener",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "the bronx"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "mott haven"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Bronx borough with 'the' prefix",
+      "expected_behavior": "Pulse recognizes the Bronx, asks for neighborhood. Mott Haven resolves.",
+      "failure_modes": [
+        "The prefix confuses parser",
+        "Bronx not recognized",
+        "Mott Haven not supported"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Edge case: uptown geographic opener",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "uptown"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "harlem"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Uptown as geographic region",
+      "expected_behavior": "Pulse interprets uptown as upper Manhattan area, asks for specific neighborhood or returns picks",
+      "failure_modes": [
+        "Uptown not understood",
+        "Returns downtown events",
+        "Error"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Edge case: downtown geographic opener",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "downtown"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "tribeca"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Downtown as geographic region",
+      "expected_behavior": "Pulse interprets downtown as lower Manhattan, asks for neighborhood or returns picks",
+      "failure_modes": [
+        "Downtown not understood",
+        "Returns uptown events",
+        "Error"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Happy path: nyc citywide opener",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "nyc"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "NYC as citywide opener",
+      "expected_behavior": "Pulse asks user to narrow down or returns citywide picks. Neighborhood resolves.",
+      "failure_modes": [
+        "NYC not recognized",
+        "Error",
+        "Returns nothing"
+      ],
+      "difficulty": "must_pass"
+    },
+    {
+      "name": "Edge case: central park landmark opener",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "central park"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "uws"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Central Park landmark redirected to nearby neighborhoods",
+      "expected_behavior": "Pulse maps Central Park to nearby neighborhoods (UES, UWS, Midtown) and offers options",
+      "failure_modes": [
+        "Treats Central Park as a neighborhood with events",
+        "Error",
+        "No redirect offered"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Poor experience: MSG venue opener",
+      "category": "poor_experience",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "msg"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "chelsea"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Major venue redirected to nearby neighborhood",
+      "expected_behavior": "Pulse acknowledges MSG, redirects to smaller venues in nearby neighborhoods",
+      "failure_modes": [
+        "Tries to return MSG events",
+        "Does not recognize MSG",
+        "Hard rejection"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Poor experience: lincoln center venue opener",
+      "category": "poor_experience",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "lincoln center"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "sure"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Lincoln Center redirected to UWS",
+      "expected_behavior": "Pulse acknowledges Lincoln Center, redirects to nearby UWS events",
+      "failure_modes": [
+        "Returns Lincoln Center performances",
+        "Hard rejection",
+        "Does not recognize"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Poor experience: barclays center venue opener",
+      "category": "poor_experience",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "barclays center"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "prospect heights"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Arena venue redirected to nearby neighborhood",
+      "expected_behavior": "Pulse redirects from Barclays to Prospect Heights or Fort Greene",
+      "failure_modes": [
+        "Tries to return Barclays events",
+        "No nearby suggestion",
+        "Error"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Edge case: brooklyn bridge landmark opener",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "brooklyn bridge"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "dumbo"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Landmark redirected to nearby neighborhood",
+      "expected_behavior": "Pulse offers nearby DUMBO or FiDi. User selects DUMBO, gets picks.",
+      "failure_modes": [
+        "Treats bridge as neighborhood",
+        "No redirect",
+        "Error"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Filter drift: bare comedy persists through neighborhood switch",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "comedy"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "how about bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Comedy filter from bare opener persists across two neighborhoods",
+      "expected_behavior": "Comedy detected from opener, persists through EV and into Bushwick switch",
+      "failure_modes": [
+        "Comedy lost on first neighborhood",
+        "Comedy lost on switch",
+        "Non-comedy events"
+      ],
+      "difficulty": "must_pass"
+    },
+    {
+      "name": "Filter drift: general opener then category then clear",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "whats good"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "jazz"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "west village"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "forget the jazz show me everything"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Filter lifecycle: no filter -> jazz -> neighborhood -> clear",
+      "expected_behavior": "Jazz accumulates across turns. Clear wipes filter. Post-clear picks are diverse.",
+      "failure_modes": [
+        "Jazz persists after clear",
+        "Clear doesn't work",
+        "Post-clear still jazz-only"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Filter drift: free stuff compounds with category and time",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "free stuff"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "how about comedy"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "anything later"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Triple compound: free from opener + comedy + time",
+      "expected_behavior": "Free persists from opener. Comedy compounds. Later adds time. All three active.",
+      "failure_modes": [
+        "Free lost on comedy",
+        "Comedy lost on time",
+        "Compound not maintained"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Filter drift: surprise me then free then neighborhood",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "surprise me"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "anything free"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "how about east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Citywide -> free filter -> neighborhood narrows with free persisting",
+      "expected_behavior": "Surprise me gives citywide. Free filter applies. EV narrows but free persists.",
+      "failure_modes": [
+        "Free lost on neighborhood",
+        "Neighborhood doesn't narrow",
+        "Returns paid events"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Filter drift: late night parties persists through more and switch",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "late night parties"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "try williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Late night + party filters persist through MORE and hood switch",
+      "expected_behavior": "Time and activity filters persist through MORE and neighborhood switch",
+      "failure_modes": [
+        "Filters lost on MORE",
+        "Filters lost on switch",
+        "Early events returned"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Filter drift: jazz opener with time then category swap",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "jazz"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "harlem"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "anything after 11"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "forget the jazz how about comedy"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Jazz -> time addition -> category swap (time persists, jazz replaced by comedy)",
+      "expected_behavior": "Jazz set from opener. Time compounds. Jazz cleared, comedy replaces. Time persists.",
+      "failure_modes": [
+        "Jazz stacks with comedy",
+        "Time cleared on swap",
+        "Comedy before 11"
+      ],
+      "difficulty": "must_pass"
+    },
+    {
+      "name": "Filter drift: exploratory opener to filter lifecycle",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "entertain me"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "greenpoint"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "only free stuff"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "show me everything"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "how about comedy"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Full filter lifecycle: none -> free -> clear -> comedy",
+      "expected_behavior": "Each filter transition is clean. Free applied, cleared, comedy applied fresh.",
+      "failure_modes": [
+        "Free persists after clear",
+        "Comedy inherits free",
+        "Transitions messy"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Abuse: weather question opener",
+      "category": "abuse_off_topic",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "whats the weather like tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "redirect",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Off-topic weather question deflected warmly",
+      "expected_behavior": "Pulse deflects with personality, redirects to events. Normal flow resumes.",
+      "failure_modes": [
+        "Tries to answer weather",
+        "Cold rejection",
+        "No redirect"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Abuse: restaurant recommendation opener",
+      "category": "abuse_off_topic",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "wheres the best pizza in brooklyn"
+        },
+        {
+          "sender": "pulse",
+          "message": "redirect",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "ok bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Food question deflected, user pivots to events",
+      "expected_behavior": "Pulse stays in scope, redirects warmly. Normal flow after neighborhood.",
+      "failure_modes": [
+        "Recommends restaurants",
+        "Harsh rejection",
+        "No redirect"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Abuse: wrong number opener",
+      "category": "abuse_off_topic",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "hey sarah are we still on for dinner"
+        },
+        {
+          "sender": "pulse",
+          "message": "redirect",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "oh whoops lol"
+        },
+        {
+          "sender": "pulse",
+          "message": "redirect",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Wrong number handled gracefully",
+      "expected_behavior": "Pulse clarifies identity warmly, introduces itself",
+      "failure_modes": [
+        "Roleplays as Sarah",
+        "Robotic error",
+        "Does not introduce itself"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Abuse: multi-turn off-topic then on track",
+      "category": "abuse_off_topic",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "can you help me with my homework"
+        },
+        {
+          "sender": "pulse",
+          "message": "redirect",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "what about uber prices"
+        },
+        {
+          "sender": "pulse",
+          "message": "redirect",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "ok fine les"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Multiple off-topic attempts before engaging",
+      "expected_behavior": "Pulse deflects warmly each time, stays patient, serves events when user engages",
+      "failure_modes": [
+        "Gets snippy",
+        "Repeats exact deflection",
+        "Gives up"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Abuse: political question opener",
+      "category": "abuse_off_topic",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "what do you think about the mayor"
+        },
+        {
+          "sender": "pulse",
+          "message": "redirect",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "west village"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Political question deflected without engaging",
+      "expected_behavior": "Pulse does not engage with politics, deflects warmly to events",
+      "failure_modes": [
+        "Engages politically",
+        "Harsh rejection",
+        "No redirect"
+      ],
+      "difficulty": "must_pass"
+    },
+    {
+      "name": "Poor experience: repeated vague without converging",
+      "category": "poor_experience",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "stuff"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "things"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "idk"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "User gives extremely vague input repeatedly",
+      "expected_behavior": "Pulse stays helpful, guides user toward a neighborhood or category",
+      "failure_modes": [
+        "Gets frustrated",
+        "Error",
+        "Returns nothing",
+        "Gives up"
+      ],
+      "difficulty": "stretch"
     }
   ]
 }
