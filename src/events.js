@@ -3,7 +3,7 @@ const path = require('path');
 const { SOURCES, SOURCE_TIERS, SOURCE_LABELS, MERGE_ORDER } = require('./source-registry');
 const { sourceHealth, saveHealthData, updateSourceHealth, updateScrapeStats, alertOnFailingSources, computeEventMix, getHealthStatus: _getHealthStatus } = require('./source-health');
 const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate } = require('./geo');
-const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues } = require('./venues');
+const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues, lookupVenueSize } = require('./venues');
 const { filterIncomplete, filterKidsEvents } = require('./curation');
 const { eventMatchesFilters, failsTimeGate } = require('./pipeline');
 const { computeCompleteness, backfillEvidence, backfillDateTimes } = require('./sources/shared');
@@ -52,6 +52,161 @@ function stampRecurrence(events) {
   }
 }
 
+/**
+ * Stamp venue_size on events using the VENUE_SIZE classification map.
+ * Sets venue_size to 'intimate', 'medium', 'large', 'massive', or leaves undefined.
+ */
+function stampVenueSize(events) {
+  let stamped = 0;
+  for (const e of events) {
+    if (!e.venue_name) continue;
+    const size = lookupVenueSize(e.venue_name);
+    if (size) {
+      e.venue_size = size;
+      stamped++;
+    }
+  }
+  if (stamped > 0) {
+    console.log(`Venue size stamping: ${stamped} events classified`);
+  }
+}
+
+/**
+ * Classify interaction format from category + subcategory + event name keywords.
+ * Three tiers: interactive (stranger interaction built in), participatory (active audience),
+ * passive (audience faces stage). Returns null if unclear.
+ */
+function classifyInteractionFormat(event) {
+  const name = (event.name || '').toLowerCase();
+  const cat = event.category;
+  const subcat = (event.subcategory || '').toLowerCase();
+
+  // --- Interactive: structure forces stranger interaction ---
+  if (cat === 'trivia') return 'interactive';
+  if (/\btrivia\b/.test(name)) return 'interactive';
+  if (/\bboard\s*game|game\s*night/.test(name)) return 'interactive';
+  if (/\bworkshop\b/.test(name) || (/\bclass\b/.test(name) && /\b(?:dance|salsa|bachata|swing|pottery|painting|cooking|craft)\b/.test(name))) return 'interactive';
+  if (/\b(?:salsa|bachata|swing)\s+(?:night|social|class|dancing)\b/.test(name)) return 'interactive';
+  if (/\brun\s*club\b|\brunning\s*club\b/.test(name)) return 'interactive';
+  if (/\bpotluck\b/.test(name)) return 'interactive';
+  if (/\bdrink\s*(?:and|&|n)\s*draw\b/.test(name)) return 'interactive';
+  if (/\bpaint\s*(?:and|&|n)\s*sip\b/.test(name)) return 'interactive';
+  if (/\bmeetup\b/.test(name)) return 'interactive';
+  if (/\bkaraoke\b/.test(name)) return 'interactive';
+  if (/\bbingo\b/.test(name)) return 'interactive';
+  if (subcat === 'mixtape_bingo') return 'interactive';
+  if (/\bcommunal\s*din/.test(name) || /\bsupper\s*club\b/.test(name)) return 'interactive';
+  if (/\bspeed\s*dat/.test(name)) return 'interactive';
+
+  // --- Participatory: you might perform, audience is active ---
+  if (/\bopen\s*mic\b/.test(name)) return 'participatory';
+  if (/\bjam\s*session\b/.test(name)) return 'participatory';
+  if (/\bdrag\s*(show|brunch|night|race|bingo)\b/.test(name)) return 'participatory';
+  if (/\bart\s*opening\b|\bgallery\s*opening\b|\bopening\s*reception\b/.test(name)) return 'participatory';
+  if (/\btasting\b/.test(name) && /\b(?:food|wine|beer|whiskey|cocktail|spirit)\b/.test(name)) return 'participatory';
+  if (subcat === 'literary' || /\bbook\s*launch\b|\breading\b.*\bsigning\b/.test(name)) return 'participatory';
+
+  // --- Category-level defaults (passive unless overridden above) ---
+  if (cat === 'comedy') return 'participatory'; // comedy audiences are active
+  if (cat === 'live_music' || cat === 'music') return 'passive';
+  if (cat === 'nightlife') return 'passive';
+  if (cat === 'theater') return 'passive';
+  if (cat === 'film') return 'passive';
+  if (cat === 'art') return /\bexhibit|installation|gallery\b/.test(name) ? 'passive' : null;
+  if (cat === 'dance') return /\bclass|lesson|social\b/.test(name) ? 'interactive' : 'passive';
+  if (cat === 'literature') return 'participatory'; // readings have Q&A, signings
+  if (cat === 'community') return 'interactive'; // community events tend interactive
+  if (cat === 'food') return 'interactive'; // food events tend interactive
+  if (cat === 'market') return 'interactive'; // markets are walk-around
+
+  return null;
+}
+
+/**
+ * Source curation signal — classifies source_name into curation quality tiers.
+ * curated: human-curated newsletters/blogs, single_venue: niche/single-venue, broad: aggregator platforms.
+ */
+const SOURCE_CURATION = {
+  // Curated: human editors pick events
+  'theskint': 'curated', 'nonsensenyc': 'curated',
+  'brooklynvegan': 'curated', 'ScreenSlate': 'curated', 'bkmag': 'curated',
+  'yutori': 'curated',
+  // Single-venue or niche: focused, high signal-to-noise
+  'smallslive': 'single_venue', 'tinycupboard': 'single_venue', 'brooklyncc': 'single_venue',
+  'bam': 'single_venue', 'nypl': 'single_venue', 'nyctrivia': 'single_venue', 'nyc_parks': 'single_venue',
+  // Broad: aggregator platforms with everything
+  'ra': 'broad', 'dice': 'broad', 'donyc': 'broad', 'songkick': 'broad',
+  'ticketmaster': 'broad', 'Luma': 'broad', 'eventbrite': 'broad',
+};
+
+/**
+ * Stamp source_curation on events from the SOURCE_CURATION map.
+ */
+function stampSourceCuration(events) {
+  let stamped = 0;
+  for (const e of events) {
+    const tier = SOURCE_CURATION[e.source_name];
+    if (tier) {
+      e.source_curation = tier;
+      stamped++;
+    }
+  }
+  if (stamped > 0) {
+    console.log(`Source curation: ${stamped} events classified`);
+  }
+}
+
+/**
+ * Stamp interaction_format on events using keyword + category classification.
+ * Sets interaction_format to 'interactive', 'participatory', 'passive', or leaves undefined.
+ */
+function stampInteractionFormat(events) {
+  let counts = { interactive: 0, participatory: 0, passive: 0 };
+  for (const e of events) {
+    const fmt = classifyInteractionFormat(e);
+    if (fmt) {
+      e.interaction_format = fmt;
+      counts[fmt]++;
+    }
+  }
+  const total = counts.interactive + counts.participatory + counts.passive;
+  if (total > 0) {
+    console.log(`Interaction format: ${total} classified (${counts.interactive} interactive, ${counts.participatory} participatory, ${counts.passive} passive)`);
+  }
+}
+
+/**
+ * Compute community score from all available signals.
+ * recurring: +3, interactive format: +2, participatory: +1, intimate venue: +2,
+ * medium venue: +1, free/cheap: +1, curated source: +1, single_venue source: +1.
+ * Max ~9. Stamps community_score on events with score > 0.
+ */
+function stampCommunityScore(events) {
+  let scored = 0;
+  for (const e of events) {
+    let score = 0;
+    if (e.is_recurring) score += 3;
+    if (e.interaction_format === 'interactive') score += 2;
+    else if (e.interaction_format === 'participatory') score += 1;
+    if (e.venue_size === 'intimate') score += 2;
+    else if (e.venue_size === 'medium') score += 1;
+    if (e.is_free || (e.price_display && /^\$?\d+/.test(e.price_display) && parseFloat(e.price_display.replace('$', '')) <= 10)) score += 1;
+    if (e.source_curation === 'curated') score += 1;
+    else if (e.source_curation === 'single_venue') score += 1;
+    if (score > 0) {
+      e.community_score = score;
+      scored++;
+    }
+  }
+  if (scored > 0) {
+    // Distribution summary
+    const high = events.filter(e => e.community_score >= 6).length;
+    const mid = events.filter(e => e.community_score >= 3 && e.community_score < 6).length;
+    const low = events.filter(e => e.community_score > 0 && e.community_score < 3).length;
+    console.log(`Community score: ${scored} scored (${high} high 6+, ${mid} mid 3-5, ${low} low 1-2)`);
+  }
+}
+
 function atomicWriteSync(filePath, data) {
   const tmp = filePath + '.tmp';
   fs.writeFileSync(tmp, data);
@@ -88,6 +243,10 @@ try {
     backfillEvidence(eventCache);
     backfillDateTimes(eventCache);
     stampRecurrence(eventCache);
+    stampVenueSize(eventCache);
+    stampInteractionFormat(eventCache);
+    stampSourceCuration(eventCache);
+    stampCommunityScore(eventCache);
     cacheTimestamp = Date.now();
     console.log(`Loaded ${eventCache.length} events from SQLite (${dbEvents.length} scraped + ${fresh.length} recurring)`);
   }
@@ -254,6 +413,8 @@ async function refreshCache() {
       eventCache = filterKidsEvents([...dbEvents, ...freshOccurrences]);
       backfillDateTimes(eventCache);
       stampRecurrence(eventCache);
+      stampVenueSize(eventCache);
+      stampInteractionFormat(eventCache);
       cacheTimestamp = Date.now();
       console.log(`SQLite: ${validEvents.length} events stored, serving ${eventCache.length} (${dbEvents.length} scraped + ${freshOccurrences.length} recurring)`);
     } catch (err) {
@@ -412,6 +573,10 @@ async function refreshSources(sourceNames, { reprocess = false } = {}) {
     const freshOccurrences = occurrences.filter(o => !seenIds.has(o.id));
     eventCache = filterKidsEvents([...dbEvents, ...freshOccurrences]);
     stampRecurrence(eventCache);
+    stampVenueSize(eventCache);
+    stampInteractionFormat(eventCache);
+    stampSourceCuration(eventCache);
+    stampCommunityScore(eventCache);
     cacheTimestamp = Date.now();
   } catch (err) {
     // SQLite failed — fall back to in-memory merge

@@ -376,34 +376,13 @@ The core thesis: Pulse's scraped event data gives it verified, temporal knowledg
 
 The key insight: category alone is too coarse. Comedy at Tiny Cupboard (30 seats) vs Carnegie Hall is categorically different. Venue size and interaction format are independent signals that must combine.
 
-**2a. Venue size classification** — Add `venue_size` field to VENUE_MAP for the ~150-200 venues we actually see events at. Four tiers:
-  - **intimate** (<~100): Smalls, Mezzrow, Tiny Cupboard, Brooklyn CC, most bars hosting trivia
-  - **medium** (~100-500): House of Yes, Baby's All Right, most comedy clubs
-  - **large** (~500-1500): Brooklyn Steel, Terminal 5, Webster Hall
-  - **massive** (1500+): Barclays, MSG, Radio City, Avant Gardner
+**2a. Venue size classification** — **Done.** VENUE_SIZE map (200+ venues), `lookupVenueSize()` with fuzzy matching, `stampVenueSize()` at cache build. LLM sees `venue_size` field.
 
-One-time manual effort, maintained as new venues appear via learned venues. Much more accurate than any API-derived proxy (Google Places review count is noisy — beloved tiny places can have tons of reviews).
+**2b. Interaction format** — **Done.** `classifyInteractionFormat()` uses category + subcategory + 20 name keyword patterns. Three tiers: interactive (trivia, workshops, dance classes, karaoke, bingo, meetups), participatory (open mic, comedy, drag, art openings, tastings), passive (concerts, DJ sets, screenings, theater). `stampInteractionFormat()` at cache build. LLM sees `interaction_format` field.
 
-**2b. Interaction format** — Derive from `subcategory` + event name keyword scan. Three tiers:
-  - **interactive** (structure forces stranger interaction): trivia, board games, workshops, dance classes (salsa/bachata/swing), communal dining, run clubs, potlucks, drink-and-draw
-  - **participatory** (you might perform, audience is active): open mic, karaoke, drag, jam sessions, comedy (small room), art openings, food tastings
-  - **passive** (audience faces stage): concerts, DJ sets (big room), screenings, lectures, readings
-  - Name keywords supplement subcategory: "workshop", "jam session", "meetup", "potluck", "drink and draw", "run club"
+**2c. Source curation signal** — **Done.** `SOURCE_CURATION` map classifies all 23 sources into curated/single_venue/broad. `stampSourceCuration()` at cache build. LLM sees `source_curation` field.
 
-**2c. Source curation signal** — Map `source_name` to curation tier:
-  - **curated**: Nonsense NYC, Skint, Screen Slate (editorially selected, tend intimate/underground)
-  - **single-venue**: Tiny Cupboard, Brooklyn CC, SmallsLIVE (intimate by definition)
-  - **broad**: RA, Dice, DoNYC, Eventbrite, Ticketmaster (mixed size, no curation signal)
-
-**2d. Community score** — Compound signal from all available data:
-  - `recurring` (Phase 1) → +3
-  - `interactive_format` → +2
-  - `intimate_venue` → +2
-  - `free_or_cheap` → +1
-  - `curated_source` → +1
-  - `large_venue` → -2
-  - `massive_venue` → -3
-  - `broad_source` → 0 (neutral, not negative)
+**2d. Community score** — **Done.** `stampCommunityScore()` combines: recurring +3, interactive +2, participatory +1, intimate venue +2, medium venue +1, free/cheap +1, curated source +1, single-venue source +1. Max ~9. Stamped at cache build after all other signals. LLM sees `community_score` field.
 
 Google Places deferred — the signals it provides (Popular Times, review count, rating) are noisy proxies for things we can classify more accurately by hand. Revisit if we need validation data for recurrence patterns or a specific question only that API answers.
 
@@ -498,6 +477,7 @@ Google Places deferred — the signals it provides (Popular Times, review count,
 | Mar 1 | Nudge-accept flow fix (Root Cause D) | Added `neighborhood` to `ask_neighborhood` pending object — one-line fix for ~10% of filter failures |
 | Mar 1 | Yutori junk event filter | Blocked ~50 prose bullets (self-help, tax, career) via category + filename + structural filters |
 | Mar 1 | Skint Ongoing events scraper | 31 series events (exhibitions, festivals) via deterministic parser; weight 0.9 |
+| Mar 3 | Community layer Phase 2 complete (2b-2d) | Interaction format (20 keyword patterns, 3 tiers), source curation (23 sources mapped), community score (compound signal, max ~9). All stamped at cache build, all visible to LLM |
 | Mar 1 | Friday/Saturday newsletter event loss fix | Yesterday included in scrape filter + 6pm evening scrape added |
 | Mar 1 | Systemic failure fixes (8 changes) | handler.js events bug, borough detection, sign-off handling, early/tonight conflict, zero-match prompt hardening |
 | Mar 1 | Fix eval gaps #8 + #9 | Neighborhood skew: 8 multi-turn + 4 regression scenarios for outer boroughs. Trace race: `getTraceById` replaces phone-based lookup in test endpoint |

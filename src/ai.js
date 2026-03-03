@@ -501,6 +501,10 @@ async function unifiedRespond(message, { session, events, neighborhood, nearbyHo
         extraction_confidence: e.extraction_confidence,
         ticket_url: e.ticket_url,
         recurring: e.is_recurring ? e.recurrence_label : undefined,
+        venue_size: e.venue_size || undefined,
+        interaction_format: e.interaction_format || undefined,
+        source_curation: e.source_curation || undefined,
+        community_score: e.community_score || undefined,
       });
     }).join('\n');
   }

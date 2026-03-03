@@ -510,6 +510,343 @@ const VENUE_MAP = {
   'Athletic Courts': { lat: 40.6895, lng: -73.9762 },
 };
 
+/**
+ * Venue size classification for community scoring.
+ * Four tiers: intimate (<~100), medium (~100-500), large (~500-1500), massive (1500+).
+ * Only venues we actually see events at need classification.
+ * Unclassified venues get null (neutral in community score).
+ */
+const VENUE_SIZE = {
+  // === Intimate (<~100 capacity) — bars, small clubs, DIY spaces ===
+
+  // Jazz clubs
+  'Smalls Jazz Club': 'intimate',
+  'Mezzrow': 'intimate',
+  'Bar Bayeux': 'intimate',
+  'Cellar Dog': 'intimate',
+  'BrownstoneJAZZ': 'intimate',
+
+  // Bushwick / East Williamsburg small venues
+  'The Tiny Cupboard': 'intimate',
+  'Mood Ring': 'intimate',
+  'Jupiter Disco': 'intimate',
+  'H0L0': 'intimate',
+  'Signal': 'intimate',
+  'Cobra Club': 'intimate',
+  'Pine Box Rock Shop': 'intimate',
+  'Outer Heaven': 'intimate',
+  'Sustain': 'intimate',
+  'Market Hotel': 'intimate',
+  'Moondog Hifi': 'intimate',
+  'ALPHAVILLE': 'intimate',
+  'Xanadu': 'intimate',
+
+  // Williamsburg / Greenpoint small venues
+  'Pete\'s Candy Store': 'intimate',
+  'Mansions': 'intimate',
+  'Superior Ingredients': 'intimate',
+  'Purgatory': 'intimate',
+  'Sleepwalk': 'intimate',
+  'Cassette': 'intimate',
+  'Reforesters Laboratory': 'intimate',
+
+  // East Village / LES small venues
+  'Berlin': 'intimate',
+  'Nublu 151': 'intimate',
+  'Nublu': 'intimate',
+  'DROM': 'intimate',
+  'Lucinda\'s': 'intimate',
+  'Night Club 101': 'intimate',
+  'Terra Blues': 'intimate',
+  'Pianos': 'intimate',
+  'Pianos: Showroom': 'intimate',
+  'Pianos: The Mezzanine': 'intimate',
+  'Arlene\'s Grocery': 'intimate',
+
+  // Other intimate venues
+  'Cafe Wha?': 'intimate',
+  'Madame X': 'intimate',
+  'Don\'t Tell Mama': 'intimate',
+  'Silver Lining Lounge': 'intimate',
+  'Index Chinatown': 'intimate',
+  'Silence Please': 'intimate',
+  'Shrine': 'intimate',
+  'Iridium': 'intimate',
+  'Brooklyn Music Kitchen': 'intimate',
+
+  // Comedy clubs (small rooms)
+  'Brooklyn Comedy Collective': 'intimate',
+  'The PIT Loft': 'intimate',
+  'Eastville Comedy Club': 'intimate',
+  'St. Marks Comedy Club': 'intimate',
+  'Comic Strip Live NYC': 'intimate',
+  'Gotham Comedy Club': 'intimate',
+  'New York Comedy Club Midtown': 'intimate',
+  'NEW YORK COMEDY CLUB EAST VILLAGE': 'intimate',
+  'New York Comedy Club Upper West Side': 'intimate',
+  'People\'s Improv Theater': 'intimate',
+  'Eris Deep Space': 'intimate',
+  'Eris Mainstage': 'intimate',
+  'Eris Main Stage': 'intimate',
+  'Eris': 'intimate',
+  'Upright Citizens Brigade Theatre': 'intimate',
+
+  // Cultural / community intimate spaces
+  'Nuyorican Poets Cafe': 'intimate',
+  'Caveat': 'intimate',
+  'Greenlight Bookstore in Fort Greene': 'intimate',
+  'Metrograph': 'intimate',
+  'IFC Center': 'intimate',
+  'Roulette': 'intimate',
+  'Issue Project Room': 'intimate',
+  'Jazz Gallery': 'intimate',
+  'The Kitchen': 'intimate',
+  'Greenwich House Music School': 'intimate',
+  'Fabrik DUMBO': 'intimate',
+  'Fabrik Dumbo': 'intimate',
+  'Fabrik': 'intimate',
+  'Fabrik NYC': 'intimate',
+
+  // Bars (trivia / community hosts)
+  'Keg & Lantern Brewing': 'intimate',
+  'Brooklyn Brewery': 'intimate',
+  'Gowanus Gardens': 'intimate',
+  'The Vale Public House': 'intimate',
+
+  // Ridgewood
+  'TV Eye': 'intimate',
+  'SILO': 'intimate',
+
+  // === Medium (~100-500 capacity) ===
+
+  // Music venues
+  'Baby\'s All Right': 'medium',
+  'Bossa Nova Civic Club': 'medium',
+  'House of Yes': 'medium',
+  'The Sultan Room': 'medium',
+  'C\'mon Everybody': 'medium',
+  'Le Poisson Rouge': 'medium',
+  'Mercury Lounge': 'medium',
+  'Bowery Palace': 'medium',
+  'SOBs': 'medium',
+  'Union Pool': 'medium',
+  'Racket NYC': 'medium',
+  'public records': 'medium',
+  'Nowadays': 'medium',
+  'Littlefield': 'medium',
+  'Nebula': 'medium',
+  'Eden': 'medium',
+  'Le Bain': 'medium',
+
+  // Comedy / theater (medium rooms)
+  'The Stand': 'medium',
+  'Joe\'s Pub': 'medium',
+  'The Bell House': 'medium',
+  'The Theater Center': 'medium',
+
+  // Brooklyn cultural
+  'BRIC House Media Center': 'medium',
+  'National Sawdust': 'medium',
+  'New York Live Arts': 'medium',
+
+  // Art / activity
+  'Muse Paintbar - Tribeca': 'medium',
+  'The Crafty Lounge': 'medium',
+  'Seventh Heaven Bar & Karaoke': 'medium',
+  'The Red Pavilion': 'medium',
+
+  // === Large (~500-1500 capacity) ===
+
+  // Concert halls
+  'Brooklyn Steel': 'large',
+  'Webster Hall': 'large',
+  'Irving Plaza': 'large',
+  'Music Hall of Williamsburg': 'large',
+  'Brooklyn Bowl': 'large',
+  'Bowery Ballroom': 'large',
+  'Gramercy Theatre': 'large',
+  'The Gramercy Theatre': 'large',
+  'Warsaw': 'large',
+  'Marquee New York': 'large',
+  'City Winery': 'large',
+
+  // Elsewhere (multi-room — main room is large)
+  'Elsewhere': 'large',
+
+  // Clubs
+  'Knockdown Center': 'large',
+
+  // Performing arts
+  'BAM': 'large',
+  'The Shed': 'large',
+  'The Shed at Hudson Yards': 'large',
+  'The Griffin Theater - The Shed': 'large',
+  'Blue Note Jazz Club': 'large',
+  'Birdland Jazz Club': 'large',
+  'Birdland Theater': 'large',
+  'Lincoln Center Theater': 'large',
+  'Lincoln Center - Claire Tow Theater': 'medium',
+  'New York City Center': 'large',
+  'David Geffen Hall': 'large',
+
+  // Off-Broadway
+  'New World Stages - Stage 1': 'large',
+  'New World Stages - Stage 2': 'large',
+  'New World Stages - Stage 3': 'large',
+  'New World Stages - Stage 4': 'large',
+  'New World Stages - Stage 5': 'large',
+  'Astor Place Theatre': 'large',
+  'Orpheum Theatre NYC': 'large',
+  'DR2': 'large',
+  'Daryl Roth Theatre': 'large',
+  'Westside Theatre Upstairs': 'large',
+  'Westside Theatre Upstairs - NY': 'large',
+
+  // === Massive (1500+ capacity) ===
+
+  // Arenas
+  'Madison Square Garden': 'massive',
+  'Barclays Center': 'massive',
+  'Radio City Music Hall': 'massive',
+  'Radio City Music Hall Tour Experience': 'massive',
+  'Beacon Theatre': 'massive',
+  'Carnegie Hall': 'massive',
+  'Brooklyn Paramount': 'massive',
+  'Kings Theatre': 'massive',
+  'Brooklyn Mirage': 'massive',
+  'Avant Gardner': 'massive',
+  'The Brooklyn Mirage': 'massive',
+  'Irving Plaza Powered By Verizon 5G': 'large',
+
+  // Broadway theaters
+  'Lena Horne Theatre': 'massive',
+  'Neil Simon Theatre': 'massive',
+  'Gershwin Theatre': 'massive',
+  'Broadway Theatre': 'massive',
+  'Broadway Theatre-New York': 'massive',
+  'Ambassador Theatre': 'massive',
+  'Ambassador Theatre-NY': 'massive',
+  'Hudson Theatre -NY': 'massive',
+  'Lyric Theatre - NY': 'massive',
+  'Minskoff Theatre': 'massive',
+  'Richard Rodgers Theatre': 'massive',
+  'Richard Rodgers Theatre-NY': 'massive',
+  'New Amsterdam Theatre': 'massive',
+  'Belasco Theatre': 'massive',
+  'Gerald Schoenfeld Theatre': 'massive',
+  'Bernard B. Jacobs Theatre': 'massive',
+  'Jacobs Theatre-NY': 'massive',
+  'Imperial Theatre': 'massive',
+  'Imperial Theatre - NY': 'massive',
+  'Walter Kerr Theatre': 'massive',
+  'John Golden Theatre': 'massive',
+  'Marquis Theatre': 'massive',
+  'Lunt-Fontanne Theatre': 'massive',
+  'Samuel J Friedman Theatre': 'massive',
+  'Circle In The Square Theatre': 'massive',
+  'Eugene O\'Neill Theatre': 'massive',
+  'Nederlander Theatre': 'massive',
+  'Lyceum Theatre': 'massive',
+  'Longacre Theatre': 'massive',
+  'Lincoln Center - Vivian Beaumont Theater': 'massive',
+  'Lincoln Center - Vivian Beaumont': 'massive',
+  'Goldstein Theatre at Kupferberg Center for the Arts': 'massive',
+  'House of the Redeemer': 'medium',
+
+  // === Additional venues from coverage audit ===
+
+  // Museums / attractions
+  'Banksy Museum New York': 'medium',
+  'The Banksy Museum': 'medium',
+  'Museum of Broadway': 'medium',
+  'Color Factory NYC': 'medium',
+  'ARTECHOUSE NYC': 'medium',
+  'Brooklyn Museum': 'large',
+  'New Museum': 'medium',
+
+  // Film venues
+  'Film Forum': 'intimate',
+  'Nitehawk Cinema': 'medium',
+  'Nitehawk Cinema Williamsburg': 'medium',
+  'Nitehawk Prospect Park': 'medium',
+  'Anthology Film Archives': 'intimate',
+  'BAM Rose Cinemas': 'medium',
+  'Spectacle Theater': 'intimate',
+  'Alamo Drafthouse': 'large',
+  'Alamo Drafthouse Downtown Brooklyn': 'large',
+  'Roxy Cinema': 'intimate',
+  'The Roxy Cinema': 'intimate',
+  'Village East by Angelika': 'medium',
+
+  // Additional music venues
+  'Rough Trade NYC': 'medium',
+  'Knitting Factory Brooklyn': 'medium',
+  'The Bitter End': 'intimate',
+  'Zinc Bar': 'intimate',
+  'The Stonewall Inn': 'intimate',
+  'Silvana': 'intimate',
+
+  // Parks / outdoor (large open spaces)
+  'Central Park': 'massive',
+  'Prospect Park': 'massive',
+  'Brooklyn Bridge Park': 'massive',
+  'The High Line': 'large',
+  'Bryant Park': 'large',
+
+  // Additional performing arts
+  'Symphony Space': 'large',
+  'Town Hall': 'large',
+  'Apollo Theater': 'large',
+  'United Palace': 'massive',
+  'St. Ann\'s Warehouse': 'medium',
+  'Pioneer Works': 'medium',
+
+  // Additional comedy
+  'Comedy Cellar': 'intimate',
+  'Old Man Hustle BKLYN COMEDY Club': 'intimate',
+  'QED Astoria': 'intimate',
+  'Stand Up NY': 'intimate',
+
+  // Bookstores / literary (all intimate)
+  'Greenlight Bookstore': 'intimate',
+  'Books Are Magic': 'intimate',
+  'Strand Book Store': 'intimate',
+  'Strand Bookstore': 'intimate',
+  'McNally Jackson': 'intimate',
+  'McNally Jackson Books': 'intimate',
+  'Housing Works Bookstore': 'intimate',
+  'Housing Works Bookstore Cafe': 'intimate',
+  'The Center for Fiction': 'intimate',
+  'Book Club Bar': 'intimate',
+  'P&T Knitwear': 'intimate',
+
+  // Bars / community venues
+  'Union Hall': 'intimate',
+  'Barbes': 'intimate',
+  'Jalopy Theatre': 'intimate',
+  'Good Room': 'medium',
+  'Public Records': 'medium',
+  'Sunny\'s Bar': 'intimate',
+  'Club Cumming': 'intimate',
+  'Niagara': 'intimate',
+  'The Parkside Lounge': 'intimate',
+};
+
+// Build normalized size lookup
+const normalizedSizeMap = new Map();
+for (const [name, size] of Object.entries(VENUE_SIZE)) {
+  normalizedSizeMap.set(normalizeName(name), size);
+}
+
+/**
+ * Look up venue size classification.
+ * Returns 'intimate', 'medium', 'large', 'massive', or null (unclassified).
+ */
+function lookupVenueSize(name) {
+  if (!name) return null;
+  return normalizedSizeMap.get(normalizeName(name)) || null;
+}
+
 // Build normalized lookup map at module load
 const normalizedMap = new Map();
 for (const [name, coords] of Object.entries(VENUE_MAP)) {
@@ -630,4 +967,4 @@ async function batchGeocodeEvents(events) {
   console.log(`Geocoding done: ${resolved}/${unresolved.length} resolved`);
 }
 
-module.exports = { VENUE_MAP, lookupVenue, learnVenueCoords, geocodeVenue, batchGeocodeEvents, exportLearnedVenues, importLearnedVenues };
+module.exports = { VENUE_MAP, VENUE_SIZE, lookupVenue, lookupVenueSize, learnVenueCoords, geocodeVenue, batchGeocodeEvents, exportLearnedVenues, importLearnedVenues };

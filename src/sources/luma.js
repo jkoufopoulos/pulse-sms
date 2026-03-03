@@ -144,9 +144,7 @@ async function fetchLumaEvents() {
       if (seen.has(id)) continue;
       seen.add(id);
 
-      // Description — strip markdown formatting, truncate to 180 chars
-      const rawDesc = ev.description ? ev.description.replace(/[#*_\[\]()]/g, '').trim() : null;
-      const descShort = rawDesc ? (rawDesc.length > 180 ? rawDesc.slice(0, 177) + '...' : rawDesc) : null;
+      // Note: Luma discover API doesn't include descriptions (only on per-event detail endpoint)
 
       // Price info
       const ti = entry.ticket_info || {};
@@ -169,8 +167,8 @@ async function fetchLumaEvents() {
         source_name: 'Luma',
         source_type: 'aggregator',
         name,
-        description_short: descShort,
-        short_detail: descShort,
+        description_short: null,
+        short_detail: null,
         venue_name: venueName,
         venue_address: venueAddress,
         neighborhood,

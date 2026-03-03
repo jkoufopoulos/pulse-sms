@@ -45,13 +45,13 @@ async function fetchSongkickEvents() {
 
           const id = makeEventId(e.name, location.name, startDate, 'songkick', null, e.startDate);
 
-          // Description — prefer performer names (matches BrooklynVegan pattern)
+          // Description — performer names only (e.description is just name+venue, not useful)
           const performers = Array.isArray(e.performer)
             ? e.performer.map(p => p.name).filter(Boolean)
             : e.performer?.name ? [e.performer.name] : [];
           const desc = performers.length > 0
             ? performers.slice(0, 3).join(', ') + (performers.length > 3 ? ` + ${performers.length - 3} more` : '')
-            : (e.description ? e.description.slice(0, 180) : null);
+            : null;
 
           const offers = e.offers || {};
           const skPrice = parseFloat(offers.lowPrice || offers.price || '');
