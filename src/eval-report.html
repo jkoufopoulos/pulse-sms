@@ -2134,10 +2134,12 @@ function renderScenarioCard(s, sortIdx) {
     if (cmpScenario && cmpScenario.pass !== s.pass) changedClass = ' changed';
   }
 
-  // Get preview text: first ~120 chars of judge note or error
+  // Get preview text: first ~120 chars of failures or judge note
   var preview = '';
   if (s.error) {
     preview = s.error;
+  } else if (noJudge && (s.code_eval_failures || []).length > 0) {
+    preview = s.code_eval_failures.map(function(f) { return f.name; }).join(', ');
   } else if (s.judgment && s.judgment.overall_note) {
     preview = s.judgment.overall_note;
   }
@@ -2151,7 +2153,7 @@ function renderScenarioCard(s, sortIdx) {
     'data-sort-idx="' + sortIdx + '" ' +
     'data-category="' + escAttr(s.category || '') + '" ' +
     'data-difficulty="' + escAttr(s.difficulty || '') + '" ' +
-    'data-result="' + (s.error ? 'error' : (s.pass ? 'pass' : 'fail')) + '" ' +
+    'data-result="' + resultClass + '" ' +
     'data-override="' + escAttr(ovrFilter) + '" ' +
     'data-name="' + escAttr((s.name || '').toLowerCase()) + '" ' +
     'data-name-exact="' + escAttr(s.name || '') + '">';
@@ -2172,10 +2174,10 @@ function renderScenarioCard(s, sortIdx) {
   html += '</div></div>';
 
   // Preview line for failures/errors
-  if (!s.pass && preview) {
+  if (resultClass !== 'pass' && preview) {
     var previewColor = s.error ? '#c084fc' : '#888';
     html += '<div class="scenario-preview" style="color:' + previewColor + '">';
-    html += '<span class="preview-label">' + (s.error ? 'Error: ' : 'Judge: ') + '</span>';
+    html += '<span class="preview-label">' + (s.error ? 'Error: ' : (noJudge ? 'Failed: ' : 'Judge: ')) + '</span>';
     html += escHtml(preview);
     html += '</div>';
   }
