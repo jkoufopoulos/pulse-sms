@@ -179,31 +179,62 @@ async function fetchCategoryDates(slug, categoryOverride, dates) {
 
 const PRICE_BATCH_SIZE = 10;
 
-function extractPriceFromDetailPage(html) {
+function extractDetailsFromPage(html) {
   const $ = cheerio.load(html);
-  // 1. Schema.org itemprop="price"
+
+  // Price extraction
+  let price = null;
   const schemaPrice = $('[itemprop="price"]').attr('content') || $('[itemprop="price"]').text().trim();
   if (schemaPrice) {
     const m = schemaPrice.match(/\$(\d+(?:\.\d{2})?)/);
-    if (m) return `$${m[1]}`;
+    if (m) price = `$${m[1]}`;
   }
-  // 2. Dollar amount in event detail area
-  const detailText = $('.ds-event-detail, .ds-event-description, .ds-event-details').text();
-  if (/\bfree\b/i.test(detailText)) return 'free';
-  const rangeMatch = detailText.match(/\$(\d+(?:\.\d{2})?)\s*[-–]\s*\$?(\d+(?:\.\d{2})?)/);
-  if (rangeMatch) return `$${rangeMatch[1]}-$${rangeMatch[2]}`;
-  const match = detailText.match(/\$(\d+(?:\.\d{2})?)/);
-  if (match) return `$${match[1]}`;
-  return null;
+  if (!price) {
+    const detailText = $('.ds-event-detail, .ds-event-description, .ds-event-details').text();
+    if (/\bfree\b/i.test(detailText)) {
+      price = 'free';
+    } else {
+      const rangeMatch = detailText.match(/\$(\d+(?:\.\d{2})?)\s*[-–]\s*\$?(\d+(?:\.\d{2})?)/);
+      if (rangeMatch) price = `$${rangeMatch[1]}-$${rangeMatch[2]}`;
+      else {
+        const match = detailText.match(/\$(\d+(?:\.\d{2})?)/);
+        if (match) price = `$${match[1]}`;
+      }
+    }
+  }
+
+  // Description extraction
+  let description = null;
+  const descEl = $('.ds-event-description').first();
+  if (descEl.length) {
+    const text = descEl.text().trim();
+    if (text.length > 10) {
+      description = text.length > 180 ? text.slice(0, 177) + '...' : text;
+    }
+  }
+  if (!description) {
+    const detailEl = $('.ds-event-detail').first();
+    if (detailEl.length) {
+      const text = detailEl.text().trim();
+      if (text.length > 10) {
+        description = text.length > 180 ? text.slice(0, 177) + '...' : text;
+      }
+    }
+  }
+
+  return { price, description };
 }
 
-async function enrichPrices(events) {
-  const needsPrice = events.filter(e => !e.price_display && !e.is_free && e.source_url);
-  if (needsPrice.length === 0) return;
+async function enrichFromDetailPages(events) {
+  const needsEnrich = events.filter(e =>
+    e.source_url && ((!e.price_display && !e.is_free) || !e.description_short)
+  );
+  if (needsEnrich.length === 0) return;
 
-  let enriched = 0;
-  for (let i = 0; i < needsPrice.length; i += PRICE_BATCH_SIZE) {
-    const batch = needsPrice.slice(i, i + PRICE_BATCH_SIZE);
+  let priceEnriched = 0;
+  let descEnriched = 0;
+  for (let i = 0; i < needsEnrich.length; i += PRICE_BATCH_SIZE) {
+    const batch = needsEnrich.slice(i, i + PRICE_BATCH_SIZE);
     const results = await Promise.allSettled(batch.map(async evt => {
       const res = await fetch(evt.source_url, {
         headers: FETCH_HEADERS,
@@ -216,15 +247,22 @@ async function enrichPrices(events) {
     for (const r of results) {
       if (r.status !== 'fulfilled' || !r.value) continue;
       const { evt, html } = r.value;
-      const price = extractPriceFromDetailPage(html);
-      if (price) {
-        evt.price_display = price;
-        if (price === 'free') evt.is_free = true;
-        enriched++;
+      const details = extractDetailsFromPage(html);
+      if (details.price && !evt.price_display && !evt.is_free) {
+        evt.price_display = details.price;
+        if (details.price === 'free') evt.is_free = true;
+        priceEnriched++;
+      }
+      if (details.description && !evt.description_short) {
+        evt.description_short = details.description;
+        evt.short_detail = details.description;
+        descEnriched++;
       }
     }
   }
-  if (enriched > 0) console.log(`DoNYC: enriched ${enriched}/${needsPrice.length} events with price from detail pages`);
+  if (priceEnriched > 0 || descEnriched > 0) {
+    console.log(`DoNYC: enriched ${priceEnriched} prices, ${descEnriched} descriptions from ${needsEnrich.length} detail pages`);
+  }
 }
 
 async function fetchDoNYCEvents() {
@@ -252,8 +290,8 @@ async function fetchDoNYCEvents() {
       }
     }
 
-    // Enrich prices from detail pages for events missing price
-    await enrichPrices(events);
+    // Enrich prices + descriptions from detail pages
+    await enrichFromDetailPages(events);
 
     console.log(`DoNYC: ${events.length} events`);
     return events;

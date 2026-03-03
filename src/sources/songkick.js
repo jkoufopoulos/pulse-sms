@@ -45,6 +45,14 @@ async function fetchSongkickEvents() {
 
           const id = makeEventId(e.name, location.name, startDate, 'songkick', null, e.startDate);
 
+          // Description — prefer performer names (matches BrooklynVegan pattern)
+          const performers = Array.isArray(e.performer)
+            ? e.performer.map(p => p.name).filter(Boolean)
+            : e.performer?.name ? [e.performer.name] : [];
+          const desc = performers.length > 0
+            ? performers.slice(0, 3).join(', ') + (performers.length > 3 ? ` + ${performers.length - 3} more` : '')
+            : (e.description ? e.description.slice(0, 180) : null);
+
           const offers = e.offers || {};
           const skPrice = parseFloat(offers.lowPrice || offers.price || '');
           const skName = (e.name || '').toLowerCase();
@@ -55,8 +63,8 @@ async function fetchSongkickEvents() {
             source_name: 'songkick',
             source_type: 'aggregator',
             name: e.name,
-            description_short: null,
-            short_detail: null,
+            description_short: desc,
+            short_detail: desc,
             venue_name: location.name || 'TBA',
             venue_address: [address.streetAddress, address.addressLocality].filter(Boolean).join(', '),
             neighborhood,

@@ -144,6 +144,10 @@ async function fetchLumaEvents() {
       if (seen.has(id)) continue;
       seen.add(id);
 
+      // Description — strip markdown formatting, truncate to 180 chars
+      const rawDesc = ev.description ? ev.description.replace(/[#*_\[\]()]/g, '').trim() : null;
+      const descShort = rawDesc ? (rawDesc.length > 180 ? rawDesc.slice(0, 177) + '...' : rawDesc) : null;
+
       // Price info
       const ti = entry.ticket_info || {};
       const isFree = ti.is_free === true;
@@ -165,8 +169,8 @@ async function fetchLumaEvents() {
         source_name: 'Luma',
         source_type: 'aggregator',
         name,
-        description_short: null,
-        short_detail: null,
+        description_short: descShort,
+        short_detail: descShort,
         venue_name: venueName,
         venue_address: venueAddress,
         neighborhood,

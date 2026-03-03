@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-02 (3 new bugs from simulator conversations: date range recognition, temporal context persistence, mid-session compound bypass)
+> Last updated: 2026-03-03 (Skint thru parsing + description coverage for Luma/Songkick/DoNYC)
 
 ---
 
@@ -372,31 +372,44 @@ The core thesis: Pulse's scraped event data gives it verified, temporal knowledg
 - `/health` endpoint includes `recurringPatterns` count.
 - Production verified: 485 active patterns, 790 events stamped, LLM naturally says "every Tues!" in picks.
 
-**Phase 2: Social-format tagging** (static mapping, no API cost)
-- Classify existing categories into social format tiers:
-  - **High social** (strangers interact by default): trivia, open mic, karaoke, workshops, communal dining, run clubs, game nights, drink-and-draw
-  - **Medium social** (shared experience, some interaction): comedy (small room), dance parties, food/drink tastings, art openings
-  - **Low social** (audience faces stage): concerts, DJ sets, screenings, lectures, readings
-- One-time mapping on existing category taxonomy. Stored as `social_format` on events.
-- Combined signal: `recurring + high_social + small_venue = community anchor`
+**Phase 2: Venue size classification + interaction format** (manual + static mapping, no API cost)
 
-**Phase 3: Google Places venue enrichment** (one-time API cost per venue)
-- Hit Google Places API for ~200-300 known venues. Refresh monthly.
-- Capture: Popular Times (hour-by-hour busyness by day), price level, rating, review count, years open
-- Consistent Popular Times spikes on specific nights = recurring crowd signal (validates Phase 1 from a different data source)
-- Low review count + decent rating + residential neighborhood = locals-only proxy
-- Build a lightweight **community score** from compound signals:
-  - `recurring_events` (Phase 1) → +3
-  - `high_social_format` (Phase 2) → +2
-  - `consistent_popular_times` (Google) → +2
-  - `low_review_count` (Google) → +1
-  - `residential_neighborhood` (existing geo) → +1
-  - `high_review_count` → -2
-  - `tourist_zone` → -2
+The key insight: category alone is too coarse. Comedy at Tiny Cupboard (30 seats) vs Carnegie Hall is categorically different. Venue size and interaction format are independent signals that must combine.
 
-**Phase 4: Community-oriented agent path**
+**2a. Venue size classification** — Add `venue_size` field to VENUE_MAP for the ~150-200 venues we actually see events at. Four tiers:
+  - **intimate** (<~100): Smalls, Mezzrow, Tiny Cupboard, Brooklyn CC, most bars hosting trivia
+  - **medium** (~100-500): House of Yes, Baby's All Right, most comedy clubs
+  - **large** (~500-1500): Brooklyn Steel, Terminal 5, Webster Hall
+  - **massive** (1500+): Barclays, MSG, Radio City, Avant Gardner
+
+One-time manual effort, maintained as new venues appear via learned venues. Much more accurate than any API-derived proxy (Google Places review count is noisy — beloved tiny places can have tons of reviews).
+
+**2b. Interaction format** — Derive from `subcategory` + event name keyword scan. Three tiers:
+  - **interactive** (structure forces stranger interaction): trivia, board games, workshops, dance classes (salsa/bachata/swing), communal dining, run clubs, potlucks, drink-and-draw
+  - **participatory** (you might perform, audience is active): open mic, karaoke, drag, jam sessions, comedy (small room), art openings, food tastings
+  - **passive** (audience faces stage): concerts, DJ sets (big room), screenings, lectures, readings
+  - Name keywords supplement subcategory: "workshop", "jam session", "meetup", "potluck", "drink and draw", "run club"
+
+**2c. Source curation signal** — Map `source_name` to curation tier:
+  - **curated**: Nonsense NYC, Skint, Screen Slate (editorially selected, tend intimate/underground)
+  - **single-venue**: Tiny Cupboard, Brooklyn CC, SmallsLIVE (intimate by definition)
+  - **broad**: RA, Dice, DoNYC, Eventbrite, Ticketmaster (mixed size, no curation signal)
+
+**2d. Community score** — Compound signal from all available data:
+  - `recurring` (Phase 1) → +3
+  - `interactive_format` → +2
+  - `intimate_venue` → +2
+  - `free_or_cheap` → +1
+  - `curated_source` → +1
+  - `large_venue` → -2
+  - `massive_venue` → -3
+  - `broad_source` → 0 (neutral, not negative)
+
+Google Places deferred — the signals it provides (Popular Times, review count, rating) are noisy proxies for things we can classify more accurately by hand. Revisit if we need validation data for recurrence patterns or a specific question only that API answers.
+
+**Phase 3: Community-oriented agent path**
 - Detect community-seeking intent: "new here", "solo tonight", "where can I meet people", "build community", first-time texters with no session history
-- Route to community-aware curation: prioritize recurring + high-social + high-community-score events
+- Route to community-aware curation: prioritize events with high community score
 - Frame picks differently: "Trivia at Black Rabbit — every Tuesday, same crowd, easy to join solo" vs. "Trivia Night at Black Rabbit, 8pm, free"
 - This is a compose skill + pick-ranking change, not a new pipeline
 
@@ -456,6 +469,7 @@ The core thesis: Pulse's scraped event data gives it verified, temporal knowledg
 
 | Date | What | Key Impact |
 |------|------|------------|
+| Mar 3 | Skint multi-day thru parsing + description coverage | Skint daily parser handles `tues thru sun:`, `tues thru 3/14:`, `(monthly)`/`(biweekly)` modifiers, and `►` bulleted sub-events with inherited `series_end`. `parseThruDate` now resolves day names. Description extraction added to Luma (API `description` field), Songkick (performer names from JSON-LD), DoNYC (detail page `.ds-event-description`). DoNYC `enrichPrices` → `enrichFromDetailPages` fetches for events missing price OR description. |
 | Mar 2 | Cross-source recurrence detection (Community Layer Phase 1) | `detectRecurringPatterns()` finds 205 patterns from 30-day historical data via SQL GROUP BY. NYC Trivia League + Yutori feed shared `processRecurrencePatterns()`. 790 events stamped `is_recurring` in serving cache. LLM surfaces "every Tues!" naturally via `recurringEvent` compose skill. `/health` shows pattern count. 485 active patterns in production. |
 | Mar 2 | Agent Brain prototype (`src/agent-brain.js`) | Parallel LLM routing path via Gemini Flash tool calling, gated behind `PULSE_AGENT_BRAIN=true`. Replaces regex pre-router for semantic messages. 3 tools: `search_events` (neighborhood/category/time/date_range/free_only + intent), `get_details`, `respond`. Mechanical pre-check ($0) for help/numbers/more. Gemini→Anthropic fallback on MALFORMED_FUNCTION_CALL/quota errors. `resolveDateRange()` converts enum→date objects. Addresses all 3 open bugs (date range recognition, temporal persistence, compound category pivot). ~$0.0004/msg vs ~$0.001 current. |
 | Mar 2 | Gemini Flash → Flash Lite → Haiku fallback chain | Three-tier model cascade on quota errors across all 3 Gemini call sites; `isQuotaError()` helper; Flash default restored (was Flash Lite) |

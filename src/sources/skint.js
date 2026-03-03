@@ -107,24 +107,58 @@ function parseSkintTime(timeStr) {
  */
 function parseSkintParagraph(text, dateLocal) {
   let remaining = text;
+  const isBullet = /^\s*[►•]/.test(remaining);
 
-  // 1. Strip trailing >> link text and whitespace
+  // 1. Strip bullet prefix (► sub-events) and trailing >> link text
+  remaining = remaining.replace(/^\s*[►•]\s*/, '');
   remaining = remaining.replace(/\s*>{1,2}\s*$/, '').replace(/\s*»\s*$/, '').trim();
 
-  // 2. Extract day prefix + optional time + optional modifier
+  // 2. Extract day prefix + optional thru range + optional time + optional modifier
   // Handles: "fri 7pm:", "sat 1pm:", "mon 7pm (monthly):", "thru sun:", "today 7pm:", "daily 10am:"
+  // Multi-day: "tues thru sun:", "tues thru 3/14:", "wed thru fri 7pm:"
   // Time can be single "7pm" or range "12-6pm" / "7pm-2am" (first am/pm optional in ranges)
   const dayTimeMatch = remaining.match(
-    /^(mon|tue|wed|thu|fri|sat|sun|thru\s+\w+|today|tonight|daily)\w*(?:\s*\+\s*\w+)?(?:\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?(?:\s*[-–]\s*\d{1,2}(?::\d{2})?)?\s*(?:am|pm)))?(?:\s*\([^)]*\))?\s*:\s*/i
+    /^((?:mon|tue|wed|thu|fri|sat|sun)\w*\s+thru\s+(?:(?:mon|tue|wed|thu|fri|sat|sun)\w*|\d{1,2}\/\d{1,2})|mon|tue|wed|thu|fri|sat|sun|thru\s+(?:(?:mon|tue|wed|thu|fri|sat|sun)\w*|\d{1,2}\/\d{1,2}|\w+)|today|tonight|daily)\w*(?:\s*\+\s*\w+)?(?:\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?(?:\s*[-–]\s*\d{1,2}(?::\d{2})?)?\s*(?:am|pm)))?(?:\s*(\([^)]*\)))?\s*:\s*/i
   );
-  if (!dayTimeMatch) return null;
 
-  const timeStr = dayTimeMatch[2] || null;
-  remaining = remaining.slice(dayTimeMatch[0].length);
+  let dayGroup = '';
+  let timeStr = null;
+  let modifierStr = null;
+  let startTime = null;
+  let endTime = null;
+  let seriesEnd = null;
+  let isRecurring = false;
+  let modifierText = null;
 
-  const { start: startTime, end: endTime } = timeStr
-    ? parseSkintTime(timeStr)
-    : { start: null, end: null };
+  if (dayTimeMatch) {
+    dayGroup = dayTimeMatch[1] || '';
+    timeStr = dayTimeMatch[2] || null;
+    modifierStr = dayTimeMatch[3] || null; // e.g., "(monthly)", "(biweekly)"
+    remaining = remaining.slice(dayTimeMatch[0].length);
+
+    const parsed = timeStr ? parseSkintTime(timeStr) : { start: null, end: null };
+    startTime = parsed.start;
+    endTime = parsed.end;
+
+    // 2b. Extract series_end from "thru" in day prefix
+    const thruMatch = dayGroup.match(/thru\s+(\S+)/i);
+    if (thruMatch) {
+      const thruTarget = thruMatch[1].toLowerCase();
+      const refYear = parseInt(dateLocal.slice(0, 4), 10);
+      seriesEnd = parseThruDate(thruTarget, refYear);
+    }
+    if (modifierStr) {
+      modifierText = modifierStr.replace(/[()]/g, '').trim().toLowerCase();
+      if (/monthly|biweekly|weekly|bimonthly/.test(modifierText)) {
+        isRecurring = true;
+      }
+    }
+  } else if (isBullet) {
+    // ► sub-events don't have a day prefix — parse as plain "name: desc. venue (hood), price"
+    // remaining is already stripped of the bullet
+  } else {
+    return null;
+  }
 
   // 3. Split event name from description on the first colon
   const colonIdx = remaining.indexOf(':');
@@ -217,7 +251,14 @@ function parseSkintParagraph(text, dateLocal) {
   // 5. Infer category
   const category = inferCategory(eventName + (description ? ' ' + description : ''));
 
-  // 6. Cap description at 200 chars
+  // 6. Append recurrence modifier to description if present
+  if (modifierText && isRecurring) {
+    description = description
+      ? `${description} (${modifierText})`
+      : `(${modifierText})`;
+  }
+
+  // Cap description at 200 chars
   if (description && description.length > 200) {
     description = description.slice(0, 197) + '...';
   }
@@ -256,6 +297,8 @@ function parseSkintParagraph(text, dateLocal) {
     category,
     extraction_confidence: confidence,
     source_url: null,
+    series_end: seriesEnd || null,
+    is_recurring: isRecurring || undefined,
     evidence: {
       name_quote: eventName ? eventName.toLowerCase() : null,
       time_quote: timeStr || null,
@@ -291,12 +334,13 @@ async function fetchSkintEvents() {
 
     // Day header pattern — short paragraphs like "friday", "saturday", "ongoing"
     const dayHeaderPattern = /^(monday|tuesday|wednesday|thursday|friday|saturday|sunday|ongoing)$/i;
-    const eventPattern = /^(mon|tue|wed|thu|fri|sat|sun|thru|today|tonight|daily|\d{1,2}\/\d{1,2})/i;
+    const eventPattern = /^(mon|tue|wed|thu|fri|sat|sun|thru|today|tonight|daily|\d{1,2}\/\d{1,2}|►|•)/i;
 
     const eventParagraphs = []; // strings with day headers, for LLM fallback
-    const rawParagraphs = [];   // { text, dateLocal } for deterministic parse
+    const rawParagraphs = [];   // { text, dateLocal, groupSeriesEnd } for deterministic parse
     let currentDayDate = null;
     let skipSection = false;
+    let groupSeriesEnd = null; // series_end from a "thru" group header for ► sub-events
 
     entry.find('p').each((i, el) => {
       const text = $(el).text().trim();
@@ -305,6 +349,7 @@ async function fetchSkintEvents() {
       // Handle day headers — resolve to date and skip past sections
       if (dayHeaderPattern.test(text)) {
         const dayName = text.toLowerCase();
+        groupSeriesEnd = null; // reset group header on new day section
         if (dayName === 'ongoing') {
           currentDayDate = null;
           skipSection = false;
@@ -321,13 +366,33 @@ async function fetchSkintEvents() {
       }
 
       // "thru" events span multiple days — include even from past sections
-      if (skipSection && !/^thru\b/i.test(text)) return;
+      const isThru = /^thru\b/i.test(text);
+      const isBullet = /^[►•]/.test(text);
+      if (skipSection && !isThru && !isBullet) return;
       if (text.length < 30) return;
       if (text.toLowerCase().startsWith('sponsored')) return;
 
+      // Detect group headers: "thru 3/15: three film fests" style lines
+      // that introduce ► sub-events. These have a short body after the colon.
+      if (isThru || /^(?:mon|tue|wed|thu|fri|sat|sun)\w*\s+thru\b/i.test(text)) {
+        const thruHeaderMatch = text.match(/thru\s+(\S+)/i);
+        if (thruHeaderMatch) {
+          const target = thruHeaderMatch[1].replace(/:$/, '').toLowerCase();
+          const refYear = parseInt(todayIso.slice(0, 4), 10);
+          groupSeriesEnd = parseThruDate(target, refYear, resolveDate);
+        }
+      } else if (!isBullet) {
+        // Non-thru, non-bullet event resets group context
+        groupSeriesEnd = null;
+      }
+
       if (eventPattern.test(text)) {
         eventParagraphs.push(text);
-        rawParagraphs.push({ text, dateLocal: currentDayDate || todayIso });
+        rawParagraphs.push({
+          text,
+          dateLocal: currentDayDate || todayIso,
+          groupSeriesEnd: isBullet ? groupSeriesEnd : null,
+        });
       }
     });
 
@@ -338,9 +403,15 @@ async function fetchSkintEvents() {
 
     // Phase 1: Deterministic parse
     const parsed = [];
-    for (const { text, dateLocal } of rawParagraphs) {
+    for (const { text, dateLocal, groupSeriesEnd } of rawParagraphs) {
       const event = parseSkintParagraph(text, dateLocal);
-      if (event) parsed.push(event);
+      if (event) {
+        // ► sub-events inherit series_end from group header
+        if (groupSeriesEnd && !event.series_end) {
+          event.series_end = groupSeriesEnd;
+        }
+        parsed.push(event);
+      }
     }
 
     const captureRate = parsed.length / rawParagraphs.length;
@@ -379,8 +450,22 @@ async function fetchSkintEvents() {
  * Parse a "thru" date string into an ISO date.
  * Handles: "3/8" → 2026-03-08, "february" → last day of month, "spring" → approximate season end.
  */
-function parseThruDate(text, refYear) {
+function parseThruDate(text, refYear, resolveDate) {
   const trimmed = text.trim().toLowerCase();
+
+  // Day name: "sun", "sunday", "fri", "friday", "tues" etc.
+  const dayAbbrevs = {
+    sun: 'sunday', mon: 'monday', tue: 'tuesday', tues: 'tuesday',
+    wed: 'wednesday', thu: 'thursday', thur: 'thursday', thurs: 'thursday',
+    fri: 'friday', sat: 'saturday',
+  };
+  const fullDay = dayAbbrevs[trimmed] || trimmed;
+  if (['sunday','monday','tuesday','wednesday','thursday','friday','saturday'].includes(fullDay)) {
+    if (resolveDate) return resolveDate(fullDay);
+    // Fallback: use getNycDayContext if no resolveDate passed
+    const ctx = getNycDayContext();
+    return ctx.resolveDate(fullDay);
+  }
 
   // Numeric: "3/8", "12/31"
   const numMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})$/);
