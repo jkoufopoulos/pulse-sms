@@ -10134,6 +10134,431 @@
         "Gives up"
       ],
       "difficulty": "stretch"
+    },
+    {
+      "name": "Happy path: Bed-Stuy live music",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "bed stuy"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Bed-Stuy:\n\n1) Ayo at C'mon Everybody — Afrobeat live band, always a party. 9pm, $15\n\n2) Open mic at Lover's Rock — Caribbean vibes, free entry, bring your A game\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "C'mon Everybody is one of those spots that just gets it right — small room, great sound, all good energy. Tonight's Afrobeat set starts at 9, expect dancing by 9:30. $15 at the door. https://cmoneverbody.com/events"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More in Bed-Stuy:\n\n1) DJ Moma at Do or Dive — low-key dance party, no cover\n\n2) Poetry slam at Bedford Hall — community night, donations welcome. 8pm\n\nReply 1-2 for details"
+        }
+      ],
+      "testing": "Neighborhood → picks → details → more. Full bread-and-butter flow in an under-tested neighborhood",
+      "expected_behavior": "Pulse recognizes Bed-Stuy, returns neighborhood-appropriate picks with real venues, details match pick #1, MORE serves fresh non-repeating picks",
+      "failure_modes": [
+        "Doesn't recognize \"bed stuy\" as Bed-Stuy",
+        "Returns events from adjacent neighborhoods (Crown Heights, Bushwick)",
+        "Details don't correspond to pick #1",
+        "MORE repeats events from first batch"
+      ],
+      "difficulty": "should_pass",
+      "generated_at": "2026-03-02T23:35:33.598Z",
+      "generated_by": "claude-code-agent"
+    },
+    {
+      "name": "Happy path: Hell's Kitchen theater and drinks",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "hells kitchen"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Hell's Kitchen:\n\n1) Cabaret at Don't Tell Mama — classic piano bar, rotating performers. 8pm, $15\n\n2) Improv at The PIT — fast-paced comedy, two-drink min. 9:30pm, $12\n\n3) Late night jazz at Flûte — speakeasy vibes, killer cocktails. 10pm, no cover\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "The PIT is solid improv — fast shows, good energy, audience gets involved. Their 9:30 set is usually the sharpest cast of the night. Two-drink min keeps it loose. $12. https://thepit-nyc.com"
+        },
+        {
+          "sender": "user",
+          "message": "anything free?"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free in Hell's Kitchen tonight:\n\n1) Open mic at Rudy's Bar — dive bar legend, free hot dogs too. 8pm\n\n2) Jazz at Flûte — speakeasy cocktails, no cover. 10pm\n\nReply 1-2 for details"
+        },
+        {
+          "sender": "user",
+          "message": "nice, thanks"
+        },
+        {
+          "sender": "pulse",
+          "message": "for more",
+          "assert": "contains"
+        }
+      ],
+      "testing": "Neighborhood → picks → details → free filter → sign-off in Hell's Kitchen",
+      "expected_behavior": "Pulse returns HK picks, gives details for #2, applies free filter keeping neighborhood context, handles casual sign-off warmly",
+      "failure_modes": [
+        "Doesn't recognize \"hells kitchen\" (no apostrophe)",
+        "Free filter resets neighborhood",
+        "Returns paid events after free filter",
+        "Robotic sign-off"
+      ],
+      "difficulty": "should_pass",
+      "generated_at": "2026-03-02T23:35:33.599Z",
+      "generated_by": "claude-code-agent"
+    },
+    {
+      "name": "Happy path: Downtown Brooklyn culture night",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "downtown brooklyn"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Downtown Brooklyn:\n\n1) Film screening at BAM — indie documentary double feature. 7pm, $16\n\n2) Live band at Livingston — soul/funk trio, no cover\n\n3) Comedy at Alamo Drafthouse — stand-up showcase + movie. 9pm, $22\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "BAM is always worth it — the Rose Cinema screen is gorgeous and they program stuff you won't find at the multiplex. Tonight's double feature starts at 7, grab a drink at the bar next door first. $16. https://bam.org/film"
+        },
+        {
+          "sender": "user",
+          "message": "actually what about comedy"
+        },
+        {
+          "sender": "pulse",
+          "message": "Comedy in Downtown Brooklyn tonight:\n\n1) Stand-up showcase at Alamo Drafthouse — comics + craft beer + a movie after. 9pm, $22\n\nOnly one comedy pick nearby — want me to check Fort Greene or Boerum Hill too?"
+        },
+        {
+          "sender": "user",
+          "message": "sure"
+        },
+        {
+          "sender": "pulse",
+          "message": "Comedy near Downtown Brooklyn:\n\n1) Improv jam at Fort Greene Comedy — BYOB, rotating cast. 8:30pm, $10\n\n2) Open mic at Boerum Hill Brewing — free, sign up at the bar. 9pm\n\nReply 1-2 for details"
+        }
+      ],
+      "testing": "Neighborhood → picks → details → category filter → sparse results → nearby expansion",
+      "expected_behavior": "Pulse returns Downtown BK picks, gives film details, applies comedy filter, honestly reports sparse results and suggests nearby, delivers expanded picks on acceptance",
+      "failure_modes": [
+        "Doesn't handle two-word neighborhood name",
+        "Comedy filter doesn't apply",
+        "Invents comedy events instead of being honest about sparse results",
+        "Nearby expansion goes too far (Manhattan)"
+      ],
+      "difficulty": "should_pass",
+      "generated_at": "2026-03-02T23:35:33.599Z",
+      "generated_by": "claude-code-agent"
+    },
+    {
+      "name": "Happy path: Nolita quick browse",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "nolita"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Nolita:\n\n1) DJ set at The Nolitan — rooftop vibes, great Manhattan views. 9pm, no cover\n\n2) Live acoustic at Café Gitane — French-Moroccan spot, mellow and beautiful. 8pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "Café Gitane is one of those timeless Nolita spots — cozy, candlelit, feels like a Parisian side street. The acoustic sets are low-key and lovely. Free, just grab dinner or drinks. https://cafegitanenyc.com"
+        },
+        {
+          "sender": "user",
+          "message": "thats perfect thanks!"
+        },
+        {
+          "sender": "pulse",
+          "message": "Have a great night! Text me anytime."
+        }
+      ],
+      "testing": "Simple neighborhood → picks → details → enthusiastic sign-off in Nolita",
+      "expected_behavior": "Pulse recognizes Nolita, returns venue-appropriate picks, gives warm details, handles enthusiastic sign-off without offering more",
+      "failure_modes": [
+        "Doesn't recognize Nolita as a neighborhood",
+        "Returns SoHo or LES events instead",
+        "Details for wrong pick",
+        "Tries to upsell more picks after clear sign-off"
+      ],
+      "difficulty": "should_pass",
+      "generated_at": "2026-03-02T23:35:33.599Z",
+      "generated_by": "claude-code-agent"
+    },
+    {
+      "name": "Happy path: Chinatown late night",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "chinatown late night"
+        },
+        {
+          "sender": "pulse",
+          "message": "Late night in Chinatown:\n\n1) DJ set at 169 Bar — divey basement dance floor, always a scene after midnight. Free\n\n2) Cocktails at Apothéke — speakeasy in an old opium den, insane drinks. Opens at 6:30pm, no cover\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "169 Bar is Chinatown's late-night staple — grungy basement with a surprisingly good sound system. DJs go til 4am on weekends, crowd picks up around midnight. No cover ever. Cash bar. https://169barnyc.com"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "More late night in Chinatown:\n\n1) Karaoke at Winnie's — legendary dive, cheap drinks, you will sing. No cover, open til 4am\n\nReply 1 for details"
+        },
+        {
+          "sender": "user",
+          "message": "love it"
+        },
+        {
+          "sender": "pulse",
+          "message": "Enjoy the night! Text me if you need anything else."
+        }
+      ],
+      "testing": "Compound request (neighborhood + time filter) → picks → details → more → conversational sign-off",
+      "expected_behavior": "Pulse parses compound \"chinatown late night\" correctly, returns only late-night events, maintains time filter through MORE, handles casual approval as sign-off",
+      "failure_modes": [
+        "Ignores \"late night\" time filter",
+        "Returns daytime events",
+        "Time filter drops on MORE",
+        "Doesn't recognize Chinatown"
+      ],
+      "difficulty": "should_pass",
+      "generated_at": "2026-03-02T23:35:33.599Z",
+      "generated_by": "claude-code-agent"
+    },
+    {
+      "name": "Happy path: FiDi slang recognition and free filter",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "fidi"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in FiDi:\n\n1) Live Irish music at The Dead Rabbit — world-class cocktail bar, no cover. 8pm\n\n2) Sunset drinks at Pier A Harbor House — waterfront patio, live DJ. 6pm, free\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "Dead Rabbit is genuinely one of the best bars in the world — not exaggerating, they've won every award. Third floor parlor has live trad music most nights. No cover, just show up and order something beautiful. https://deadrabbitnyc.com"
+        },
+        {
+          "sender": "user",
+          "message": "how about something free"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free in FiDi tonight:\n\n1) Sunset DJ at Pier A Harbor House — waterfront spot, great views, no cover. 6pm\n\n2) Open mic at Stone Street Tavern — after-work crowd, casual vibes. 7pm\n\nReply 1-2 for details"
+        }
+      ],
+      "testing": "Slang recognition (fidi → Financial District) → picks → details → free filter",
+      "expected_behavior": "Pulse recognizes \"fidi\" as Financial District, returns area-appropriate picks, applies free filter while keeping neighborhood",
+      "failure_modes": [
+        "Doesn't recognize \"fidi\" slang",
+        "Confuses with Flatiron or another neighborhood",
+        "Free filter resets neighborhood context"
+      ],
+      "difficulty": "should_pass",
+      "generated_at": "2026-03-02T23:35:33.599Z",
+      "generated_by": "claude-code-agent"
+    },
+    {
+      "name": "Happy path: Flatiron comedy search with price refinement",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "comedy near flatiron"
+        },
+        {
+          "sender": "pulse",
+          "message": "Comedy near Flatiron tonight:\n\n1) Stand-up at Comedy Cellar — the gold standard, always stacked lineups. 9pm, $24\n\n2) Sketch comedy at UCB — new show every week, sharp and weird. 8pm, $12\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "Comedy Cellar is the one — MacDougal St, tiny room, massive comics drop in unannounced. The 9pm show is prime. Book ahead if you can, walk-ins fill fast. $24 + 2 drink min. https://comedycellar.com"
+        },
+        {
+          "sender": "user",
+          "message": "anything cheaper?"
+        },
+        {
+          "sender": "pulse",
+          "message": "Cheaper comedy near Flatiron:\n\n1) Sketch at UCB — $12, no drink minimum\n\n2) Open mic at Grisly Pear — free, signup at 7:30, show at 8pm\n\nReply 1-2 for details"
+        },
+        {
+          "sender": "user",
+          "message": "2"
+        },
+        {
+          "sender": "pulse",
+          "message": "Grisly Pear is a cozy MacDougal St bar with a back room — free open mic draws a mix of seasoned comics testing material and brave newcomers. Sign up at 7:30, show starts at 8. No cover, no minimum. https://grislypear.com"
+        }
+      ],
+      "testing": "Category + neighborhood compound → picks → details → price refinement → more details",
+      "expected_behavior": "Pulse handles \"comedy near flatiron\" as compound request, gives comedy picks, responds to \"anything cheaper\" by filtering to lower-price options, gives details on second selection",
+      "failure_modes": [
+        "Ignores comedy filter",
+        "Doesn't understand \"cheaper\" as price refinement",
+        "Returns non-comedy events for price filter",
+        "Details for wrong pick after second selection"
+      ],
+      "difficulty": "should_pass",
+      "generated_at": "2026-03-02T23:35:33.599Z",
+      "generated_by": "claude-code-agent"
+    },
+    {
+      "name": "Happy path: Gramercy to East Village jazz",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "gramercy"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Gramercy:\n\n1) Indie rock at Irving Plaza — solid mid-size venue, great sound. 8pm, $25\n\n2) Trivia night at Pete's Tavern — oldest bar in NYC, free to play. 7:30pm\n\nReply 1-2 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "any jazz?"
+        },
+        {
+          "sender": "pulse",
+          "message": "Jazz in Gramercy tonight:\n\n1) Quartet at The Jazz Gallery — adventurous programming, intimate room. 9pm, $25\n\nOnly one jazz pick right here — want me to check East Village or West Village?"
+        },
+        {
+          "sender": "user",
+          "message": "yeah ev"
+        },
+        {
+          "sender": "pulse",
+          "message": "Jazz in East Village tonight:\n\n1) Trio at Smalls — legendary basement, world-class players. 9:30pm, $20\n\n2) Latin jazz at Nublu — funky spot, always a groove. 10pm, $15\n\nReply 1-2 for details"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "Smalls is the real deal — tiny basement on W 10th, incredible jazz. Sets run late and the vibe is electric. $20 cover, cash only at the door. https://smallslive.com/events"
+        }
+      ],
+      "testing": "Neighborhood → picks → jazz filter → sparse results with nearby suggestion → neighborhood switch with filter persistence → details",
+      "expected_behavior": "Pulse returns Gramercy picks, applies jazz filter, honestly flags sparse results, suggests nearby jazz neighborhoods, switches to EV on acceptance while keeping jazz filter, gives details",
+      "failure_modes": [
+        "Returns non-jazz events after filter",
+        "Invents jazz events in Gramercy instead of being honest",
+        "Jazz filter drops on neighborhood switch",
+        "Doesn't recognize \"ev\" as East Village"
+      ],
+      "difficulty": "should_pass",
+      "generated_at": "2026-03-02T23:35:33.599Z",
+      "generated_by": "claude-code-agent"
+    },
+    {
+      "name": "Happy path: Murray Hill free filter persists through neighborhood switch",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "murray hill"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Murray Hill:\n\n1) Rooftop DJ at 230 Fifth — huge outdoor space, skyline views. 6pm, no cover before 10\n\n2) Live cover band at Slattery's — classic Irish pub energy. 9pm, free\n\n3) Cocktails at The Campbell — Grand Central's secret bar, gorgeous room. No cover\n\nReply 1-3 for details, MORE for extra picks"
+        },
+        {
+          "sender": "user",
+          "message": "free stuff only"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free in Murray Hill tonight:\n\n1) Cover band at Slattery's — classic pub, good crowd. 9pm\n\n2) Cocktails at The Campbell — no cover, just stunning architecture and strong drinks\n\nReply 1-2 for details"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "Slattery's is a solid Murray Hill staple — big Irish pub, always crowded on Fridays, live band brings the energy. No cover, beers are reasonable. Get there by 8:30 to grab a spot near the stage. https://slatterysmidtownpub.com"
+        },
+        {
+          "sender": "user",
+          "message": "actually lets try something different, what about LES"
+        },
+        {
+          "sender": "pulse",
+          "message": "Free on the Lower East Side tonight:\n\n1) DJ set at Pianos — indie dance party, no cover. 10pm\n\n2) Live jazz at Rockwood Music Hall — three stages, always something on. Free\n\nReply 1-2 for details"
+        },
+        {
+          "sender": "user",
+          "message": "nice options"
+        },
+        {
+          "sender": "pulse",
+          "message": "LES never disappoints! Reply a number for details or MORE if you want extra picks."
+        }
+      ],
+      "testing": "Neighborhood → free filter → details → neighborhood switch with filter persistence → casual response",
+      "expected_behavior": "Pulse returns Murray Hill picks, applies free filter, gives details, switches to LES keeping free filter active, handles casual acknowledgment without over-interpreting as sign-off",
+      "failure_modes": [
+        "Free filter drops on neighborhood switch to LES",
+        "Returns paid events after filter",
+        "Interprets \"nice options\" as sign-off instead of keeping session alive",
+        "Doesn't recognize Murray Hill"
+      ],
+      "difficulty": "should_pass",
+      "generated_at": "2026-03-02T23:35:33.599Z",
+      "generated_by": "claude-code-agent"
     }
   ]
 }

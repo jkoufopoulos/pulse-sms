@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-02 (broad query support: date range detection, filter-aware citywide pool, borough resolution)
+> Last updated: 2026-03-02 (3 new bugs from simulator conversations: date range recognition, temporal context persistence, mid-session compound bypass)
 
 ---
 
@@ -154,6 +154,36 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 | Citywide picks don't set `visitedHoods` | "surprise me" → citywide → "bushwick" → exhaust → no suggestion | **Fixed** — `visitedHoods` now uses `'citywide'` sentinel instead of filtering out null. Updated in `pipeline.js`, `unified-flow.js`, `handler.js`. |
 
 **Earlier partial fix (2026-03-01):** Expanded `filter_intent` prompt for bare openers — "jazz", "free stuff", "comedy tonight" now report `filter_intent: modify` on turn 1, enabling P1-compliant filter persistence through citywide→neighborhood flows.
+
+### ~~"Later in the week" not recognized as date range~~ — **Addressed by Agent Brain (2026-03-02)**
+
+**Description:** User texts "later in the week" or "later this week" and Pulse responds with "I only see tonight's events" despite having 7 days of data in cache.
+
+**Root cause:** `parseDateRange()` in `pre-router.js:62-102` has no pattern for "later in the week", "later this week", or similar phrases. The `isFutureQuery` regex in `build-compose-prompt.js:33` also misses it, so `tonightPriority` skill fires incorrectly — the LLM is told to prioritize tonight's events when the user explicitly asked for later in the week.
+
+**Regression principle:** P5 (Temporal Accuracy)
+
+**Fix strategy:** Add "later in/this week" pattern to `parseDateRange()` returning a date range from tomorrow through end of week. Add the same pattern to `isFutureQuery` regex so `tonightPriority` skill does not fire. Consider also handling "end of the week", "this weekend" variants if not already covered.
+
+### ~~`date_range` absent from `filter_intent` schema — temporal context drops between turns~~ — **Addressed by Agent Brain (2026-03-02)**
+
+**Description:** After Pulse suggests "text a neighborhood for later-in-week events", the user texts a neighborhood and Pulse drops the temporal context entirely, serving tonight's events instead of the later-in-week events the conversation established.
+
+**Root cause:** `filter_intent.updates` schema in `ai.js:92-99,718-725` and `prompts.js:353-370` has no `date_range` field. The LLM cannot report temporal intent back to the handler. `pendingMessage` saves the user's text but nothing converts it to a persisted date range filter on the next turn. The handler has no mechanism to carry temporal context across the ask_neighborhood → neighborhood flow.
+
+**Regression principle:** P7 (Session Context), P1 (Code owns state)
+
+**Fix strategy:** Two options, in order of preference: (1) Detect date range in the pre-router and persist it in session filters (P1-compliant — code owns state). This means `parseDateRange()` output gets saved as a session field like `lastDateRange` and `mergeFilters` compounds it across turns. (2) Add `date_range` to `filter_intent.updates` schema so the LLM can report it — but this expands the LLM output contract (P5 tension) and requires boundary validation (P3).
+
+### ~~Mid-session compound requests bypass pre-router — stale filters persist~~ — **Addressed by Agent Brain (2026-03-02)**
+
+**Description:** A returning user (with existing session and active filters) texts a compound category+neighborhood request like "trivia or art stuff in greenpoint" but the previous filter (e.g. comedy) persists. The user is trapped in a filter they cannot escape through natural conversation.
+
+**Root cause:** Three interacting issues: (1) First-message compound detection in `pre-router.js:249` is gated by `!sessionHoodEarly && !session?.lastPicks?.length` — skipped entirely for returning users with session history. (2) Session-aware filter detection (lines 308-393) cannot parse compound category+neighborhood requests like "trivia or art in greenpoint". (3) When `mergeFilters(lastFilters, null)` receives no pre-detected filters, it falls back to stale session filters. The zero-match bypass in `handler.js:328-332` fires BEFORE the LLM call, preventing the LLM from seeing the user's intent and reporting a filter change via `filter_intent`.
+
+**Regression principle:** P1 (Code owns state), P3 (Category Fidelity), P10 (Explicit Filter Removal)
+
+**Fix strategy:** Three-part fix: (1) Allow compound detection for mid-session messages — remove or relax the `!session?.lastPicks?.length` gate so returning users get the same compound parsing as first-time users. (2) When zero-match fires, check if the user's message contains a different category than the active filter — if so, let the LLM handle it instead of the deterministic bypass, so `filter_intent` can report the category change. (3) Consider multi-category support ("trivia or art") as a pre-router pattern, returning multiple categories that `buildTaggedPool` can match against.
 
 ### Deferred (post-MVP)
 
@@ -329,21 +359,72 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 
 ## Feature Roadmap
 
+### Near-term — Community Layer (Priority)
+
+The core thesis: Pulse's scraped event data gives it verified, temporal knowledge that LLMs like Gemini cannot provide. The most underserved audience is people new to NYC trying to build community. They need recurring, intimate, social events — not novelty. Gemini confidently recommends closed bookstores and nonexistent events. Pulse can be right.
+
+**Phase 1: Recurrence detection** — **Done 2026-03-02**
+- `detectRecurringPatterns()` in `db.js`: SQL GROUP BY on `normalized_name + venue_name + day_of_week` across 30 days of events, upserts patterns for 2+ distinct date occurrences. Runs after every `refreshCache()`.
+- `normalized_name` column added to events table (migration + backfill). `processRecurrencePatterns()` generalized from Yutori, shared by NYC Trivia League.
+- NYC Trivia League wired in (~165 patterns). Yutori delegates to shared version.
+- `stampRecurrence()` in `events.js`: Set lookup of active pattern keys stamps `is_recurring` + `recurrence_label` (e.g. "every Tuesday") on serving cache events. Runs on boot + every cache rebuild.
+- `recurring` field added to LLM event serialization in `ai.js`. `recurringEvent` compose skill tells LLM to mention recurrence naturally.
+- `/health` endpoint includes `recurringPatterns` count.
+- Production verified: 485 active patterns, 790 events stamped, LLM naturally says "every Tues!" in picks.
+
+**Phase 2: Social-format tagging** (static mapping, no API cost)
+- Classify existing categories into social format tiers:
+  - **High social** (strangers interact by default): trivia, open mic, karaoke, workshops, communal dining, run clubs, game nights, drink-and-draw
+  - **Medium social** (shared experience, some interaction): comedy (small room), dance parties, food/drink tastings, art openings
+  - **Low social** (audience faces stage): concerts, DJ sets, screenings, lectures, readings
+- One-time mapping on existing category taxonomy. Stored as `social_format` on events.
+- Combined signal: `recurring + high_social + small_venue = community anchor`
+
+**Phase 3: Google Places venue enrichment** (one-time API cost per venue)
+- Hit Google Places API for ~200-300 known venues. Refresh monthly.
+- Capture: Popular Times (hour-by-hour busyness by day), price level, rating, review count, years open
+- Consistent Popular Times spikes on specific nights = recurring crowd signal (validates Phase 1 from a different data source)
+- Low review count + decent rating + residential neighborhood = locals-only proxy
+- Build a lightweight **community score** from compound signals:
+  - `recurring_events` (Phase 1) → +3
+  - `high_social_format` (Phase 2) → +2
+  - `consistent_popular_times` (Google) → +2
+  - `low_review_count` (Google) → +1
+  - `residential_neighborhood` (existing geo) → +1
+  - `high_review_count` → -2
+  - `tourist_zone` → -2
+
+**Phase 4: Community-oriented agent path**
+- Detect community-seeking intent: "new here", "solo tonight", "where can I meet people", "build community", first-time texters with no session history
+- Route to community-aware curation: prioritize recurring + high-social + high-community-score events
+- Frame picks differently: "Trivia at Black Rabbit — every Tuesday, same crowd, easy to join solo" vs. "Trivia Night at Black Rabbit, 8pm, free"
+- This is a compose skill + pick-ranking change, not a new pipeline
+
 ### Near-term — Source + Quality
 
 - Comedy source — Dedicated scraper for Comedy Cellar, UCB, Caveat, QED
 - Gallery/art source — Gallery listing aggregator or DoNYC art category
+- Happy hour detection — Identify recurring happy hours from event data and venue pages; surface as a filterable category ("happy hours near me")
+- Niche/local-first ranking — Bias pick selection toward intimate, creative, communal, underground events over mainstream ticketed shows. Leverage source tiers (Nonsense NYC, Skint, Screen Slate already weighted highest) and add scoring signals: small venue capacity, free/cheap, DIY keywords, community-tagged
 
 ### Medium-term — Intelligence
 
 - Scout worker — Background process to fill neighborhood gaps after daily scrape
 - Perennial picks evolution — Auto-detect candidates from scrape data
 - ~~Second daily scrape~~ — **Done**: `SCRAPE_HOURS = [10, 18]` — 10am ET + 6pm ET catches same-day evening newsletters
+- Self-healing scraper pipeline — Daily automated health check that detects scraper failures (0 events, parse errors, schema changes) and attempts self-repair: retry with backoff, fall back to cached data, alert on structural breakage. Build on existing `source-health.js` alerts + scrape audit
+- Web discovery crawlers — Scheduled crawlers that search for niche/interesting events beyond whitelisted sources. Targeted web searches (Tavily or similar) for neighborhood-specific terms ("bushwick pop-up", "LES gallery opening", "DIY warehouse show"), deduplicate against existing cache, feed into extraction pipeline
+- "Stumble" mode — Text "stumble" or "surprise me" and get 1-3 genuinely unexpected picks: hidden gems, one-night-only events, weird/unique happenings. Selection heuristic: low source frequency (appears in ≤1 source), unusual category, non-recurring, small venue. Different from citywide scan — optimizes for serendipity, not coverage
+- Better interest capture — Expand onboarding to capture 2-3 preference signals early ("what are you into?" or infer from first few interactions). Feed into preference-profile.js to build richer user profiles faster
 
 ### Long-term — Infrastructure + Product
 
 - PostgreSQL — Persistent event storage, user sessions, conversation history
 - Preference learning — Profile capture done; next: inject profile into compose prompt for personalized picks
+- Profile-based event ranking — Score and re-rank the tagged event pool using user profile signals (preferred categories, neighborhoods, price sensitivity, past engagement). Profile-weighted events surface higher in picks without replacing filter logic
+- Proactive user alerts — For users with established profiles, send unsolicited texts when high-match events are discovered: "Hey, there's a free jazz thing in your neighborhood tonight." Requires opt-in, frequency caps, and a match-quality threshold to avoid spam
+- SMS map sharing — Generate a shareable map image or link showing picked event locations. Options: static map image (Mapbox/Google Static Maps API) embedded in MMS, or a short link to a lightweight map page. MMS costs more (~$0.02 vs $0.008) but visual impact is high for multi-pick responses
+- Group planning / voting — Multi-user coordination: one person texts "plan saturday with @friend1 @friend2", Pulse sends each person the same picks, collects votes (text back 1/2/3), reports consensus. Requires multi-phone session linking and a voting state machine. Could start simpler: shareable pick list link where friends vote via web
 - Referral analytics — Dashboard for referral code generation, card views, conversion rates
 - Paid tier — Stripe billing, $5-10/month unlimited
 - Push notifications — "Free rooftop thing near you starting in 30 min"
@@ -375,6 +456,8 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 
 | Date | What | Key Impact |
 |------|------|------------|
+| Mar 2 | Cross-source recurrence detection (Community Layer Phase 1) | `detectRecurringPatterns()` finds 205 patterns from 30-day historical data via SQL GROUP BY. NYC Trivia League + Yutori feed shared `processRecurrencePatterns()`. 790 events stamped `is_recurring` in serving cache. LLM surfaces "every Tues!" naturally via `recurringEvent` compose skill. `/health` shows pattern count. 485 active patterns in production. |
+| Mar 2 | Agent Brain prototype (`src/agent-brain.js`) | Parallel LLM routing path via Gemini Flash tool calling, gated behind `PULSE_AGENT_BRAIN=true`. Replaces regex pre-router for semantic messages. 3 tools: `search_events` (neighborhood/category/time/date_range/free_only + intent), `get_details`, `respond`. Mechanical pre-check ($0) for help/numbers/more. Gemini→Anthropic fallback on MALFORMED_FUNCTION_CALL/quota errors. `resolveDateRange()` converts enum→date objects. Addresses all 3 open bugs (date range recognition, temporal persistence, compound category pivot). ~$0.0004/msg vs ~$0.001 current. |
 | Mar 2 | Gemini Flash → Flash Lite → Haiku fallback chain | Three-tier model cascade on quota errors across all 3 Gemini call sites; `isQuotaError()` helper; Flash default restored (was Flash Lite) |
 | Mar 2 | Broad query support (citywide category + date range) | party/parties + film/films/cinema/movie/movies in catMap, `parseDateRange()` for "this week"/"this weekend"/"tomorrow", filter-aware citywide pool (`filterAwareSort`), borough+neighborhood resolution fix ("brooklyn/williamsburg"), MULTI-DAY DATA prompt, 12 multi-turn + 5 regression scenarios |
 | Mar 1 | Prompt audit: best practices overhaul | tool_use for unified path (guaranteed JSON), self-verification checklist, tone reduction (31 ALL-CAPS → rationale-based), examples trimmed 18→8, negative→positive rewrites, shared prompt sections extracted (`SHARED_UNDERSTANDING`/`SHARED_GEOGRAPHY`), XML skill tags, user prompt restructured (data top, query bottom) |
@@ -439,9 +522,9 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 
 ## Not Building
 
-- Happy hours / venue busyness / bar discovery — different product
-- Yelp/Foursquare venue DB — venue discovery != event discovery
+- ~~Happy hours / venue busyness / bar discovery~~ — Happy hour detection moved to near-term roadmap; Google Places enrichment (Popular Times, review signals) moved to community layer Phase 3 for community-score heuristics; general bar discovery (no event connection) still out of scope
+- Yelp/Foursquare venue DB — Google Places covers the venue metadata we need (Popular Times, review count, price level); no need for additional venue APIs
 - X/Twitter — expensive API, poor geo, ToS risk
 - Time Out NY — aggressive anti-bot, DoNYC covers similar
-- General web crawling — whitelist sources only
+- ~~General web crawling — whitelist sources only~~ — Targeted niche crawlers moved to medium-term roadmap; untargeted general crawling still out of scope
 - Real-time scraping — SMS users don't need sub-daily freshness
