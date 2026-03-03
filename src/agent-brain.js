@@ -538,6 +538,49 @@ function reconcilePicks(smsText, picks) {
 }
 
 /**
+ * Validate picks against event pool with name-match fallback.
+ * Unlike strict ID filtering, this recovers picks where the LLM returned a
+ * wrong ID but the event name matches one in the pool (common with near-duplicate events).
+ */
+function validatePicks(picks, events) {
+  if (!picks || picks.length === 0 || !events || events.length === 0) return [];
+  const idMap = new Map(events.map(e => [e.id, e]));
+  const nameMap = new Map();
+  for (const e of events) {
+    const key = (e.name || '').toLowerCase().trim();
+    if (key && !nameMap.has(key)) nameMap.set(key, e);
+  }
+  const usedIds = new Set();
+  return picks.map(p => {
+    if (!p) return null;
+    // 1. Exact ID match
+    if (p.event_id && idMap.has(p.event_id) && !usedIds.has(p.event_id)) {
+      usedIds.add(p.event_id);
+      return p;
+    }
+    // 2. Name match — check if pick's event_id looks like a name, or use event name from SMS context
+    const pickName = (p.event_name || p.event_id || '').toLowerCase().trim();
+    if (pickName) {
+      // Exact name match
+      const byName = nameMap.get(pickName);
+      if (byName && !usedIds.has(byName.id)) {
+        usedIds.add(byName.id);
+        return { ...p, event_id: byName.id };
+      }
+      // Substring match — pick name contained in event name or vice versa
+      for (const [name, evt] of nameMap) {
+        if (usedIds.has(evt.id)) continue;
+        if ((name.includes(pickName) || pickName.includes(name)) && name.length >= 3) {
+          usedIds.add(evt.id);
+          return { ...p, event_id: evt.id };
+        }
+      }
+    }
+    return null;
+  }).filter(Boolean);
+}
+
+/**
  * Lightweight compose — Gemini Flash with minimal prompt, Anthropic fallback.
  * Returns { sms_text, picks, _raw, _usage, _provider }
  */
@@ -775,10 +818,11 @@ async function executeSearchEvents(params, session, phone, trace) {
   recordAICost(trace, 'compose', result._usage, result._provider);
   trackAICost(phone, result._usage, result._provider);
 
-  // Validate picks
+  // Validate picks with name-match fallback for near-duplicate events
   const eventMap = buildEventMap(curated);
   for (const e of events) eventMap[e.id] = e;
-  const validPicks = (result.picks || []).filter(p => eventMap[p.event_id]);
+  const allEvents = [...curated, ...events.filter(e => !eventMap[e.id] || eventMap[e.id] === e)];
+  const validPicks = validatePicks(result.picks, allEvents);
 
   trace.composition.picks = validPicks.map(p => {
     const evt = eventMap[p.event_id];
@@ -937,4 +981,4 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
   return trace.id;
 }
 
-module.exports = { checkMechanical, callAgentBrain, handleAgentBrainRequest, resolveDateRange, brainCompose };
+module.exports = { checkMechanical, callAgentBrain, handleAgentBrainRequest, resolveDateRange, brainCompose, validatePicks };

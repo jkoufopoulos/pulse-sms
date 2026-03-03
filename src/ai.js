@@ -655,34 +655,11 @@ Respond now.`;
     };
   }
 
-  // Validate picks against provided events
+  // Validate picks against provided events (with name-match fallback for near-duplicates)
   let validPicks = [];
   if (parsed.picks && parsed.picks.length > 0 && events && events.length > 0) {
-    const validIds = new Set(events.map(e => e.id));
-    validPicks = parsed.picks.filter(p => p && typeof p.event_id === 'string' && validIds.has(p.event_id));
-
-    // Fallback: name matching (same as composeResponse)
-    if (validPicks.length === 0 && parsed.picks.length > 0) {
-      console.warn(`unifiedRespond: ${parsed.picks.length} picks had invalid IDs, attempting name match`);
-      const nameToId = new Map(events.map(e => [(e.name || '').toLowerCase(), e.id]));
-      validPicks = parsed.picks.map(p => {
-        if (p && validIds.has(p.event_id)) return p;
-        for (const [name, id] of nameToId) {
-          if (name && p.event_id && name.includes(p.event_id.toLowerCase())) return { ...p, event_id: id };
-        }
-        return null;
-      }).filter(Boolean);
-      if (validPicks.length === 0) {
-        const smsLower = parsed.sms_text.toLowerCase();
-        validPicks = events.filter(e => {
-          const name = (e.name || '').toLowerCase();
-          return name.length >= 3 && smsLower.includes(name);
-        }).slice(0, 3).map((e, i) => ({ rank: i + 1, event_id: e.id }));
-        if (validPicks.length > 0) {
-          console.warn(`unifiedRespond: [RECOVERED] ${validPicks.length} picks via full-name sms_text matching`);
-        }
-      }
-    }
+    const { validatePicks } = require('./agent-brain');
+    validPicks = validatePicks(parsed.picks, events);
   }
 
   // Derive filter_intent from response — support both new filter_intent and legacy clear_filters
