@@ -116,7 +116,8 @@ async function fetchLumaEvents() {
       const geoCity = (geo?.city_state || geo?.city || '').toLowerCase();
       const geoAddr = (geo?.full_address || geo?.short_address || '').toLowerCase();
       const geoText = geoCity + ' ' + geoAddr;
-      if (/\b(new jersey|new jersey|nj\b|jersey city|hoboken|hackensack|newark|clifton|montclair|englewood|bayonne|weehawken|union city|fort lee|westchester|yonkers|white plains|connecticut)\b/.test(geoText)) continue;
+      const isJC = /\bjersey city\b/.test(geoText);
+      if (!isJC && /\b(new jersey|nj\b|hoboken|hackensack|newark|clifton|montclair|englewood|bayonne|weehawken|union city|fort lee|westchester|yonkers|white plains|connecticut)\b/.test(geoText)) continue;
 
       // Extract date in NYC timezone
       if (!ev.start_at) continue;
