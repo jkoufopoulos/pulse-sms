@@ -20,7 +20,7 @@ const { extractNeighborhood, NEIGHBORHOODS, BOROUGHS, detectBorough } = require(
 const { getAdjacentNeighborhoods } = require('./pre-router');
 const { getEvents, getEventsForBorough, getEventsCitywide, getCacheStatus } = require('./events');
 const { filterKidsEvents } = require('./curation');
-const { buildTaggedPool, buildEventMap, saveResponseFrame, mergeFilters, buildZeroMatchResponse, executeQuery } = require('./pipeline');
+const { buildTaggedPool, buildEventMap, saveResponseFrame, mergeFilters, buildZeroMatchResponse, describeFilters } = require('./pipeline');
 const { sendSMS, maskPhone } = require('./twilio');
 const { startTrace, saveTrace, recordAICost } = require('./traces');
 const { getSession, setSession, addToHistory } = require('./session');
@@ -513,8 +513,6 @@ const BRAIN_COMPOSE_SCHEMA = {
 async function brainCompose(events, options = {}) {
   const { neighborhood, isSparse, isCitywide, isBorough, borough, nearbyHoods,
           suggestedNeighborhood, matchCount, excludeIds, activeFilters } = options;
-  const { describeFilters } = require('./pipeline');
-
   const todayNyc = getNycDateString(0);
   const tomorrowNyc = getNycDateString(1);
 
@@ -709,33 +707,22 @@ async function executeSearchEvents(params, session, phone, trace) {
     return { sms: zeroResp.message, intent: 'events', picks: [], activeFilters };
   }
 
-  // 7. Compose SMS from pool via existing compose path
-  const history = session?.conversationHistory || [];
-  const now = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-
-  // Build exclude list from previously shown events
+  // 7. Compose SMS from pool via lightweight brain compose
   const prevPickIds = (session?.allPicks || session?.lastPicks || []).map(p => p.event_id);
   const prevOfferedIds = session?.allOfferedIds || [];
   const excludeIds = [...new Set([...prevPickIds, ...prevOfferedIds])];
-
   const suggestedHood = (isSparse || matchCount === 0) && nearbyHoods.length > 0 ? nearbyHoods[0] : null;
 
   const composeStart = Date.now();
-  const result = await executeQuery('Show the user event picks.', events, {
-    session,
+  const result = await brainCompose(events, {
     neighborhood: hood,
     nearbyHoods,
-    conversationHistory: history,
-    currentTime: now,
-    validNeighborhoods: NEIGHBORHOOD_NAMES,
     activeFilters,
     isSparse,
     isCitywide,
     isBorough,
     borough,
     matchCount,
-    hardCount,
-    softCount,
     excludeIds,
     suggestedNeighborhood: suggestedHood,
   });
