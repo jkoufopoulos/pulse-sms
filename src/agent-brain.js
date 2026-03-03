@@ -312,7 +312,7 @@ async function callAgentBrain(message, session, phone, trace) {
   }
 
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.5-flash-lite',
     systemInstruction: systemPrompt,
     safetySettings: GEMINI_SAFETY,
     tools: BRAIN_TOOLS,
@@ -331,6 +331,7 @@ async function callAgentBrain(message, session, phone, trace) {
   } catch (err) {
     // Fallback to Anthropic if Gemini fails
     console.warn(`Agent brain Gemini failed, falling back to Anthropic: ${err.message}`);
+    trace.brain_error = `gemini: ${err.message}`;
     return callAgentBrainAnthropic(message, session, phone, trace, brainStart);
   }
 
@@ -853,7 +854,7 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
     trace.routing.model_routing = {
       score: 0,
       tier: 'brain',
-      model: brainResult.provider === 'gemini' ? 'gemini-2.5-flash' : 'claude-haiku-4.5',
+      model: brainResult.provider === 'gemini' ? 'gemini-2.5-flash-lite' : 'claude-haiku-4.5',
     };
 
     recordAICost(trace, 'brain', brainResult.usage, brainResult.provider);
