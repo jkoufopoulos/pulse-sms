@@ -593,21 +593,21 @@
   </div>
   <div class="intent-card">
     <h4>more</h4>
-    <div class="route">Pre-router: "more", "what else" | AI router</div>
+    <div class="route">Pre-router: "more", "what else" | Unified LLM</div>
     <div class="handler">handleMore() — intent-handlers.js:124</div>
     <div class="llm-calls">LLM calls: compose (always)</div>
     <p>Shows next batch from session's remaining events. Tracks allOfferedIds to avoid repeats. Falls back to perennial picks when scraped events exhausted.</p>
   </div>
   <div class="intent-card">
     <h4>free</h4>
-    <div class="route">Pre-router: "free", "free stuff" | AI router</div>
+    <div class="route">Pre-router: "free", "free stuff" | Unified LLM</div>
     <div class="handler">handleFree() — intent-handlers.js:225</div>
     <div class="llm-calls">LLM calls: compose (always)</div>
     <p>Filters events by is_free. Searches adjacent neighborhoods if none found locally. Respects category filters from pending state.</p>
   </div>
   <div class="intent-card">
     <h4>details</h4>
-    <div class="route">Pre-router: "1"-"5", event name match | AI router</div>
+    <div class="route">Pre-router: "1"-"5", event name match | Unified LLM</div>
     <div class="handler">handleDetails() — intent-handlers.js:69</div>
     <div class="llm-calls">LLM calls: composeDetails (1 call) or none (fallback)</div>
     <p>Shows expanded info about a specific pick. Uses composeDetails() for natural language, falls back to formatEventDetails() if Claude fails.</p>
@@ -621,7 +621,7 @@
   </div>
   <div class="intent-card">
     <h4>conversational</h4>
-    <div class="route">Pre-router: greetings, thanks, bye, off-topic | AI router</div>
+    <div class="route">Pre-router: greetings, thanks, bye, off-topic | Unified LLM</div>
     <div class="handler">handleConversational() — intent-handlers.js:54</div>
     <div class="llm-calls">LLM calls: 0 (pre-routed) or 1 (AI-routed)</div>
     <p>Social niceties + off-topic deflection. Always redirects back to events. Session-aware — mentions "more" if they have recent picks.</p>

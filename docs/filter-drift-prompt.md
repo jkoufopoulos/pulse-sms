@@ -1,3 +1,5 @@
+> **Historical:** Filter drift problem statement (resolved).
+
 # Filter Drift Architecture Problem — Seeking Fresh Approaches
 
 ## Context

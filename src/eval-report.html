@@ -1692,9 +1692,15 @@ function renderToolbar() {
     if (group.length === 0) return;
     html += '<optgroup label="' + escAttr(t.label) + '">';
     group.forEach(function(r) {
-      var rate = r.total > 0 ? Math.round(100 * r.passed / r.total) : 0;
+      var rate;
+      var ce = r.code_evals;
+      if (ce && ce.total > 0 && (!r.judge_cost || r.judge_cost === 0) && r.passed === 0) {
+        rate = Math.round(100 * ce.passed / ce.total);
+      } else {
+        rate = r.total > 0 ? Math.round(100 * r.passed / r.total) : 0;
+      }
       var ts = formatTimestamp(r.timestamp);
-      var label = ts + ' \u2014 ' + rate + '% (' + r.passed + '/' + r.total + ')';
+      var label = ts + ' \u2014 ' + rate + '% (' + (ce && (!r.judge_cost || r.judge_cost === 0) && r.passed === 0 ? ce.passed + '/' + ce.total + ' code' : r.passed + '/' + r.total) + ')';
       var sel = r.filename === currentFilename ? ' selected' : '';
       html += '<option value="' + escAttr(r.filename) + '"' + sel + '>' + escHtml(label) + '</option>';
     });
@@ -1712,9 +1718,15 @@ function renderToolbar() {
       if (group.length === 0) return;
       html += '<optgroup label="' + escAttr(t.label) + '">';
       group.forEach(function(r) {
-        var rate = r.total > 0 ? Math.round(100 * r.passed / r.total) : 0;
+        var rate;
+        var ce = r.code_evals;
+        if (ce && ce.total > 0 && (!r.judge_cost || r.judge_cost === 0) && r.passed === 0) {
+          rate = Math.round(100 * ce.passed / ce.total);
+        } else {
+          rate = r.total > 0 ? Math.round(100 * r.passed / r.total) : 0;
+        }
         var ts = formatTimestamp(r.timestamp);
-        var label = ts + ' \u2014 ' + rate + '% (' + r.passed + '/' + r.total + ')';
+        var label = ts + ' \u2014 ' + rate + '% (' + (ce && (!r.judge_cost || r.judge_cost === 0) && r.passed === 0 ? ce.passed + '/' + ce.total + ' code' : r.passed + '/' + r.total) + ')';
         html += '<option value="' + escAttr(r.filename) + '">' + escHtml(label) + '</option>';
       });
       html += '</optgroup>';
@@ -2280,13 +2292,15 @@ function renderScenarioCard(s, sortIdx) {
 }
 
 function renderOverridePanel(s, ovr) {
+  var noJudge = isNoJudgeReport();
   var scenarioName = escAttr(s.name || '');
   var currentVerdict = ovr ? ovr.verdict : '';
-  var currentCategory = ovr ? ovr.category : 'false_failure';
+  var defaultCategory = noJudge ? 'data_dependent' : 'false_failure';
+  var currentCategory = ovr ? ovr.category : defaultCategory;
   var currentNotes = ovr ? ovr.notes : '';
 
   var html = '<div class="override-panel" data-override-panel="' + scenarioName + '">';
-  html += '<h4>Human Override</h4>';
+  html += '<h4>' + (noJudge ? 'Your Verdict' : 'Human Override') + '</h4>';
 
   html += '<div class="override-btns">';
   html += '<button class="ovr-btn ovr-pass' + (currentVerdict === 'pass' ? ' active' : '') + '" ' +
@@ -2295,12 +2309,20 @@ function renderOverridePanel(s, ovr) {
     'data-ovr-verdict="fail" data-ovr-scenario="' + scenarioName + '">FAIL</button>';
 
   html += '<select class="ovr-category-select" data-ovr-category="' + scenarioName + '">';
-  var cats = [
-    ['false_failure', 'False Failure \u2014 LLM judge was wrong, this actually passed'],
-    ['false_pass', 'False Pass \u2014 LLM judge was wrong, this actually failed'],
-    ['data_dependent', 'Data Dependent \u2014 result depends on scrape data, exclude from rate'],
-    ['product_gap', 'Product Gap \u2014 real failure, needs a code fix']
-  ];
+  var cats;
+  if (noJudge) {
+    cats = [
+      ['data_dependent', 'Data Dependent \u2014 result depends on scrape data, exclude from rate'],
+      ['product_gap', 'Product Gap \u2014 real failure, needs a code fix']
+    ];
+  } else {
+    cats = [
+      ['false_failure', 'False Failure \u2014 LLM judge was wrong, this actually passed'],
+      ['false_pass', 'False Pass \u2014 LLM judge was wrong, this actually failed'],
+      ['data_dependent', 'Data Dependent \u2014 result depends on scrape data, exclude from rate'],
+      ['product_gap', 'Product Gap \u2014 real failure, needs a code fix']
+    ];
+  }
   cats.forEach(function(c) {
     html += '<option value="' + c[0] + '"' + (currentCategory === c[0] ? ' selected' : '') + '>' + escHtml(c[1]) + '</option>';
   });
@@ -2371,8 +2393,9 @@ function groupBy(scenarios, field) {
     var key = s[field] || 'unknown';
     if (!groups[key]) groups[key] = { pass: 0, fail: 0, error: 0, total: 0 };
     groups[key].total++;
-    if (s.error) groups[key].error++;
-    else if (s.pass) groups[key].pass++;
+    var res = scenarioResult(s);
+    if (res === 'error') groups[key].error++;
+    else if (res === 'pass') groups[key].pass++;
     else groups[key].fail++;
   });
   return groups;
@@ -2596,6 +2619,99 @@ function setupEventListeners() {
     }
   });
 
+
+  // Keyboard shortcuts (no-judge mode only)
+  var kbdCardIdx = -1;
+  document.addEventListener('keydown', function(e) {
+    if (!isNoJudgeReport()) return;
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+    var visibleCards = Array.from(document.querySelectorAll('.scenario-card')).filter(function(c) {
+      return c.style.display !== 'none';
+    });
+    if (visibleCards.length === 0) return;
+
+    if (e.key === 'j') {
+      e.preventDefault();
+      kbdCardIdx = Math.min(kbdCardIdx + 1, visibleCards.length - 1);
+      kbdNavigate(visibleCards, kbdCardIdx);
+    } else if (e.key === 'k') {
+      e.preventDefault();
+      kbdCardIdx = Math.max(kbdCardIdx - 1, 0);
+      kbdNavigate(visibleCards, kbdCardIdx);
+    } else if (e.key === 'p' && kbdCardIdx >= 0 && kbdCardIdx < visibleCards.length) {
+      e.preventDefault();
+      kbdQuickVerdict(visibleCards[kbdCardIdx], 'pass');
+      kbdCardIdx = Math.min(kbdCardIdx + 1, visibleCards.length - 1);
+      kbdNavigate(visibleCards, kbdCardIdx);
+    } else if (e.key === 'f' && kbdCardIdx >= 0 && kbdCardIdx < visibleCards.length) {
+      e.preventDefault();
+      kbdQuickVerdict(visibleCards[kbdCardIdx], 'fail');
+      kbdCardIdx = Math.min(kbdCardIdx + 1, visibleCards.length - 1);
+      kbdNavigate(visibleCards, kbdCardIdx);
+    } else if (e.key === 'd' && kbdCardIdx >= 0 && kbdCardIdx < visibleCards.length) {
+      e.preventDefault();
+      kbdQuickVerdict(visibleCards[kbdCardIdx], 'pass', 'data_dependent');
+      kbdCardIdx = Math.min(kbdCardIdx + 1, visibleCards.length - 1);
+      kbdNavigate(visibleCards, kbdCardIdx);
+    } else if (e.key === 'x' && kbdCardIdx >= 0 && kbdCardIdx < visibleCards.length) {
+      e.preventDefault();
+      var name = visibleCards[kbdCardIdx].dataset.nameExact;
+      if (name && overrides[name]) clearOverride(name);
+    }
+  });
+
+  function kbdNavigate(cards, idx) {
+    document.querySelectorAll('.scenario-card.kbd-focus').forEach(function(c) { c.classList.remove('kbd-focus'); });
+    document.querySelectorAll('.scenario-card.expanded').forEach(function(c) { c.classList.remove('expanded'); });
+    var card = cards[idx];
+    if (!card) return;
+    card.classList.add('expanded', 'kbd-focus');
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function kbdQuickVerdict(card, verdict, category) {
+    var name = card.dataset.nameExact;
+    if (!name) return;
+    var resultPass = card.dataset.result === 'pass';
+    var cat = category || (verdict === 'pass' ? 'false_failure' : 'product_gap');
+    var reportFilename = currentReport ? (currentReport._filename || '') : '';
+    fetch('/api/eval-overrides/' + encodeURIComponent(name), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        verdict: verdict,
+        category: cat,
+        notes: '',
+        against_report: reportFilename,
+        against_llm_verdict: resultPass,
+      }),
+    }).then(function(res) { return res.json(); }).then(function() {
+      overrides[name] = {
+        verdict: verdict,
+        category: cat,
+        notes: '',
+        overridden_at: new Date().toISOString(),
+        against_report: reportFilename,
+        against_llm_verdict: resultPass,
+      };
+      // Update card header with override pill
+      var headerTop = card.querySelector('.scenario-header-top');
+      if (headerTop) {
+        var existing = headerTop.querySelector('.override-pill');
+        if (existing) existing.remove();
+        var stale = headerTop.querySelector('.stale-badge');
+        if (stale) stale.remove();
+        var pill = document.createElement('span');
+        pill.className = 'override-pill ' + verdict;
+        pill.textContent = 'HUMAN: ' + verdict.toUpperCase();
+        var statusPill = headerTop.querySelector('.status-pill');
+        if (statusPill && statusPill.nextSibling) headerTop.insertBefore(pill, statusPill.nextSibling);
+        else headerTop.appendChild(pill);
+      }
+    });
+  }
 
   // Back to top
   var topBtn = document.getElementById('back-to-top');

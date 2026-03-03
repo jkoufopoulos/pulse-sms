@@ -1,3 +1,5 @@
+> **Historical:** Pre-migration design analysis (Feb 2025). Current principles in ROADMAP.md.
+
 # Pulse Architecture Principles: LLM/Code Pipeline Design
 
 ## Context

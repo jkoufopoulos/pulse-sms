@@ -1,3 +1,5 @@
+> **Historical:** Implementation plan for tagged pool (completed).
+
 # Implementation Plan: Tagged Event Pool + Deterministic Filter State
 
 ## Overview
