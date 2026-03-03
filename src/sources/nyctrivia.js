@@ -211,11 +211,27 @@ async function fetchNYCTriviaEvents() {
           source_url: listing.venueUrl || SOURCE_URL,
           map_url: null,
           map_hint: listing.venueName,
+          _raw: {
+            is_recurring: true,
+            recurrence_day: listing.dayOfWeek,
+            recurrence_time: hhmm,
+          },
         });
       }
     }
 
     console.log(`NYC Trivia League: ${events.length} events (from ${listings.length} weekly listings)`);
+
+    // Feed recurrence patterns into SQLite
+    try {
+      const { processRecurrencePatterns } = require('../db');
+      processRecurrencePatterns(events, 'nyctrivia');
+    } catch (err) {
+      if (err.code !== 'MODULE_NOT_FOUND') {
+        console.warn('NYC Trivia League: failed to process recurrence patterns:', err.message);
+      }
+    }
+
     return events;
   } catch (err) {
     console.error('NYC Trivia League error:', err.message);

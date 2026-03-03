@@ -82,41 +82,13 @@ function saveProcessedIds(ids) {
 
 /**
  * Scan extracted events for recurrence markers and upsert into recurring_patterns table.
+ * Delegates to the shared processRecurrencePatterns in db.js.
  */
 function processRecurrencePatterns(events) {
-  const recurring = events.filter(e => e._raw?.is_recurring && e._raw?.recurrence_day);
-  if (recurring.length === 0) return;
-
   try {
-    const { upsertPattern } = require('../../db');
-    let count = 0;
-    for (const e of recurring) {
-      upsertPattern({
-        name: e.name,
-        venue_name: e.venue_name || 'TBA',
-        venue_address: e.venue_address || null,
-        neighborhood: e.neighborhood || null,
-        day_of_week: e._raw.recurrence_day,
-        time_local: e._raw.recurrence_time || null,
-        end_time_local: null,
-        category: e.category || null,
-        subcategory: e.subcategory || null,
-        is_free: e.is_free || false,
-        price_display: e.price_display || null,
-        description_short: e.description_short || null,
-        source_name: 'yutori',
-        source_url: e.source_url || null,
-        ticket_url: e.ticket_url || null,
-        extraction_confidence: e.extraction_confidence ?? null,
-        last_confirmed: new Date().toISOString().slice(0, 10),
-      });
-      count++;
-    }
-    if (count > 0) {
-      console.log(`Yutori: ${count} recurring patterns upserted`);
-    }
+    const db = require('../../db');
+    db.processRecurrencePatterns(events, 'yutori');
   } catch (err) {
-    // SQLite not available — skip pattern detection
     if (err.code !== 'MODULE_NOT_FOUND') {
       console.warn('Yutori: failed to upsert recurring patterns:', err.message);
     }

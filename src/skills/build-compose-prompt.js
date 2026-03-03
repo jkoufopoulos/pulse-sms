@@ -105,6 +105,11 @@ function buildUnifiedPrompt(events, options = {}) {
     }
   }
 
+  // Recurring event — when any event in the pool has recurrence info
+  if (events && events.some(e => e.is_recurring)) {
+    parts.push(skills.recurringEvent.text);
+  }
+
   return parts.join('\n');
 }
 

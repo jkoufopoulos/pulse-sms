@@ -93,13 +93,33 @@ function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_patterns_day ON recurring_patterns(day_of_week);
     CREATE INDEX IF NOT EXISTS idx_patterns_active ON recurring_patterns(active_until, deactivated);
   `);
+
+  // Migration: add normalized_name column for recurrence detection
+  try {
+    db.prepare("SELECT normalized_name FROM events LIMIT 1").get();
+  } catch {
+    db.exec("ALTER TABLE events ADD COLUMN normalized_name TEXT");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_events_norm_name ON events(normalized_name, venue_name, date_local)");
+    // Backfill existing rows
+    const rows = db.prepare("SELECT id, name FROM events WHERE normalized_name IS NULL").all();
+    if (rows.length > 0) {
+      const update = db.prepare("UPDATE events SET normalized_name = ? WHERE id = ?");
+      const tx = db.transaction(() => {
+        for (const r of rows) {
+          update.run(normalizePatternName(r.name), r.id);
+        }
+      });
+      tx();
+      console.log(`Backfilled normalized_name for ${rows.length} events`);
+    }
+  }
 }
 
 // --- Event CRUD ---
 
 const EVENT_COLUMNS = [
   'id', 'source_name', 'source_type', 'source_weight', 'source_tier',
-  'name', 'description_short', 'short_detail', 'venue_name', 'venue_address',
+  'name', 'normalized_name', 'description_short', 'short_detail', 'venue_name', 'venue_address',
   'neighborhood', 'start_time_local', 'end_time_local', 'date_local', 'time_window',
   'is_free', 'price_display', 'category', 'subcategory',
   'extraction_confidence', 'completeness', 'needs_review',
@@ -116,6 +136,7 @@ function eventToRow(e) {
     source_weight: e.source_weight ?? null,
     source_tier: e.source_tier || null,
     name: e.name,
+    normalized_name: normalizePatternName(e.name),
     description_short: e.description_short || null,
     short_detail: e.short_detail || null,
     venue_name: e.venue_name || null,
@@ -411,6 +432,137 @@ function generateOccurrences(startDate, endDate) {
   return events;
 }
 
+// --- Cross-source recurrence detection ---
+
+/**
+ * Detect recurring events from historical data in the events table.
+ * Groups by normalized_name + venue_name + day_of_week, finds groups appearing
+ * on 2+ distinct dates in the last 30 days, and upserts them as patterns.
+ */
+function detectRecurringPatterns() {
+  const d = getDb();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 30);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+  const rows = d.prepare(`
+    SELECT
+      normalized_name,
+      venue_name,
+      CAST(strftime('%w', date_local) AS INTEGER) as day_of_week,
+      COUNT(DISTINCT date_local) as occurrence_count,
+      MAX(date_local) as last_seen,
+      MIN(date_local) as first_seen,
+      -- Pick representative fields from the most recent occurrence
+      MAX(neighborhood) as neighborhood,
+      MAX(category) as category,
+      MAX(subcategory) as subcategory,
+      MAX(is_free) as is_free,
+      MAX(price_display) as price_display,
+      MAX(description_short) as description_short,
+      MAX(source_name) as source_name,
+      MAX(source_url) as source_url,
+      MAX(ticket_url) as ticket_url,
+      MAX(extraction_confidence) as extraction_confidence,
+      -- Get start time from the most common time
+      MAX(SUBSTR(start_time_local, 12, 5)) as time_local
+    FROM events
+    WHERE date_local >= ?
+      AND normalized_name IS NOT NULL
+      AND normalized_name != ''
+      AND venue_name IS NOT NULL
+      AND venue_name != ''
+    GROUP BY normalized_name, venue_name, CAST(strftime('%w', date_local) AS INTEGER)
+    HAVING COUNT(DISTINCT date_local) >= 2
+  `).all(cutoffStr);
+
+  let count = 0;
+  for (const row of rows) {
+    upsertPattern({
+      name: row.normalized_name,
+      venue_name: row.venue_name,
+      neighborhood: row.neighborhood,
+      day_of_week: row.day_of_week,
+      time_local: row.time_local || null,
+      category: row.category,
+      subcategory: row.subcategory,
+      is_free: !!row.is_free,
+      price_display: row.price_display,
+      description_short: row.description_short,
+      source_name: row.source_name,
+      source_url: row.source_url,
+      ticket_url: row.ticket_url,
+      extraction_confidence: row.extraction_confidence,
+      last_confirmed: row.last_seen,
+    });
+    count++;
+  }
+
+  if (count > 0) {
+    console.log(`Recurrence detection: ${count} patterns found from historical data`);
+  }
+  return count;
+}
+
+/**
+ * Process events with _raw recurrence markers and upsert as patterns.
+ * Shared by Yutori, NYC Trivia League, and any future scrapers that know
+ * their events are recurring.
+ */
+function processRecurrencePatterns(events, sourceName) {
+  const recurring = events.filter(e => e._raw?.is_recurring && e._raw?.recurrence_day != null);
+  if (recurring.length === 0) return 0;
+
+  let count = 0;
+  for (const e of recurring) {
+    upsertPattern({
+      name: e.name,
+      venue_name: e.venue_name || 'TBA',
+      venue_address: e.venue_address || null,
+      neighborhood: e.neighborhood || null,
+      day_of_week: e._raw.recurrence_day,
+      time_local: e._raw.recurrence_time || null,
+      end_time_local: null,
+      category: e.category || null,
+      subcategory: e.subcategory || null,
+      is_free: e.is_free || false,
+      price_display: e.price_display || null,
+      description_short: e.description_short || null,
+      source_name: sourceName,
+      source_url: e.source_url || null,
+      ticket_url: e.ticket_url || null,
+      extraction_confidence: e.extraction_confidence ?? null,
+      last_confirmed: new Date().toISOString().slice(0, 10),
+    });
+    count++;
+  }
+  if (count > 0) {
+    console.log(`${sourceName}: ${count} recurring patterns upserted`);
+  }
+  return count;
+}
+
+/**
+ * Get a Set of pattern_keys for all active patterns.
+ * Used for fast lookup when stamping is_recurring on serving cache events.
+ */
+function getActivePatternKeys() {
+  const patterns = getActivePatterns();
+  return new Set(patterns.map(p => p.pattern_key));
+}
+
+/**
+ * Get count of active recurring patterns + day-of-week labels for health dashboard.
+ */
+function getPatternCount() {
+  const d = getDb();
+  const today = new Date().toISOString().slice(0, 10);
+  const row = d.prepare(
+    'SELECT COUNT(*) as total FROM recurring_patterns WHERE active_until >= ? AND deactivated = 0'
+  ).get(today);
+  return row.total;
+}
+
 // --- Migration: import from JSON cache ---
 
 /**
@@ -447,9 +599,14 @@ module.exports = {
   upsertPattern,
   getActivePatterns,
   generateOccurrences,
+  detectRecurringPatterns,
+  processRecurrencePatterns,
+  getActivePatternKeys,
+  getPatternCount,
   importFromJsonCache,
   // Exposed for testing
   makePatternKey,
+  normalizePatternName,
   addMonths,
   DAY_NAMES,
 };

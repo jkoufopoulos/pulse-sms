@@ -115,6 +115,16 @@ If all picks happen to fall on the same day, mention it once in the intro instea
 </skill>`,
 };
 
-const ALL_SKILLS = { tonightPriority, sourceTiers, neighborhoodMismatch, lastBatch, freeEmphasis, pendingIntent, activityAdherence, conversationAwareness, nearbySuggestion, singlePick, citywide, multiDay };
+const recurringEvent = {
+  id: 'recurring-event',
+  text: `
+<skill name="recurring-event">
+Some events in the pool are marked "recurring" (e.g. "every Tuesday"). When picking recurring events:
+- Mention the recurrence naturally — "Trivia at Black Rabbit (every Tues, 8pm)"
+- This signals to the user they can come back next week — it's a community anchor, not a one-off
+</skill>`,
+};
+
+const ALL_SKILLS = { tonightPriority, sourceTiers, neighborhoodMismatch, lastBatch, freeEmphasis, pendingIntent, activityAdherence, conversationAwareness, nearbySuggestion, singlePick, citywide, multiDay, recurringEvent };
 
 module.exports = ALL_SKILLS;

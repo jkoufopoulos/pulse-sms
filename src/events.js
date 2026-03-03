@@ -11,6 +11,47 @@ const { runExtractionAudit } = require('./evals/extraction-audit');
 const { checkSourceCompleteness } = require('./evals/source-completeness');
 const { captureExtractionInput, getExtractionInputs, clearExtractionInputs } = require('./extraction-capture');
 
+/**
+ * Stamp is_recurring + recurrence_label on events that match active recurring patterns.
+ * Uses a Set lookup of pattern_keys — no per-event DB query.
+ */
+function stampRecurrence(events) {
+  try {
+    const { getActivePatternKeys, makePatternKey, normalizePatternName, DAY_NAMES } = require('./db');
+    const patternKeys = getActivePatternKeys();
+    if (patternKeys.size === 0) return;
+
+    let stamped = 0;
+    for (const e of events) {
+      // Events from generateOccurrences already have source_type: 'recurring'
+      if (e.source_type === 'recurring') {
+        e.is_recurring = true;
+        const dayIdx = e.date_local ? new Date(e.date_local + 'T12:00:00').getDay() : null;
+        e.recurrence_label = dayIdx != null ? `every ${DAY_NAMES[dayIdx].charAt(0).toUpperCase() + DAY_NAMES[dayIdx].slice(1)}` : null;
+        stamped++;
+        continue;
+      }
+      // Check scraped events against pattern keys
+      if (!e.name || !e.venue_name || !e.date_local) continue;
+      const dayIdx = new Date(e.date_local + 'T12:00:00').getDay();
+      const key = makePatternKey(e.name, e.venue_name, dayIdx);
+      if (patternKeys.has(key)) {
+        e.is_recurring = true;
+        e.recurrence_label = `every ${DAY_NAMES[dayIdx].charAt(0).toUpperCase() + DAY_NAMES[dayIdx].slice(1)}`;
+        stamped++;
+      }
+    }
+    if (stamped > 0) {
+      console.log(`Recurrence stamping: ${stamped} events marked as recurring`);
+    }
+  } catch (err) {
+    // SQLite not available — skip stamping
+    if (err.code !== 'MODULE_NOT_FOUND') {
+      console.warn('Recurrence stamping failed:', err.message);
+    }
+  }
+}
+
 function atomicWriteSync(filePath, data) {
   const tmp = filePath + '.tmp';
   fs.writeFileSync(tmp, data);
@@ -46,6 +87,7 @@ try {
     eventCache = filterKidsEvents([...dbEvents, ...fresh]);
     backfillEvidence(eventCache);
     backfillDateTimes(eventCache);
+    stampRecurrence(eventCache);
     cacheTimestamp = Date.now();
     console.log(`Loaded ${eventCache.length} events from SQLite (${dbEvents.length} scraped + ${fresh.length} recurring)`);
   }
@@ -198,6 +240,12 @@ async function refreshCache() {
       const db = require('./db');
       db.upsertEvents(validEvents);
       db.pruneOldEvents(getNycDateString(-30));
+      // Detect recurring patterns from historical data
+      try {
+        db.detectRecurringPatterns();
+      } catch (err) {
+        console.warn('Recurrence detection failed:', err.message);
+      }
       // Rebuild serving cache from SQLite (7-day window) + recurring patterns
       const dbEvents = db.getEventsInRange(today, weekOut);
       const occurrences = db.generateOccurrences(today, weekOut);
@@ -205,6 +253,7 @@ async function refreshCache() {
       const freshOccurrences = occurrences.filter(o => !seenIds.has(o.id));
       eventCache = filterKidsEvents([...dbEvents, ...freshOccurrences]);
       backfillDateTimes(eventCache);
+      stampRecurrence(eventCache);
       cacheTimestamp = Date.now();
       console.log(`SQLite: ${validEvents.length} events stored, serving ${eventCache.length} (${dbEvents.length} scraped + ${freshOccurrences.length} recurring)`);
     } catch (err) {
@@ -362,6 +411,7 @@ async function refreshSources(sourceNames, { reprocess = false } = {}) {
     const seenIds = new Set(dbEvents.map(e => e.id));
     const freshOccurrences = occurrences.filter(o => !seenIds.has(o.id));
     eventCache = filterKidsEvents([...dbEvents, ...freshOccurrences]);
+    stampRecurrence(eventCache);
     cacheTimestamp = Date.now();
   } catch (err) {
     // SQLite failed — fall back to in-memory merge
@@ -617,6 +667,13 @@ function getHealthStatus() {
   const result = _getHealthStatus({ size: eventCache.length, timestamp: cacheTimestamp });
   // Attach eventMix computed from live cache
   result.eventMix = computeEventMix(eventCache);
+  // Attach recurring pattern count
+  try {
+    const { getPatternCount } = require('./db');
+    result.recurringPatterns = getPatternCount();
+  } catch {
+    result.recurringPatterns = 0;
+  }
   return result;
 }
 

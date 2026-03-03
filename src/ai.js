@@ -500,6 +500,7 @@ async function unifiedRespond(message, { session, events, neighborhood, nearbyHo
         source_tier: e.source_tier || 'secondary',
         extraction_confidence: e.extraction_confidence,
         ticket_url: e.ticket_url,
+        recurring: e.is_recurring ? e.recurrence_label : undefined,
       });
     }).join('\n');
   }
