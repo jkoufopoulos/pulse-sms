@@ -20,6 +20,7 @@ const { fetchLumaEvents } = require('./luma');
 const { fetchTinyCupboardEvents } = require('./tinycupboard');
 const { fetchBrooklynCCEvents } = require('./brooklyncc');
 const { fetchNYCTriviaEvents } = require('./nyctrivia');
+const { fetchBKMagEvents } = require('./bkmag');
 
 module.exports = {
   fetchSkintEvents,
@@ -50,4 +51,5 @@ module.exports = {
   fetchTinyCupboardEvents,
   fetchBrooklynCCEvents,
   fetchNYCTriviaEvents,
+  fetchBKMagEvents,
 };

@@ -28,6 +28,7 @@ const VENUE_MAP = {
   'Cobra Club': { lat: 40.7055, lng: -73.9234 },
   'Eris Main Stage': { lat: 40.7135, lng: -73.9438 },
   'Eris': { lat: 40.7135, lng: -73.9438 },
+  'TV Eye': { lat: 40.7036, lng: -73.9099 },
 
   // === Williamsburg ===
   'Baby\'s All Right': { lat: 40.7095, lng: -73.9591 },
@@ -44,6 +45,7 @@ const VENUE_MAP = {
   'Pete\'s Candy Store': { lat: 40.7126, lng: -73.9558 },
   'Knitting Factory Brooklyn': { lat: 40.7112, lng: -73.9604 },
   'Sleepwalk': { lat: 40.7130, lng: -73.9608 },
+  'Wythe Hotel': { lat: 40.7220, lng: -73.9578 },
 
   // === Greenpoint ===
   'McCarren Parkhouse': { lat: 40.7206, lng: -73.9515 },
@@ -71,6 +73,7 @@ const VENUE_MAP = {
   'Casablanca Cocktail Lounge': { lat: 40.6876, lng: -73.9513 },
   'Peaches HotHouse': { lat: 40.6886, lng: -73.9487 },
   'C\'mon Everybody': { lat: 40.6883, lng: -73.9535 },
+  'Loudmouth': { lat: 40.6810, lng: -73.9437 },
 
   // === Upper West Side ===
   'Beacon Theatre': { lat: 40.7805, lng: -73.9812 },
@@ -168,6 +171,7 @@ const VENUE_MAP = {
   // === Fort Greene / Clinton Hill ===
   'BAM': { lat: 40.6861, lng: -73.9781 },
   'BAM Howard Gilman Opera House': { lat: 40.6861, lng: -73.9781 },
+  'BAM, Howard Gilman Opera House': { lat: 40.6861, lng: -73.9781 },
   'BAM Harvey Theater': { lat: 40.6877, lng: -73.9761 },
   'BRIC': { lat: 40.6865, lng: -73.9772 },
   'BRIC House Media Center': { lat: 40.6865, lng: -73.9772 },
@@ -372,6 +376,7 @@ const VENUE_MAP = {
   'BAM (Brooklyn Academy of Music)': { lat: 40.6861, lng: -73.9781 },
   'Fritz': { lat: 40.6870, lng: -73.9750 },
   'Friends and Lovers': { lat: 40.6747, lng: -73.9610 },
+  'Friends & Lovers': { lat: 40.6747, lng: -73.9610 },
   'Singers': { lat: 40.6895, lng: -73.9515 },
   'Salon on Kingston': { lat: 40.6750, lng: -73.9475 },
   'Brooklyn Community Pride Center': { lat: 40.6822, lng: -73.9567 },
