@@ -488,6 +488,7 @@ Last line: "Reply 1-N for details, MORE for extra picks, or FREE for free events
 RULES:
 - Pick 1-3 best events from the provided list. Prefer [MATCH] events first, then others.
 - Prefer TODAY over tomorrow. Prefer soonest events.
+- Favor discovery: lead with source_vibe:"discovery" events, intimate venues, interesting one-offs over mainstream/big-ticket. When you see interaction_format:"interactive" + recurring, mention it naturally ("every Tuesday, great for becoming a regular").
 - EVERY pick MUST include: event name, venue name, your opinionated take, start time, and price ("$20", "free", "cover")
 - Label TODAY as "tonight", TOMORROW as "tomorrow", further out by day name
 - [NEARBY] events are from adjacent neighborhoods — you MUST label each with its actual neighborhood in parentheses, e.g. "at Venue (Fort Greene)". If ALL picks are [NEARBY], lead with "Not much in [hood] tonight, but nearby:"
@@ -523,12 +524,27 @@ function stripCodeFences(text) {
 }
 
 /**
+ * After smartTruncate, some numbered picks may have been cut off.
+ * Reconcile the picks array to match what actually appears in the SMS.
+ */
+function reconcilePicks(smsText, picks) {
+  if (!picks || picks.length === 0) return picks;
+  // Count how many numbered picks (e.g. "1)", "2)") appear in the truncated SMS
+  const visibleCount = (smsText.match(/^\d\)/gm) || []).length;
+  if (visibleCount > 0 && visibleCount < picks.length) {
+    return picks.slice(0, visibleCount);
+  }
+  return picks;
+}
+
+/**
  * Lightweight compose — Gemini Flash with minimal prompt, Anthropic fallback.
  * Returns { sms_text, picks, _raw, _usage, _provider }
  */
 async function brainCompose(events, options = {}) {
   const { neighborhood, isSparse, isCitywide, isBorough, borough, nearbyHoods,
-          suggestedNeighborhood, matchCount, excludeIds, activeFilters } = options;
+          suggestedNeighborhood, matchCount, excludeIds, activeFilters,
+          isLastBatch, exhaustionMessage } = options;
   const todayNyc = getNycDateString(0);
   const tomorrowNyc = getNycDateString(1);
 
@@ -542,6 +558,10 @@ async function brainCompose(events, options = {}) {
       neighborhood: e.neighborhood, day: dayLabel, start_time_local: e.start_time_local,
       is_free: e.is_free, price_display: e.price_display, category: e.category,
       short_detail: (e.short_detail || e.description_short || '').slice(0, 100),
+      recurring: e.is_recurring ? e.recurrence_label : undefined,
+      venue_size: e.venue_size || undefined,
+      interaction_format: e.interaction_format || undefined,
+      source_vibe: e.source_vibe || undefined,
     })}`;
   }).join('\n');
 
@@ -551,7 +571,8 @@ async function brainCompose(events, options = {}) {
   const excludeNote = excludeIds?.length > 0 ? `\nEXCLUDED (already shown): ${excludeIds.join(', ')}` : '';
   const suggestNote = suggestedNeighborhood ? `\nSuggest ${suggestedNeighborhood} as nearby alternative.` : '';
 
-  const userPrompt = `Neighborhood: ${hoodLabel}${filterDesc ? `\nFilter: ${filterDesc}` : ''}\nMATCH count: ${matchCount}${sparseNote}${excludeNote}${suggestNote}\n\nEVENTS (${events.length}):\n${eventListStr}`;
+  const lastBatchNote = isLastBatch ? `\nLAST BATCH: These are the final picks. Do NOT say "Reply MORE". Instead end with: "${exhaustionMessage || 'That\'s everything I\'ve got!'}"` : '';
+  const userPrompt = `Neighborhood: ${hoodLabel}${filterDesc ? `\nFilter: ${filterDesc}` : ''}\nMATCH count: ${matchCount}${sparseNote}${excludeNote}${suggestNote}${lastBatchNote}\n\nEVENTS (${events.length}):\n${eventListStr}`;
 
   // Try Gemini Flash first
   const genAI = getGeminiClient();
@@ -577,7 +598,8 @@ async function brainCompose(events, options = {}) {
       const usage = { input_tokens: result.response.usageMetadata?.promptTokenCount || 0,
                       output_tokens: result.response.usageMetadata?.candidatesTokenCount || 0 };
       const parsed = JSON.parse(stripCodeFences(text));
-      return { sms_text: smartTruncate(parsed.sms_text), picks: parsed.picks || [], _raw: text, _usage: usage, _provider: 'gemini' };
+      const sms = smartTruncate(parsed.sms_text);
+      return { sms_text: sms, picks: reconcilePicks(sms, parsed.picks || []), _raw: text, _usage: usage, _provider: 'gemini' };
     } catch (err) {
       console.warn('brainCompose Gemini failed, falling back to Anthropic:', err.message);
     }
@@ -595,7 +617,8 @@ async function brainCompose(events, options = {}) {
   const raw = response.content?.[0]?.text || '';
   const usage = response.usage || {};
   const parsed = JSON.parse(stripCodeFences(raw));
-  return { sms_text: smartTruncate(parsed.sms_text), picks: parsed.picks || [], _raw: raw, _usage: usage, _provider: 'anthropic' };
+  const sms = smartTruncate(parsed.sms_text);
+  return { sms_text: sms, picks: reconcilePicks(sms, parsed.picks || []), _raw: raw, _usage: usage, _provider: 'anthropic' };
 }
 
 // --- Tool execution: search_events ---
@@ -694,6 +717,7 @@ async function executeSearchEvents(params, session, phone, trace) {
     category: e.category, start_time_local: e.start_time_local, date_local: e.date_local,
     is_free: e.is_free, price_display: e.price_display, source_name: e.source_name,
     filter_match: e.filter_match, ticket_url: e.ticket_url || null,
+    source_vibe: e.source_vibe || null,
   }));
   trace.events.pool_meta = { matchCount, hardCount, softCount, isSparse };
 
@@ -768,6 +792,7 @@ async function executeSearchEvents(params, session, phone, trace) {
       is_free: evt?.is_free ?? null,
       price_display: evt?.price_display || null,
       start_time_local: evt?.start_time_local || null,
+      source_vibe: evt?.source_vibe || null,
     };
   });
 
@@ -912,4 +937,4 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
   return trace.id;
 }
 
-module.exports = { checkMechanical, callAgentBrain, handleAgentBrainRequest, resolveDateRange };
+module.exports = { checkMechanical, callAgentBrain, handleAgentBrainRequest, resolveDateRange, brainCompose };
