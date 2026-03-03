@@ -168,7 +168,7 @@ app.get('/api/eval-reports', (req, res) => {
       const type = getReportType(f);
       const base = { filename: f, type, timestamp: data.timestamp };
       if (type === 'scenario') {
-        return { ...base, total: data.total, passed: data.passed, failed: data.failed, errors: data.errors, judge_model: data.judge_model, judge_cost: data.judge_cost, elapsed_seconds: data.elapsed_seconds, concurrency: data.concurrency, base_url: data.base_url };
+        return { ...base, total: data.total, passed: data.passed, failed: data.failed, errors: data.errors, judge_model: data.judge_model, judge_cost: data.judge_cost, elapsed_seconds: data.elapsed_seconds, concurrency: data.concurrency, base_url: data.base_url, code_evals: data.code_evals };
       }
       if (type === 'regression') {
         const scenarios = data.scenarios || [];

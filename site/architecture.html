@@ -494,7 +494,7 @@
 <header class="page-header">
   <div class="container">
     <h1>How Bestie <em>works</em></h1>
-    <p class="subtitle">A text message comes in. 18 scrapers, a unified AI layer, a tagged event pool, and a 480-character limit later, a recommendation goes out.</p>
+    <p class="subtitle">A text message comes in. 23 scrapers, a unified AI layer, a tagged event pool, and a 480-character limit later, a recommendation goes out.</p>
   </div>
 </header>
 
@@ -505,11 +505,11 @@
     <h2 class="section-title">Text in, picks out</h2>
     <div class="section-body">
       <p>Bestie is an SMS-based AI assistant that recommends NYC nightlife and events. A user texts a neighborhood name and gets back curated picks within seconds. The entire experience happens in a single SMS thread &mdash; no app, no account, no links until asked.</p>
-      <p>Behind the scenes, Bestie scrapes <strong>18 event sources</strong> every morning, deduplicates and caches them in memory, then uses a lightweight <strong>pre-router</strong> for mechanical shortcuts and a <strong>unified AI call</strong> (Claude Haiku) for everything semantic &mdash; understanding intent, picking events from a tagged pool, and writing the SMS in a single pass.</p>
+      <p>Behind the scenes, Bestie scrapes <strong>23 event sources</strong> every morning, deduplicates and caches them in memory, then uses a lightweight <strong>pre-router</strong> for mechanical shortcuts and one of two AI paths for everything semantic: the <strong>unified LLM</strong> (Claude Haiku, single call) or the <strong>agent brain</strong> (Gemini 2.5 Flash Lite tool calling, ~$0.0005/msg). Both understand intent, pick events from a tagged pool, and write the SMS &mdash; the agent brain does it via structured tool calls instead of a monolithic prompt.</p>
     </div>
 
     <div class="stats">
-      <span class="stat"><em>18</em> event sources</span>
+      <span class="stat"><em>23</em> event sources</span>
       <span class="stat"><em>36</em> neighborhoods</span>
       <span class="stat"><em>480</em> char SMS cap</span>
       <span class="stat"><em>~15%</em> pre-routed (zero AI)</span>
@@ -565,7 +565,7 @@
     <details>
       <summary><span class="step-label">Step 4</span> Event fetching &amp; curation <span class="step-preview">14 &rarr; 15 tagged events</span></summary>
       <div class="detail-body">
-        <p><code>getEvents("Williamsburg")</code> queries the in-memory cache. The cache was built at 10am from 18 scrapers. Events are already deduped and sorted by proximity to Williamsburg's center coordinates.</p>
+        <p><code>getEvents("Williamsburg")</code> queries the in-memory cache. The cache was built at 10am from 23 scrapers. Events are already deduped and sorted by proximity to Williamsburg's center coordinates.</p>
         <p>Say it returns 14 events. Before entering the tagged pool, <code>curation.js</code> runs deterministic quality filters:</p>
         <ul>
           <li><strong>filterKidsEvents</strong> &mdash; Drops NYC Parks events that match children's patterns ("storytime", "toddler", "ages 3-5"). Without this, Claude would occasionally recommend a toddler puppet show alongside a DJ set.</li>
@@ -650,16 +650,29 @@
       </div>
     </details>
 
+    <div class="card" style="border-left: 3px solid var(--purple);">
+      <h3 style="color: var(--purple);">Alternative path: Agent Brain</h3>
+      <p>When <code>PULSE_AGENT_BRAIN=true</code>, the unified LLM call (Steps 5-6) is replaced by <strong>Gemini 2.5 Flash Lite tool calling</strong> (~$0.0005/msg, 2-3s). Three tools: <code>search_events</code> (with multi-category OR), <code>get_details</code>, <code>respond</code>. A lightweight <code>brainCompose</code> call generates the final SMS. Falls back to Claude Haiku on Gemini 503s.</p>
+    </div>
+
     <div class="card">
       <h3>Total cost &amp; timing</h3>
       <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 4px;">
         <div>
           <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">~$0.001</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">AI cost (1 unified Haiku call)</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">AI cost (unified Haiku)</div>
+        </div>
+        <div>
+          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--purple);">~$0.0005</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">AI cost (agent brain)</div>
         </div>
         <div>
           <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">~1.2s</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">total latency</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">latency (unified)</div>
+        </div>
+        <div>
+          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--purple);">~2-3s</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">latency (agent brain)</div>
         </div>
         <div>
           <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">1</div>
@@ -680,15 +693,15 @@
     <p class="section-label">Data Pipeline</p>
     <h2 class="section-title">Daily scrape, in-memory cache</h2>
     <div class="section-body">
-      <p>Every morning at 10am ET, Bestie runs all 18 scrapers in parallel. Each scraper extracts structured event data from its source &mdash; parsing HTML, hitting APIs, or using Claude to extract from newsletters. Events are deduped across sources (hashed by name + venue + date), ranked by source trust weight, and cached in memory. No scraping happens in the hot request path.</p>
+      <p>Every morning at 10am ET, Bestie runs all 23 scrapers in parallel. Each scraper extracts structured event data from its source &mdash; parsing HTML, hitting APIs, or using Claude to extract from newsletters. Events are deduped across sources (hashed by name + venue + date), ranked by source trust weight, and cached in memory. No scraping happens in the hot request path.</p>
     </div>
 
     <div class="flow">
       <div class="flow-node node-yellow">10am ET &mdash; daily cron trigger</div>
       <div class="flow-arrow"></div>
       <div class="flow-node node-blue">
-        sources/ &mdash; 18 scrapers in parallel
-        <div class="label">Skint, RA, Dice, Eventbrite, Songkick, BrooklynVegan, NYC Parks, Nonsense NYC, Oh My Rockness, DoNYC, BAM, SmallsLIVE, NYPL, Ticketmaster, Yutori, Tavily</div>
+        sources/ &mdash; 23 scrapers in parallel
+        <div class="label">Skint, Skint Ongoing, Nonsense NYC, RA, Dice, BrooklynVegan, BAM, SmallsLIVE, Yutori, Screen Slate, NYC Parks, DoNYC, Songkick, Ticketmaster, Luma, Eventbrite, NYPL, EventbriteComedy, EventbriteArts, TinyCupboard, BrooklynCC, NYCTrivia, BKMag</div>
       </div>
       <div class="flow-arrow"></div>
       <div class="flow-node node-green">
@@ -817,9 +830,9 @@
 <section id="sources">
   <div class="container">
     <p class="section-label">Sources</p>
-    <h2 class="section-title">18 event sources, ranked by trust</h2>
+    <h2 class="section-title">23 event sources, ranked by trust</h2>
     <div class="section-body">
-      <p>Events are deduplicated across sources using a hash of name + venue + date. When the same event appears in multiple sources, the version from the higher-trust source wins. Sources with geo data (lat/lng) also teach venue coordinates to the shared venue map.</p>
+      <p>Events are deduplicated across sources using a hash of name + venue + date. When the same event appears in multiple sources, the version from the higher-trust source wins. Sources with geo data (lat/lng) also teach venue coordinates to the shared venue map. Each source belongs to a <strong>vibe tier</strong> &mdash; discovery (indie newsletters, curated blogs), niche (single-venue or specialized), platform (structured aggregators), or mainstream (large ticketing platforms).</p>
     </div>
 
     <div class="table-wrap">
@@ -829,105 +842,151 @@
             <th>Source</th>
             <th>Weight</th>
             <th>Method</th>
-            <th>Specialty</th>
+            <th>Tier</th>
           </tr>
         </thead>
         <tbody>
+          <tr><td colspan="4" style="font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--green); padding: 12px 16px 6px; border-bottom: none;">Discovery</td></tr>
           <tr>
             <td class="source-name">Skint</td>
             <td class="weight-high">0.9</td>
-            <td>HTML &rarr; Claude extraction</td>
-            <td>Free &amp; cheap NYC events</td>
+            <td>Gmail &rarr; Claude extraction</td>
+            <td>discovery</td>
+          </tr>
+          <tr>
+            <td class="source-name">Skint Ongoing</td>
+            <td class="weight-high">0.9</td>
+            <td>Gmail &rarr; Claude extraction</td>
+            <td>discovery</td>
           </tr>
           <tr>
             <td class="source-name">Nonsense NYC</td>
             <td class="weight-high">0.9</td>
-            <td>Gmail newsletter &rarr; Claude</td>
-            <td>Underground, weird, one-of-a-kind</td>
+            <td>Gmail &rarr; Claude extraction</td>
+            <td>discovery</td>
           </tr>
           <tr>
-            <td class="source-name">Resident Advisor</td>
-            <td class="weight-high">0.85</td>
-            <td>GraphQL API</td>
-            <td>Electronic music &amp; club nights</td>
+            <td class="source-name">Screen Slate</td>
+            <td class="weight-high">0.9</td>
+            <td>Gmail &rarr; Claude extraction</td>
+            <td>discovery</td>
           </tr>
           <tr>
-            <td class="source-name">Oh My Rockness</td>
-            <td class="weight-high">0.85</td>
-            <td>HTML &rarr; Claude extraction</td>
-            <td>Indie &amp; live music</td>
-          </tr>
-          <tr>
-            <td class="source-name">Dice</td>
-            <td class="weight-mid">0.8</td>
-            <td>__NEXT_DATA__ JSON</td>
-            <td>Music &amp; nightlife</td>
+            <td class="source-name">BKMag</td>
+            <td class="weight-high">0.9</td>
+            <td>RSS + Cheerio</td>
+            <td>discovery</td>
           </tr>
           <tr>
             <td class="source-name">BrooklynVegan</td>
             <td class="weight-mid">0.8</td>
-            <td>DoStuff JSON feed</td>
-            <td>Indie shows, punk, rock</td>
+            <td>Cheerio HTML</td>
+            <td>discovery</td>
+          </tr>
+          <tr>
+            <td class="source-name">Yutori</td>
+            <td class="weight-mid">0.8</td>
+            <td>Gmail &rarr; Claude extraction</td>
+            <td>discovery</td>
+          </tr>
+          <tr><td colspan="4" style="font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--blue); padding: 12px 16px 6px; border-bottom: none;">Niche</td></tr>
+          <tr>
+            <td class="source-name">Luma</td>
+            <td class="weight-high">0.9</td>
+            <td>JSON API</td>
+            <td>niche</td>
           </tr>
           <tr>
             <td class="source-name">BAM</td>
             <td class="weight-mid">0.8</td>
             <td>JSON API</td>
-            <td>Film, theater, music, dance</td>
+            <td>niche</td>
           </tr>
           <tr>
             <td class="source-name">SmallsLIVE</td>
             <td class="weight-mid">0.8</td>
-            <td>AJAX HTML</td>
-            <td>Jazz at Smalls + Mezzrow</td>
-          </tr>
-          <tr>
-            <td class="source-name">Yutori</td>
-            <td class="weight-mid">0.8</td>
-            <td>Gmail API &rarr; Claude</td>
-            <td>Agent briefings, curated picks</td>
+            <td>Cheerio HTML</td>
+            <td>niche</td>
           </tr>
           <tr>
             <td class="source-name">NYC Parks</td>
             <td class="weight-mid">0.75</td>
-            <td>Schema.org markup</td>
-            <td>Outdoor events, free programming</td>
+            <td>JSON API</td>
+            <td>niche</td>
           </tr>
           <tr>
-            <td class="source-name">DoNYC</td>
-            <td class="weight-mid">0.75</td>
-            <td>Cheerio HTML scraping</td>
-            <td>Music, comedy, theater</td>
-          </tr>
-          <tr>
-            <td class="source-name">Songkick</td>
+            <td class="source-name">TinyCupboard</td>
             <td class="weight-mid">0.75</td>
             <td>JSON-LD</td>
-            <td>Concerts &amp; live music</td>
+            <td>niche</td>
           </tr>
           <tr>
-            <td class="source-name">Ticketmaster</td>
+            <td class="source-name">BrooklynCC</td>
             <td class="weight-mid">0.75</td>
-            <td>Discovery API</td>
-            <td>Indie filter: venue blocklist + $100 cap</td>
+            <td>Cheerio HTML</td>
+            <td>niche</td>
           </tr>
           <tr>
-            <td class="source-name">Eventbrite</td>
-            <td class="weight-low">0.7</td>
-            <td>JSON-LD + __SERVER_DATA__</td>
-            <td>Community events, workshops</td>
+            <td class="source-name">NYCTrivia</td>
+            <td class="weight-mid">0.75</td>
+            <td>Cheerio HTML</td>
+            <td>niche</td>
           </tr>
           <tr>
             <td class="source-name">NYPL</td>
             <td class="weight-low">0.7</td>
-            <td>Eventbrite organizer pages</td>
-            <td>Free library events</td>
+            <td>Cheerio HTML</td>
+            <td>niche</td>
+          </tr>
+          <tr><td colspan="4" style="font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--purple); padding: 12px 16px 6px; border-bottom: none;">Platform</td></tr>
+          <tr>
+            <td class="source-name">Resident Advisor</td>
+            <td class="weight-high">0.85</td>
+            <td>JSON API</td>
+            <td>platform</td>
           </tr>
           <tr>
-            <td class="source-name">Tavily</td>
-            <td class="weight-low">0.6</td>
-            <td>Web search</td>
-            <td>Fallback only (not in hot path)</td>
+            <td class="source-name">Dice</td>
+            <td class="weight-mid">0.8</td>
+            <td>JSON API</td>
+            <td>platform</td>
+          </tr>
+          <tr>
+            <td class="source-name">DoNYC</td>
+            <td class="weight-mid">0.75</td>
+            <td>Cheerio HTML</td>
+            <td>platform</td>
+          </tr>
+          <tr>
+            <td class="source-name">Songkick</td>
+            <td class="weight-mid">0.75</td>
+            <td>Cheerio HTML</td>
+            <td>platform</td>
+          </tr>
+          <tr><td colspan="4" style="font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--yellow); padding: 12px 16px 6px; border-bottom: none;">Mainstream</td></tr>
+          <tr>
+            <td class="source-name">Ticketmaster</td>
+            <td class="weight-mid">0.75</td>
+            <td>JSON API</td>
+            <td>mainstream</td>
+          </tr>
+          <tr>
+            <td class="source-name">Eventbrite</td>
+            <td class="weight-low">0.7</td>
+            <td>Cheerio HTML</td>
+            <td>mainstream</td>
+          </tr>
+          <tr>
+            <td class="source-name">EventbriteComedy</td>
+            <td class="weight-low">0.7</td>
+            <td>Cheerio HTML (search pages)</td>
+            <td>mainstream</td>
+          </tr>
+          <tr>
+            <td class="source-name">EventbriteArts</td>
+            <td class="weight-low">0.7</td>
+            <td>Cheerio HTML (search pages)</td>
+            <td>mainstream</td>
           </tr>
         </tbody>
       </table>
@@ -1052,10 +1111,11 @@ CHARACTER LIMIT: 480 characters total for sms_text.</div>
       <summary>sourceTiers <span class="skill-condition">&mdash; always on. Editorial trust hierarchy.</span></summary>
       <div class="detail-body">
         <p><strong>Problem it solves:</strong> Without this, Claude treats all events equally. An Eventbrite "networking mixer" looks the same as a Nonsense NYC underground art party. This skill teaches Claude our editorial hierarchy.</p>
-        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">SOURCE TIERS — use source_tier to break ties between similar events:
-- "unstructured" (Skint, Nonsense NYC, Oh My Rockness, Yutori): curated editorial picks — trust these, they've been hand-selected.
-- "primary" (RA, Dice, BrooklynVegan, BAM, SmallsLIVE): structured high-quality listings.
-- "secondary" (NYC Parks, DoNYC, Songkick, Ticketmaster, Eventbrite, NYPL, Tavily): broader aggregators.</div>
+        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">SOURCE VIBE TIERS — use source_vibe to break ties between similar events:
+- "discovery" (Skint, Nonsense NYC, BrooklynVegan, Screen Slate, BKMag, Yutori): curated editorial picks — trust these, they've been hand-selected.
+- "niche" (SmallsLIVE, TinyCupboard, BrooklynCC, BAM, NYPL, NYCTrivia, NYCParks, Luma): specialized single-venue or domain-specific sources.
+- "platform" (RA, Dice, DoNYC, Songkick): structured aggregator listings.
+- "mainstream" (Ticketmaster, Eventbrite): large ticketing platforms — use as last resort.</div>
       </div>
     </details>
 
@@ -1112,7 +1172,7 @@ DAY-SPECIFIC CLAIMS: NEVER say an event happens on a particular day (e.g. "trivi
         <p><strong>lastBatch</strong> &mdash; Fires on the final "more" batch. Removes the "Reply MORE for extra picks" CTA since there are no more picks. Appends a nearby neighborhood suggestion.</p>
         <p><strong>freeEmphasis</strong> &mdash; Fires when user asked for free events. Tells Claude to list free events even if they seem niche &mdash; the user specifically wants free.</p>
         <p><strong>pendingIntent</strong> &mdash; Fires when restoring a deferred request. User said "free comedy" with no neighborhood, then sent "bushwick" &mdash; this skill passes the original request so Claude knows the full intent.</p>
-        <p><strong>venueFraming</strong> &mdash; Fires when Tavily search results include permanent venues. Tells Claude to frame them as "solid spots to check out" rather than events with specific times.</p>
+        <p><strong>venueFraming</strong> &mdash; Fires when results include permanent venues without specific events. Tells Claude to frame them as "solid spots to check out" rather than events with specific times.</p>
         <p><strong>nearbySuggestion</strong> &mdash; Fires when nearby neighborhoods are provided. Tells Claude to suggest travel when picks are thin: "Slim pickings in Fort Greene &mdash; Park Slope is right nearby, want picks from there?"</p>
       </div>
     </details>

@@ -514,7 +514,7 @@
       </li>
       <li>
         <span class="layer-num">3</span>
-        <span><strong>Code evals</strong> &mdash; 9 deterministic trace checks on full pipeline output: char limit, valid intent, valid neighborhood, picked events exist, day-label accuracy. <strong style="color: var(--green);">Free. ~3min.</strong></span>
+        <span><strong>Code evals</strong> &mdash; 24 deterministic trace checks on full pipeline output: char limit, valid intent, valid neighborhood, picked events exist, day-label accuracy, filter match alignment, and more. <strong style="color: var(--green);">Free. ~3min.</strong></span>
       </li>
       <li>
         <span class="layer-num">4</span>
@@ -532,9 +532,9 @@
 
     <div class="stats" style="margin-top: 24px;">
       <span class="stat"><em>539</em> unit tests</span>
-      <span class="stat"><em>9</em> code eval checks</span>
+      <span class="stat"><em>24</em> code eval checks</span>
       <span class="stat"><em>8</em> extraction audit checks</span>
-      <span class="stat"><em>105</em> synthetic cases</span>
+      <span class="stat"><em>386</em> scenario cases</span>
       <span class="stat"><em>~$0.70</em> full eval run</span>
     </div>
   </div>
@@ -557,7 +557,7 @@
 
 <span class="hl-dim"># 3. Wait for "Cache refreshed: ..." in the logs, then:</span>
 
-<span class="hl-dim"># 4. Pipeline evals — code checks on all 105 synthetic cases (free)</span>
+<span class="hl-dim"># 4. Pipeline evals — code checks on all 386 scenario cases (free)</span>
 <span class="hl">npm run eval</span>
 
 <span class="hl-dim"># 5. Check extraction quality from the scrape that just ran</span>
@@ -645,7 +645,7 @@
     <p class="section-label">Layer 2</p>
     <h2 class="section-title">Extraction audit</h2>
     <div class="section-body">
-      <p>Five of Bestie's 18 sources use Claude to extract events from unstructured HTML or newsletters: <strong>Skint, Nonsense NYC, Oh My Rockness, Yutori, and Tavily</strong>. The extraction audit verifies that Claude's output matches the actual source text. It catches hallucinated venues, invented times, and overconfident scores.</p>
+      <p>Four of Bestie's 23 sources use Claude to extract events from unstructured HTML or newsletters: <strong>Skint, Nonsense NYC, Yutori, and Screen Slate</strong>. The extraction audit verifies that Claude's output matches the actual source text. It catches hallucinated venues, invented times, and overconfident scores.</p>
       <p>Tier 1 runs <strong>automatically on every scrape</strong> &mdash; you don't need to do anything. Tier 2 (LLM judge) is on-demand for deeper investigation.</p>
     </div>
 
@@ -724,7 +724,7 @@
     <p class="section-label">Layer 3</p>
     <h2 class="section-title">Code evals</h2>
     <div class="section-body">
-      <p>The workhorse layer. Sends 105 synthetic test cases through the full live pipeline (routing, event fetch, curation, compose, SMS send), then runs 9 deterministic checks on each trace. Free, because the checks are just JavaScript &mdash; the only cost is the compose calls during the pipeline run.</p>
+      <p>The workhorse layer. Sends 386 scenario cases through the full live pipeline (routing, event fetch, curation, compose, SMS send), then runs 24 deterministic checks on each trace. Free, because the checks are just JavaScript &mdash; the only cost is the compose calls during the pipeline run.</p>
     </div>
 
     <div class="code-block"><span class="hl-dim"># Code checks only (free after initial pipeline run)</span>
@@ -745,48 +745,112 @@
           </tr>
         </thead>
         <tbody>
+          <tr><td colspan="2" style="font-weight: 700; color: var(--text); padding-top: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">Core</td></tr>
           <tr>
             <td class="col-name">char_limit</td>
             <td>SMS over 480 characters (details intent exempt &mdash; multi-SMS is intentional)</td>
           </tr>
           <tr>
             <td class="col-name">valid_intent</td>
-            <td>Intent not one of the 6 valid types (events, details, more, free, help, conversational)</td>
+            <td>Intent not one of the valid types (events, details, more, free, help, conversational)</td>
           </tr>
           <tr>
             <td class="col-name">valid_neighborhood</td>
             <td>Resolved neighborhood not in the 36-neighborhood map</td>
           </tr>
           <tr>
-            <td class="col-name">picked_events_exist</td>
-            <td>Claude picked event IDs that weren't in the candidate list (hallucination)</td>
+            <td class="col-name">response_not_empty</td>
+            <td>Blank SMS response</td>
           </tr>
           <tr>
             <td class="col-name">valid_urls</td>
             <td>Truncated or malformed URLs in SMS text</td>
           </tr>
           <tr>
-            <td class="col-name">off_topic_redirect</td>
-            <td>Conversational response doesn't redirect user back to events (excludes farewells)</td>
+            <td class="col-name">latency_under_10s</td>
+            <td>Total response time exceeds 10 seconds</td>
           </tr>
+          <tr><td colspan="2" style="font-weight: 700; color: var(--text); padding-top: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">Data accuracy</td></tr>
           <tr>
-            <td class="col-name">response_not_empty</td>
-            <td>Blank SMS response</td>
+            <td class="col-name">picked_events_exist</td>
+            <td>Claude picked event IDs that weren't in the candidate list (hallucination)</td>
           </tr>
           <tr>
             <td class="col-name">day_label_accuracy</td>
             <td>Says "tonight" but all picked events are tomorrow, or vice versa</td>
           </tr>
           <tr>
-            <td class="col-name">latency_under_10s</td>
-            <td>Total response time exceeds 10 seconds</td>
+            <td class="col-name">pick_count_accuracy</td>
+            <td>Number of events in SMS text doesn't match number of picked event IDs</td>
+          </tr>
+          <tr>
+            <td class="col-name">neighborhood_accuracy</td>
+            <td>Picked events are outside the resolved neighborhood</td>
+          </tr>
+          <tr>
+            <td class="col-name">category_adherence</td>
+            <td>Category filter active but picked events don't match the filtered category</td>
+          </tr>
+          <tr>
+            <td class="col-name">free_claim_accuracy</td>
+            <td>Response claims events are free but picked events have a price</td>
+          </tr>
+          <tr>
+            <td class="col-name">compound_filter_accuracy</td>
+            <td>Compound filter (e.g., "free comedy") active but picks don't satisfy both conditions</td>
+          </tr>
+          <tr>
+            <td class="col-name">filter_match_alignment</td>
+            <td>Tagged [MATCH] events in pool but picks ignore them in favor of unmatched events</td>
+          </tr>
+          <tr>
+            <td class="col-name">time_filter_accuracy</td>
+            <td>Time filter active (e.g., after 10pm) but picked events start before the filter time</td>
+          </tr>
+          <tr>
+            <td class="col-name">neighborhood_expansion_transparency</td>
+            <td>Events from outside the target neighborhood included without disclosing the expansion</td>
+          </tr>
+          <tr>
+            <td class="col-name">price_transparency</td>
+            <td>Price information available but omitted or misrepresented in SMS text</td>
+          </tr>
+          <tr><td colspan="2" style="font-weight: 700; color: var(--text); padding-top: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">Schema / routing</td></tr>
+          <tr>
+            <td class="col-name">schema_compliance</td>
+            <td>LLM response doesn't match expected JSON schema structure</td>
+          </tr>
+          <tr>
+            <td class="col-name">model_routing_captured</td>
+            <td>Trace missing which model was used for the compose call</td>
+          </tr>
+          <tr>
+            <td class="col-name">ai_cost_tracked</td>
+            <td>AI cost not tracked or missing from trace</td>
+          </tr>
+          <tr><td colspan="2" style="font-weight: 700; color: var(--text); padding-top: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">Behavioral</td></tr>
+          <tr>
+            <td class="col-name">off_topic_redirect</td>
+            <td>Conversational response doesn't redirect user back to events (excludes farewells)</td>
+          </tr>
+          <tr>
+            <td class="col-name">filter_intent_gating</td>
+            <td>LLM overrides pre-router filter detection (violates P1: code owns state)</td>
+          </tr>
+          <tr>
+            <td class="col-name">split_validation_effective</td>
+            <td>Compound message split into parts but validation doesn't catch mismatches</td>
+          </tr>
+          <tr>
+            <td class="col-name">discovery_lean</td>
+            <td>Picks skew too heavily toward mainstream/platform sources over discovery/niche</td>
           </tr>
         </tbody>
       </table>
     </div>
 
     <div class="section-body" style="margin-top: 16px;">
-      <p>Each test case can also include <strong>expectation assertions</strong>: expected intent, expected neighborhood, expected event presence, and banned words. These are checked alongside the 9 code evals. For example, "williamsburg" should route to <code>intent: "events"</code> and resolve to <code>"Williamsburg"</code>.</p>
+      <p>Each test case can also include <strong>expectation assertions</strong>: expected intent, expected neighborhood, expected event presence, and banned words. These are checked alongside the 24 code evals. For example, "williamsburg" should route to <code>intent: "events"</code> and resolve to <code>"Williamsburg"</code>.</p>
     </div>
 
     <div class="card" style="margin-top: 20px;">
@@ -987,7 +1051,7 @@ ls -t data/reports/eval-*.json | head -1 | xargs cat | jq '
     <details>
       <summary><span class="step-label">Step 4</span> Pipeline evals <span class="step-preview">free, ~3min</span></summary>
       <div class="detail-body">
-        <p>105 synthetic cases through the full pipeline. 9 deterministic checks + expectation assertions per case.</p>
+        <p>386 scenario cases through the full pipeline. 24 deterministic checks + expectation assertions per case.</p>
         <div class="code-block"><span class="hl">npm run eval</span></div>
       </div>
     </details>
@@ -1070,7 +1134,7 @@ ls -t data/reports/eval-*.json | head -1 | xargs cat | jq '
         <tbody>
           <tr>
             <td class="col-name">synthetic-cases.json</td>
-            <td>105 single-turn + multi-turn cases</td>
+            <td>262 multi-turn scenario cases</td>
             <td><code>run-evals.js</code></td>
             <td><code>npm run eval:gen</code> or edit directly</td>
           </tr>
@@ -1082,7 +1146,7 @@ ls -t data/reports/eval-*.json | head -1 | xargs cat | jq '
           </tr>
           <tr>
             <td class="col-name">regression-scenarios.json</td>
-            <td>Assertion-based behavioral scenarios</td>
+            <td>124 assertion-based behavioral scenarios</td>
             <td><code>run-regression-evals.js</code></td>
             <td>Edit directly</td>
           </tr>
@@ -1275,7 +1339,7 @@ ab-compose-cases.json</span></div>
       <summary>How do I know if an eval failure is a real regression or just LLM noise?</summary>
       <div class="detail-body">
         <p><strong>Deterministic failures (layers 1-3) are always real.</strong> If <code>char_limit</code> or <code>picked_events_exist</code> fails, something broke.</p>
-        <p><strong>Judge failures (layers 4-6) can be noisy.</strong> A single tone failure might just be the judge being strict. Look for patterns: if <code>judge_tone</code> fails on 3+ traces in the same run, the compose prompt probably changed in a way that sounds less natural. If it's 1 out of 105, it's probably noise.</p>
+        <p><strong>Judge failures (layers 4-6) can be noisy.</strong> A single tone failure might just be the judge being strict. Look for patterns: if <code>judge_tone</code> fails on 3+ traces in the same run, the compose prompt probably changed in a way that sounds less natural. If it's 1 out of 386, it's probably noise.</p>
         <p>The A/B eval handles noise explicitly with the <code>--runs=3</code> flag, which runs each case multiple times and averages the results.</p>
       </div>
     </details>

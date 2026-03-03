@@ -807,6 +807,34 @@
   .back-to-top:hover { opacity: 0.85; }
 
   /* ── Keyboard hint ── */
+  .keyboard-hint {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #111;
+    border-top: 1px solid #333;
+    padding: 6px 16px;
+    font-size: 11px;
+    color: #666;
+    font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Monaco, monospace;
+    z-index: 150;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  .keyboard-hint kbd {
+    background: #222;
+    border: 1px solid #444;
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: #aaa;
+    font-size: 11px;
+  }
+  .scenario-card.kbd-focus {
+    outline: 2px solid #FF6B35;
+    outline-offset: -2px;
+  }
 
   /* ── Override badges ── */
   .override-pill {
@@ -1105,6 +1133,15 @@ var filters = { category: 'all', difficulty: 'all', result: 'all', override: 'al
 var searchQuery = '';
 var compareVisible = false;
 
+function isNoJudgeReport() {
+  if (!currentReport) return false;
+  var r = currentReport;
+  if (r.judge_cost > 0) return false;
+  var scenarios = r.scenarios || [];
+  if (scenarios.length === 0) return false;
+  return scenarios.every(function(s) { return s.pass == null; });
+}
+
 var REPORT_TYPES = [
   { key: 'scenario', label: 'Scenario Evals' },
   { key: 'regression', label: 'Regression Evals' },
@@ -1216,13 +1253,17 @@ async function loadCompareReport(filename) {
 function populateSelects() {}
 
 // ── Sorting ──
+function scenarioResult(s) {
+  if (s.error) return 'error';
+  if (isNoJudgeReport()) return (s.code_eval_failures || []).length > 0 ? 'fail' : 'pass';
+  return s.pass ? 'pass' : 'fail';
+}
+
 function sortScenarios(scenarios) {
   var order = { error: 0, fail: 1, pass: 2 };
   var tierOrder = { must_pass: 0, should_pass: 1, stretch: 2 };
   return scenarios.slice().sort(function(a, b) {
-    var aResult = a.error ? 'error' : (a.pass ? 'pass' : 'fail');
-    var bResult = b.error ? 'error' : (b.pass ? 'pass' : 'fail');
-    var rDiff = (order[aResult] || 2) - (order[bResult] || 2);
+    var rDiff = (order[scenarioResult(a)] || 2) - (order[scenarioResult(b)] || 2);
     if (rDiff !== 0) return rDiff;
     var aTier = tierOrder[a.difficulty] != null ? tierOrder[a.difficulty] : 9;
     var bTier = tierOrder[b.difficulty] != null ? tierOrder[b.difficulty] : 9;
@@ -1237,11 +1278,17 @@ function getOverride(scenarioName) {
 
 function isOverrideStale(scenario, ovr) {
   if (!ovr) return false;
-  var llmPass = scenario.error ? false : !!scenario.pass;
-  return ovr.against_llm_verdict !== llmPass;
+  var resultPass;
+  if (isNoJudgeReport()) {
+    resultPass = (scenario.code_eval_failures || []).length === 0;
+  } else {
+    resultPass = scenario.error ? false : !!scenario.pass;
+  }
+  return ovr.against_llm_verdict !== resultPass;
 }
 
 function computeAdjustedStats(scenarios) {
+  var noJudge = isNoJudgeReport();
   var passed = 0, failed = 0, excluded = 0, total = scenarios.length;
   scenarios.forEach(function(s) {
     var ovr = getOverride(s.name);
@@ -1254,6 +1301,8 @@ function computeAdjustedStats(scenarios) {
       adjustedPass = true;
     } else if (ovr && ovr.category === 'false_pass') {
       adjustedPass = false;
+    } else if (noJudge) {
+      adjustedPass = !s.error && (s.code_eval_failures || []).length === 0;
     } else {
       adjustedPass = !s.error && !!s.pass;
     }
@@ -1288,10 +1337,8 @@ function render() {
   // Category breakdown
   html += renderCategoryBreakdown(scenarios);
 
-  // Trend sparkline (only if >3 reports)
-  if (allReports.length > 3) {
-    html += renderSparkline();
-  }
+  // Trend sparkline
+  html += renderSparkline();
 
   // Must-pass alert
   html += renderMustPassAlert(scenarios);
@@ -1314,6 +1361,17 @@ function render() {
     html += renderScenarioCard(s, i);
   });
   html += '</div>';
+
+  // Keyboard hint bar (no-judge mode only)
+  if (isNoJudgeReport()) {
+    html += '<div class="keyboard-hint" id="keyboard-hint">';
+    html += '<kbd>j</kbd>/<kbd>k</kbd> navigate &nbsp;&nbsp;';
+    html += '<kbd>p</kbd> pass &nbsp;&nbsp;';
+    html += '<kbd>f</kbd> fail &nbsp;&nbsp;';
+    html += '<kbd>d</kbd> data-dep &nbsp;&nbsp;';
+    html += '<kbd>x</kbd> clear';
+    html += '</div>';
+  }
 
   c.innerHTML = html;
 
@@ -1674,37 +1732,66 @@ function renderToolbar() {
 
 function renderSummary(passRate, scenarios) {
   var r = currentReport;
+  var noJudge = isNoJudgeReport();
   var cmp = compareReport;
   var cmpRate = cmp && cmp.total > 0 ? (100 * cmp.passed / cmp.total) : null;
 
   var html = '<div class="summary-section">';
 
-  // Big pass rate
-  html += '<div class="summary-big">';
-  html += '<div class="label">Pass Rate</div>';
-  html += '<div class="value ' + passRateColor(passRate) + '">' + Math.round(passRate) + '%';
-  if (cmpRate != null) html += deltaHtml(passRate, cmpRate, '%');
-  html += '</div>';
-  html += '<div class="sub">' + r.passed + ' of ' + r.total + ' scenarios</div>';
-  var adj = computeAdjustedStats(scenarios);
-  var hasOverrides = Object.keys(overrides).length > 0;
-  if (hasOverrides) {
-    var adjColor = passRateColor(adj.rate);
-    html += '<div class="adjusted-stats">Human-adjusted: ' + Math.round(adj.rate) + '% (' + adj.passed + '/' + adj.total;
-    if (adj.excluded > 0) html += ', ' + adj.excluded + ' excluded';
-    html += ')</div>';
-  }
-  html += '</div>';
+  if (noJudge) {
+    // Code eval as primary metric
+    var ce = r.code_evals || {};
+    var ceRate = ce.total > 0 ? (100 * ce.passed / ce.total) : 0;
+    html += '<div class="summary-big">';
+    html += '<div class="label">Code Eval Pass Rate</div>';
+    html += '<div class="value ' + passRateColor(ceRate) + '">' + ceRate.toFixed(1) + '%</div>';
+    html += '<div class="sub">' + (ce.passed || 0) + ' of ' + (ce.total || 0) + ' checks across ' + r.total + ' scenarios</div>';
+    html += '<div class="sub" style="color:#666">No judge \u2014 run with --judge for behavioral scoring</div>';
+    var adj = computeAdjustedStats(scenarios);
+    var hasOverrides = Object.keys(overrides).length > 0;
+    if (hasOverrides) {
+      html += '<div class="adjusted-stats">Your verdicts: ' + Math.round(adj.rate) + '% (' + adj.passed + '/' + adj.total;
+      if (adj.excluded > 0) html += ', ' + adj.excluded + ' excluded';
+      html += ')</div>';
+    }
+    html += '</div>';
 
-  // Stats column
-  html += '<div class="summary-stats">';
-  html += statRow('Passed', r.passed, 'green', cmp ? deltaHtml(r.passed, cmp.passed) : '');
-  html += statRow('Failed', r.failed, r.failed > 0 ? 'red' : '', cmp ? deltaHtml(r.failed, cmp.failed, '', true) : '');
-  html += statRow('Errors', r.errors || 0, (r.errors || 0) > 0 ? 'purple' : '', cmp ? deltaHtml(r.errors || 0, cmp.errors || 0, '', true) : '');
-  html += statRow('Duration', r.elapsed_seconds != null ? Math.round(r.elapsed_seconds) + 's' : 'N/A', '');
-  html += statRow('Judge Cost', r.judge_cost != null ? '$' + r.judge_cost.toFixed(2) : 'N/A', '');
-  if (r.judge_model) html += statRow('Judge', r.judge_model, '');
-  html += '</div>';
+    // Stats column — no-judge
+    html += '<div class="summary-stats">';
+    var ceFailCount = scenarios.filter(function(s) { return (s.code_eval_failures || []).length > 0; }).length;
+    var ceOkCount = scenarios.length - ceFailCount;
+    html += statRow('Scenarios', scenarios.length, '');
+    html += statRow('Code OK', ceOkCount, 'green');
+    html += statRow('Code Fail', ceFailCount, ceFailCount > 0 ? 'red' : '');
+    html += statRow('Duration', r.elapsed_seconds != null ? Math.round(r.elapsed_seconds) + 's' : 'N/A', '');
+    html += '</div>';
+  } else {
+    // Judge mode — existing behavior
+    html += '<div class="summary-big">';
+    html += '<div class="label">Pass Rate</div>';
+    html += '<div class="value ' + passRateColor(passRate) + '">' + Math.round(passRate) + '%';
+    if (cmpRate != null) html += deltaHtml(passRate, cmpRate, '%');
+    html += '</div>';
+    html += '<div class="sub">' + r.passed + ' of ' + r.total + ' scenarios</div>';
+    var adj = computeAdjustedStats(scenarios);
+    var hasOverrides = Object.keys(overrides).length > 0;
+    if (hasOverrides) {
+      html += '<div class="adjusted-stats">Human-adjusted: ' + Math.round(adj.rate) + '% (' + adj.passed + '/' + adj.total;
+      if (adj.excluded > 0) html += ', ' + adj.excluded + ' excluded';
+      html += ')</div>';
+    }
+    html += '</div>';
+
+    // Stats column
+    html += '<div class="summary-stats">';
+    html += statRow('Passed', r.passed, 'green', cmp ? deltaHtml(r.passed, cmp.passed) : '');
+    html += statRow('Failed', r.failed, r.failed > 0 ? 'red' : '', cmp ? deltaHtml(r.failed, cmp.failed, '', true) : '');
+    html += statRow('Errors', r.errors || 0, (r.errors || 0) > 0 ? 'purple' : '', cmp ? deltaHtml(r.errors || 0, cmp.errors || 0, '', true) : '');
+    html += statRow('Duration', r.elapsed_seconds != null ? Math.round(r.elapsed_seconds) + 's' : 'N/A', '');
+    html += statRow('Judge Cost', r.judge_cost != null ? '$' + r.judge_cost.toFixed(2) : 'N/A', '');
+    if (r.judge_model) html += statRow('Judge', r.judge_model, '');
+    html += '</div>';
+  }
 
   html += '</div>';
 
@@ -1904,12 +1991,21 @@ function renderCategoryBreakdown(scenarios) {
 }
 
 function renderSparkline() {
-  var recent = allReports.slice(0, 12).reverse();
+  var scenarioReports = allReports.filter(function(r) { return (r.type || detectReportType(r.filename)) === 'scenario'; });
+  var recent = scenarioReports.slice(0, 12).reverse();
+  if (recent.length < 4) return '';
+  var noJudge = isNoJudgeReport();
+  var label = noJudge ? 'Code Eval Trend' : 'Pass Rate Trend';
   var html = '<div class="trend-section">';
-  html += '<div class="trend-label">Pass Rate Trend (last ' + recent.length + ' runs)</div>';
+  html += '<div class="trend-label">' + label + ' (last ' + recent.length + ' runs)</div>';
   html += '<div class="sparkline">';
   recent.forEach(function(r) {
-    var rate = r.total > 0 ? Math.round(100 * r.passed / r.total) : 0;
+    var rate;
+    if (noJudge && r.code_evals && r.code_evals.total > 0) {
+      rate = Math.round(100 * r.code_evals.passed / r.code_evals.total);
+    } else {
+      rate = r.total > 0 ? Math.round(100 * r.passed / r.total) : 0;
+    }
     var h = Math.max(2, Math.round(rate * 0.34));
     var color = rate >= 70 ? '#1a5a1a' : (rate >= 40 ? '#5a4a1a' : '#5a1a1a');
     var ts = formatTimestamp(r.timestamp);
@@ -1922,7 +2018,10 @@ function renderSparkline() {
 }
 
 function renderMustPassAlert(scenarios) {
-  var failures = scenarios.filter(function(s) { return s.difficulty === 'must_pass' && !s.pass; });
+  var failures = scenarios.filter(function(s) {
+    if (s.difficulty !== 'must_pass') return false;
+    return scenarioResult(s) !== 'pass';
+  });
   if (failures.length === 0) return '<div class="must-pass-alert hidden"></div>';
   var html = '<div class="must-pass-alert">';
   html += '<h3>Must-Pass Failures (' + failures.length + ')</h3>';
@@ -2011,8 +2110,18 @@ function renderChips() {
 }
 
 function renderScenarioCard(s, sortIdx) {
-  var resultClass = s.error ? 'error' : (s.pass ? 'pass' : 'fail');
-  var resultLabel = s.error ? 'ERROR' : (s.pass ? 'PASS' : 'FAIL');
+  var noJudge = isNoJudgeReport();
+  var resultClass, resultLabel;
+  if (s.error) {
+    resultClass = 'error'; resultLabel = 'ERROR';
+  } else if (noJudge) {
+    var ceFailed = (s.code_eval_failures || []).length > 0;
+    resultClass = ceFailed ? 'fail' : 'pass';
+    resultLabel = ceFailed ? 'CODE FAIL' : 'CODE OK';
+  } else {
+    resultClass = s.pass ? 'pass' : 'fail';
+    resultLabel = s.pass ? 'PASS' : 'FAIL';
+  }
 
   // Compare changes
   var changedClass = '';
