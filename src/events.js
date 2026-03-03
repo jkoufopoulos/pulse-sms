@@ -135,7 +135,7 @@ const SOURCE_VIBE = {
   'brooklynvegan': 'discovery', 'ScreenSlate': 'discovery', 'bkmag': 'discovery',
   'yutori': 'discovery',
   // Niche: focused, known but specific
-  'smallslive': 'niche', 'tinycupboard': 'niche', 'brooklyncc': 'niche',
+  'tinycupboard': 'niche', 'brooklyncc': 'niche',
   'bam': 'niche', 'nypl': 'niche', 'nyctrivia': 'niche', 'nyc_parks': 'niche',
   // Platform: broad aggregators, mixed quality
   'ra': 'platform', 'dice': 'platform', 'donyc': 'platform', 'songkick': 'platform',

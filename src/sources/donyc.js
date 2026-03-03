@@ -23,6 +23,7 @@ const CATEGORIES = [
 
 const MAX_PAGES = 3;
 const PAGE_DELAY_MS = 200;
+const SCRAPE_BUDGET_MS = 45000; // bail out before the 60s global timeout
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -134,9 +135,15 @@ function parseCards($, cards, dateStr, categoryOverride) {
   return parsed;
 }
 
-async function fetchCategoryDates(slug, categoryOverride, dates) {
+async function fetchCategoryDates(slug, categoryOverride, dates, startTime) {
   const events = [];
   for (let di = 0; di < dates.length; di++) {
+    // Bail if we've used most of the time budget
+    if (Date.now() - startTime > SCRAPE_BUDGET_MS) {
+      console.warn(`DoNYC: ${slug} time budget hit after ${di} dates, returning ${events.length} events`);
+      break;
+    }
+
     const dateStr = dates[di];
     const [yyyy, mm, dd] = dateStr.split('-');
     const month = String(parseInt(mm, 10));
@@ -151,7 +158,7 @@ async function fetchCategoryDates(slug, categoryOverride, dates) {
       try {
         res = await fetch(url, {
           headers: FETCH_HEADERS,
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(8000),
         });
       } catch (err) {
         console.error(`DoNYC fetch error ${slug} ${dateStr} p${page}:`, err.message);
@@ -225,20 +232,30 @@ function extractDetailsFromPage(html) {
   return { price, description };
 }
 
-async function enrichFromDetailPages(events) {
+async function enrichFromDetailPages(events, startTime) {
   const needsEnrich = events.filter(e =>
     e.source_url && ((!e.price_display && !e.is_free) || !e.description_short)
   );
   if (needsEnrich.length === 0) return;
 
+  // Cap enrichment to leave headroom under the global timeout
+  const MAX_ENRICH = 30;
+  const toEnrich = needsEnrich.slice(0, MAX_ENRICH);
+
   let priceEnriched = 0;
   let descEnriched = 0;
-  for (let i = 0; i < needsEnrich.length; i += PRICE_BATCH_SIZE) {
-    const batch = needsEnrich.slice(i, i + PRICE_BATCH_SIZE);
+  for (let i = 0; i < toEnrich.length; i += PRICE_BATCH_SIZE) {
+    // Bail if time budget is nearly exhausted
+    if (Date.now() - startTime > SCRAPE_BUDGET_MS) {
+      console.warn(`DoNYC: enrichment time budget hit after ${i} detail pages`);
+      break;
+    }
+
+    const batch = toEnrich.slice(i, i + PRICE_BATCH_SIZE);
     const results = await Promise.allSettled(batch.map(async evt => {
       const res = await fetch(evt.source_url, {
         headers: FETCH_HEADERS,
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) return null;
       return { evt, html: await res.text() };
@@ -261,19 +278,20 @@ async function enrichFromDetailPages(events) {
     }
   }
   if (priceEnriched > 0 || descEnriched > 0) {
-    console.log(`DoNYC: enriched ${priceEnriched} prices, ${descEnriched} descriptions from ${needsEnrich.length} detail pages`);
+    console.log(`DoNYC: enriched ${priceEnriched} prices, ${descEnriched} descriptions from ${toEnrich.length} detail pages`);
   }
 }
 
 async function fetchDoNYCEvents() {
   console.log('Fetching DoNYC...');
+  const startTime = Date.now();
   try {
     const dates = Array.from({length: 7}, (_, i) => getNycDateString(i));
     const seen = new Set();
 
     const results = await Promise.allSettled(
       CATEGORIES.map(({ slug, categoryOverride }) =>
-        fetchCategoryDates(slug, categoryOverride, dates)
+        fetchCategoryDates(slug, categoryOverride, dates, startTime)
       )
     );
 
@@ -290,10 +308,10 @@ async function fetchDoNYCEvents() {
       }
     }
 
-    // Enrich prices + descriptions from detail pages
-    await enrichFromDetailPages(events);
+    // Enrich prices + descriptions from detail pages (time-budgeted)
+    await enrichFromDetailPages(events, startTime);
 
-    console.log(`DoNYC: ${events.length} events`);
+    console.log(`DoNYC: ${events.length} events (${((Date.now() - startTime) / 1000).toFixed(1)}s)`);
     return events;
   } catch (err) {
     console.error('DoNYC error:', err.message);

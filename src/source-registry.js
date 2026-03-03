@@ -1,4 +1,4 @@
-const { fetchSkintEvents, fetchSkintOngoingEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchNonsenseNYC, fetchDoNYCEvents, fetchBAMEvents, fetchSmallsLiveEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents, fetchTicketmasterEvents, fetchYutoriEvents, fetchScreenSlateEvents, fetchLumaEvents, fetchTinyCupboardEvents, fetchBrooklynCCEvents, fetchNYCTriviaEvents, fetchBKMagEvents } = require('./sources');
+const { fetchSkintEvents, fetchSkintOngoingEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchNonsenseNYC, fetchDoNYCEvents, fetchBAMEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents, fetchTicketmasterEvents, fetchYutoriEvents, fetchScreenSlateEvents, fetchLumaEvents, fetchTinyCupboardEvents, fetchBrooklynCCEvents, fetchNYCTriviaEvents, fetchBKMagEvents } = require('./sources');
 
 // Source tier classification for compose prompt
 const SOURCE_TIERS = {
@@ -11,7 +11,7 @@ const SOURCE_TIERS = {
   Dice: 'primary',
   BrooklynVegan: 'primary',
   BAM: 'primary',
-  SmallsLIVE: 'primary',
+  // SmallsLIVE removed — single-venue jazz, low volume. Scraper preserved at sources/smallslive.js.
   NYCParks: 'secondary',
   DoNYC: 'secondary',
   Songkick: 'secondary',
@@ -41,7 +41,7 @@ const SOURCES = [
   { label: 'Dice',             fetch: fetchDiceEvents,          weight: 0.8,  mergeRank: 0, endpoint: 'https://dice.fm/browse/new_york-5bbf4db0f06331478e9b2c59' },
   { label: 'BrooklynVegan',    fetch: fetchBrooklynVeganEvents, weight: 0.8,  mergeRank: 1, endpoint: 'https://www.brooklynvegan.com' },
   { label: 'BAM',              fetch: fetchBAMEvents,           weight: 0.8,  mergeRank: 2, endpoint: 'https://www.bam.org/api/BAMApi/GetCalendarEventsByDayWithOnGoing' },
-  { label: 'SmallsLIVE',       fetch: fetchSmallsLiveEvents,    weight: 0.8,  mergeRank: 3, endpoint: 'https://www.smallslive.com/events/today' },
+  // SmallsLIVE removed — single-venue jazz, low volume. Scraper preserved at sources/smallslive.js.
   { label: 'Yutori',            fetch: fetchYutoriEvents,        weight: 0.8,  mergeRank: 4, endpoint: null },
   { label: 'ScreenSlate',      fetch: fetchScreenSlateEvents,   weight: 0.9,  mergeRank: 2, endpoint: null },
   { label: 'NYCParks',         fetch: fetchNYCParksEvents,      weight: 0.75, mergeRank: 0, endpoint: 'https://www.nycgovparks.org/events' },

@@ -8,6 +8,7 @@ const { stripHtml } = require('./shared');
 
 const SCREENSLATE_DIR = path.join(__dirname, '../../data/screenslate');
 const CACHE_FILE = path.join(SCREENSLATE_DIR, 'cached-events.json');
+const EXTRACT_BUDGET_MS = 45000; // bail before the 60s global timeout
 
 /**
  * Load cached events from a previously processed newsletter.
@@ -148,10 +149,18 @@ async function fetchScreenSlateEvents() {
 
     console.log(`ScreenSlate: ${sections.length} venue sections found`);
     const allEvents = [];
+    const extractStart = Date.now();
 
     // Process venue sections in parallel (max 3 concurrent)
     const CONCURRENCY = 3;
+    let sectionsProcessed = 0;
     for (let i = 0; i < sections.length; i += CONCURRENCY) {
+      // Bail if extraction time budget is nearly exhausted
+      if (Date.now() - extractStart > EXTRACT_BUDGET_MS) {
+        console.warn(`ScreenSlate: time budget hit after ${sectionsProcessed}/${sections.length} sections, returning ${allEvents.length} events`);
+        break;
+      }
+
       const batch = sections.slice(i, i + CONCURRENCY);
       const results = await Promise.allSettled(
         batch.map(async ({ venue, content }) => {
@@ -173,10 +182,11 @@ async function fetchScreenSlateEvents() {
           console.warn('ScreenSlate: extraction failed for venue section:', r.reason?.message);
         }
       }
+      sectionsProcessed += batch.length;
     }
 
     saveCachedEvents(latest.id, allEvents);
-    console.log(`ScreenSlate: ${allEvents.length} events from ${sections.length} venue sections`);
+    console.log(`ScreenSlate: ${allEvents.length} events from ${sectionsProcessed}/${sections.length} venue sections (${((Date.now() - extractStart) / 1000).toFixed(1)}s)`);
     return allEvents;
   } catch (err) {
     console.error('Screen Slate error:', err.message);

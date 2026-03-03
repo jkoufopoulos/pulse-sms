@@ -327,7 +327,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 | Dice | 0.8 | `__NEXT_DATA__` JSON (6 categories) | Ticketed shows, DJ sets, comedy, theater |
 | BrooklynVegan | 0.8 | DoStuff JSON | Free shows, indie/rock |
 | BAM | 0.8 | JSON API | Film, theater, music, dance |
-| SmallsLIVE | 0.8 | AJAX HTML | Jazz (Smalls + Mezzrow) |
+| ~~SmallsLIVE~~ | ~~0.8~~ | ~~AJAX HTML~~ | ~~Removed: single-venue jazz, low volume~~ |
 | Yutori | 0.8 | Gmail + file briefings → Claude | Curated newsletters |
 | NYC Parks | 0.75 | Schema.org | Free parks/outdoor events |
 | DoNYC | 0.75 | Cheerio HTML | Music, comedy, theater |
@@ -352,7 +352,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 | Community/social | Good (Luma, NYC Parks, Eventbrite) | — |
 | Food/drink | Moderate (Luma) | Single source for food events |
 | Underground/DIY | Single source (Nonsense NYC) | If it breaks, entire vibe gone |
-| Jazz | Good (SmallsLIVE, Skint, DoNYC) | — |
+| Jazz | Moderate (Skint, DoNYC) | SmallsLIVE removed (low volume) |
 | Film | Good (Screen Slate, BAM, Skint Ongoing) | — |
 
 ---

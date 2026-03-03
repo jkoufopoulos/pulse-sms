@@ -29,7 +29,6 @@ const SOURCE_MINIMUMS = {
   Ticketmaster: 5,
   NonsenseNYC: 3,
   BrooklynVegan: 3,
-  SmallsLIVE: 3,
   Songkick: 3,
   Eventbrite: 3,
   BAM: 2,
