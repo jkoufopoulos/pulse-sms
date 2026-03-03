@@ -299,6 +299,7 @@
       <div class="name">Bestie</div>
       <div class="number">+1 (646) 722-6926</div>
     </div>
+    <button onclick="saveSession()" id="saveBtn" style="background:none;border:1px solid #3a3a3c;color:#34C759;font-size:12px;padding:4px 10px;border-radius:12px;cursor:pointer;margin-right:4px" title="Save this conversation for review">Save</button>
     <button onclick="newSession()" style="background:none;border:1px solid #3a3a3c;color:#007AFF;font-size:12px;padding:4px 10px;border-radius:12px;cursor:pointer" title="Start a fresh conversation with a new phone number">New Session</button>
   </div>
 
@@ -423,6 +424,35 @@ async function send() {
   } catch (err) {
     typingEl.classList.remove('active');
     addMessage('Connection error: ' + err.message, 'system');
+  }
+}
+
+async function saveSession() {
+  const label = prompt('Optional label (e.g., "multi-category bug", "brooklyn resolution"):') || '';
+  const saveBtn = document.getElementById('saveBtn');
+  saveBtn.textContent = '...';
+  saveBtn.disabled = true;
+  try {
+    const res = await fetch('/api/conversations/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: SESSION_PHONE, label: label.trim() }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      addMessage(`Session saved (${data.turn_count} turns) → ${data.filepath}`, 'system');
+      saveBtn.textContent = 'Saved!';
+      saveBtn.style.color = '#34C759';
+      setTimeout(() => { saveBtn.textContent = 'Save'; saveBtn.disabled = false; }, 2000);
+    } else {
+      addMessage('Save failed: ' + data.error, 'system');
+      saveBtn.textContent = 'Save';
+      saveBtn.disabled = false;
+    }
+  } catch (err) {
+    addMessage('Save error: ' + err.message, 'system');
+    saveBtn.textContent = 'Save';
+    saveBtn.disabled = false;
   }
 }
 

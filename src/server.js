@@ -368,7 +368,7 @@ app.get('/api/eval/events', (req, res) => {
 });
 
 // API: trace endpoints
-const { getRecentTraces, getTraceById, annotateTrace, loadTraces, startConversationCapture } = require('./traces');
+const { getRecentTraces, getTraceById, annotateTrace, loadTraces, startConversationCapture, saveConversation } = require('./traces');
 loadTraces(); // Load existing traces from disk at startup
 startConversationCapture(); // Thread traces into conversations for golden dataset
 
@@ -391,6 +391,34 @@ app.post('/api/eval/traces/:id/annotate', (req, res) => {
   const ok = annotateTrace(req.params.id, { verdict, failure_modes, notes });
   if (!ok) return res.status(404).json({ error: 'Trace not found' });
   res.json({ ok: true });
+});
+
+// API: save conversation on demand (admin action from simulator)
+app.post('/api/conversations/save', (req, res) => {
+  const { phone, label } = req.body;
+  if (!phone) return res.status(400).json({ ok: false, error: 'phone is required' });
+  const result = saveConversation(phone, { label });
+  res.json(result);
+});
+
+// API: list and read saved conversations
+app.get('/api/conversations/saved', (req, res) => {
+  const savedDir = require('path').join(__dirname, '..', 'data', 'conversations', 'saved');
+  const fs = require('fs');
+  if (!fs.existsSync(savedDir)) return res.json([]);
+  const files = fs.readdirSync(savedDir).filter(f => f.endsWith('.json')).sort().reverse();
+  if (req.query.file) {
+    const file = files.find(f => f === req.query.file);
+    if (!file) return res.status(404).json({ error: 'Not found' });
+    return res.json(JSON.parse(fs.readFileSync(require('path').join(savedDir, file), 'utf8')));
+  }
+  const summaries = files.map(f => {
+    try {
+      const data = JSON.parse(fs.readFileSync(require('path').join(savedDir, f), 'utf8'));
+      return { file: f, label: data.label, first_message: data.first_message, turn_count: data.turn_count, saved_at: data.saved_at };
+    } catch { return { file: f, error: 'parse error' }; }
+  });
+  res.json(summaries);
 });
 
 // API: extraction audit (GET = read latest report)
