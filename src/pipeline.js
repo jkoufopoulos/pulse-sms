@@ -105,7 +105,9 @@ function describeFilters(filters) {
   if (!filters || typeof filters !== 'object') return 'events';
   const parts = [];
   if (filters.free_only) parts.push('free');
-  if (filters.subcategory) {
+  if (filters.categories && Array.isArray(filters.categories) && filters.categories.length > 0) {
+    parts.push(filters.categories.map(c => c.replace(/_/g, ' ')).join(' or '));
+  } else if (filters.subcategory) {
     parts.push(filters.subcategory);
   } else if (filters.category) {
     parts.push(filters.category.replace(/_/g, ' '));
@@ -200,7 +202,7 @@ function mergeFilters(existing, incoming) {
   if (!existing && !incoming) return {};
   const base = existing || {};
   const next = incoming || {};
-  return {
+  const result = {
     free_only: 'free_only' in next ? (next.free_only || false) : (base.free_only || false),
     category: 'category' in next ? (next.category || null) : (base.category || null),
     subcategory: 'subcategory' in next ? (next.subcategory || null) : (base.subcategory || null),
@@ -208,6 +210,14 @@ function mergeFilters(existing, incoming) {
     time_after: 'time_after' in next ? (next.time_after || null) : (base.time_after || null),
     date_range: 'date_range' in next ? (next.date_range || null) : (base.date_range || null),
   };
+  // Multi-category array (agent brain only): categories takes precedence over category
+  if ('categories' in next) {
+    result.categories = next.categories?.length > 0 ? next.categories : null;
+    if (result.categories) result.category = null; // categories replaces category
+  } else if ('categories' in base && !('category' in next)) {
+    result.categories = base.categories?.length > 0 ? base.categories : null;
+  }
+  return result;
 }
 
 /**
@@ -240,7 +250,12 @@ function failsTimeGate(event, timeAfter) {
  */
 function eventMatchesFilters(event, filters) {
   if (filters.free_only && !event.is_free) return false;
-  if (filters.category && event.category !== filters.category) return false;
+  // Multi-category (OR match): event matches if its category is in the array
+  if (filters.categories && Array.isArray(filters.categories) && filters.categories.length > 0) {
+    if (!filters.categories.includes(event.category)) return false;
+  } else if (filters.category && event.category !== filters.category) {
+    return false;
+  }
   // Date range filter: check event's date falls within range
   if (filters.date_range) {
     const eventDate = getEventDate(event);

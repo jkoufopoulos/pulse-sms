@@ -269,7 +269,39 @@ async function handleMessageAI(phone, message) {
     }
   }
 
-  // --- Route ---
+  // --- Agent Brain path (gated behind PULSE_AGENT_BRAIN=true) ---
+  if (process.env.PULSE_AGENT_BRAIN === 'true') {
+    const { handleAgentBrainRequest, checkMechanical } = require('./agent-brain');
+
+    // Mechanical pre-check: help, bare numbers, "more" — $0 AI cost
+    const mechanical = checkMechanical(message, session);
+    if (mechanical) {
+      // Set up session + history for mechanical handlers
+      if (!getSession(phone)) setSession(phone, {});
+      addToHistory(phone, 'user', message);
+
+      trace.routing.pre_routed = true;
+      trace.routing.result = { intent: mechanical.intent, confidence: 1.0 };
+      trace.routing.latency_ms = 0;
+      trace.brain_tool = null;
+      trace.brain_provider = 'mechanical';
+
+      const route = { ...mechanical };
+      const ctx = { phone, message, masked, session, trace, route, finalizeTrace, trackAICost: (usage, provider) => trackAICost(phone, usage, provider), recordAICost };
+
+      if (session?.pendingNearby) {
+        setSession(phone, { pendingNearby: null, pendingFilters: null, pendingMessage: null });
+      }
+
+      await dispatchPreRouterIntent(route, ctx);
+      return trace.id;
+    }
+
+    // Agent brain handles everything else
+    return handleAgentBrainRequest(phone, message, session, trace, finalizeTrace);
+  }
+
+  // --- Original pre-router + unified flow ---
   const preRouted = preRoute(message, session);
   // Snapshot previous conversation history BEFORE adding current message
   // (so Claude doesn't see the current message duplicated in both <user_message> and history)

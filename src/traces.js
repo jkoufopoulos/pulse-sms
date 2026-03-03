@@ -60,6 +60,12 @@ function startTrace(phone_masked, input_message) {
     total_latency_ms: 0,
     ai_costs: [],
     total_ai_cost_usd: 0,
+    // Agent brain fields (populated when PULSE_AGENT_BRAIN=true)
+    brain_tool: null,       // "search_events", "get_details", "respond"
+    brain_params: null,     // the tool call parameters
+    brain_latency_ms: null, // brain LLM call time
+    brain_provider: null,   // "gemini", "anthropic", or "mechanical"
+    brain_error: null,      // error message if brain failed
     annotation: null,
   };
 }
@@ -269,11 +275,20 @@ function recordConversationTurn(trace) {
       sender: 'bestie',
       message: trace.output_sms,
       timestamp: trace.timestamp,
-      _meta: {
+      trace: {
+        id: trace.id,
         intent: trace.output_intent,
         neighborhood: trace.routing?.resolved_neighborhood || trace.routing?.result?.neighborhood,
         pre_routed: trace.routing?.pre_routed,
-        latency_ms: trace.total_latency_ms
+        latency_ms: trace.total_latency_ms,
+        ai_cost_usd: trace.total_ai_cost_usd,
+        model: trace.routing?.model_routing?.model,
+        active_filters: trace.composition?.active_filters,
+        pool_meta: trace.events?.pool_meta,
+        candidates_count: trace.events?.candidates_count,
+        picks: trace.composition?.picks,
+        active_skills: trace.composition?.active_skills,
+        filter_state: trace.composition?.filter_state,
       }
     });
   }
@@ -349,8 +364,54 @@ function stopConversationCapture() {
   flushAllConversations();
 }
 
+const SAVED_DIR = path.join(CONVERSATIONS_DIR, 'saved');
+
+/**
+ * Save a specific phone's conversation on demand (admin action from simulator).
+ * Accepts the raw phone number, masks it, looks up active conversation.
+ * Saves to data/conversations/saved/ with a descriptive filename.
+ * Returns { ok, filepath, turn_count } or { ok: false, error }.
+ */
+function saveConversation(rawPhone, { label } = {}) {
+  const { maskPhone } = require('./twilio');
+  const masked = maskPhone(rawPhone);
+  const conv = conversations.get(masked);
+  if (!conv || conv.turns.length === 0) {
+    return { ok: false, error: 'No active conversation for this phone' };
+  }
+
+  try {
+    if (!fs.existsSync(SAVED_DIR)) {
+      fs.mkdirSync(SAVED_DIR, { recursive: true });
+    }
+    const d = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+    const t = new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour12: false, hour: '2-digit', minute: '2-digit' }).replace(':', '');
+    const slug = label ? '-' + label.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) : '';
+    const filename = `${d}_${t}${slug}.json`;
+    const filepath = path.join(SAVED_DIR, filename);
+
+    // Build first user message preview for quick scanning
+    const firstUserMsg = conv.turns.find(t => t.sender === 'user')?.message || '';
+
+    const record = {
+      phone_masked: masked,
+      label: label || null,
+      first_message: firstUserMsg,
+      started_at: conv.startedAt,
+      saved_at: new Date().toISOString(),
+      turn_count: conv.turns.length,
+      turns: conv.turns
+    };
+    fs.writeFileSync(filepath, JSON.stringify(record, null, 2));
+    return { ok: true, filepath: filename, turn_count: conv.turns.length };
+  } catch (err) {
+    console.error('Failed to save conversation:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
 module.exports = {
   startTrace, saveTrace, loadTraces, annotateTrace, getRecentTraces, getTraceById, getLatestTraceForPhone,
-  recordConversationTurn, startConversationCapture, stopConversationCapture,
+  recordConversationTurn, startConversationCapture, stopConversationCapture, saveConversation,
   PRICING, recordAICost
 };
