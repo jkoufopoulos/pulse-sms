@@ -267,36 +267,6 @@
       "difficulty": "stretch"
     },
     {
-      "name": "Edge case: borough too broad — queens",
-      "category": "edge_case",
-      "turns": [
-        {
-          "sender": "user",
-          "message": "queens"
-        },
-        {
-          "sender": "pulse",
-          "message": "Queens is huge! Narrow it down for me?\n\nAstoria, Long Island City, Jackson Heights, Flushing"
-        },
-        {
-          "sender": "user",
-          "message": "astoria"
-        },
-        {
-          "sender": "pulse",
-          "message": "Not much tonight in Astoria... would you check out LIC? Just a couple stops on the N/W."
-        }
-      ],
-      "testing": "Pulse recognizes a borough name as too broad and asks to narrow down",
-      "expected_behavior": "Pulse lists supported neighborhoods within that borough and asks user to pick, in a casual tone. If the chosen neighborhood is quiet, travel nudge is acceptable.",
-      "failure_modes": [
-        "Treats 'queens' as a neighborhood",
-        "Returns random events from all over Queens",
-        "Lists neighborhoods not in Queens"
-      ],
-      "difficulty": "stretch"
-    },
-    {
       "name": "Edge case: unsupported neighborhood — bay ridge",
       "category": "edge_case",
       "turns": [
@@ -2067,70 +2037,6 @@
       "difficulty": "stretch"
     },
     {
-      "name": "Extended: exhaustion then category pivot",
-      "category": "poor_experience",
-      "turns": [
-        {
-          "sender": "user",
-          "message": "greenpoint"
-        },
-        {
-          "sender": "pulse",
-          "message": "Tonight in Greenpoint:\n\n1) Live jazz at Troost — chill, free. 8pm\n\n2) DJ at Good Room — house music, goes late. $15\n\nReply 1-2 for details, MORE for extra picks"
-        },
-        {
-          "sender": "user",
-          "message": "more"
-        },
-        {
-          "sender": "pulse",
-          "message": "More Greenpoint picks:\n\n1) Art opening at Transmitter Gallery — free. 6-9pm\n\nReply 1 for details"
-        },
-        {
-          "sender": "user",
-          "message": "more"
-        },
-        {
-          "sender": "pulse",
-          "message": "That's all I've got in Greenpoint tonight! Want to try a category filter or check a nearby neighborhood?"
-        },
-        {
-          "sender": "user",
-          "message": "ok what about comedy instead"
-        },
-        {
-          "sender": "pulse",
-          "message": "Comedy in Greenpoint tonight:\n\n1) Stand-up at a local bar — open mic, free. 8pm\n\nReply 1 for details, MORE for extra picks"
-        },
-        {
-          "sender": "user",
-          "message": "1"
-        },
-        {
-          "sender": "pulse",
-          "message": "Local comedy open mic — free, casual, always unpredictable. 8pm."
-        },
-        {
-          "sender": "user",
-          "message": "free"
-        },
-        {
-          "sender": "pulse",
-          "message": "Free comedy in Greenpoint:\n\n1) Open mic — same one, free. 8pm\n\nReply 1 for details"
-        }
-      ],
-      "testing": "Event exhaustion then category pivot (P6, P3, P7). After exhausting generic picks, user pivots to comedy. This is a fresh search within the same neighborhood, not a continuation. Free stacks on comedy + Greenpoint.",
-      "expected_behavior": "Pulse signals exhaustion clearly. Category pivot accepted — ALL picks are comedy in Greenpoint. Fresh search, not a continuation of the generic list. Free stacks on comedy. Detail from comedy list, not generic.",
-      "failure_modes": [
-        "Repeats earlier generic picks on MORE",
-        "No guidance when exhausted",
-        "Comedy from a different neighborhood",
-        "Returns generic events after comedy pivot",
-        "Comedy filter dropped when free applied"
-      ],
-      "difficulty": "should_pass"
-    },
-    {
       "name": "Extended: neighborhood boundary ambiguity — noho/soho overlap",
       "category": "edge_case",
       "turns": [
@@ -2588,7 +2494,7 @@
       "grounded_at": "2026-02-23T05:39:31.607Z"
     },
     {
-      "name": "Edge case: food and drink deflection with graceful recovery",
+      "name": "Edge case: food and drink request with event recovery",
       "category": "edge_case",
       "turns": [
         {
@@ -2640,13 +2546,13 @@
           "message": "More Bushwick tonight:\n\n1) Indie rock at Our Wicked Lady — Brooklyn bands, rooftop vibes. 9pm, $12\n2) House party at Bossa Nova Civic Club — sweaty dance floor, local selectors. 10pm, $10\n3) Poetry slam at The Footlight — open mic + featured readers. 7:30pm, $8\n\nReply 1-3 for details"
         }
       ],
-      "testing": "Food/drink/restaurant requests should be deflected gracefully, and user should be able to recover into normal event flow",
-      "expected_behavior": "Pulse deflects food/drink requests with a friendly message explaining it does events. Extracts neighborhood from the message (Bushwick) for context. When user pivots to events, normal flow works. Repeated food requests get the same deflection without frustration.",
+      "testing": "Food/drink requests should be served from food_drink category events (Luma source), not deflected. User should be able to refine or pivot.",
+      "expected_behavior": "Pulse should attempt to serve food_drink events (18+ events from Luma exist). If events are sparse, acknowledge limited coverage. Extracts neighborhood from the message (Bushwick) for context. When user pivots to generic events, normal flow works. Repeated food requests should keep serving food_drink events, not deflect.",
       "failure_modes": [
-        "System tries to recommend restaurants or bars",
+        "System deflects food/drink requests instead of searching food_drink events",
         "Loses the neighborhood context from the food request",
-        "Robotic or preachy deflection tone",
-        "Session state corrupted by off-topic messages"
+        "Returns non-food events when food_drink filter is active",
+        "Session state corrupted by category switch"
       ],
       "difficulty": "stretch",
       "grounded_at": "2026-02-23T05:39:44.104Z"
@@ -4380,37 +4286,6 @@
       ],
       "difficulty": "should_pass",
       "grounded_at": "2026-02-23T05:55:25.673Z"
-    },
-    {
-      "name": "Happy path: Tribeca quick pick",
-      "category": "happy_path",
-      "turns": [
-        {
-          "sender": "user",
-          "message": "tribeca"
-        },
-        {
-          "sender": "pulse",
-          "message": "Tonight in Tribeca:\n\n1) Quantum at The Screening Room — experimental jazz trio, intimate setting. 8pm, $15\n\n2) Open Mic Poetry at Poet's Den — spoken word showcase, always surprises. 9pm, free\n\nReply 1-2 for details, MORE for extra picks"
-        },
-        {
-          "sender": "user",
-          "message": "2"
-        },
-        {
-          "sender": "pulse",
-          "message": "Poet's Den on Franklin is a cozy spot — exposed brick, dim lights, the whole vibe. Tonight's open mic brings out some real talent mixed with brave first-timers. Free entry, 9pm start. https://poetsdentribeca.com"
-        }
-      ],
-      "testing": "Simple neighborhood query with single detail request in underused neighborhood",
-      "expected_behavior": "Pulse returns curated picks for Tribeca, provides rich venue details on request",
-      "failure_modes": [
-        "No Tribeca events returned",
-        "Generic venue description",
-        "Wrong pick details"
-      ],
-      "difficulty": "must_pass",
-      "grounded_at": "2026-02-23T05:55:55.777Z"
     },
     {
       "name": "Happy path: time filter — early show request",
@@ -6942,7 +6817,7 @@
         }
       ],
       "testing": "Explicit clock-time filter '10pm' — events before 10pm excluded. Time filter persists through MORE.",
-      "expected_behavior": "Turn 2: only events starting at/after 10pm. Turn 3: MORE respects same time filter.",
+      "expected_behavior": "Only events with start_time_local at or after 22:00 should be picked. This is enforced by the hard time gate in pipeline.js. Turn 2: only events starting at/after 10pm. Turn 3: MORE respects same time filter.",
       "failure_modes": [
         "Events before 10pm included",
         "Time filter lost on MORE",
@@ -7141,7 +7016,7 @@
         }
       ],
       "testing": "After-midnight time filter ('after 1am') — tests the 6am wrapping boundary in failsTimeGate.",
-      "expected_behavior": "Turn 2: only events starting after 1am (after-midnight). 10pm and 8pm events excluded. Detail works.",
+      "expected_behavior": "Only events starting after 1am (after-midnight). The 6am wrapping boundary means times 00:00-05:59 are treated as late night (after midnight), not early morning. 10pm and 8pm events excluded. Detail works.",
       "failure_modes": [
         "10pm event shown (before 1am)",
         "Time parsing fails for 1am",
@@ -10584,7 +10459,7 @@
         }
       ],
       "testing": "When discovery-tier sources (Skint, NonsenseNYC, BrooklynVegan) and mainstream sources coexist in the pool, picks should lean toward discovery events. Code eval discovery_lean measures this.",
-      "expected_behavior": "Picks favor editorial/curated events from discovery sources over generic aggregator listings. Tone is opinionated, not catalog-style.",
+      "expected_behavior": "At least 40% of picks should come from discovery-tier (Skint, NonsenseNYC, BrooklynVegan, BKMag, Yutori, ScreenSlate) or niche-tier (SmallsLIVE, TinyCupboard, BrooklynCC, BAM, NYPL, NYCTrivia, Luma) sources. The discovery_lean code eval measures this. Tone is opinionated, not catalog-style.",
       "failure_modes": [
         "Leads with Ticketmaster/Eventbrite listings when editorial sources have coverage",
         "All picks from platform/mainstream sources when discovery events available",
@@ -10593,6 +10468,986 @@
       "difficulty": "should_pass",
       "generated_at": "2026-03-03T22:00:00.000Z",
       "generated_by": "claude-code-agent"
+    },
+    {
+      "name": "Happy path: trivia as bare category opener",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "trivia"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Trivia as a standalone category request — should serve trivia events citywide or ask for neighborhood",
+      "expected_behavior": "Pulse recognizes trivia as a first-class category. Returns trivia events (bar trivia, pub quiz, etc.) or asks which neighborhood. Detail request works.",
+      "failure_modes": [
+        "Trivia not recognized as category",
+        "Returns non-trivia events",
+        "Deflects instead of serving events"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: trivia in williamsburg compound",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "trivia in williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "First-message compound with trivia category + neighborhood",
+      "expected_behavior": "Pre-router extracts both trivia filter and Williamsburg neighborhood. All picks should be trivia events in/near Williamsburg. MORE serves additional trivia picks.",
+      "failure_modes": [
+        "Only one of category/neighborhood extracted",
+        "Non-trivia events in picks",
+        "Wrong neighborhood"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Filter drift: trivia persists through neighborhood switch",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "trivia in east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "how about bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Trivia filter persists when user switches neighborhoods (P1, P7)",
+      "expected_behavior": "Trivia filter carries over from East Village to Bushwick. Bushwick picks should still be trivia events. Filter was set by pre-router, so it persists deterministically.",
+      "failure_modes": [
+        "Trivia filter dropped on neighborhood switch",
+        "Returns generic Bushwick events",
+        "Filter drift — different category appears"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Filter drift: how about trivia mid-session",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "how about trivia"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Mid-session trivia filter application via \"how about trivia\" pattern",
+      "expected_behavior": "Pre-router detects \"how about trivia\" as category filter. Tagged pool marks trivia events as [MATCH]. Picks switch to trivia in Bushwick. Detail works.",
+      "failure_modes": [
+        "\"how about trivia\" not recognized as filter",
+        "Returns generic picks ignoring trivia filter",
+        "Neighborhood lost"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: trivia free compound",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "free trivia"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Free + trivia compound extraction on first message",
+      "expected_behavior": "Pre-router extracts both free and trivia filters. Picks should be free trivia events (most trivia is free). Citywide or asks for neighborhood.",
+      "failure_modes": [
+        "Only one filter extracted",
+        "Paid trivia events appear",
+        "Deflection instead of serving events"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: theater as category opener",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "theater"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Theater as a standalone category request",
+      "expected_behavior": "Pulse recognizes theater as a category. Returns theater events citywide or asks for neighborhood. Detail request works.",
+      "failure_modes": [
+        "Theater not recognized",
+        "Returns non-theater events",
+        "Deflects"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: theater near midtown compound",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "theater in midtown"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Theater + Midtown compound — high-density category/neighborhood pair",
+      "expected_behavior": "All picks should be theater events in/near Midtown. MORE serves additional theater picks from the same area.",
+      "failure_modes": [
+        "Non-theater events in picks",
+        "Wrong neighborhood",
+        "MORE breaks filter"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Filter drift: theater persists through MORE",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "theater in chelsea"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Theater filter persists through multiple MORE requests (P1, P7)",
+      "expected_behavior": "Theater filter stays active across MORE requests. Each batch shows new theater events in Chelsea, no repeats from previous batches.",
+      "failure_modes": [
+        "Theater filter dropped after MORE",
+        "Non-theater events appear",
+        "Duplicate picks"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Edge case: theatre British spelling",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "theatre tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "British spelling \"theatre\" resolves to theater category",
+      "expected_behavior": "Pulse treats \"theatre\" same as \"theater\". Returns theater events.",
+      "failure_modes": [
+        "\"theatre\" not recognized",
+        "Treated as unknown word"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: karaoke subcategory",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "karaoke"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Karaoke maps to community category via pre-router",
+      "expected_behavior": "Pulse recognizes karaoke and returns community events with karaoke focus. Should serve karaoke events or acknowledge sparse coverage.",
+      "failure_modes": [
+        "Karaoke not recognized",
+        "Returns non-karaoke events",
+        "Deflects"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: open mic in east village",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "open mic in east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Multi-word subcategory \"open mic\" + neighborhood compound",
+      "expected_behavior": "Pre-router extracts \"open mic\" from multiWordCatMap. Picks should be open mic events in East Village. Detail works.",
+      "failure_modes": [
+        "\"open mic\" not recognized as multi-word category",
+        "Only \"open\" extracted",
+        "Wrong neighborhood"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: drag show request",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "drag shows in bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Drag subcategory recognition and event serving",
+      "expected_behavior": "Pulse recognizes \"drag\" and maps to community category. Picks should feature drag events in Bushwick.",
+      "failure_modes": [
+        "Drag not recognized",
+        "Returns generic community events",
+        "Deflects drag requests"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Edge case: community-seeking intent",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "new to nyc looking to meet people"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Vague community-seeking intent should produce interactive/social events",
+      "expected_behavior": "Pulse picks events with high social interaction potential — open mics, trivia, karaoke, group activities. May ask for neighborhood first. Should not deflect.",
+      "failure_modes": [
+        "Deflects as off-topic",
+        "Returns solo-experience events like film screenings",
+        "No response"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Happy path: techno in bushwick compound",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "techno in bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Techno subcategory + Bushwick compound — maps to nightlife",
+      "expected_behavior": "Techno maps to nightlife. Picks should be electronic/DJ events in Bushwick. Detail works.",
+      "failure_modes": [
+        "Techno not recognized as nightlife subcategory",
+        "Returns non-electronic events"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: house music multi-word match",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "house music tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Multi-word \"house music\" recognized via pre-router multiWordCatMap",
+      "expected_behavior": "Pre-router matches \"house music\" as nightlife subcategory. Returns nightlife/electronic events. Citywide or asks for neighborhood.",
+      "failure_modes": [
+        "\"house\" triggers ambiguous word guard without event context",
+        "\"house music\" split into separate tokens"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: DJ sets with time context",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "any dj sets tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "DJ maps to nightlife category, \"tonight\" provides temporal context",
+      "expected_behavior": "Pulse recognizes DJ as nightlife subcategory. Returns DJ/electronic events. The \"tonight\" provides temporal grounding.",
+      "failure_modes": [
+        "DJ not recognized",
+        "Returns daytime events",
+        "Deflects"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: film category opener",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "any film screenings tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Film as a category request — sources include Screen Slate, BAM",
+      "expected_behavior": "Pulse recognizes film/movie/cinema as film category. Returns screening events. Detail includes venue info.",
+      "failure_modes": [
+        "Film not recognized as category",
+        "Returns non-film events",
+        "No film events found"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: movies in williamsburg",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "movies in williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Movies synonym for film + Williamsburg compound (Nitehawk, Syndicated)",
+      "expected_behavior": "Pulse treats \"movies\" as film category. Returns film events near Williamsburg.",
+      "failure_modes": [
+        "\"movies\" not recognized",
+        "Returns non-film events",
+        "Wrong neighborhood"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Filter drift: mid-session compound replaces active filter",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "comedy in east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "actually trivia in greenpoint"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Complete context switch mid-session — new category + new neighborhood replaces old",
+      "expected_behavior": "The \"actually trivia in greenpoint\" should replace both comedy filter and East Village neighborhood. Picks should be trivia in Greenpoint, not comedy.",
+      "failure_modes": [
+        "Comedy filter persists",
+        "East Village persists",
+        "Only one of category/neighborhood changes",
+        "Compound not extracted"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Filter drift: free persists through compound category+neighborhood",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "free stuff in bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "comedy shows in williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Free filter should persist when user provides new category+neighborhood compound",
+      "expected_behavior": "Free filter from turn 1 persists. Comedy + Williamsburg set in turn 2. Picks should be free comedy in Williamsburg (or comedy in Williamsburg if free is cleared by the full pivot).",
+      "failure_modes": [
+        "Free filter dropped silently",
+        "Bushwick persists instead of Williamsburg",
+        "Comedy not extracted"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Happy path: sunnyside neighborhood",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "sunnyside"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Sunnyside neighborhood recognition — 14 events, zero previous coverage",
+      "expected_behavior": "Pulse recognizes Sunnyside as a valid Queens neighborhood. Returns events or suggests nearby neighborhoods if sparse.",
+      "failure_modes": [
+        "Sunnyside not recognized",
+        "Returns Manhattan events",
+        "Error"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: east williamsburg comedy",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "comedy in east williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "East Williamsburg + comedy compound — Brooklyn Comedy Collective territory",
+      "expected_behavior": "Pulse serves comedy events in East Williamsburg (Brooklyn Comedy Collective, Eris, etc.). Detail includes venue info.",
+      "failure_modes": [
+        "East Williamsburg not recognized",
+        "Returns Williamsburg events instead",
+        "No comedy found"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Happy path: recurring event surfacing",
+      "category": "happy_path",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "trivia in east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "When recurring events are in the pool (is_recurring=true, recurrence_label set), LLM should naturally mention the recurrence pattern",
+      "expected_behavior": "Picks include recurring trivia events. LLM should mention recurrence naturally (e.g. \"every Tuesday\", \"weekly\"). The recurringEvent compose skill provides this context.",
+      "failure_modes": [
+        "Recurrence info not surfaced",
+        "Wrong recurrence pattern stated",
+        "No trivia events found"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Edge case: recurring vs one-off distinction",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Pool may contain both recurring and one-off events. LLM should handle both naturally in details.",
+      "expected_behavior": "Picks serve a mix of recurring and one-off events. Detail response may mention if an event is recurring (\"they do this every week\") or one-off. No incorrect recurrence claims.",
+      "failure_modes": [
+        "Claims a one-off event is recurring",
+        "Claims a recurring event is one-off",
+        "Error on detail"
+      ],
+      "difficulty": "stretch"
+    },
+    {
+      "name": "Edge case: this weekend date range",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "what's happening this weekend in williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "\"this weekend\" should trigger date_range filter for Saturday/Sunday events",
+      "expected_behavior": "Pulse recognizes \"this weekend\" as a date range. Returns events for the upcoming Saturday and Sunday. parseDateRange() handles this in the traditional pipeline.",
+      "failure_modes": [
+        "\"this weekend\" ignored, returns tonight only",
+        "Wrong dates calculated",
+        "No events for the date range"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Edge case: tomorrow date range",
+      "category": "edge_case",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "comedy tomorrow night"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "\"tomorrow\" date range + comedy category compound",
+      "expected_behavior": "Pulse extracts both \"tomorrow\" date range and comedy category. Picks should be comedy events for tomorrow's date, not today.",
+      "failure_modes": [
+        "Returns today's events",
+        "Tomorrow not extracted",
+        "Comedy filter lost"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Filter drift: date range persists across neighborhood switch",
+      "category": "filter_drift",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "this weekend in east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "how about williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Date range filter (this weekend) persists through neighborhood switch (P1, P7)",
+      "expected_behavior": "Weekend date range from turn 1 persists when switching to Williamsburg. Picks should still be weekend events.",
+      "failure_modes": [
+        "Date range dropped on neighborhood switch",
+        "Returns tonight events instead of weekend",
+        "Wrong neighborhood"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Agent brain: neighborhood search via tool call",
+      "category": "happy_path",
+      "pipeline": "agent_brain",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "1"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Agent brain routes neighborhood request through search_events tool with intent=new_search",
+      "expected_behavior": "Brain calls search_events with neighborhood=williamsburg. Returns picks via brainCompose. Detail via mechanical pre-check (bare number). Same code evals should pass.",
+      "failure_modes": [
+        "Brain does not call search_events",
+        "Wrong neighborhood resolved",
+        "brainCompose fails",
+        "No picks returned"
+      ],
+      "difficulty": "must_pass"
+    },
+    {
+      "name": "Agent brain: category filter via search_events",
+      "category": "happy_path",
+      "pipeline": "agent_brain",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "comedy in bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Agent brain extracts category + neighborhood compound and passes to search_events tool",
+      "expected_behavior": "Brain calls search_events with category=comedy, neighborhood=bushwick. Picks are comedy events in Bushwick. MORE via mechanical pre-check serves next batch.",
+      "failure_modes": [
+        "Category not extracted",
+        "Neighborhood not extracted",
+        "Non-comedy events returned",
+        "MORE broken"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Agent brain: multi-category OR query",
+      "category": "edge_case",
+      "pipeline": "agent_brain",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "trivia or comedy in greenpoint"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Agent brain supports multi-category OR via categories array in search_events tool",
+      "expected_behavior": "Brain calls search_events with categories=[\"trivia\",\"comedy\"] (OR logic). Picks include events from either category in Greenpoint.",
+      "failure_modes": [
+        "Only one category extracted",
+        "Categories treated as AND instead of OR",
+        "Tool call malformed"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Agent brain: date range recognition",
+      "category": "edge_case",
+      "pipeline": "agent_brain",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "what's happening this weekend in east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Agent brain recognizes \"this weekend\" and passes date_range=this_weekend to search_events",
+      "expected_behavior": "Brain resolves \"this weekend\" to date_range enum value. search_events filters to Saturday/Sunday events. This is a known gap in the traditional pipeline that agent brain addresses.",
+      "failure_modes": [
+        "\"this weekend\" not recognized as date range",
+        "Returns tonight events only",
+        "Date range not passed to tool"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Agent brain: filter persistence across refine",
+      "category": "filter_drift",
+      "pipeline": "agent_brain",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "jazz in east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "how about free ones"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Agent brain preserves jazz filter when user refines with free — intent=refine merges filters",
+      "expected_behavior": "Turn 1: search_events with category=jazz, neighborhood=east_village. Turn 2: search_events with intent=refine, free_only=true. Jazz + East Village persist via mergeFilters. Picks should be free jazz in East Village.",
+      "failure_modes": [
+        "Jazz filter dropped on refine",
+        "East Village lost",
+        "Free not added",
+        "Intent classified as new_search instead of refine"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Agent brain: pivot intent clears previous filters",
+      "category": "filter_drift",
+      "pipeline": "agent_brain",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "comedy in bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "actually show me techno in williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Agent brain classifies \"actually show me X in Y\" as pivot intent, replacing all filters",
+      "expected_behavior": "Turn 1: comedy + Bushwick. Turn 2: intent=pivot, replaces with techno/nightlife + Williamsburg. Comedy and Bushwick should NOT persist.",
+      "failure_modes": [
+        "Comedy filter persists",
+        "Bushwick persists",
+        "Intent classified as refine instead of pivot",
+        "Both old and new filters applied"
+      ],
+      "difficulty": "should_pass"
+    },
+    {
+      "name": "Agent brain: conversational respond tool",
+      "category": "happy_path",
+      "pipeline": "agent_brain",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "thanks so much!"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Agent brain uses respond tool for conversational messages (thanks/greetings)",
+      "expected_behavior": "Brain calls respond tool with intent=thanks. Response is warm sign-off that redirects to events. Must end with event redirect per respond tool contract.",
+      "failure_modes": [
+        "Brain calls search_events instead of respond",
+        "No redirect to events",
+        "Empty response"
+      ],
+      "difficulty": "should_pass"
     }
   ]
 }

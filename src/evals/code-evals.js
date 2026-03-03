@@ -18,7 +18,7 @@ const CATEGORY_PARENTS = {
   dance: 'nightlife', salsa: 'nightlife', bachata: 'nightlife', swing: 'nightlife',
   standup: 'comedy', 'stand-up': 'comedy', improv: 'comedy', sketch: 'comedy',
   theatre: 'theater',
-  trivia: 'community', karaoke: 'community', drag: 'community',
+  karaoke: 'community', drag: 'community',
   burlesque: 'community', bingo: 'community', 'open mic': 'community', poetry: 'community',
 };
 
@@ -728,7 +728,7 @@ const evals = {
   /**
    * Discovery lean: when discovery/niche events are available in the pool,
    * picks should favor them over platform/mainstream.
-   * Informational — always passes. Measures editorial lean effectiveness.
+   * Enforced — fails if <30% of picks are from discovery/niche when pool has sufficient options.
    */
   discovery_lean(trace) {
     const picks = trace.composition.picks || [];
@@ -750,10 +750,13 @@ const evals = {
       return poolEvt?.source_vibe === 'discovery' || poolEvt?.source_vibe === 'niche';
     });
     const ratio = discoveryPicks.length / picks.length;
+    // Floor: at least 30% discovery/niche when pool has enough options
+    const poolRatio = discoveryInPool.length / sentPool.length;
+    const pass = ratio >= 0.30 || poolRatio < 0.30; // exempt if pool itself is <30% discovery/niche
     return {
       name: 'discovery_lean',
-      pass: true, // informational — always passes until we establish a baseline
-      detail: `${discoveryPicks.length}/${picks.length} picks from discovery/niche (${Math.round(ratio * 100)}%) — pool had ${discoveryInPool.length}/${sentPool.length}`,
+      pass,
+      detail: `${discoveryPicks.length}/${picks.length} picks from discovery/niche (${Math.round(ratio * 100)}%) — pool had ${discoveryInPool.length}/${sentPool.length} (${Math.round(poolRatio * 100)}%)${!pass ? ' — below 30% floor' : ''}`,
     };
   },
 
