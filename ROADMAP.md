@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-03 (Skint thru parsing + description coverage for Luma/Songkick/DoNYC)
+> Last updated: 2026-03-03 (Editorial voice + discovery signals reframe)
 
 ---
 
@@ -378,18 +378,21 @@ The key insight: category alone is too coarse. Comedy at Tiny Cupboard (30 seats
 
 **2a. Venue size classification** — **Done.** VENUE_SIZE map (200+ venues), `lookupVenueSize()` with fuzzy matching, `stampVenueSize()` at cache build. LLM sees `venue_size` field.
 
-**2b. Interaction format** — **Done.** `classifyInteractionFormat()` uses category + subcategory + 20 name keyword patterns. Three tiers: interactive (trivia, workshops, dance classes, karaoke, bingo, meetups), participatory (open mic, comedy, drag, art openings, tastings), passive (concerts, DJ sets, screenings, theater). `stampInteractionFormat()` at cache build. LLM sees `interaction_format` field.
+**2b. Interaction format** — **Done.** `classifyInteractionFormat()` uses keyword-specific patterns only (trivia, workshops, dance classes, karaoke, bingo, meetups, book club, social mixer, newcomer night, etc.) + a few category-level defaults (comedy→participatory, music→passive). Blanket category defaults for community/food/market removed — precision over recall. `stampInteractionFormat()` at cache build. LLM sees `interaction_format` field.
 
-**2c. Source curation signal** — **Done.** `SOURCE_CURATION` map classifies all 23 sources into curated/single_venue/broad. `stampSourceCuration()` at cache build. LLM sees `source_curation` field.
+**2c. Source vibe signal** — **Done.** `SOURCE_VIBE` map classifies all 23 sources into discovery-factor tiers: `discovery` (Skint, NonsenseNYC, BKMag, Yutori, ScreenSlate, BrooklynVegan — editorial picks, underground), `niche` (SmallsLIVE, TinyCupboard, BrooklynCC, BAM, NYPL, NYCTrivia, NYCParks, Luma — focused, specific), `platform` (RA, Dice, DoNYC, Songkick — broad, mixed quality), `mainstream` (Ticketmaster, Eventbrite — fills gaps). `stampSourceVibe()` at cache build. LLM sees `source_vibe` field. Luma reclassified from mainstream→niche (community/creative content, not generic aggregator).
 
-**2d. Community score** — **Done.** `stampCommunityScore()` combines: recurring +3, interactive +2, participatory +1, intimate venue +2, medium venue +1, free/cheap +1, curated source +1, single-venue source +1. Max ~9. Stamped at cache build after all other signals. LLM sees `community_score` field.
+**2d. Community score** — **Removed.** Validation showed the composite score collapses useful signals into a misleading number — a Luma "Exocapitalism & AI" panel at a small venue scored 5, which isn't community. Individual signals (`venue_size`, `interaction_format`, `is_recurring`, `source_vibe`) are more useful to the LLM as separate context than as a single number.
+
+**2e. Editorial voice** — **Done.** Added editorial lean to UNIFIED_SYSTEM prompt: Pulse favors discovery-tier sources, interesting one-offs, intimate venues. Mainstream events fine when requested but don't lead with them. Interactive + recurring highlighted naturally. This is Pulse's default editorial identity, not a persona mode.
 
 Google Places deferred — the signals it provides (Popular Times, review count, rating) are noisy proxies for things we can classify more accurately by hand. Revisit if we need validation data for recurrence patterns or a specific question only that API answers.
 
-**Phase 3: Community-oriented agent path**
+**Phase 3: Proactive persona capture + amplified discovery lean**
 - Detect community-seeking intent: "new here", "solo tonight", "where can I meet people", "build community", first-time texters with no session history
-- Route to community-aware curation: prioritize events with high community score
+- Amplify the editorial lean for these users: even stronger preference for interactive+recurring events at intimate venues from discovery sources
 - Frame picks differently: "Trivia at Black Rabbit — every Tuesday, same crowd, easy to join solo" vs. "Trivia Night at Black Rabbit, 8pm, free"
+- Capture persona signal in preference-profile.js so it persists across sessions
 - This is a compose skill + pick-ranking change, not a new pipeline
 
 ### Near-term — Source + Quality
@@ -397,7 +400,7 @@ Google Places deferred — the signals it provides (Popular Times, review count,
 - Comedy source — Dedicated scraper for Comedy Cellar, UCB, Caveat, QED
 - Gallery/art source — Gallery listing aggregator or DoNYC art category
 - Happy hour detection — Identify recurring happy hours from event data and venue pages; surface as a filterable category ("happy hours near me")
-- Niche/local-first ranking — Bias pick selection toward intimate, creative, communal, underground events over mainstream ticketed shows. Leverage source tiers (Nonsense NYC, Skint, Screen Slate already weighted highest) and add scoring signals: small venue capacity, free/cheap, DIY keywords, community-tagged
+- ~~Niche/local-first ranking~~ — **Done** via three layers: (1) editorial lean in UNIFIED_SYSTEM + BRAIN_COMPOSE_SYSTEM prompts, (2) deterministic `vibeOrder` sort tiebreaker in `rankEventsByProximity`, `getEventsCitywide`, `getEventsForBorough` — discovery events surface first in pool, (3) `source_vibe` wired into traces (sent_pool + picks) for measurement. `discovery_lean` code eval tracks pick ratio. Eval results: 51% of picks from discovery/niche sources (up from 28% baseline), mainstream down to 5% of pool
 
 ### Medium-term — Intelligence
 
@@ -477,7 +480,7 @@ Google Places deferred — the signals it provides (Popular Times, review count,
 | Mar 1 | Nudge-accept flow fix (Root Cause D) | Added `neighborhood` to `ask_neighborhood` pending object — one-line fix for ~10% of filter failures |
 | Mar 1 | Yutori junk event filter | Blocked ~50 prose bullets (self-help, tax, career) via category + filename + structural filters |
 | Mar 1 | Skint Ongoing events scraper | 31 series events (exhibitions, festivals) via deterministic parser; weight 0.9 |
-| Mar 3 | Community layer Phase 2 complete (2b-2d) | Interaction format (20 keyword patterns, 3 tiers), source curation (23 sources mapped), community score (compound signal, max ~9). All stamped at cache build, all visible to LLM |
+| Mar 3 | Community layer Phase 2 → Editorial voice (2b-2e) | Interaction format (keyword-specific patterns, blanket defaults removed), source vibe (4 tiers: discovery/niche/platform/mainstream), community_score removed. Editorial lean in UNIFIED_SYSTEM + BRAIN_COMPOSE_SYSTEM. Deterministic vibeOrder sort tiebreaker in geo.js + events.js. source_vibe wired into traces + discovery_lean code eval. Luma reclassified mainstream→niche. Results: 51% picks from discovery/niche (was 28%), mainstream 5% of pool (was 19%). Agent brain serializes all 4 enrichment fields. |
 | Mar 1 | Friday/Saturday newsletter event loss fix | Yesterday included in scrape filter + 6pm evening scrape added |
 | Mar 1 | Systemic failure fixes (8 changes) | handler.js events bug, borough detection, sign-off handling, early/tonight conflict, zero-match prompt hardening |
 | Mar 1 | Fix eval gaps #8 + #9 | Neighborhood skew: 8 multi-turn + 4 regression scenarios for outer boroughs. Trace race: `getTraceById` replaces phone-based lookup in test endpoint |
@@ -516,7 +519,7 @@ Google Places deferred — the signals it provides (Popular Times, review count,
 
 ## Not Building
 
-- ~~Happy hours / venue busyness / bar discovery~~ — Happy hour detection moved to near-term roadmap; Google Places enrichment (Popular Times, review signals) moved to community layer Phase 3 for community-score heuristics; general bar discovery (no event connection) still out of scope
+- ~~Happy hours / venue busyness / bar discovery~~ — Happy hour detection moved to near-term roadmap; Google Places enrichment (Popular Times, review signals) deferred — noisy proxies for things we classify better by hand; general bar discovery (no event connection) still out of scope
 - Yelp/Foursquare venue DB — Google Places covers the venue metadata we need (Popular Times, review count, price level); no need for additional venue APIs
 - X/Twitter — expensive API, poor geo, ToS risk
 - Time Out NY — aggressive anti-bot, DoNYC covers similar

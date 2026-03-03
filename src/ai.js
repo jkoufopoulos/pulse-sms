@@ -503,8 +503,7 @@ async function unifiedRespond(message, { session, events, neighborhood, nearbyHo
         recurring: e.is_recurring ? e.recurrence_label : undefined,
         venue_size: e.venue_size || undefined,
         interaction_format: e.interaction_format || undefined,
-        source_curation: e.source_curation || undefined,
-        community_score: e.community_score || undefined,
+        source_vibe: e.source_vibe || undefined,
       });
     }).join('\n');
   }

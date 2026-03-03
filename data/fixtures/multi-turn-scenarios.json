@@ -10559,6 +10559,40 @@
       "difficulty": "should_pass",
       "generated_at": "2026-03-02T23:35:33.599Z",
       "generated_by": "claude-code-agent"
+    },
+    {
+      "name": "Editorial lean: discovery sources over mainstream",
+      "category": "editorial",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "Tonight in Bushwick:",
+          "assert": "contains"
+        },
+        {
+          "sender": "user",
+          "message": "how about williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "Williamsburg",
+          "assert": "contains"
+        }
+      ],
+      "testing": "When discovery-tier sources (Skint, NonsenseNYC, BrooklynVegan) and mainstream sources coexist in the pool, picks should lean toward discovery events. Code eval discovery_lean measures this.",
+      "expected_behavior": "Picks favor editorial/curated events from discovery sources over generic aggregator listings. Tone is opinionated, not catalog-style.",
+      "failure_modes": [
+        "Leads with Ticketmaster/Eventbrite listings when editorial sources have coverage",
+        "All picks from platform/mainstream sources when discovery events available",
+        "Generic listing tone with no editorial voice"
+      ],
+      "difficulty": "should_pass",
+      "generated_at": "2026-03-03T22:00:00.000Z",
+      "generated_by": "claude-code-agent"
     }
   ]
 }

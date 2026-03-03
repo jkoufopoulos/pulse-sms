@@ -156,6 +156,7 @@ async function resolveUnifiedContext(message, session, preDetectedFilters, phone
     source_name: e.source_name,
     filter_match: e.filter_match,
     ticket_url: e.ticket_url || null,
+    source_vibe: e.source_vibe || null,
   }));
   trace.events.pool_meta = { matchCount, hardCount, softCount, isSparse };
 
@@ -217,6 +218,7 @@ async function callUnified(message, unifiedCtx, session, history, phone, trace, 
       is_free: evt?.is_free ?? null,
       price_display: evt?.price_display || null,
       start_time_local: evt?.start_time_local || null,
+      source_vibe: evt?.source_vibe || null,
     };
   });
   trace.composition.active_filters = activeFilters || null;

@@ -3,8 +3,40 @@ const { getNycDateString, resolveNeighborhood } = require('../geo');
 const { learnVenueCoords } = require('../venues');
 
 const API_URL = 'https://api.lu.ma/discover/get-paginated-events';
+const DETAIL_API_URL = 'https://api.lu.ma/event/get';
 const PAGE_LIMIT = 50;
 const MAX_PAGES = 20; // safety cap: 50 * 20 = 1000 events max
+const DETAIL_BATCH_SIZE = 10;
+
+/**
+ * Extract plain text from ProseMirror JSON (Luma's description format).
+ * Recursively walks nodes, extracts text content, joins with spaces.
+ */
+function extractTextFromProseMirror(node) {
+  if (!node) return '';
+  const parts = [];
+  if (node.text) parts.push(node.text);
+  if (Array.isArray(node.content)) {
+    for (const child of node.content) {
+      parts.push(extractTextFromProseMirror(child));
+    }
+  }
+  return parts.filter(Boolean).join(' ');
+}
+
+/**
+ * Map Luma category labels to our categories.
+ */
+const LUMA_CATEGORY_MAP = {
+  music: 'live_music',
+  comedy: 'comedy',
+  nightlife: 'nightlife',
+  film: 'film',
+  theater: 'theater',
+  art: 'art',
+  food: 'food_drink',
+  trivia: 'trivia',
+};
 
 /**
  * Infer event category from name keywords.
@@ -151,10 +183,26 @@ async function fetchLumaEvents() {
       if (seen.has(id)) continue;
       seen.add(id);
 
-      // Note: Luma discover API doesn't include descriptions (only on per-event detail endpoint)
+      // Social proof + capacity from API
+      const ti = entry.ticket_info || {};
+      const guestCount = entry.guest_count || 0;
+      const isSoldOut = ti.is_sold_out === true;
+      const isNearCapacity = ti.is_near_capacity === true;
+      const spotsRemaining = ti.spots_remaining || null;
+      const hostName = (entry.hosts || [])[0]?.name || null;
+
+      // Build description from social/capacity signals (API doesn't include event descriptions)
+      const descParts = [];
+      if (hostName) descParts.push(`Hosted by ${hostName}`);
+      if (isSoldOut) {
+        descParts.push('SOLD OUT');
+      } else if (isNearCapacity) {
+        descParts.push(spotsRemaining ? `Almost full (${spotsRemaining} spots left)` : 'Almost full');
+      }
+      if (guestCount >= 20) descParts.push(`${guestCount} going`);
+      const descShort = descParts.length > 0 ? descParts.join('. ') : null;
 
       // Price info
-      const ti = entry.ticket_info || {};
       const isFree = ti.is_free === true;
       let priceDisplay = null;
       if (isFree) {
@@ -170,12 +218,13 @@ async function fetchLumaEvents() {
       }
 
       events.push({
+        _apiId: ev.api_id || null, // used by enrichFromDetailAPI, removed after
         id,
         source_name: 'Luma',
         source_type: 'aggregator',
         name,
-        description_short: null,
-        short_detail: null,
+        description_short: descShort,
+        short_detail: descShort,
         venue_name: venueName,
         venue_address: venueAddress,
         neighborhood,
@@ -195,10 +244,86 @@ async function fetchLumaEvents() {
     }
 
     console.log(`Luma: ${events.length} events (after date/location filter)`);
+
+    // Enrich with descriptions from detail API
+    await enrichFromDetailAPI(events);
+
     return events;
   } catch (err) {
     console.error('Luma error:', err.message);
     return [];
+  }
+}
+
+/**
+ * Fetch event detail pages from Luma's internal API to get descriptions.
+ * The discover API doesn't include descriptions; the detail API returns
+ * `description_mirror` (ProseMirror JSON) and `categories`.
+ */
+async function enrichFromDetailAPI(events) {
+  const needsEnrich = events.filter(e => e._apiId);
+  if (needsEnrich.length === 0) return;
+
+  let enriched = 0;
+  let catImproved = 0;
+
+  for (let i = 0; i < needsEnrich.length; i += DETAIL_BATCH_SIZE) {
+    const batch = needsEnrich.slice(i, i + DETAIL_BATCH_SIZE);
+    const results = await Promise.allSettled(batch.map(async evt => {
+      const res = await fetch(`${DETAIL_API_URL}?event_api_id=${evt._apiId}`, {
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) return null;
+      return { evt, data: await res.json() };
+    }));
+
+    for (const r of results) {
+      if (r.status !== 'fulfilled' || !r.value) continue;
+      const { evt, data } = r.value;
+      const detail = data.event || data.data?.event || {};
+
+      // Extract description from ProseMirror JSON
+      if (detail.description_mirror) {
+        let text;
+        try {
+          const mirror = typeof detail.description_mirror === 'string'
+            ? JSON.parse(detail.description_mirror)
+            : detail.description_mirror;
+          text = extractTextFromProseMirror(mirror).replace(/\s+/g, ' ').trim();
+        } catch { /* ignore parse errors */ }
+        if (text && text.length > 10) {
+          const desc = text.length > 180 ? text.slice(0, 177) + '...' : text;
+          // Prepend social proof if we already have it, append description
+          if (evt.description_short) {
+            evt.description_short = evt.description_short + '. ' + desc;
+            evt.short_detail = evt.description_short;
+          } else {
+            evt.description_short = desc;
+            evt.short_detail = desc;
+          }
+          enriched++;
+        }
+      }
+
+      // Use Luma's own categories to improve inference
+      const cats = detail.categories || [];
+      if (cats.length > 0) {
+        const lumaCat = cats[0].toLowerCase();
+        const mapped = LUMA_CATEGORY_MAP[lumaCat];
+        if (mapped && evt.category === 'community') {
+          evt.category = mapped;
+          catImproved++;
+        }
+      }
+    }
+  }
+
+  // Clean up internal field
+  for (const evt of events) delete evt._apiId;
+
+  if (enriched > 0 || catImproved > 0) {
+    console.log(`Luma: enriched ${enriched} descriptions, ${catImproved} categories from ${needsEnrich.length} detail API calls`);
   }
 }
 

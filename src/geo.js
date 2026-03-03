@@ -140,11 +140,17 @@ function rankEventsByProximity(events, targetNeighborhood, { refTimeMs } = {}) {
     return { event: e, rawDist, sortDist, dateTier };
   });
 
+  // source_vibe tiebreaker: within same date+distance, favor discovery > niche > platform > mainstream
+  const vibeOrder = { discovery: 0, niche: 1, platform: 2, mainstream: 3 };
+
   return scored
     .filter(s => s.rawDist <= 3)
     .sort((a, b) => {
       if (a.dateTier !== b.dateTier) return a.dateTier - b.dateTier;
-      return a.sortDist - b.sortDist;
+      if (a.sortDist !== b.sortDist) return a.sortDist - b.sortDist;
+      const va = vibeOrder[a.event.source_vibe] ?? 2;
+      const vb = vibeOrder[b.event.source_vibe] ?? 2;
+      return va - vb;
     })
     .map(s => s.event);
 }

@@ -726,6 +726,38 @@ const evals = {
   },
 
   /**
+   * Discovery lean: when discovery/niche events are available in the pool,
+   * picks should favor them over platform/mainstream.
+   * Informational — always passes. Measures editorial lean effectiveness.
+   */
+  discovery_lean(trace) {
+    const picks = trace.composition.picks || [];
+    const sentPool = trace.events?.sent_pool || [];
+    if (picks.length === 0 || sentPool.length === 0) {
+      return { name: 'discovery_lean', pass: true, detail: 'no picks or no pool' };
+    }
+    // Count discovery/niche events available in the pool
+    const discoveryInPool = sentPool.filter(e =>
+      e.source_vibe === 'discovery' || e.source_vibe === 'niche'
+    );
+    if (discoveryInPool.length < 2) {
+      return { name: 'discovery_lean', pass: true, detail: `${discoveryInPool.length} discovery/niche in pool (insufficient to measure)` };
+    }
+    // Check what was picked
+    const poolById = new Map(sentPool.map(e => [e.id, e]));
+    const discoveryPicks = picks.filter(p => {
+      const poolEvt = poolById.get(p.event_id);
+      return poolEvt?.source_vibe === 'discovery' || poolEvt?.source_vibe === 'niche';
+    });
+    const ratio = discoveryPicks.length / picks.length;
+    return {
+      name: 'discovery_lean',
+      pass: true, // informational — always passes until we establish a baseline
+      detail: `${discoveryPicks.length}/${picks.length} picks from discovery/niche (${Math.round(ratio * 100)}%) — pool had ${discoveryInPool.length}/${sentPool.length}`,
+    };
+  },
+
+  /**
    * Total latency should be under 10s
    */
   latency_under_10s(trace) {

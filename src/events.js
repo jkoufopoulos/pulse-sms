@@ -97,6 +97,9 @@ function classifyInteractionFormat(event) {
   if (subcat === 'mixtape_bingo') return 'interactive';
   if (/\bcommunal\s*din/.test(name) || /\bsupper\s*club\b/.test(name)) return 'interactive';
   if (/\bspeed\s*dat/.test(name)) return 'interactive';
+  if (/\bbook\s*club\b/.test(name)) return 'interactive';
+  if (/\bsocial\s*mixer\b|\bnetworking\s*mixer\b/.test(name)) return 'interactive';
+  if (/\bnewcomer\b|\bwelcome\s*night\b/.test(name)) return 'interactive';
 
   // --- Participatory: you might perform, audience is active ---
   if (/\bopen\s*mic\b/.test(name)) return 'participatory';
@@ -115,44 +118,47 @@ function classifyInteractionFormat(event) {
   if (cat === 'art') return /\bexhibit|installation|gallery\b/.test(name) ? 'passive' : null;
   if (cat === 'dance') return /\bclass|lesson|social\b/.test(name) ? 'interactive' : 'passive';
   if (cat === 'literature') return 'participatory'; // readings have Q&A, signings
-  if (cat === 'community') return 'interactive'; // community events tend interactive
-  if (cat === 'food') return 'interactive'; // food events tend interactive
-  if (cat === 'market') return 'interactive'; // markets are walk-around
 
   return null;
 }
 
 /**
- * Source curation signal — classifies source_name into curation quality tiers.
- * curated: human-curated newsletters/blogs, single_venue: niche/single-venue, broad: aggregator platforms.
+ * Source vibe signal — classifies source_name into discovery-factor tiers.
+ * discovery: editorial picks, underground — the stuff your coolest friend knows about.
+ * niche: focused, known but specific venues/orgs.
+ * platform: broad coverage, mixed quality, some gems.
+ * mainstream: fills gaps, generic/commercial listings.
  */
-const SOURCE_CURATION = {
-  // Curated: human editors pick events
-  'theskint': 'curated', 'nonsensenyc': 'curated',
-  'brooklynvegan': 'curated', 'ScreenSlate': 'curated', 'bkmag': 'curated',
-  'yutori': 'curated',
-  // Single-venue or niche: focused, high signal-to-noise
-  'smallslive': 'single_venue', 'tinycupboard': 'single_venue', 'brooklyncc': 'single_venue',
-  'bam': 'single_venue', 'nypl': 'single_venue', 'nyctrivia': 'single_venue', 'nyc_parks': 'single_venue',
-  // Broad: aggregator platforms with everything
-  'ra': 'broad', 'dice': 'broad', 'donyc': 'broad', 'songkick': 'broad',
-  'ticketmaster': 'broad', 'Luma': 'broad', 'eventbrite': 'broad',
+const SOURCE_VIBE = {
+  // Discovery: editorial picks, underground, curated newsletters
+  'theskint': 'discovery', 'nonsensenyc': 'discovery',
+  'brooklynvegan': 'discovery', 'ScreenSlate': 'discovery', 'bkmag': 'discovery',
+  'yutori': 'discovery',
+  // Niche: focused, known but specific
+  'smallslive': 'niche', 'tinycupboard': 'niche', 'brooklyncc': 'niche',
+  'bam': 'niche', 'nypl': 'niche', 'nyctrivia': 'niche', 'nyc_parks': 'niche',
+  // Platform: broad aggregators, mixed quality
+  'ra': 'platform', 'dice': 'platform', 'donyc': 'platform', 'songkick': 'platform',
+  // Mainstream: fills gaps, generic/commercial
+  'ticketmaster': 'mainstream', 'eventbrite': 'mainstream',
+  // Luma is niche — community panels, creative meetups, food events, not generic commercial
+  'Luma': 'niche',
 };
 
 /**
- * Stamp source_curation on events from the SOURCE_CURATION map.
+ * Stamp source_vibe on events from the SOURCE_VIBE map.
  */
-function stampSourceCuration(events) {
+function stampSourceVibe(events) {
   let stamped = 0;
   for (const e of events) {
-    const tier = SOURCE_CURATION[e.source_name];
+    const tier = SOURCE_VIBE[e.source_name];
     if (tier) {
-      e.source_curation = tier;
+      e.source_vibe = tier;
       stamped++;
     }
   }
   if (stamped > 0) {
-    console.log(`Source curation: ${stamped} events classified`);
+    console.log(`Source vibe: ${stamped} events classified`);
   }
 }
 
@@ -172,38 +178,6 @@ function stampInteractionFormat(events) {
   const total = counts.interactive + counts.participatory + counts.passive;
   if (total > 0) {
     console.log(`Interaction format: ${total} classified (${counts.interactive} interactive, ${counts.participatory} participatory, ${counts.passive} passive)`);
-  }
-}
-
-/**
- * Compute community score from all available signals.
- * recurring: +3, interactive format: +2, participatory: +1, intimate venue: +2,
- * medium venue: +1, free/cheap: +1, curated source: +1, single_venue source: +1.
- * Max ~9. Stamps community_score on events with score > 0.
- */
-function stampCommunityScore(events) {
-  let scored = 0;
-  for (const e of events) {
-    let score = 0;
-    if (e.is_recurring) score += 3;
-    if (e.interaction_format === 'interactive') score += 2;
-    else if (e.interaction_format === 'participatory') score += 1;
-    if (e.venue_size === 'intimate') score += 2;
-    else if (e.venue_size === 'medium') score += 1;
-    if (e.is_free || (e.price_display && /^\$?\d+/.test(e.price_display) && parseFloat(e.price_display.replace('$', '')) <= 10)) score += 1;
-    if (e.source_curation === 'curated') score += 1;
-    else if (e.source_curation === 'single_venue') score += 1;
-    if (score > 0) {
-      e.community_score = score;
-      scored++;
-    }
-  }
-  if (scored > 0) {
-    // Distribution summary
-    const high = events.filter(e => e.community_score >= 6).length;
-    const mid = events.filter(e => e.community_score >= 3 && e.community_score < 6).length;
-    const low = events.filter(e => e.community_score > 0 && e.community_score < 3).length;
-    console.log(`Community score: ${scored} scored (${high} high 6+, ${mid} mid 3-5, ${low} low 1-2)`);
   }
 }
 
@@ -245,8 +219,7 @@ try {
     stampRecurrence(eventCache);
     stampVenueSize(eventCache);
     stampInteractionFormat(eventCache);
-    stampSourceCuration(eventCache);
-    stampCommunityScore(eventCache);
+    stampSourceVibe(eventCache);
     cacheTimestamp = Date.now();
     console.log(`Loaded ${eventCache.length} events from SQLite (${dbEvents.length} scraped + ${fresh.length} recurring)`);
   }
@@ -575,8 +548,7 @@ async function refreshSources(sourceNames, { reprocess = false } = {}) {
     stampRecurrence(eventCache);
     stampVenueSize(eventCache);
     stampInteractionFormat(eventCache);
-    stampSourceCuration(eventCache);
-    stampCommunityScore(eventCache);
+    stampSourceVibe(eventCache);
     cacheTimestamp = Date.now();
   } catch (err) {
     // SQLite failed — fall back to in-memory merge
@@ -691,8 +663,9 @@ async function getEventsForBorough(borough, { dateRange, filters } = {}) {
     return d >= rangeStart && d <= rangeEnd;
   });
 
-  // Sort by date proximity x source tier (same as citywide)
+  // Sort by date proximity x source tier x source vibe (discovery first)
   const tierOrder = { unstructured: 0, primary: 1, secondary: 2 };
+  const vibeOrder = { discovery: 0, niche: 1, platform: 2, mainstream: 3 };
   const sortFn = (a, b) => {
     const dateA = getEventDate(a) || rangeEnd;
     const dateB = getEventDate(b) || rangeEnd;
@@ -700,6 +673,9 @@ async function getEventsForBorough(borough, { dateRange, filters } = {}) {
     const tierA = tierOrder[a.source_tier] ?? 2;
     const tierB = tierOrder[b.source_tier] ?? 2;
     if (tierA !== tierB) return tierA - tierB;
+    const va = vibeOrder[a.source_vibe] ?? 2;
+    const vb = vibeOrder[b.source_vibe] ?? 2;
+    if (va !== vb) return va - vb;
     const confA = a.extraction_confidence ?? 1;
     const confB = b.extraction_confidence ?? 1;
     return confB - confA;
@@ -744,8 +720,9 @@ async function getEventsCitywide({ dateRange, filters } = {}) {
     return d >= rangeStart && d <= rangeEnd;
   });
 
-  // Rank by: date proximity (today first) x source tier quality
+  // Rank by: date proximity (today first) x source tier x source vibe (discovery first)
   const tierOrder = { unstructured: 0, primary: 1, secondary: 2 };
+  const vibeOrder = { discovery: 0, niche: 1, platform: 2, mainstream: 3 };
   const sortFn = (a, b) => {
     const dateA = getEventDate(a) || rangeEnd;
     const dateB = getEventDate(b) || rangeEnd;
@@ -753,6 +730,9 @@ async function getEventsCitywide({ dateRange, filters } = {}) {
     const tierA = tierOrder[a.source_tier] ?? 2;
     const tierB = tierOrder[b.source_tier] ?? 2;
     if (tierA !== tierB) return tierA - tierB;
+    const va = vibeOrder[a.source_vibe] ?? 2;
+    const vb = vibeOrder[b.source_vibe] ?? 2;
+    if (va !== vb) return va - vb;
     const confA = a.extraction_confidence ?? 1;
     const confB = b.extraction_confidence ?? 1;
     return confB - confA;
