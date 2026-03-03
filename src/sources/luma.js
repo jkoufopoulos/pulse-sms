@@ -33,9 +33,14 @@ const LUMA_CATEGORY_MAP = {
   nightlife: 'nightlife',
   film: 'film',
   theater: 'theater',
+  arts: 'art',
   art: 'art',
   food: 'food_drink',
-  trivia: 'trivia',
+  fitness: 'community',
+  wellness: 'community',
+  tech: 'community',
+  ai: 'community',
+  crypto: 'community',
 };
 
 /**
@@ -281,15 +286,14 @@ async function enrichFromDetailAPI(events) {
     for (const r of results) {
       if (r.status !== 'fulfilled' || !r.value) continue;
       const { evt, data } = r.value;
-      const detail = data.event || data.data?.event || {};
 
-      // Extract description from ProseMirror JSON
-      if (detail.description_mirror) {
+      // Extract description from ProseMirror JSON (top-level field, not inside data.event)
+      if (data.description_mirror) {
         let text;
         try {
-          const mirror = typeof detail.description_mirror === 'string'
-            ? JSON.parse(detail.description_mirror)
-            : detail.description_mirror;
+          const mirror = typeof data.description_mirror === 'string'
+            ? JSON.parse(data.description_mirror)
+            : data.description_mirror;
           text = extractTextFromProseMirror(mirror).replace(/\s+/g, ' ').trim();
         } catch { /* ignore parse errors */ }
         if (text && text.length > 10) {
@@ -307,9 +311,9 @@ async function enrichFromDetailAPI(events) {
       }
 
       // Use Luma's own categories to improve inference
-      const cats = detail.categories || [];
+      const cats = data.categories || [];
       if (cats.length > 0) {
-        const lumaCat = cats[0].toLowerCase();
+        const lumaCat = (cats[0].slug || cats[0].name || '').toLowerCase();
         const mapped = LUMA_CATEGORY_MAP[lumaCat];
         if (mapped && evt.category === 'community') {
           evt.category = mapped;
