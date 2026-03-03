@@ -109,7 +109,7 @@ const BRAIN_TOOLS = [
       parameters: {
         type: 'OBJECT',
         properties: {
-          message: { type: 'STRING', description: 'SMS response text, max 480 characters. Be warm, brief, on-brand.' },
+          message: { type: 'STRING', description: 'SMS response text, max 480 chars. Be warm, brief. ALWAYS end with a redirect to events (e.g. "Drop a neighborhood or tell me what you are in the mood for!" or "Text me a neighborhood to get started!")' },
           intent: {
             type: 'STRING',
             enum: ['greeting', 'thanks', 'farewell', 'off_topic', 'clarify', 'acknowledge'],
@@ -431,7 +431,7 @@ async function callAgentBrainAnthropic(message, session, phone, trace, brainStar
       input_schema: {
         type: 'object',
         properties: {
-          message: { type: 'string', description: 'SMS response text, max 480 chars' },
+          message: { type: 'string', description: 'SMS response text, max 480 chars. ALWAYS end with a redirect to events (e.g. "Drop a neighborhood or tell me what you are in the mood for!")' },
           intent: { type: 'string', enum: ['greeting', 'thanks', 'farewell', 'off_topic', 'clarify', 'acknowledge'] },
         },
         required: ['message', 'intent'],
@@ -474,20 +474,28 @@ async function callAgentBrainAnthropic(message, session, phone, trace, brainStar
 // --- Lightweight compose for brain path ---
 // ~400 tokens system prompt vs ~2000+ for unified. No routing, no intent, just write the SMS.
 
-const BRAIN_COMPOSE_SYSTEM = `You are Bestie, an NYC nightlife SMS bot. Write a short, warm SMS recommending events from the list below.
+const BRAIN_COMPOSE_SYSTEM = `You are Bestie, an NYC nightlife SMS bot. Write a short, warm SMS recommending events.
+
+FORMAT (MANDATORY — always use numbered picks):
+Line 1: Short intro (e.g. "Tonight in East Village:")
+Then numbered events:
+1) Event Name at Venue — your take. Time, price
+2) Event Name at Venue — your take. Time, price
+3) Event Name at Venue — your take. Time, price
+Last line: "Reply 1-N for details, MORE for extra picks, or FREE for free events"
 
 RULES:
-- Pick 1-3 best events. Prefer [MATCH] events. Prefer TODAY over tomorrow.
-- Numbered format: "1) Event at Venue — your take. Time, price"
-- Every pick MUST mention price ("$20", "free", "cover") and time
-- Label TODAY events as "tonight", TOMORROW as "tomorrow", further out by day name
-- End with "Reply 1-N for details, MORE for extra picks, or FREE for free events"
-- Under 480 characters total
-- If events are [NEARBY] (different neighborhood), mention that
-- If picks are thin (SPARSE), acknowledge honestly and suggest nearby neighborhoods
-- Voice: friend texting picks. Opinionated, concise, warm.
+- Pick 1-3 best events from the provided list. Prefer [MATCH] events first, then others.
+- Prefer TODAY over tomorrow. Prefer soonest events.
+- EVERY pick MUST include: event name, venue name, your opinionated take, start time, and price ("$20", "free", "cover")
+- Label TODAY as "tonight", TOMORROW as "tomorrow", further out by day name
+- [NEARBY] events are from adjacent neighborhoods — you MUST label each with its actual neighborhood in parentheses, e.g. "at Venue (Fort Greene)". If ALL picks are [NEARBY], lead with "Not much in [hood] tonight, but nearby:"
+- If SPARSE, be honest about slim pickings but still show what's available
+- Under 480 characters total. No URLs.
+- Voice: friend texting. Opinionated, concise, warm.
 
-Return JSON: { "sms_text": "...", "picks": [{"rank": 1, "event_id": "...", "why": "..."}] }`;
+Return JSON: { "sms_text": "the full SMS", "picks": [{"rank": 1, "event_id": "id from the event", "why": "short reason"}] }
+The picks array MUST match the numbered events in sms_text.`;
 
 const BRAIN_COMPOSE_SCHEMA = {
   type: 'object',
@@ -505,6 +513,13 @@ const BRAIN_COMPOSE_SCHEMA = {
   },
   required: ['sms_text', 'picks'],
 };
+
+/**
+ * Strip markdown code fences from LLM JSON responses.
+ */
+function stripCodeFences(text) {
+  return text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+}
 
 /**
  * Lightweight compose — Gemini Flash with minimal prompt, Anthropic fallback.
@@ -541,12 +556,13 @@ async function brainCompose(events, options = {}) {
   const genAI = getGeminiClient();
   if (genAI) {
     try {
+      // Use flash-lite for compose — minimal thinking, much faster for simple generation
       const model = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.5-flash-lite',
         systemInstruction: BRAIN_COMPOSE_SYSTEM,
         safetySettings: GEMINI_SAFETY,
         generationConfig: {
-          maxOutputTokens: 512,
+          maxOutputTokens: 1024,
           temperature: 0.6,
           responseMimeType: 'application/json',
           responseSchema: BRAIN_COMPOSE_SCHEMA,
@@ -559,7 +575,7 @@ async function brainCompose(events, options = {}) {
       const text = result.response.text();
       const usage = { input_tokens: result.response.usageMetadata?.promptTokenCount || 0,
                       output_tokens: result.response.usageMetadata?.candidatesTokenCount || 0 };
-      const parsed = JSON.parse(text);
+      const parsed = JSON.parse(stripCodeFences(text));
       return { sms_text: smartTruncate(parsed.sms_text), picks: parsed.picks || [], _raw: text, _usage: usage, _provider: 'gemini' };
     } catch (err) {
       console.warn('brainCompose Gemini failed, falling back to Anthropic:', err.message);
@@ -577,7 +593,7 @@ async function brainCompose(events, options = {}) {
   }, { timeout: 10000 }), 12000, 'brainCompose-anthropic');
   const raw = response.content?.[0]?.text || '';
   const usage = response.usage || {};
-  const parsed = JSON.parse(raw);
+  const parsed = JSON.parse(stripCodeFences(raw));
   return { sms_text: smartTruncate(parsed.sms_text), picks: parsed.picks || [], _raw: raw, _usage: usage, _provider: 'anthropic' };
 }
 
