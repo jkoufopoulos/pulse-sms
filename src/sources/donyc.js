@@ -203,22 +203,22 @@ function extractDetailsFromPage(html) {
     }
   }
 
-  // Description extraction
+  // Description extraction — only use .ds-event-description (detail is too noisy)
   let description = null;
   const descEl = $('.ds-event-description').first();
   if (descEl.length) {
-    const text = descEl.text().trim();
+    let text = descEl.text().trim();
+    // Strip leading whitespace/newlines and collapse internal whitespace
+    text = text.replace(/\s+/g, ' ').trim();
     if (text.length > 10) {
       description = text.length > 180 ? text.slice(0, 177) + '...' : text;
     }
   }
   if (!description) {
-    const detailEl = $('.ds-event-detail').first();
-    if (detailEl.length) {
-      const text = detailEl.text().trim();
-      if (text.length > 10) {
-        description = text.length > 180 ? text.slice(0, 177) + '...' : text;
-      }
+    // Fallback: og:description meta tag (clean summary)
+    const ogDesc = $('meta[property="og:description"]').attr('content');
+    if (ogDesc && ogDesc.length > 10) {
+      description = ogDesc.length > 180 ? ogDesc.slice(0, 177) + '...' : ogDesc;
     }
   }
 
