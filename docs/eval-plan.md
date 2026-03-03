@@ -1,3 +1,5 @@
+> **Historical:** Original eval system design. Current system documented in docs/eval-howto.md.
+
 # Pulse Eval Plan
 
 ## Current State

@@ -1,3 +1,5 @@
+> **Historical:** Step 2 implementation prompt (completed).
+
 # Step 2: Compound Pre-Router Extraction
 
 ## Context

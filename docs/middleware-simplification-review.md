@@ -1,3 +1,5 @@
+> **Historical:** Closed code review.
+
 # Middleware Simplification — Code Review
 
 > **Status: CLOSED** — All 3 bugs fixed, dead code removed, review complete. Regressions #4 and #5 accepted (simpler code, Claude handles edge cases naturally).

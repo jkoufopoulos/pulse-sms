@@ -332,8 +332,8 @@
       </div>
     </div>
     <div class="eval-card-desc">
-      9 deterministic checks on request traces &mdash; character limits, valid intents and neighborhoods,
-      picked events exist in pool, valid URLs. Runs on stored traces with zero AI cost.
+      22 deterministic checks on request traces &mdash; character limits, valid intents, neighborhoods,
+      filter accuracy, pick alignment, URLs, and more. Runs on stored traces with zero AI cost.
     </div>
     <div class="eval-card-stat">
       <span class="stat-label">Traces</span>
@@ -353,12 +353,13 @@
     <div class="eval-card-header">
       <div class="eval-card-title">Scenario Evals</div>
       <div class="eval-card-badges">
-        <span class="cost-badge paid">~$1.20</span>
+        <span class="cost-badge free">Free</span>
       </div>
     </div>
     <div class="eval-card-desc">
-      64 multi-turn SMS conversations with LLM judge scoring. Tests happy paths, filter drift,
-      edge cases, abuse handling, and poor experience recovery. Requires a running server.
+      293 multi-turn SMS conversations with 22 deterministic code evals per turn &mdash; verifies
+      filters, neighborhoods, pick accuracy, URLs, and data integrity. Free by default; add
+      <code>--judge</code> for LLM behavioral scoring (~$1.20). Requires a running server.
     </div>
     <div class="eval-card-stat">
       <span class="stat-label">Latest</span>
@@ -448,8 +449,8 @@
       <p>Run scenario evals to validate end-to-end behavior. Review failures in the <a href="/eval-report" style="color:#93c5fd">Reports</a> dashboard.</p>
     </div>
     <div class="how-card">
-      <h3><span class="step-num">6</span>Override false failures</h3>
-      <p>In the Reports dashboard, mark data-dependent or false failures with human overrides so they don't pollute the pass rate.</p>
+      <h3><span class="step-num">6</span>Label scenarios</h3>
+      <p>In the Reports dashboard, review conversations and mark pass/fail. Use <kbd>j</kbd>/<kbd>k</kbd> to navigate, <kbd>p</kbd>/<kbd>f</kbd> to label quickly.</p>
     </div>
   </div>
 </div>
@@ -528,7 +529,7 @@ async function loadStats() {
     document.getElementById('traces-stat').className = 'stat-value neutral';
   }
 
-  // Scenario evals
+  // Scenario evals — show code eval rate when no judge, judge rate otherwise
   try {
     var res = await fetch('/api/eval-reports?type=scenario');
     if (res.ok) {
@@ -536,9 +537,17 @@ async function loadStats() {
       var el = document.getElementById('scenario-stat');
       if (reports.length > 0) {
         var latest = reports[0];
-        var rate = latest.total > 0 ? Math.round(100 * latest.passed / latest.total) : 0;
-        el.textContent = rate + '% (' + latest.passed + '/' + latest.total + ')';
-        el.className = 'stat-value ' + rateColor(rate);
+        var ce = latest.code_evals;
+        var isNoJudge = (!latest.judge_cost || latest.judge_cost === 0) && latest.passed === 0;
+        if (isNoJudge && ce && ce.total > 0) {
+          var ceRate = Math.round(100 * ce.passed / ce.total);
+          el.textContent = ceRate + '% code evals (' + ce.passed + '/' + ce.total + ')';
+          el.className = 'stat-value ' + rateColor(ceRate);
+        } else {
+          var rate = latest.total > 0 ? Math.round(100 * latest.passed / latest.total) : 0;
+          el.textContent = rate + '% (' + latest.passed + '/' + latest.total + ')';
+          el.className = 'stat-value ' + rateColor(rate);
+        }
       } else {
         el.textContent = 'no reports';
         el.className = 'stat-value neutral';
