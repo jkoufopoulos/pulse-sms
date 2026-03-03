@@ -25,11 +25,13 @@ Pulse turns a simple text message into a curated night out. A user texts a neigh
 
 ## How Conversations Work
 
-Pulse routes every incoming message through a two-tier system: a fast deterministic pre-router and a unified LLM call. The handler owns all filter state deterministically — the LLM never manages filters, it only composes from a pre-tagged event pool.
+Pulse routes every incoming message through a two-tier system: a fast deterministic pre-router and an LLM call. The handler owns all filter state deterministically — the LLM never manages filters, it only composes from a pre-tagged event pool. Two LLM paths exist: the unified flow (default) and the agent brain (gated).
 
-**Pre-router (~15% of messages, zero AI cost)** — Pattern-matches mechanical shortcuts: help, numbers 1-5 for details, "more", greetings/thanks/bye, event name matches, and session-aware filter detection ("how about comedy", "free", "later tonight"). Filter detections are injected into the unified branch — the pre-router never composes responses for these.
+**Pre-router (~15% of messages, zero AI cost)** — Pattern-matches mechanical shortcuts: help, numbers 1-5 for details, "more", greetings/thanks/bye, event name matches, and session-aware filter detection ("how about comedy", "free", "later tonight"). Filter detections are injected into the LLM branch — the pre-router never composes responses for these.
 
-**Unified LLM call (~85% of messages, ~$0.001/call)** — A single Claude Haiku call that understands intent AND composes the SMS response. Handles neighborhoods, compound requests, off-topic deflection, nudge accepts, boroughs, and all semantic understanding. Receives a tagged event pool where filter-matched events are marked `[MATCH]`.
+**Unified LLM call (default path, ~$0.001/call)** — A single Claude Haiku call that understands intent AND composes the SMS response. Handles neighborhoods, compound requests, off-topic deflection, nudge accepts, boroughs, and all semantic understanding. Receives a tagged event pool where filter-matched events are marked `[MATCH]`.
+
+**Agent brain (`PULSE_AGENT_BRAIN=true`, ~$0.0005/call)** — Alternative path using Gemini 2.5 Flash Lite with tool calling. `checkMechanical` handles $0 shortcuts, then `callAgentBrain` invokes 3 tools (`search_events`, `get_details`, `respond`), followed by `brainCompose` for lightweight SMS composition. 2-3s typical latency. Falls back to Anthropic Haiku on Gemini 503s.
 
 A typical multi-turn conversation:
 ```
@@ -55,8 +57,8 @@ Daily scrape (10am ET)              Incoming SMS
         │                                │
         ▼                                ▼
    sources/                         handler.js
-   (23 source entries)               (request-guard.js:           $0
-        │                            TCPA, dedup, budget)
+   (23 entries across               (request-guard.js:           $0
+    21 scraper modules)              TCPA, dedup, budget)
         │                                │
         ├─► venues.js              pre-router.js ◄── session.js
         │   (auto-learn             (mechanical        (14 fields,
@@ -80,19 +82,25 @@ Daily scrape (10am ET)              Incoming SMS
         │                     ┌── [MATCH] + unmatched events
         │                     │   + ACTIVE_FILTER / SPARSE
         │                     ▼
-        └──────────►   ai.js/unifiedRespond
-                       (Claude Haiku, 1 call)          ~$0.001
-                       skills/ + prompts.js
-                       (15 conditional modules)
-                              │
-                              ▼
-                       handler saves                    $0
-                       activeFilters → lastFilters
-                       (deterministic, not LLM-derived)
-                              │
-                       formatters.js (480-char)
-                              │
-                       twilio.js (send SMS)            ~$0.008
+        │              ┌─────────────────────────────┐
+        │              │  PULSE_AGENT_BRAIN=true?     │
+        │              ├──── yes ────┬──── no ────────┤
+        │              ▼             ▼                │
+        │     agent-brain.js    ai.js/unifiedRespond  │
+        │     (Gemini 2.5       (Claude Haiku,        │
+        └─►   Flash Lite,       1 call)    ~$0.001   │
+              tool calling      skills/ + prompts.js  │
+              + brainCompose)   (15 conditional       │
+              ~$0.0005          modules)              │
+              └──────────┬───────────┘                │
+                         ▼
+                   handler saves                    $0
+                   activeFilters → lastFilters
+                   (deterministic, not LLM-derived)
+                         │
+                   formatters.js (480-char)
+                         │
+                   twilio.js (send SMS)            ~$0.008
 ```
 
 **Key modules** (all under `src/`):
@@ -105,15 +113,16 @@ Daily scrape (10am ET)              Incoming SMS
 | `pre-router.js` | Deterministic intent matching + session-aware filter detection. Returns `null` → unified LLM |
 | `pipeline.js` | `mergeFilters`, `buildTaggedPool`, `eventMatchesFilters`, `saveResponseFrame` (atomic session writes) |
 | `ai.js` | `unifiedRespond` (single Haiku call), `composeResponse` (handleMore), `extractEvents` (scrape-time) |
-| `prompts.js` | System prompts: `UNIFIED_SYSTEM`, `COMPOSE_SYSTEM`, `ROUTE_SYSTEM`, `EXTRACTION_PROMPT` |
+| `agent-brain.js` | Agent brain path: `checkMechanical` ($0), `callAgentBrain` (Gemini tool calling), `brainCompose`. Gated by `PULSE_AGENT_BRAIN=true` |
+| `prompts.js` | System prompts: `UNIFIED_SYSTEM`, `DETAILS_SYSTEM`, `EXTRACTION_PROMPT` |
 | `session.js` | Per-phone session store, 2hr TTL, 14 fields |
-| `events.js` | Daily event cache + disk persistence, cross-source dedup, quality gates |
-| `source-registry.js` | Single source of truth for all 23 source entries (weights, tiers, fetch functions) |
+| `events.js` | Daily event cache + disk persistence, cross-source dedup, quality gates, source vibe stamping |
+| `source-registry.js` | Single source of truth for all 23 source entries across 21 scraper modules (weights, tiers, fetch functions) |
 | `model-router.js` | Complexity scoring (0-100), routes Haiku vs Gemini Flash |
 
 Other modules: `intent-handlers.js` (help/details/more/convo), `geo.js` + `neighborhoods.js` (36 NYC hoods), `venues.js` (auto-learning coords), `formatters.js` (480-char cap), `twilio.js`, `traces.js`, `alerts.js`, `preference-profile.js`, `referral.js`, `card.js`, `curation.js`, `source-health.js`, `db.js` (SQLite).
 
-Sources: 23 entries across 19 scraper modules in `sources/` — see `source-registry.js` for the full list. Evals: 6 modules in `src/evals/`. Scripts: 13 runners in `scripts/`. UIs: 7 dashboards served by `server.js`.
+Sources: 23 entries across 21 scraper modules in `sources/` — see `source-registry.js` for the full list. Evals: 6 modules in `src/evals/`. Scripts: 13 runners in `scripts/`. UIs: 7 dashboards served by `server.js`.
 
 ## Design Principles (do not violate)
 
@@ -131,7 +140,7 @@ Sources: 23 entries across 19 scraper modules in `sources/` — see `source-regi
 
 Required: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `ANTHROPIC_API_KEY`, `TAVILY_API_KEY` (required at boot, not used in hot path).
 
-Optional: `PORT` (default 3000), `PULSE_TEST_MODE=true` (enables simulator), `GEMINI_API_KEY` (fallback provider), `TICKETMASTER_API_KEY`, `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`/`GMAIL_REFRESH_TOKEN` (newsletter scrapers), `RESEND_API_KEY`/`ALERT_EMAIL` (email alerts), `PULSE_NO_RATE_LIMIT=true`, `PULSE_CARD_DOMAIN`.
+Optional: `PORT` (default 3000), `PULSE_TEST_MODE=true` (enables simulator), `PULSE_AGENT_BRAIN=true` (enables agent brain path), `GEMINI_API_KEY` (agent brain + fallback provider), `TICKETMASTER_API_KEY`, `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`/`GMAIL_REFRESH_TOKEN` (newsletter scrapers), `RESEND_API_KEY`/`ALERT_EMAIL` (email alerts), `PULSE_NO_RATE_LIMIT=true`, `PULSE_CARD_DOMAIN`.
 
 Model overrides: `PULSE_MODEL_COMPOSE`, `PULSE_MODEL_EXTRACT`, `PULSE_MODEL_ROUTE`, `PULSE_MODEL_ROUTE_GEMINI`, `PULSE_ROUTE_PROVIDER`.
 

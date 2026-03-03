@@ -45,7 +45,7 @@ The server must be running for pipeline evals, scenario evals, and A/B evals. Un
 npm test
 ```
 
-**Read the output:** Every line says `PASS` or `FAIL` with the test name. Exit code 0 = all pass. Currently 419 tests.
+**Read the output:** Every line says `PASS` or `FAIL` with the test name. Exit code 0 = all pass. Currently 124 tests.
 
 **When to run:** After any code change, before committing. This is the fastest feedback loop.
 
@@ -55,7 +55,7 @@ npm test
 
 **What it checks:** Whether Claude's extracted events match the actual source text. Catches hallucinated venues, made-up times, invented prices, and overconfident extractions.
 
-**Sources covered:** The 5 Claude-extracted sources — Skint, Nonsense NYC, Oh My Rockness, Yutori, Tavily.
+**Sources covered:** The 4 Claude-extracted sources — Skint, Nonsense NYC, Yutori, Screen Slate.
 
 ### Tier 1 — Deterministic (runs automatically every scrape)
 
@@ -130,7 +130,7 @@ Key things to look for:
 
 **What it checks:** End-to-end SMS pipeline correctness — does the right intent get routed, the right neighborhood resolved, the right events picked, and the right SMS format produced?
 
-**Test cases:** 105 synthetic cases in `data/fixtures/synthetic-cases.json` covering:
+**Test cases:** 105 synthetic cases in `data/fixtures/synthetic-cases.json` plus 262 multi-turn scenarios and 124 regression scenarios (386 total golden dataset), covering:
 - 8 neighborhoods x 3 phrasings (direct, slang, question)
 - Landmark and subway-based neighborhood references
 - Free intent, more intent, details intent, help intent
@@ -139,7 +139,7 @@ Key things to look for:
 - Edge cases (emoji-only, single char, gibberish, very long messages)
 - Session context (same hood, different hood)
 - Filters (comedy, music, jazz, art, theater, vibes)
-- 25 multi-turn conversation flows
+- Multi-turn conversation flows across 5 categories (happy path, edge case, filter drift, poor experience, abuse)
 
 ### Code evals only (free, fast)
 
@@ -149,16 +149,39 @@ npm run eval
 node scripts/run-evals.js --url=http://localhost:3000
 ```
 
-Runs 9 deterministic checks per trace:
+Runs 24 deterministic checks per trace:
+
+**Core:**
 1. `char_limit` — SMS under 480 chars
 2. `valid_intent` — intent is one of 6 valid types
 3. `valid_neighborhood` — neighborhood is in the known set
-4. `picked_events_exist` — pick IDs match sent event IDs
+4. `response_not_empty` — SMS is not blank
 5. `valid_urls` — all URLs in SMS are parseable
-6. `off_topic_redirect` — conversational responses redirect to events
-7. `response_not_empty` — SMS is not blank
+6. `latency_under_10s` — total response time under 10 seconds
+
+**Data accuracy:**
+7. `picked_events_exist` — pick IDs match sent event IDs
 8. `day_label_accuracy` — "tonight" matches today's events, "tomorrow" matches tomorrow's
-9. `latency_under_10s` — total response time under 10 seconds
+9. `pick_count_accuracy` — numbered items in SMS match picks count
+10. `neighborhood_accuracy` — picked events are in the claimed neighborhood
+11. `category_adherence` — picks match the active category filter
+12. `free_claim_accuracy` — picks match the free_only filter
+13. `compound_filter_accuracy` — picks satisfy both free + category simultaneously
+14. `filter_match_alignment` — picks come from [MATCH]-tagged pool events
+15. `time_filter_accuracy` — picks start after the time_after filter
+16. `neighborhood_expansion_transparency` — SMS acknowledges when picks are from nearby hoods
+17. `price_transparency` — SMS mentions price or "free" when data is available
+
+**Schema/routing:**
+18. `schema_compliance` — LLM raw response is valid JSON with required fields
+19. `model_routing_captured` — trace has model routing score, tier, and model
+20. `ai_cost_tracked` — AI cost recorded for LLM-hitting traces
+
+**Behavioral:**
+21. `off_topic_redirect` — conversational responses redirect to events
+22. `filter_intent_gating` — LLM modify ignored when pre-router set filters (P1)
+23. `split_validation_effective` — reports split-mode intervention stats (informational)
+24. `discovery_lean` — measures editorial lean toward discovery/niche sources (informational)
 
 Plus expectation checks per case (expected intent, expected neighborhood, banned words).
 
@@ -207,7 +230,7 @@ Tags appear in the report JSON for comparison across runs.
 
 **What it checks:** Behavioral correctness across multi-turn conversations — does the bot handle conversation flows naturally? Does session context carry forward? Does it handle edge cases gracefully?
 
-**Test cases:** `data/fixtures/multi-turn-scenarios.json` — scripted conversations with expected behavior descriptions and known failure modes.
+**Test cases:** `data/fixtures/multi-turn-scenarios.json` (262 scenarios across 5 categories: happy path, edge case, filter drift, poor experience, abuse) — scripted conversations with expected behavior descriptions and known failure modes.
 
 **Run:**
 ```bash
@@ -215,13 +238,19 @@ Tags appear in the report JSON for comparison across runs.
 node scripts/run-scenario-evals.js
 
 # Filter by category:
-node scripts/run-scenario-evals.js --category=details
+node scripts/run-scenario-evals.js --category=filter_drift
+
+# Filter by difficulty:
+node scripts/run-scenario-evals.js --difficulty=hard
 
 # Filter by name:
 node scripts/run-scenario-evals.js --name="events then details"
 
 # Against deployed server:
 node scripts/run-scenario-evals.js --url=https://web-production-c8fdb.up.railway.app
+
+# With LLM judge (costs API tokens):
+node scripts/run-scenario-evals.js --judge
 ```
 
 Each scenario:
@@ -248,6 +277,45 @@ Key things to look for:
 - **Details flow** — user asks about pick #1, bot responds about wrong event
 - **More flow** — bot re-sends same events instead of new ones
 - **Hood switch** — user changes neighborhood, bot still shows old neighborhood events
+
+---
+
+## Layer 3b: Regression Evals
+
+**What it checks:** Principle-specific behavioral assertions tied to P1-P12 architecture principles. Each scenario has deterministic assertions (not LLM-judged) that verify specific invariants.
+
+**Test cases:** `data/fixtures/regression-scenarios.json` — 124 scenarios with assertions tied to specific principles.
+
+**Run:**
+```bash
+# All regression scenarios:
+node scripts/run-regression-evals.js
+
+# Against deployed server:
+node scripts/run-regression-evals.js --url=https://web-production-c8fdb.up.railway.app
+```
+
+**When to run:** After any change that touches handler.js, pipeline.js, pre-router.js, or session state logic. These catch principle violations that scenario evals might miss.
+
+---
+
+## CC Agent Analysis (Alternative to LLM Judge)
+
+Instead of running scenario evals with `--judge` (which costs API tokens), you can run evals without the judge flag, then analyze the resulting JSON reports using Claude Code agents. This is cheaper, faster, and more nuanced.
+
+**Workflow:**
+```bash
+# 1. Run evals (no --judge flag):
+node scripts/run-scenario-evals.js
+node scripts/run-regression-evals.js
+
+# 2. Analyze reports with CC agents (fan out 3 in parallel):
+# - Agent 1: Analyze scenario eval report for failures
+# - Agent 2: Analyze regression eval report for principle violations
+# - Agent 3: Cross-reference failures with filter drift patterns
+```
+
+Reports are saved to `data/reports/` as JSON. The CC agent reads the JSON and provides nuanced analysis of failures, filter drift, and behavioral regressions.
 
 ---
 
