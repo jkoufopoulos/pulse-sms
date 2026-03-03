@@ -112,6 +112,12 @@ async function fetchLumaEvents() {
       const cLng = parseFloat(coord?.longitude);
       if (!isNaN(cLat) && !isNaN(cLng) && !isInsideNYC(cLat, cLng)) continue;
 
+      // Address/city filter — bbox includes parts of NJ (Jersey City, Hoboken)
+      const geoCity = (geo?.city_state || geo?.city || '').toLowerCase();
+      const geoAddr = (geo?.full_address || geo?.short_address || '').toLowerCase();
+      const geoText = geoCity + ' ' + geoAddr;
+      if (/\b(new jersey|new jersey|nj\b|jersey city|hoboken|hackensack|newark|clifton|montclair|englewood|bayonne|weehawken|union city|fort lee|westchester|yonkers|white plains|connecticut)\b/.test(geoText)) continue;
+
       // Extract date in NYC timezone
       if (!ev.start_at) continue;
       const startAt = new Date(ev.start_at);
