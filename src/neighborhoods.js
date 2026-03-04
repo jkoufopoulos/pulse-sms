@@ -50,7 +50,7 @@ const NEIGHBORHOODS = {
   },
   'Flatiron': {
     lat: 40.7395, lng: -73.9903, radius_km: 0.6,
-    aliases: ['flatiron', 'flatiron district', 'union square', 'union sq']
+    aliases: ['flatiron', 'flatiron district', 'union square', 'union sq', 'nomad']
   },
   'Upper West Side': {
     lat: 40.7870, lng: -73.9754, radius_km: 1.5,
@@ -94,7 +94,7 @@ const NEIGHBORHOODS = {
   },
   'Financial District': {
     lat: 40.7075, lng: -74.0089, radius_km: 0.8,
-    aliases: ['financial district', 'fidi', 'wall street', 'downtown manhattan']
+    aliases: ['financial district', 'fidi', 'wall street', 'downtown manhattan', 'lower manhattan']
   },
   'Battery Park City': {
     lat: 40.7115, lng: -74.0167, radius_km: 0.6,
