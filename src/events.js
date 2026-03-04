@@ -133,7 +133,7 @@ const SOURCE_VIBE = {
   // Discovery: editorial picks, underground, curated newsletters
   'theskint': 'discovery', 'nonsensenyc': 'discovery',
   'brooklynvegan': 'discovery', 'ScreenSlate': 'discovery', 'bkmag': 'discovery',
-  'yutori': 'discovery',
+  'yutori': 'discovery', 'SofarSounds': 'discovery',
   // Niche: focused, known but specific
   'tinycupboard': 'niche', 'brooklyncc': 'niche',
   'bam': 'niche', 'nypl': 'niche', 'nyctrivia': 'niche', 'nyc_parks': 'niche',

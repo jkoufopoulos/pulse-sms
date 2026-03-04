@@ -1,4 +1,4 @@
-const { fetchSkintEvents, fetchSkintOngoingEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchNonsenseNYC, fetchDoNYCEvents, fetchBAMEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents, fetchTicketmasterEvents, fetchYutoriEvents, fetchScreenSlateEvents, fetchLumaEvents, fetchTinyCupboardEvents, fetchBrooklynCCEvents, fetchNYCTriviaEvents, fetchBKMagEvents } = require('./sources');
+const { fetchSkintEvents, fetchSkintOngoingEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchNonsenseNYC, fetchDoNYCEvents, fetchBAMEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents, fetchTicketmasterEvents, fetchYutoriEvents, fetchScreenSlateEvents, fetchLumaEvents, fetchTinyCupboardEvents, fetchBrooklynCCEvents, fetchNYCTriviaEvents, fetchBKMagEvents, fetchSofarSoundsEvents } = require('./sources');
 
 // Source tier classification for compose prompt
 const SOURCE_TIERS = {
@@ -25,6 +25,7 @@ const SOURCE_TIERS = {
   BrooklynCC: 'secondary',
   NYCTrivia: 'secondary',
   BKMag: 'unstructured',
+  SofarSounds: 'secondary',
 };
 
 // ============================================================
@@ -57,6 +58,7 @@ const SOURCES = [
   { label: 'BrooklynCC',      fetch: fetchBrooklynCCEvents,    weight: 0.75, mergeRank: 6, endpoint: 'https://www.brooklyncc.com/show-schedule' },
   { label: 'NYCTrivia',       fetch: fetchNYCTriviaEvents,     weight: 0.75, mergeRank: 7, endpoint: 'https://nyctrivialeague.com/' },
   { label: 'BKMag',           fetch: fetchBKMagEvents,         weight: 0.9,  mergeRank: 3, endpoint: 'https://www.bkmag.com' },
+  { label: 'SofarSounds',    fetch: fetchSofarSoundsEvents,   weight: 0.8,  mergeRank: 4, endpoint: 'https://donyc.com/venues/sofar-sounds-secret-location' },
   // Tavily removed entirely — daily scrape returns 0 events, hot-path fallback added 9-15s
   // latency per request with 58% waste rate. All event data comes from the 18 scrapers above.
 ];
