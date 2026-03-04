@@ -57,8 +57,8 @@ Daily scrape (10am ET)              Incoming SMS
         │                                │
         ▼                                ▼
    sources/                         handler.js
-   (22 entries across               (request-guard.js:           $0
-    20 scraper modules)              TCPA, dedup, budget)
+   (23 entries across               (request-guard.js:           $0
+    21 scraper modules)              TCPA, dedup, budget)
         │                                │
         ├─► venues.js              pre-router.js ◄── session.js
         │   (auto-learn             (mechanical        (14 fields,
@@ -117,12 +117,12 @@ Daily scrape (10am ET)              Incoming SMS
 | `prompts.js` | System prompts: `UNIFIED_SYSTEM`, `DETAILS_SYSTEM`, `EXTRACTION_PROMPT` |
 | `session.js` | Per-phone session store, 2hr TTL, 14 fields |
 | `events.js` | Daily event cache + disk persistence, cross-source dedup, quality gates, source vibe stamping |
-| `source-registry.js` | Single source of truth for all 22 source entries across 20 scraper modules (weights, tiers, fetch functions) |
+| `source-registry.js` | Single source of truth for all 23 source entries across 21 scraper modules (weights, tiers, fetch functions) |
 | `model-router.js` | Complexity scoring (0-100), routes Haiku vs Gemini Flash |
 
 Other modules: `intent-handlers.js` (help/details/more/convo), `geo.js` + `neighborhoods.js` (36 NYC hoods), `venues.js` (auto-learning coords), `formatters.js` (480-char cap), `twilio.js`, `traces.js`, `alerts.js`, `preference-profile.js`, `referral.js`, `card.js`, `curation.js`, `source-health.js`, `db.js` (SQLite).
 
-Sources: 22 entries across 20 scraper modules in `sources/` — see `source-registry.js` for the full list. Evals: 6 modules in `src/evals/`. Scripts: 13 runners in `scripts/`. UIs: 7 dashboards served by `server.js`.
+Sources: 23 entries across 21 scraper modules in `sources/` — see `source-registry.js` for the full list. Evals: 6 modules in `src/evals/`. Scripts: 13 runners in `scripts/`. UIs: 7 dashboards served by `server.js`.
 
 ## Design Principles (do not violate)
 
