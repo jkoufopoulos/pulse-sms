@@ -41,7 +41,7 @@ function parseCards($, cards) {
     const neighborhood = hoodName ? resolveNeighborhood(hoodName, null, null) : null;
 
     const cardText = card.text();
-    const isFree = /\bfree\b/i.test(cardText);
+    const isFree = /\bfree\b/i.test(cardText) || /\$0(?:\.00)?/.test(cardText);
     let priceDisplay = isFree ? 'free' : null;
     if (!isFree) {
       const rangeMatch = cardText.match(/\$(\d+(?:\.\d{2})?)\s*[-–]\s*\$?(\d+(?:\.\d{2})?)/);
