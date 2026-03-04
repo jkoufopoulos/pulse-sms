@@ -340,3 +340,24 @@ check('short text returns null', short === null);
 
 // Source URL set
 check('fmtA: source_url set', fmtA && fmtA.source_url === 'https://theskint.com/ongoing-events/');
+
+
+// ---- Sofar Sounds: neighborhood extraction ----
+console.log('\nSofar Sounds scraper:');
+
+const { extractNeighborhood } = require('../../src/sources/sofarsounds');
+
+check('extracts "Meatpacking District"',
+  extractNeighborhood('Sofar Sounds - Meatpacking District') === 'Meatpacking District');
+check('extracts "East Village"',
+  extractNeighborhood('Sofar Sounds - East Village') === 'East Village');
+check('extracts "Lower Manhattan"',
+  extractNeighborhood('Sofar Sounds - Lower Manhattan') === 'Lower Manhattan');
+check('handles en-dash separator',
+  extractNeighborhood('Sofar Sounds – SOHO') === 'SOHO');
+check('handles em-dash separator',
+  extractNeighborhood('Sofar Sounds — Williamsburg') === 'Williamsburg');
+check('returns null for non-Sofar event',
+  extractNeighborhood('Jazz at Blue Note') === null);
+check('returns null for bare "Sofar Sounds"',
+  extractNeighborhood('Sofar Sounds') === null);
