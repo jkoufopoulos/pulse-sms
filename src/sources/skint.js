@@ -388,10 +388,14 @@ async function fetchSkintEvents() {
 
       if (eventPattern.test(text)) {
         eventParagraphs.push(text);
+        // Extract the href from the >> link (last <a> in the paragraph)
+        const lastLink = $(el).find('a').last();
+        const linkHref = lastLink.length ? lastLink.attr('href') : null;
         rawParagraphs.push({
           text,
           dateLocal: currentDayDate || todayIso,
           groupSeriesEnd: isBullet ? groupSeriesEnd : null,
+          eventUrl: linkHref || null,
         });
       }
     });
@@ -403,12 +407,16 @@ async function fetchSkintEvents() {
 
     // Phase 1: Deterministic parse
     const parsed = [];
-    for (const { text, dateLocal, groupSeriesEnd } of rawParagraphs) {
+    for (const { text, dateLocal, groupSeriesEnd, eventUrl } of rawParagraphs) {
       const event = parseSkintParagraph(text, dateLocal);
       if (event) {
         // ► sub-events inherit series_end from group header
         if (groupSeriesEnd && !event.series_end) {
           event.series_end = groupSeriesEnd;
+        }
+        // Use the direct event link instead of theskint.com
+        if (eventUrl) {
+          event.source_url = eventUrl;
         }
         parsed.push(event);
       }
@@ -722,7 +730,15 @@ async function fetchSkintOngoingEvents() {
       if (nonEventPattern.test(text)) return;
 
       const event = parseOngoingParagraph(text, todayIso, refYear);
-      if (event) parsed.push(event);
+      if (event) {
+        // Extract the href from the >> link (last <a> in the paragraph)
+        const lastLink = $(el).find('a').last();
+        const linkHref = lastLink.length ? lastLink.attr('href') : null;
+        if (linkHref) {
+          event.source_url = linkHref;
+        }
+        parsed.push(event);
+      }
     });
 
     // Filter out expired events (series_end < today)
