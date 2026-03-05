@@ -19,6 +19,7 @@ function makeHealthEntry() {
     totalScrapes: 0,        // lifetime scrape count
     totalSuccesses: 0,      // lifetime success count (events > 0)
     history: [],            // last 7 entries: { timestamp, count, durationMs, status }
+    lastQuarantineReason: null,
   };
 }
 
@@ -170,6 +171,7 @@ function getHealthStatus(cacheInfo) {
       duration_ms: h.lastDurationMs,
       last_error: h.lastError,
       last_scrape: h.lastScrapeAt,
+      quarantine_reason: h.lastQuarantineReason,
       success_rate: h.totalScrapes > 0
         ? Math.round((h.totalSuccesses / h.totalScrapes) * 100) + '%'
         : null,
@@ -177,8 +179,8 @@ function getHealthStatus(cacheInfo) {
     };
   }
 
-  const anyFailed = Object.values(sourceHealth).some(h => h.lastStatus === 'error' || h.lastStatus === 'timeout');
-  const allFailed = Object.values(sourceHealth).every(h => h.lastStatus === 'error' || h.lastStatus === 'timeout');
+  const anyFailed = Object.values(sourceHealth).some(h => h.lastStatus === 'error' || h.lastStatus === 'timeout' || h.lastStatus === 'quarantined');
+  const allFailed = Object.values(sourceHealth).every(h => h.lastStatus === 'error' || h.lastStatus === 'timeout' || h.lastStatus === 'quarantined');
 
   return {
     status: allFailed && lastScrapeStats.startedAt ? 'critical' : anyFailed ? 'degraded' : 'ok',

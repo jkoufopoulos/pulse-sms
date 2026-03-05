@@ -13,6 +13,7 @@ require('./unit/pipeline.test');
 require('./unit/ai.test');
 require('./unit/curation.test');
 require('./unit/scrapers.test');
+require('./unit/scrape-guard.test');
 require('./unit/db.test');
 const misc = require('./unit/misc.test');
 const profile = require('./unit/preference-profile.test');

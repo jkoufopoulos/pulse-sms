@@ -414,6 +414,8 @@ async function refreshCache() {
           console.warn(`[SCRAPE-GUARD] Quarantined ${label}: ${verdict.reason}`);
           result.status = 'quarantined';
           result.quarantineReason = verdict.reason;
+          sourceHealth[label].lastStatus = 'quarantined';
+          sourceHealth[label].lastQuarantineReason = verdict.reason;
           sourcesQuarantined++;
           continue; // skip merge — cache retains yesterday's events for this source
         }
