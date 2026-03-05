@@ -1318,6 +1318,12 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
 
     console.log(`Agent brain: tool=${brainResult.tool}, params=${JSON.stringify(brainResult.params)}, provider=${brainResult.provider}, ${brainResult.latency_ms}ms`);
 
+    // Record tool call in structured history
+    addToHistory(phone, 'tool_call', '', {
+      name: brainResult.tool,
+      params: brainResult.params,
+    });
+
     // Execute the tool
     let execResult;
 
@@ -1325,6 +1331,10 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
       const poolResult = await buildSearchPool(brainResult.params, session, phone, trace);
 
       if (poolResult.zeroMatch) {
+        addToHistory(phone, 'tool_result', '', {
+          match_count: 0,
+          neighborhood: poolResult.zeroMatch.activeFilters?.neighborhood || 'unknown',
+        });
         execResult = poolResult.zeroMatch;
       } else if (brainResult.chat) {
         // Single-turn: continue same Gemini session with event results
@@ -1364,6 +1374,16 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
 
           updateProfile(phone, { neighborhood: poolResult.hood, filters: poolResult.activeFilters, responseType: 'event_picks' })
             .catch(err => console.error('profile update failed:', err.message));
+
+          // Record tool result in structured history
+          addToHistory(phone, 'tool_result', '', {
+            picks: validPicks.slice(0, 3).map(p => {
+              const evt = eventMap[p.event_id];
+              return { name: evt?.name, category: evt?.category, neighborhood: evt?.neighborhood };
+            }),
+            match_count: poolResult.matchCount,
+            neighborhood: poolResult.hood || poolResult.borough || 'citywide',
+          });
 
           execResult = {
             sms: composeResult.sms_text,
