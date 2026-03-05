@@ -60,12 +60,15 @@ function generateDigest(eventCache, scrapeStats) {
   const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   const dayName = dayNames[new Date().getDay()];
 
-  // Source counts from cache
+  // Source counts from cache (lowercase keys for case-insensitive match with SOURCE_LABELS)
   const sourceCounts = {};
   const categoryCounts = {};
   let freeCount = 0;
   for (const e of eventCache) {
-    if (e.source_name) sourceCounts[e.source_name] = (sourceCounts[e.source_name] || 0) + 1;
+    if (e.source_name) {
+      const key = e.source_name.toLowerCase();
+      sourceCounts[key] = (sourceCounts[key] || 0) + 1;
+    }
     const cat = e.category || 'other';
     categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
     if (e.is_free) freeCount++;
@@ -81,9 +84,9 @@ function generateDigest(eventCache, scrapeStats) {
     const expectations = SOURCE_EXPECTATIONS[label] || { minExpected: 0, schedule: null };
     return {
       name: label,
-      count: sourceCounts[label] || 0,
+      count: sourceCounts[label.toLowerCase()] || 0,
       avg7d,
-      status: (sourceCounts[label] || 0) >= expectations.minExpected * 0.4 ? 'ok' : 'warn',
+      status: (sourceCounts[label.toLowerCase()] || 0) >= expectations.minExpected * 0.4 ? 'ok' : 'warn',
       ...expectations,
     };
   });
