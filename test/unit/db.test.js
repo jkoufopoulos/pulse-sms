@@ -488,4 +488,45 @@ function upsertEvents(db, events) {
   testDb.close();
 }
 
+// 19. Daily digests table
+{
+  console.log('\nDaily digests table:');
+
+  const testDb = createTestDb();
+
+  // Create digests table in test db
+  testDb.exec(`
+    CREATE TABLE IF NOT EXISTS daily_digests (
+      id TEXT PRIMARY KEY,
+      generated_at TEXT NOT NULL,
+      status TEXT NOT NULL,
+      report TEXT NOT NULL,
+      email_sent INTEGER DEFAULT 0
+    );
+  `);
+
+  // Insert a digest
+  const digest = { id: '2026-03-05', status: 'green', summary: '2541 events', cache: { total: 2541 } };
+  testDb.prepare('INSERT OR REPLACE INTO daily_digests (id, generated_at, status, report, email_sent) VALUES (?, ?, ?, ?, ?)').run('2026-03-05', '2026-03-05T15:00:00Z', 'green', JSON.stringify(digest), 0);
+
+  // Read it back
+  const digestRow = testDb.prepare('SELECT * FROM daily_digests WHERE id = ?').get('2026-03-05');
+  check('digest saved with correct id', digestRow.id === '2026-03-05');
+  check('digest status is green', digestRow.status === 'green');
+  check('digest report is valid JSON', JSON.parse(digestRow.report).cache.total === 2541);
+
+  // Insert second digest, read last 2
+  testDb.prepare('INSERT OR REPLACE INTO daily_digests (id, generated_at, status, report, email_sent) VALUES (?, ?, ?, ?, ?)').run('2026-03-04', '2026-03-04T15:00:00Z', 'yellow', JSON.stringify({ id: '2026-03-04' }), 1);
+  const digestRows = testDb.prepare('SELECT * FROM daily_digests ORDER BY id DESC LIMIT 30').all();
+  check('getDigests returns 2 rows', digestRows.length === 2);
+  check('getDigests ordered newest first', digestRows[0].id === '2026-03-05');
+
+  // markDigestEmailed
+  testDb.prepare('UPDATE daily_digests SET email_sent = 1 WHERE id = ?').run('2026-03-05');
+  const emailedRow = testDb.prepare('SELECT * FROM daily_digests WHERE id = ?').get('2026-03-05');
+  check('markDigestEmailed sets email_sent', emailedRow.email_sent === 1);
+
+  testDb.close();
+}
+
 module.exports = {};

@@ -92,6 +92,14 @@ function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_events_neighborhood ON events(neighborhood);
     CREATE INDEX IF NOT EXISTS idx_patterns_day ON recurring_patterns(day_of_week);
     CREATE INDEX IF NOT EXISTS idx_patterns_active ON recurring_patterns(active_until, deactivated);
+
+    CREATE TABLE IF NOT EXISTS daily_digests (
+      id TEXT PRIMARY KEY,
+      generated_at TEXT NOT NULL,
+      status TEXT NOT NULL,
+      report TEXT NOT NULL,
+      email_sent INTEGER DEFAULT 0
+    );
   `);
 
   // Migration: add normalized_name column for recurrence detection
@@ -606,6 +614,37 @@ function importFromJsonCache(cachePath) {
   }
 }
 
+// --- Daily digests ---
+
+function saveDigest(id, status, report) {
+  const d = getDb();
+  d.prepare(`
+    INSERT OR REPLACE INTO daily_digests (id, generated_at, status, report, email_sent)
+    VALUES (?, ?, ?, ?, 0)
+  `).run(id, new Date().toISOString(), status, JSON.stringify(report));
+}
+
+function markDigestEmailed(id) {
+  const d = getDb();
+  d.prepare('UPDATE daily_digests SET email_sent = 1 WHERE id = ?').run(id);
+}
+
+function getDigests(limit = 30) {
+  const d = getDb();
+  return d.prepare('SELECT * FROM daily_digests ORDER BY id DESC LIMIT ?').all(limit).map(row => ({
+    ...row,
+    report: JSON.parse(row.report),
+    email_sent: !!row.email_sent,
+  }));
+}
+
+function getYesterdayDigest() {
+  const d = getDb();
+  const rows = d.prepare('SELECT * FROM daily_digests ORDER BY id DESC LIMIT 2').all();
+  if (rows.length < 2) return null;
+  return { ...rows[1], report: JSON.parse(rows[1].report) };
+}
+
 module.exports = {
   getDb,
   closeDb,
@@ -623,6 +662,10 @@ module.exports = {
   getActivePatternKeys,
   getPatternCount,
   importFromJsonCache,
+  saveDigest,
+  markDigestEmailed,
+  getDigests,
+  getYesterdayDigest,
   // Exposed for testing
   makePatternKey,
   normalizePatternName,
