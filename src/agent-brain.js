@@ -226,10 +226,64 @@ function checkMechanical(message, session) {
   if (/^[1-5]$/.test(lower) && session?.lastPicks?.length && session?.lastResponseHadPicks !== false) {
     return { intent: 'details', pick: parseInt(lower), event_reference: lower };
   }
+  // Bare numbers without session → conversational
+  if (/^[1-5]$/.test(lower) && !session?.pendingNearby) {
+    return { intent: 'conversational', reply: "I don't have picks loaded — tell me what you're looking for!" };
+  }
 
   // "more" / "what else" → more picks (only if session has context)
-  if (/^(more|show me more|what else|anything else|next)$/i.test(lower) && session?.lastPicks?.length) {
+  if (/^(more|show me more|what else|anything else|what else you got|next|what's next)$/i.test(lower) && session?.lastPicks?.length) {
     return { intent: 'more' };
+  }
+  // "more" without session → conversational
+  if (/^(more|show me more|what else|anything else|what else you got|next|what's next)$/i.test(lower)) {
+    if (!session?.pendingNearby) {
+      return { intent: 'conversational', reply: "Hey! Tell me what neighborhood or vibe you're looking for and I'll find picks." };
+    }
+  }
+
+  // Greetings
+  if (/^(hey|hi|hello|yo|sup|what's up|wassup|hola|howdy)$/i.test(lower)) {
+    if (session?.lastPicks?.length > 0) {
+      return { intent: 'conversational', reply: "Hey! What are you in the mood for tonight? Drop a vibe, a category, or a neighborhood." };
+    }
+    return { intent: 'conversational', reply: "Hey! What are you in the mood for tonight? Drop a vibe, a category, or a neighborhood." };
+  }
+
+  // Thanks
+  if (/^(thanks|thank you|thx|ty|appreciate it|cheers)$/i.test(lower)) {
+    return { intent: 'conversational', reply: "Anytime! Hit me up when you're ready to go out again." };
+  }
+
+  // Bye
+  if (/^(bye|later|peace|gn|good night|night|see ya|cya|deuces)$/i.test(lower)) {
+    return { intent: 'conversational', reply: "Later! Hit me up whenever." };
+  }
+
+  // Satisfied-exit signals
+  if (/^(cool|perfect|sick|dope|nice|sweet|awesome|amazing|fire|love it|sounds good|sounds great)(\s+thanks?)?$/i.test(lower)) {
+    return { intent: 'conversational', reply: "Have fun tonight! Hit me up whenever you want more picks." };
+  }
+
+  // Decline signals
+  if (/^(nah|nope|no thanks|no thank you|nah i'?m good|i'?m good|all good|all set|i'?m set|pass|no)$/i.test(lower)) {
+    return { intent: 'conversational', reply: "No worries! Hit me up whenever you want picks." };
+  }
+
+  // Casual acknowledgments (session-aware)
+  if (/^(k|ok|bet|word|aight|ight|gotcha|copy)$/i.test(lower) && !session?.pendingNearby) {
+    if (session?.lastPicks?.length > 0) {
+      return { intent: 'conversational', reply: `Your ${session.lastNeighborhood || ''} picks are above — reply a number for details, MORE for extra picks, or try a different neighborhood.` };
+    }
+    return { intent: 'conversational', reply: "Hey! Tell me what you're looking for — comedy, jazz, something weird — or a neighborhood." };
+  }
+
+  // Impatient follow-up
+  if (/^(hello\?+|hey\?+|\?\?+|yo\?+|you there\??|helloooo+|hellooo+)$/i.test(lower)) {
+    if (session?.lastPicks?.length > 0) {
+      return { intent: 'conversational', reply: `Sorry for the wait! Your ${session.lastNeighborhood || 'picks'} should be above — reply MORE for extra picks or try a different neighborhood.` };
+    }
+    return { intent: 'conversational', reply: "Hey! Tell me what you're looking for — comedy, jazz, something weird — or a neighborhood." };
   }
 
   return null; // → agent brain

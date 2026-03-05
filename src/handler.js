@@ -1,19 +1,15 @@
 const express = require('express');
 const twilio = require('twilio');
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
-const { formatTime, smartTruncate } = require('./formatters');
 const { startTrace, saveTrace, getLatestTraceForPhone, getTraceById, recordAICost } = require('./traces');
 const { getSession, setSession, clearSession, addToHistory, clearSessionInterval, acquireLock } = require('./session');
-const { preRoute } = require('./pre-router');
 const { handleHelp, handleConversational, handleDetails, handleMore } = require('./intent-handlers');
 const { sendRuntimeAlert } = require('./alerts');
 const { getEventById } = require('./events');
 const { lookupReferralCode, recordAttribution } = require('./referral');
-const { saveResponseFrame, buildEventMap, sendPickUrls } = require('./pipeline');
+const { saveResponseFrame } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
-const { routeModel } = require('./model-router');
-const { processedMessages, OPT_OUT_KEYWORDS, isOverBudget, trackAICost, getCostSummary, getBudgetUsedPct, ipRateLimits, IP_RATE_LIMIT, IP_RATE_WINDOW, clearGuardIntervals } = require('./request-guard');
-const { resolveUnifiedContext, callUnified, handleUnifiedResponse, handleZeroMatch } = require('./unified-flow');
+const { processedMessages, OPT_OUT_KEYWORDS, isOverBudget, trackAICost, getCostSummary, ipRateLimits, IP_RATE_LIMIT, IP_RATE_WINDOW, clearGuardIntervals } = require('./request-guard');
 
 const router = express.Router();
 
@@ -203,6 +199,7 @@ async function dispatchPreRouterIntent(route, ctx) {
     }
     const msg1 = "Hey! I'm Bestie — I dig through the best of what's happening in NYC daily that you'll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.";
     const msg2 = 'Text me a neighborhood like "Bushwick" or a vibe like "jazz tonight" to start exploring. I\'ll send picks — reply a number for details, "more" to keep going, or just tell me what you\'re looking for.';
+    saveResponseFrame(phone, { picks: [], eventMap: {}, neighborhood: null, filters: null, offeredIds: [] });
     await sendSMS(phone, msg1);
     await sendSMS(phone, msg2);
     finalizeTrace(msg1 + '\n' + msg2, 'referral_expired');
@@ -269,79 +266,24 @@ async function handleMessageAI(phone, message) {
     }
   }
 
-  // --- Agent Brain path (gated behind PULSE_AGENT_BRAIN=true) ---
-  if (process.env.PULSE_AGENT_BRAIN === 'true') {
-    const { handleAgentBrainRequest, checkMechanical } = require('./agent-brain');
+  const { handleAgentBrainRequest, checkMechanical } = require('./agent-brain');
 
-    // Mechanical pre-check: help, bare numbers, "more" — $0 AI cost
-    const mechanical = checkMechanical(message, session);
-    if (mechanical) {
-      // Set up session + history for mechanical handlers
-      if (!getSession(phone)) setSession(phone, {});
-      addToHistory(phone, 'user', message);
+  // Mechanical pre-check: help, bare numbers, "more" — $0 AI cost
+  const mechanical = checkMechanical(message, session);
+  if (mechanical) {
+    // Set up session + history for mechanical handlers
+    if (!getSession(phone)) setSession(phone, {});
+    addToHistory(phone, 'user', message);
 
-      trace.routing.pre_routed = true;
-      trace.routing.result = { intent: mechanical.intent, confidence: 1.0 };
-      trace.routing.latency_ms = 0;
-      trace.brain_tool = null;
-      trace.brain_provider = 'mechanical';
-
-      const route = { ...mechanical };
-      const ctx = { phone, message, masked, session, trace, route, finalizeTrace, trackAICost: (usage, provider) => trackAICost(phone, usage, provider), recordAICost };
-
-      if (session?.pendingNearby) {
-        setSession(phone, { pendingNearby: null, pendingFilters: null, pendingMessage: null });
-      }
-
-      await dispatchPreRouterIntent(route, ctx);
-      return trace.id;
-    }
-
-    // Agent brain handles everything else
-    return handleAgentBrainRequest(phone, message, session, trace, finalizeTrace);
-  }
-
-  // --- Original pre-router + unified flow ---
-  const preRouted = preRoute(message, session);
-  // Snapshot previous conversation history BEFORE adding current message
-  // (so Claude doesn't see the current message duplicated in both <user_message> and history)
-  if (!getSession(phone)) setSession(phone, {});
-  const history = getSession(phone)?.conversationHistory || [];
-  addToHistory(phone, 'user', message);
-
-  // Pre-router filter follow-ups: inject detected filters into session for unified branch
-  let preDetectedFilters = null;
-  if (preRouted && preRouted.intent === 'events') {
-    if (preRouted.clearFilters) {
-      // Deterministic filter clear (P6) — wipe session filters before unified call
-      setSession(phone, { lastFilters: null, pendingFilters: null });
-      session = getSession(phone);
-      trace.routing.pre_routed = true;
-      trace.routing.result = { intent: 'events', neighborhood: preRouted.neighborhood, confidence: 1.0 };
-      trace.routing.latency_ms = 0;
-      trace.routing.clear_filters = true;
-      console.log(`Pre route (pre): clear_filters detected → unified with no filters`);
-    } else {
-      // Deterministic filter detection (category/time/vibe/free) — use unified branch for composition
-      preDetectedFilters = preRouted.filters;
-      trace.routing.pre_routed = true;
-      trace.routing.result = { intent: preRouted.intent, neighborhood: preRouted.neighborhood, confidence: preRouted.confidence };
-      trace.routing.latency_ms = 0;
-      console.log(`Pre route (pre): intent=${preRouted.intent}, neighborhood=${preRouted.neighborhood} → unified with filters`);
-    }
-  }
-
-  if (preRouted && !preDetectedFilters && !preRouted.clearFilters) {
-    // Pre-router matched — mechanical shortcuts
-    const route = preRouted;
     trace.routing.pre_routed = true;
-    trace.routing.result = { intent: route.intent, neighborhood: route.neighborhood, confidence: route.confidence };
+    trace.routing.result = { intent: mechanical.intent, confidence: 1.0 };
     trace.routing.latency_ms = 0;
-    console.log(`Pre route (pre): intent=${route.intent}, neighborhood=${route.neighborhood}, confidence=${route.confidence}`);
+    trace.brain_tool = null;
+    trace.brain_provider = 'mechanical';
 
+    const route = { ...mechanical };
     const ctx = { phone, message, masked, session, trace, route, finalizeTrace, trackAICost: (usage, provider) => trackAICost(phone, usage, provider), recordAICost };
 
-    // Clear pending state on any pre-routed intent
     if (session?.pendingNearby) {
       setSession(phone, { pendingNearby: null, pendingFilters: null, pendingMessage: null });
     }
@@ -350,121 +292,8 @@ async function handleMessageAI(phone, message) {
     return trace.id;
   }
 
-  // Unified LLM call — handles semantic messages + pre-detected filter follow-ups
-  const unifiedCtx = await resolveUnifiedContext(message, session, preDetectedFilters, phone, trace);
-
-  // Zero-match bypass: when filters are active but match nothing, skip the LLM ($0 AI cost).
-  // Skip if the LAST response was also a zero-match — let the LLM interpret the follow-up
-  // (e.g. "paid is fine too" needs semantic understanding to clear free_only).
-  // The flag auto-clears after one LLM turn via setResponseState.
-  if (Object.values(unifiedCtx.activeFilters || {}).some(Boolean) &&
-      unifiedCtx.matchCount === 0 && !session?.lastZeroMatch) {
-    await handleZeroMatch(unifiedCtx, phone, session, trace, finalizeTrace);
-    return trace.id;
-  }
-
-  // Compute model routing based on complexity signals
-  const budgetUsedPct = getBudgetUsedPct(phone);
-
-  const routing = routeModel({
-    message,
-    session,
-    matchCount: unifiedCtx.matchCount,
-    hardCount: unifiedCtx.hardCount,
-    softCount: unifiedCtx.softCount,
-    isSparse: unifiedCtx.isSparse,
-    hood: unifiedCtx.hood,
-    activeFilters: unifiedCtx.activeFilters,
-    events: unifiedCtx.events,
-    conversationHistory: history,
-    isCitywide: unifiedCtx.isCitywide,
-    hasPreDetectedFilters: !!preDetectedFilters,
-    budgetUsedPct,
-  });
-  trace.routing.model_routing = routing;
-
-  try {
-    const result = await callUnified(message, unifiedCtx, session, history, phone, trace, { model: routing.model });
-    await handleUnifiedResponse(result, unifiedCtx, phone, session, trace, message, finalizeTrace);
-    // Clear lastZeroMatch after LLM turn so zero-match bypass can fire on the next turn
-    if (session?.lastZeroMatch) setSession(phone, { lastZeroMatch: false });
-  } catch (llmErr) {
-    console.error('LLM failed, degraded fallback:', llmErr.message);
-    await handleDegradedFallback(unifiedCtx, phone, session, trace, finalizeTrace, llmErr);
-  }
-  return trace.id;
-}
-
-/**
- * Degraded-mode fallback: compose deterministic picks from the pre-resolved
- * tagged pool when the LLM call fails. $0 AI cost, session saved (P4).
- */
-async function handleDegradedFallback(unifiedCtx, phone, session, trace, finalizeTrace, err) {
-  const { hood, activeFilters, events, curated } = unifiedCtx;
-
-  // Pick top 3, preferring filter-matched events
-  const matched = events.filter(e => e.filter_match === 'hard' || e.filter_match === 'soft');
-  const pool = matched.length > 0 ? matched : events;
-  const top = pool.slice(0, 3);
-
-  if (top.length === 0) {
-    trace.composition.latency_ms = 0;
-    trace.composition.degraded_mode = true;
-    trace.composition.degraded_error = err.message;
-    const sms = "I'm having a moment — try again in a sec!";
-    await sendSMS(phone, sms);
-    finalizeTrace(sms, 'events');
-    return;
-  }
-
-  // Format numbered picks deterministically
-  const header = hood ? `Here's what's happening in ${hood}:` : "Here's what's happening tonight:";
-  const lines = top.map((e, i) => {
-    let line = `${i + 1}. ${e.name}`;
-    if (e.venue_name && e.venue_name !== 'TBA') line += ` at ${e.venue_name}`;
-    if (e.start_time_local) line += ` — ${formatTime(e.start_time_local)}`;
-    if (e.is_free) line += ' (Free!)';
-    return line;
-  });
-  const footer = 'Reply a number for details, or "more" for more picks.';
-  const sms = smartTruncate(`${header}\n\n${lines.join('\n')}\n\n${footer}`);
-
-  // P4: one save path — save session with fallback picks
-  const eventMap = buildEventMap(curated);
-  for (const e of events) eventMap[e.id] = e;
-  const picks = top.map(e => ({ event_id: e.id, why: 'degraded fallback' }));
-
-  saveResponseFrame(phone, {
-    picks,
-    eventMap,
-    neighborhood: hood,
-    filters: activeFilters,
-    offeredIds: top.map(e => e.id),
-    visitedHoods: [...new Set([...(session?.visitedHoods || []), hood || 'citywide'])],
-  });
-
-  trace.routing.latency_ms = trace.routing.latency_ms || 0;
-  trace.composition.latency_ms = 0;
-  trace.composition.degraded_mode = true;
-  trace.composition.degraded_error = err.message;
-  trace.composition.picks = top.map(e => ({
-    event_id: e.id, why: 'degraded fallback',
-    event_name: e.name, venue_name: e.venue_name,
-    neighborhood: e.neighborhood, category: e.category,
-  }));
-
-  await sendSMS(phone, sms);
-  await sendPickUrls(phone, picks, eventMap);
-  finalizeTrace(sms, 'events');
-
-  // Fire-and-forget runtime alert
-  sendRuntimeAlert('llm_failure', {
-    error: err.message,
-    phone_masked: maskPhone(phone),
-    hood,
-    event_count: events.length,
-    degraded_picks: top.length,
-  });
+  // Agent brain handles everything else
+  return handleAgentBrainRequest(phone, message, session, trace, finalizeTrace);
 }
 
 // Cleanup intervals (for graceful shutdown)
