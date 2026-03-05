@@ -361,3 +361,15 @@ check('returns null for non-Sofar event',
   extractNeighborhood('Jazz at Blue Note') === null);
 check('returns null for bare "Sofar Sounds"',
   extractNeighborhood('Sofar Sounds') === null);
+
+
+console.log('\nCategory normalization at boundary:');
+const { normalizeExtractedEvent } = require('../../src/sources/shared');
+const musicEvent = normalizeExtractedEvent({ name: 'Jazz Night', category: 'music', venue_name: 'Blue Note', date_local: '2026-03-05' }, 'TestSource', 'primary', 0.8);
+check('music category normalized to live_music', musicEvent.category === 'live_music');
+const liveEvent = normalizeExtractedEvent({ name: 'Rock Show', category: 'live_music', venue_name: 'Bowery', date_local: '2026-03-05' }, 'TestSource', 'primary', 0.8);
+check('live_music category preserved', liveEvent.category === 'live_music');
+const comedyEvent = normalizeExtractedEvent({ name: 'Stand Up', category: 'comedy', venue_name: 'Cellar', date_local: '2026-03-05' }, 'TestSource', 'primary', 0.8);
+check('comedy category unchanged', comedyEvent.category === 'comedy');
+const noCategory = normalizeExtractedEvent({ name: 'Some Event', venue_name: 'Somewhere', date_local: '2026-03-05' }, 'TestSource', 'primary', 0.8);
+check('missing category defaults to other', noCategory.category === 'other');
