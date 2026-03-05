@@ -739,6 +739,29 @@ async function getEvents(neighborhood, { dateRange } = {}) {
 }
 
 /**
+ * Creates a sort comparator for events: date proximity → source tier → source vibe → confidence.
+ * @param {string} rangeEnd - fallback date for undated events
+ */
+function createEventSortFn(rangeEnd) {
+  const tierOrder = { unstructured: 0, primary: 1, secondary: 2 };
+  const vibeOrder = { discovery: 0, niche: 1, platform: 2, mainstream: 3 };
+  return (a, b) => {
+    const dateA = getEventDate(a) || rangeEnd;
+    const dateB = getEventDate(b) || rangeEnd;
+    if (dateA !== dateB) return dateA < dateB ? -1 : 1;
+    const tierA = tierOrder[a.source_tier] ?? 2;
+    const tierB = tierOrder[b.source_tier] ?? 2;
+    if (tierA !== tierB) return tierA - tierB;
+    const va = vibeOrder[a.source_vibe] ?? 2;
+    const vb = vibeOrder[b.source_vibe] ?? 2;
+    if (va !== vb) return va - vb;
+    const confA = a.extraction_confidence ?? 1;
+    const confB = b.extraction_confidence ?? 1;
+    return confB - confA;
+  };
+}
+
+/**
  * Get events for a borough — filters to neighborhoods within the borough.
  * Applies quality gates, date filtering, and neighborhood diversity (max 3 per hood).
  */
@@ -764,22 +787,7 @@ async function getEventsForBorough(borough, { dateRange, filters } = {}) {
   });
 
   // Sort by date proximity x source tier x source vibe (discovery first)
-  const tierOrder = { unstructured: 0, primary: 1, secondary: 2 };
-  const vibeOrder = { discovery: 0, niche: 1, platform: 2, mainstream: 3 };
-  const sortFn = (a, b) => {
-    const dateA = getEventDate(a) || rangeEnd;
-    const dateB = getEventDate(b) || rangeEnd;
-    if (dateA !== dateB) return dateA < dateB ? -1 : 1;
-    const tierA = tierOrder[a.source_tier] ?? 2;
-    const tierB = tierOrder[b.source_tier] ?? 2;
-    if (tierA !== tierB) return tierA - tierB;
-    const va = vibeOrder[a.source_vibe] ?? 2;
-    const vb = vibeOrder[b.source_vibe] ?? 2;
-    if (va !== vb) return va - vb;
-    const confA = a.extraction_confidence ?? 1;
-    const confB = b.extraction_confidence ?? 1;
-    return confB - confA;
-  };
+  const sortFn = createEventSortFn(rangeEnd);
 
   // Filter-aware pool: matching events first, padded with unmatched
   const sorted = filterAwareSort(dateFiltered, filters, sortFn);
@@ -821,22 +829,7 @@ async function getEventsCitywide({ dateRange, filters } = {}) {
   });
 
   // Rank by: date proximity (today first) x source tier x source vibe (discovery first)
-  const tierOrder = { unstructured: 0, primary: 1, secondary: 2 };
-  const vibeOrder = { discovery: 0, niche: 1, platform: 2, mainstream: 3 };
-  const sortFn = (a, b) => {
-    const dateA = getEventDate(a) || rangeEnd;
-    const dateB = getEventDate(b) || rangeEnd;
-    if (dateA !== dateB) return dateA < dateB ? -1 : 1;
-    const tierA = tierOrder[a.source_tier] ?? 2;
-    const tierB = tierOrder[b.source_tier] ?? 2;
-    if (tierA !== tierB) return tierA - tierB;
-    const va = vibeOrder[a.source_vibe] ?? 2;
-    const vb = vibeOrder[b.source_vibe] ?? 2;
-    if (va !== vb) return va - vb;
-    const confA = a.extraction_confidence ?? 1;
-    const confB = b.extraction_confidence ?? 1;
-    return confB - confA;
-  };
+  const sortFn = createEventSortFn(rangeEnd);
 
   // Filter-aware pool: matching events first, padded with unmatched
   const sorted = filterAwareSort(dateFiltered, filters, sortFn);

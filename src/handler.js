@@ -10,6 +10,7 @@ const { lookupReferralCode, recordAttribution } = require('./referral');
 const { saveResponseFrame, sendPickUrls } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
 const { processedMessages, OPT_OUT_KEYWORDS, isOverBudget, trackAICost, getCostSummary, ipRateLimits, IP_RATE_LIMIT, IP_RATE_WINDOW, clearGuardIntervals } = require('./request-guard');
+const { WELCOME_INTRO, WELCOME_INSTRUCTIONS } = require('./messages');
 
 const router = express.Router();
 
@@ -202,10 +203,10 @@ async function dispatchPreRouterIntent(route, ctx) {
         filters: referredEvent?.category ? { category: referredEvent.category } : {},
         responseType: 'referral',
       }).catch(err => console.error('profile update failed:', err.message));
-      const msg1 = "Hey! I'm Pulse — I dig through the best of what's happening in NYC daily that you'll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.";
+      const msg1 = WELCOME_INTRO;
       const msg2 = referredEvent?.neighborhood
         ? `Text me a vibe like "jazz tonight" or try "${referredEvent.neighborhood}" to start exploring. I'll send picks — reply a number for details, "more" to keep going, or just tell me what you're looking for.`
-        : 'Text me a neighborhood like "Bushwick" or a vibe like "jazz tonight" to start exploring. I\'ll send picks — reply a number for details, "more" to keep going, or just tell me what you\'re looking for.';
+        : WELCOME_INSTRUCTIONS;
       saveResponseFrame(phone, { picks: [], eventMap: {}, neighborhood: null, filters: null, offeredIds: [] });
       await sendSMS(phone, msg1);
       await sendSMS(phone, msg2);
@@ -226,8 +227,8 @@ async function dispatchPreRouterIntent(route, ctx) {
         console.warn('Welcome flow failed for expired referral, using canned intro:', err.message);
       }
     }
-    const msg1 = "Hey! I'm Pulse — I dig through the best of what's happening in NYC daily that you'll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.";
-    const msg2 = 'Text me a neighborhood like "Bushwick" or a vibe like "jazz tonight" to start exploring. I\'ll send picks — reply a number for details, "more" to keep going, or just tell me what you\'re looking for.';
+    const msg1 = WELCOME_INTRO;
+    const msg2 = WELCOME_INSTRUCTIONS;
     saveResponseFrame(phone, { picks: [], eventMap: {}, neighborhood: null, filters: null, offeredIds: [] });
     await sendSMS(phone, msg1);
     await sendSMS(phone, msg2);
