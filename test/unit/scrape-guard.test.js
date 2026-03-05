@@ -70,12 +70,12 @@ const dupResult = checkBaseline('TestDupes', dupeEvents);
 check('duplicate spike: quarantined', dupResult.quarantined === true);
 check('duplicate spike: reason mentions duplicate', dupResult.reason.includes('duplicate'));
 
-// --- Date sanity ---
+// --- Date sanity (warn only, no quarantine) ---
 sh['TestDates'] = { ...mkEntry(), history: buildHistory(50, 5, { name: 0.95, venue_name: 0.90, date_local: 0.95 }) };
-const farFuture = new Array(50).fill({ name: 'E', venue_name: 'V', date_local: '2026-06-01' });
+const farFuture = [];
+for (let i = 0; i < 50; i++) farFuture.push({ name: `Future Event ${i}`, venue_name: 'V', date_local: '2026-06-01' });
 const dateResult = checkBaseline('TestDates', farFuture);
-check('date sanity: quarantined (all events far future)', dateResult.quarantined === true);
-check('date sanity: reason mentions date', dateResult.reason.includes('date'));
+check('date sanity: NOT quarantined (warn only)', dateResult.quarantined === false);
 
 // --- Insufficient history: skip checks ---
 sh['TestNewSource'] = { ...mkEntry(), history: buildHistory(50, 2) };

@@ -66,8 +66,8 @@ function checkBaseline(label, events) {
     }
   }
 
-  // 3. Date sanity — use 30-day window (matches refreshCache date filter)
-  // Newsletter/film sources naturally have events weeks out; 7 days was too aggressive
+  // 3. Date sanity — warn only, don't quarantine
+  // Newsletter/film sources legitimately publish events weeks/months out
   const today = getNycDateString(0);
   const monthOut = getNycDateString(30);
   const datedEvents = events.filter(e => !!e.date_local);
@@ -75,10 +75,7 @@ function checkBaseline(label, events) {
     const nearbyPct = datedEvents.filter(e => e.date_local >= today && e.date_local <= monthOut).length / datedEvents.length;
     const avgDateCoverage = baseline.avgCoverage.date_local;
     if (nearbyPct < DATE_SANITY_THRESHOLD && avgDateCoverage >= DATE_SANITY_BASELINE_MIN) {
-      return {
-        quarantined: true,
-        reason: `date sanity: ${(nearbyPct * 100).toFixed(0)}% events within 30 days (expected >${(DATE_SANITY_THRESHOLD * 100)}%)`,
-      };
+      console.warn(`[SCRAPE-GUARD] ${label} date sanity warning: ${(nearbyPct * 100).toFixed(0)}% events within 30 days`);
     }
   }
 
