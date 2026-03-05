@@ -79,7 +79,7 @@ function checkBaseline(label, events) {
     if (nearbyPct < DATE_SANITY_THRESHOLD && avgDateCoverage >= DATE_SANITY_BASELINE_MIN) {
       return {
         quarantined: true,
-        reason: `date sanity: ${(nearbyPct * 100).toFixed(0)}% events within 7 days (expected >${(DATE_SANITY_THRESHOLD * 100)}%)`,
+        reason: `date sanity: ${(nearbyPct * 100).toFixed(0)}% events within 30 days (expected >${(DATE_SANITY_THRESHOLD * 100)}%)`,
       };
     }
   }

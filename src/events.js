@@ -419,6 +419,9 @@ async function refreshCache() {
           sourceHealth[label].lastQuarantineReason = verdict.reason;
           sourcesQuarantined++;
           continue; // skip merge — cache retains yesterday's events for this source
+        } else {
+          // Clear stale quarantine reason on pass
+          sourceHealth[label].lastQuarantineReason = null;
         }
       }
 
