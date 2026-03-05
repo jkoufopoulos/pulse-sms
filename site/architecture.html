@@ -14,6 +14,7 @@
       --bg: #08070d;
       --bg-card: rgba(255,255,255,0.03);
       --bg-card-hover: rgba(255,255,255,0.05);
+      --border: rgba(255,255,255,0.06);
       --text: #ede9e3;
       --text-dim: #7a756d;
       --text-muted: #4a463f;
@@ -42,1075 +43,955 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* NAV */
-    nav {
+    /* ── NAV ── */
+    .main-nav {
       position: sticky;
       top: 0;
       z-index: 100;
       backdrop-filter: blur(24px) saturate(1.4);
       -webkit-backdrop-filter: blur(24px) saturate(1.4);
       background: rgba(8,7,13,0.8);
-      border-bottom: 1px solid rgba(255,255,255,0.04);
+      border-bottom: 1px solid var(--border);
     }
-    .nav-inner {
+    .main-nav-inner {
       max-width: var(--max-w);
       margin: 0 auto;
-      padding: 18px 28px;
+      padding: 16px 24px;
       display: flex;
       align-items: center;
       gap: 16px;
     }
     .nav-logo {
       font-family: var(--font-display);
-      font-size: 1.5rem;
       font-weight: 800;
+      font-size: 1.25rem;
       color: var(--coral);
       text-decoration: none;
-      letter-spacing: -0.02em;
     }
     .nav-sep {
+      width: 1px;
+      height: 20px;
+      background: var(--text-muted);
+    }
+    .nav-breadcrumb {
+      font-family: var(--font-body);
+      font-size: 0.9rem;
+      color: var(--text-dim);
+    }
+
+    /* ── SECTION JUMP NAV ── */
+    .jump-nav {
+      position: sticky;
+      top: 57px;
+      z-index: 99;
+      backdrop-filter: blur(24px) saturate(1.4);
+      -webkit-backdrop-filter: blur(24px) saturate(1.4);
+      background: rgba(8,7,13,0.85);
+      border-bottom: 1px solid var(--border);
+    }
+    .jump-nav-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 10px 24px;
+      display: flex;
+      gap: 24px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .jump-nav-inner::-webkit-scrollbar { display: none; }
+    .jump-nav a {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
       color: var(--text-muted);
-      font-size: 1.2rem;
-      font-weight: 300;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: color 0.2s;
+      letter-spacing: 0.03em;
     }
-    .nav-page {
-      font-family: var(--font-display);
-      font-size: 0.88rem;
-      font-weight: 700;
-      color: var(--text-dim);
-      letter-spacing: -0.01em;
-    }
-
-    /* LAYOUT */
-    .container { max-width: var(--max-w); margin: 0 auto; padding: 0 28px; }
-
-    .page-header {
-      padding: 72px 0 48px;
-    }
-    .page-header h1 {
-      font-family: var(--font-display);
-      font-size: clamp(2rem, 4vw, 2.8rem);
-      font-weight: 800;
-      line-height: 1.1;
-      letter-spacing: -0.035em;
-      margin-bottom: 12px;
-    }
-    .page-header h1 em { font-style: normal; color: var(--coral); }
-    .page-header .subtitle {
-      color: var(--text-dim);
-      font-size: 1.05rem;
-      max-width: 600px;
-      line-height: 1.65;
+    .jump-nav a:hover,
+    .jump-nav a.active {
+      color: var(--coral);
     }
 
-    /* SECTIONS */
+    /* ── SECTIONS ── */
+    .container {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 24px;
+    }
     section {
-      padding: 56px 0;
-      border-top: 1px solid rgba(255,255,255,0.04);
+      padding: 80px 0;
+    }
+    section + section {
+      border-top: 1px solid var(--border);
     }
     .section-label {
-      font-family: var(--font-display);
-      text-transform: uppercase;
+      font-family: var(--font-mono);
       font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 0.18em;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
       color: var(--coral);
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
     .section-title {
       font-family: var(--font-display);
-      font-size: clamp(1.4rem, 3vw, 1.8rem);
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      line-height: 1.15;
-      margin-bottom: 20px;
+      font-weight: 700;
+      font-size: 2rem;
+      line-height: 1.2;
+      color: var(--text);
+      margin-bottom: 32px;
     }
-    .section-body {
+    .section-subtitle {
+      font-size: 1.05rem;
       color: var(--text-dim);
-      font-size: 0.92rem;
-      line-height: 1.75;
-      max-width: 700px;
+      margin-bottom: 48px;
+      max-width: 600px;
     }
-    .section-body p + p { margin-top: 12px; }
-    .section-body strong { color: var(--text); font-weight: 600; }
 
-    /* CARDS */
+    /* ── CARDS ── */
     .card {
       background: var(--bg-card);
-      border: 1px solid rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 24px;
-      margin-top: 20px;
+      padding: 28px;
     }
-    .card h3 {
-      font-family: var(--font-display);
-      font-size: 0.95rem;
-      font-weight: 700;
-      margin-bottom: 8px;
-      letter-spacing: -0.01em;
-    }
-    .card p {
-      color: var(--text-dim);
-      font-size: 0.88rem;
-      line-height: 1.65;
-    }
-    .card-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-top: 20px;
+    .card-sm {
+      border-radius: var(--radius-sm);
+      padding: 20px;
     }
 
-    /* FLOW DIAGRAMS */
-    .flow {
-      margin-top: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-      align-items: center;
+    /* ── HERO: PHONE + ANNOTATIONS ── */
+    .hero-layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 40px;
+      align-items: start;
     }
-    .flow-node {
-      padding: 14px 24px;
-      border-radius: var(--radius-sm);
-      font-family: var(--font-mono);
-      font-size: 0.82rem;
-      text-align: center;
-      max-width: 360px;
-      width: 100%;
+
+    /* Phone mockup */
+    .phone {
+      width: 320px;
+      min-height: 560px;
+      background: #111018;
+      border: 2px solid rgba(255,255,255,0.08);
+      border-radius: 40px;
+      padding: 48px 16px 32px;
       position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
     }
-    .flow-node .label {
-      font-family: var(--font-body);
-      font-size: 0.75rem;
-      color: var(--text-dim);
-      margin-top: 4px;
-      font-style: italic;
-    }
-    .flow-arrow {
-      width: 1px;
-      height: 20px;
-      background: rgba(255,255,255,0.12);
-      position: relative;
-    }
-    .flow-arrow::after {
+    .phone::before {
       content: '';
       position: absolute;
-      bottom: 0;
-      left: -3px;
-      border-left: 4px solid transparent;
-      border-right: 4px solid transparent;
-      border-top: 5px solid rgba(255,255,255,0.12);
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80px;
+      height: 6px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 3px;
     }
-    .flow-split {
-      display: flex;
-      gap: 12px;
-      align-items: flex-start;
-      width: 100%;
-      max-width: 460px;
-    }
-    .flow-split .flow-node { flex: 1; }
-
-    .node-coral { background: var(--coral-dim); border: 1px solid rgba(255,107,66,0.2); color: var(--coral); }
-    .node-blue { background: rgba(88,166,255,0.08); border: 1px solid rgba(88,166,255,0.15); color: var(--blue); }
-    .node-green { background: rgba(63,185,80,0.08); border: 1px solid rgba(63,185,80,0.15); color: var(--green); }
-    .node-purple { background: rgba(210,168,255,0.08); border: 1px solid rgba(210,168,255,0.15); color: var(--purple); }
-    .node-yellow { background: rgba(240,136,62,0.08); border: 1px solid rgba(240,136,62,0.15); color: var(--yellow); }
-    .node-dim { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); color: var(--text-dim); }
-
-    /* TABLES */
-    .table-wrap {
-      margin-top: 20px;
-      overflow-x: auto;
-      border-radius: var(--radius);
-      border: 1px solid rgba(255,255,255,0.04);
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.84rem;
-    }
-    thead th {
-      text-align: left;
-      font-family: var(--font-display);
-      font-weight: 700;
-      font-size: 0.75rem;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--text-dim);
-      padding: 12px 16px;
-      background: rgba(255,255,255,0.02);
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-    }
-    tbody td {
-      padding: 10px 16px;
-      border-bottom: 1px solid rgba(255,255,255,0.03);
-      color: var(--text-dim);
-      vertical-align: top;
-    }
-    tbody tr:last-child td { border-bottom: none; }
-    tbody tr:hover { background: rgba(255,255,255,0.02); }
-    .source-name { color: var(--text); font-weight: 600; }
-    .weight-high { color: var(--green); }
-    .weight-mid { color: var(--blue); }
-    .weight-low { color: var(--yellow); }
-
-    /* CODE BLOCKS */
-    .code-block {
-      background: rgba(0,0,0,0.3);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: var(--radius-sm);
-      padding: 16px 20px;
-      font-family: var(--font-mono);
-      font-size: 0.8rem;
-      line-height: 1.7;
-      color: var(--text-dim);
-      overflow-x: auto;
-      margin-top: 16px;
-      white-space: pre;
-    }
-    .code-block .hl { color: var(--coral); }
-    .code-block .hl-blue { color: var(--blue); }
-    .code-block .hl-green { color: var(--green); }
-    .code-block .hl-dim { color: var(--text-muted); }
-
-    /* INLINE MONO */
-    code {
-      font-family: var(--font-mono);
-      font-size: 0.85em;
-      background: rgba(255,255,255,0.05);
-      padding: 2px 6px;
-      border-radius: 4px;
-      color: var(--coral);
-    }
-
-    /* STAT PILLS */
-    .stats {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-top: 16px;
-    }
-    .stat {
-      padding: 8px 16px;
-      border-radius: 100px;
-      font-size: 0.78rem;
-      font-weight: 600;
-      border: 1px solid rgba(255,255,255,0.06);
-      color: var(--text-dim);
-    }
-    .stat em { font-style: normal; color: var(--coral); }
-
-    /* EXAMPLES */
-    .example {
-      background: var(--bg-card);
-      border: 1px solid rgba(255,255,255,0.04);
-      border-radius: var(--radius-sm);
-      padding: 16px 20px;
-      margin-top: 12px;
-    }
-    .example-turn {
-      display: flex;
-      gap: 12px;
-      align-items: baseline;
-      font-size: 0.85rem;
-      padding: 4px 0;
-    }
-    .example-turn + .example-turn { border-top: 1px solid rgba(255,255,255,0.03); padding-top: 8px; margin-top: 4px; }
-    .turn-user {
-      font-weight: 700;
-      color: var(--coral);
-      flex-shrink: 0;
-      min-width: 36px;
-    }
-    .turn-system {
-      font-weight: 700;
-      color: var(--blue);
-      flex-shrink: 0;
-      min-width: 36px;
-    }
-    .turn-msg { color: var(--text); }
-    .turn-route {
-      color: var(--text-muted);
-      font-size: 0.78rem;
-      font-style: italic;
-      margin-left: auto;
-      flex-shrink: 0;
-    }
-
-    /* LAYER LIST */
-    .layer-list {
-      list-style: none;
-      margin-top: 16px;
+    .phone-messages {
       display: flex;
       flex-direction: column;
-      gap: 8px;
-    }
-    .layer-list li {
-      display: flex;
       gap: 12px;
-      align-items: flex-start;
-      font-size: 0.88rem;
-      color: var(--text-dim);
+      min-height: 100%;
     }
-    .layer-num {
-      font-family: var(--font-display);
-      font-weight: 800;
-      font-size: 0.85rem;
-      color: var(--coral);
-      min-width: 20px;
-      flex-shrink: 0;
+    .msg {
+      max-width: 85%;
+      padding: 10px 14px;
+      border-radius: 16px;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      opacity: 0;
+      transform: translateY(12px);
     }
-    .layer-list li strong { color: var(--text); font-weight: 600; }
+    .msg.visible {
+      animation: fadeSlideIn 0.4s ease forwards;
+    }
+    .msg-user {
+      align-self: flex-end;
+      background: var(--coral);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+      font-weight: 500;
+    }
+    .msg-pulse {
+      align-self: flex-start;
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      border-bottom-left-radius: 4px;
+    }
 
-    /* FOOTER */
-    footer {
-      border-top: 1px solid rgba(255,255,255,0.04);
-      padding: 40px 0;
-      margin-top: 40px;
+    @keyframes fadeSlideIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
-    .footer-inner {
-      max-width: var(--max-w);
-      margin: 0 auto;
-      padding: 0 28px;
+
+    /* Annotations sidebar */
+    .annotations {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
+      flex-direction: column;
+      gap: 12px;
+      padding-top: 48px;
     }
-    .footer-brand {
-      font-family: var(--font-display);
-      font-size: 1rem;
-      font-weight: 800;
-      color: var(--coral);
-    }
-    .footer-note {
-      font-size: 0.8rem;
+    .annotation {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      line-height: 1.6;
       color: var(--text-muted);
-    }
-
-    /* COLLAPSIBLE DETAILS */
-    details {
       background: var(--bg-card);
-      border: 1px solid rgba(255,255,255,0.04);
-      border-radius: var(--radius);
-      margin-top: 12px;
-      overflow: hidden;
-      transition: border-color 0.2s;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      white-space: pre-wrap;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      min-height: 60px;
     }
-    details[open] {
-      border-color: rgba(255,255,255,0.08);
+    .annotation.visible {
+      opacity: 1;
+      transform: translateY(0);
     }
-    details summary {
-      padding: 18px 24px;
+    .annotation .ann-highlight {
+      color: var(--coral);
+    }
+    .annotation .ann-dim {
+      color: var(--text-muted);
+    }
+    .annotation .ann-cost {
+      color: var(--green);
+    }
+
+    .replay-btn {
+      margin-top: 20px;
+      padding: 8px 20px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
       cursor: pointer;
+      transition: color 0.2s, border-color 0.2s;
+      align-self: flex-start;
+    }
+    .replay-btn:hover {
+      color: var(--coral);
+      border-color: var(--coral);
+    }
+
+    /* ── FLOW TIMELINE ── */
+    .timeline {
+      position: relative;
+      padding-left: 40px;
+    }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 11px;
+      top: 8px;
+      bottom: 8px;
+      width: 2px;
+      background: var(--border);
+    }
+    .timeline-step {
+      position: relative;
+      margin-bottom: 24px;
+    }
+    .timeline-step:last-child {
+      margin-bottom: 0;
+    }
+    .timeline-dot {
+      position: absolute;
+      left: -40px;
+      top: 20px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--bg);
+      border: 2px solid var(--text-muted);
       display: flex;
       align-items: center;
-      gap: 12px;
-      list-style: none;
-      font-family: var(--font-display);
-      font-size: 0.95rem;
-      font-weight: 700;
-      letter-spacing: -0.01em;
-      user-select: none;
-      transition: background 0.15s;
+      justify-content: center;
     }
-    details summary:hover { background: var(--bg-card-hover); }
-    details summary::-webkit-details-marker { display: none; }
-    details summary::before {
+    .timeline-dot::after {
       content: '';
-      display: inline-block;
-      width: 0;
-      height: 0;
-      border-left: 5px solid var(--text-muted);
-      border-top: 4px solid transparent;
-      border-bottom: 4px solid transparent;
-      flex-shrink: 0;
-      transition: transform 0.2s;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
     }
-    details[open] summary::before {
-      transform: rotate(90deg);
+    .timeline-step.paid .timeline-dot {
+      border-color: var(--coral);
     }
-    details summary .step-label {
+    .timeline-step.paid .timeline-dot::after {
+      background: var(--coral);
+    }
+    .timeline-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 20px 24px;
+      border-left: 3px solid transparent;
+    }
+    .timeline-step.paid .timeline-card {
+      border-left-color: var(--coral);
+    }
+    .timeline-card-header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+    }
+    .timeline-module {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text);
+    }
+    .timeline-meta {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      display: flex;
+      gap: 12px;
+    }
+    .timeline-step.paid .timeline-meta .cost {
       color: var(--coral);
-      font-size: 0.78rem;
+    }
+    .timeline-desc {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+    .timeline-card details {
+      margin-top: 12px;
+    }
+    .timeline-card summary {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .timeline-card summary:hover {
+      color: var(--coral);
+    }
+
+    /* ── BRAIN: 3-COL GRID ── */
+    .brain-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 20px;
+    }
+    .brain-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+    .brain-panel-title {
+      font-family: var(--font-display);
       font-weight: 700;
-      letter-spacing: 0.04em;
+      font-size: 1rem;
+      margin-bottom: 20px;
+      color: var(--text);
     }
-    details summary .step-preview {
-      color: var(--text-muted);
-      font-size: 0.82rem;
-      font-weight: 400;
-      font-family: var(--font-body);
-      margin-left: auto;
-      flex-shrink: 0;
-    }
-    details .detail-body {
-      padding: 0 24px 20px;
-    }
-    details .detail-body p {
+
+    /* File tree */
+    .file-tree {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      line-height: 2;
       color: var(--text-dim);
-      font-size: 0.88rem;
-      line-height: 1.65;
     }
-    details .detail-body p + p { margin-top: 8px; }
-    details .detail-body strong { color: var(--text); font-weight: 600; }
-    details .detail-body ul {
+    .file-tree .root {
+      color: var(--coral);
+      font-weight: 500;
+    }
+    .file-tree .child {
       padding-left: 20px;
-      color: var(--text-dim);
-      font-size: 0.88rem;
-      line-height: 1.8;
-      margin-top: 8px;
+      position: relative;
     }
-
-    /* Skill-specific: condition tag */
-    .skill-condition {
+    .file-tree .child::before {
+      content: '';
+      position: absolute;
+      left: 4px;
+      top: 0;
+      bottom: 50%;
+      width: 1px;
+      border-left: 1px solid var(--text-muted);
+    }
+    .file-tree .child::after {
+      content: '';
+      position: absolute;
+      left: 4px;
+      top: 50%;
+      width: 10px;
+      border-top: 1px solid var(--text-muted);
+    }
+    .file-tree .file-note {
+      font-size: 0.68rem;
       color: var(--text-muted);
-      font-weight: 400;
-      font-size: 0.82rem;
-      font-family: var(--font-body);
+    }
+    .file-tree .lines {
+      color: var(--text-muted);
+      font-size: 0.68rem;
     }
 
-    /* RESPONSIVE */
-    @media (max-width: 680px) {
-      .card-grid { grid-template-columns: 1fr; }
-      .flow-split { flex-direction: column; align-items: center; }
-      .page-header { padding: 56px 0 36px; }
-      section { padding: 40px 0; }
-      .turn-route { display: none; }
-      .footer-inner { flex-direction: column; gap: 8px; text-align: center; }
+    /* Tool schemas */
+    .tool-schema {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.8;
+      color: var(--text-dim);
+    }
+    .tool-schema .tool-name {
+      color: var(--blue);
+      font-weight: 500;
+      font-size: 0.8rem;
+      margin-bottom: 4px;
+    }
+    .tool-schema .prop-key {
+      color: var(--text-dim);
+    }
+    .tool-schema .prop-type {
+      color: var(--text-muted);
+    }
+    .tool-schema .prop-highlight {
+      color: var(--coral);
+      font-weight: 500;
+    }
+    .tool-schema .prop-enum {
+      color: var(--purple);
+      font-size: 0.66rem;
+    }
+    .tool-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 16px 0;
+    }
+
+    /* P1 callout */
+    .callout-p1 {
+      margin-top: 20px;
+      padding: 14px 16px;
+      border: 1px solid var(--coral);
+      border-radius: var(--radius-sm);
+      background: var(--coral-dim);
+      font-size: 0.78rem;
+      line-height: 1.6;
+      color: var(--text-dim);
+    }
+    .callout-p1 strong {
+      color: var(--coral);
+      font-weight: 600;
+    }
+
+    /* Fallback chain */
+    .fallback-chain {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.8;
+      color: var(--text-dim);
+    }
+    .fallback-chain .chain-label {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 0.78rem;
+      color: var(--text);
+      margin-bottom: 8px;
+      margin-top: 20px;
+    }
+    .fallback-chain .chain-label:first-child {
+      margin-top: 0;
+    }
+    .fallback-chain .chain-primary {
+      color: var(--green);
+      font-weight: 500;
+    }
+    .fallback-chain .chain-fallback {
+      color: var(--text-muted);
+    }
+    .fallback-chain .chain-arrow {
+      color: var(--text-muted);
+      padding-left: 8px;
+      font-size: 0.68rem;
+    }
+
+    /* ── PLACEHOLDER SECTIONS ── */
+    .placeholder-text {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      .hero-layout {
+        grid-template-columns: 1fr;
+        gap: 32px;
+      }
+      .phone {
+        width: 100%;
+        max-width: 360px;
+        margin: 0 auto;
+      }
+      .annotations {
+        padding-top: 0;
+      }
+      .brain-grid {
+        grid-template-columns: 1fr;
+      }
+      .section-title {
+        font-size: 1.5rem;
+      }
+      section {
+        padding: 56px 0;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .main-nav-inner,
+      .jump-nav-inner {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+      .container {
+        padding: 0 16px;
+      }
+      .phone {
+        min-height: 480px;
+        padding: 40px 12px 24px;
+      }
     }
   </style>
 </head>
 <body>
 
-<nav>
-  <div class="nav-inner">
-    <a href="index.html" class="nav-logo">Pulse</a>
-    <span class="nav-sep">/</span>
-    <span class="nav-page">Architecture</span>
+<!-- ── MAIN NAV ── -->
+<nav class="main-nav">
+  <div class="main-nav-inner">
+    <a href="/" class="nav-logo">Pulse</a>
+    <div class="nav-sep"></div>
+    <span class="nav-breadcrumb">Architecture</span>
   </div>
 </nav>
 
-<!-- Header -->
-<header class="page-header">
-  <div class="container">
-    <h1>How Pulse <em>works</em></h1>
-    <p class="subtitle">A text message comes in. 22 scrapers, an agent brain with tool calling, and a 480-character limit later, a recommendation goes out.</p>
+<!-- ── SECTION JUMP NAV ── -->
+<nav class="jump-nav">
+  <div class="jump-nav-inner">
+    <a href="#hero">Live Demo</a>
+    <a href="#flow">Request Flow</a>
+    <a href="#brain">Agent Brain</a>
+    <a href="#pipeline">Pipeline</a>
+    <a href="#sessions">Sessions</a>
+    <a href="#cost">Cost Model</a>
   </div>
-</header>
+</nav>
 
-<!-- 1. System Overview -->
-<section id="overview">
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- SECTION 1: HERO + LIVE CONVERSATION                   -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="hero">
   <div class="container">
-    <p class="section-label">Overview</p>
-    <h2 class="section-title">Text in, picks out</h2>
-    <div class="section-body">
-      <p>Pulse is an SMS-based AI assistant that recommends NYC nightlife and events. A user texts a neighborhood name and gets back curated picks within seconds. The entire experience happens in a single SMS thread &mdash; no app, no account, no links until asked.</p>
-      <p>Behind the scenes, Pulse scrapes <strong>22 event sources</strong> every morning, deduplicates and caches them in memory, then routes every message through <code>checkMechanical</code> for $0 shortcuts (bare numbers, "more", "help", greetings) and the <strong>agent brain</strong> (Gemini 2.5 Flash Lite tool calling, ~$0.0005/msg) for everything else. The agent brain uses three structured tools &mdash; <code>search_events</code>, <code>get_details</code>, <code>respond</code> &mdash; to understand intent, pick events, and compose the SMS.</p>
-    </div>
+    <div class="section-label">01 / Live Demo</div>
+    <h2 class="section-title">A Real Conversation, Annotated</h2>
+    <p class="section-subtitle">Every SMS to Pulse passes through the same pipeline. Watch a real multi-turn session unfold, and see exactly what happens at each step.</p>
 
-    <div class="stats">
-      <span class="stat"><em>22</em> event sources</span>
-      <span class="stat"><em>36</em> neighborhoods</span>
-      <span class="stat"><em>480</em> char SMS cap</span>
-      <span class="stat"><em>~$0.0005</em> per message</span>
-      <span class="stat"><em>2hr</em> session TTL</span>
+    <div class="hero-layout">
+      <!-- Phone mockup -->
+      <div class="phone" id="phone">
+        <div class="phone-messages" id="phoneMessages"></div>
+      </div>
+
+      <!-- Annotations -->
+      <div class="annotations" id="annotations">
+        <div id="annotationSlots"></div>
+        <button class="replay-btn" id="replayBtn" style="display:none;">Replay conversation</button>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- 2. End-to-End Walkthrough -->
-<section id="walkthrough">
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- SECTION 2: REQUEST FLOW TIMELINE                      -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="flow">
   <div class="container">
-    <p class="section-label">Walkthrough</p>
-    <h2 class="section-title">What happens when you text "williamsburg"</h2>
-    <div class="section-body">
-      <p>Let's trace a single message through the entire system. A user with no session history texts <strong>"williamsburg"</strong> at 7:14 PM on a Friday.</p>
-    </div>
+    <div class="section-label">02 / Request Flow</div>
+    <h2 class="section-title">From SMS to Response in 9 Steps</h2>
+    <p class="section-subtitle">Every message traverses the same deterministic pipeline. Only two steps cost money.</p>
 
-    <details open style="margin-top: 24px;">
-      <summary><span class="step-label">Step 1</span> Guard rails <span class="step-preview">&lt;1ms, $0</span></summary>
-      <div class="detail-body">
-        <p><code>handler.js</code> receives the Twilio webhook. Three checks run before any processing:</p>
-        <ul>
-          <li><strong>TCPA check</strong> &mdash; Is this "STOP", "UNSUBSCRIBE", "CANCEL", or "QUIT"? If yes, drop silently (no reply). Twilio manages the opt-out list; we just make sure no response leaks.</li>
-          <li><strong>Dedup</strong> &mdash; Has this MessageSid been seen in the last 5 minutes? Twilio retries on timeout, so this prevents double-processing.</li>
-          <li><strong>Budget</strong> &mdash; Has this phone number spent over $0.10 in AI costs today? If so, send a friendly limit message and stop. Pricing is provider-aware (Haiku input: $1/M tokens, Gemini: $0.10/M).</li>
-        </ul>
-        <p>"williamsburg" passes all three. Cost so far: <strong style="color: var(--green);">$0.00</strong>. Latency: <strong style="color: var(--green);">&lt;1ms</strong>.</p>
-      </div>
-    </details>
+    <div class="timeline">
 
-    <details>
-      <summary><span class="step-label">Step 2</span> Routing &mdash; mechanical miss, agent brain <span class="step-preview">~2s, ~$0.0005</span></summary>
-      <div class="detail-body">
-        <p><code>checkMechanical</code> in <code>agent-brain.js</code> checks the message against $0 shortcuts: help, bare numbers 1-5, "more", greetings, thanks, bye. "williamsburg" doesn't match any of these &mdash; it's a semantic request that needs the agent brain.</p>
-        <p>The message goes to <code>callAgentBrain</code>, which sends the message, session context, and event pool to <strong>Gemini 2.5 Flash Lite</strong> with three tools: <code>search_events</code> (neighborhood, categories, time, free, intent), <code>get_details</code>, and <code>respond</code>. The model calls <code>search_events</code> with the structured parameters it understands from the message.</p>
-        <p>Mechanical shortcuts handle a small percentage of messages at $0 cost. Everything semantic (neighborhoods, categories, vibes, compound queries, off-topic deflection) goes through the agent brain's tool calling.</p>
-      </div>
-    </details>
-
-    <details>
-      <summary><span class="step-label">Step 3</span> Tool execution &amp; event fetching <span class="step-preview">deterministic, $0</span></summary>
-      <div class="detail-body">
-        <p>The agent brain calls <code>search_events</code> with structured parameters. The handler executes the tool deterministically:</p>
-        <ul>
-          <li><strong>Neighborhood resolution</strong> &mdash; The <code>neighborhood</code> param from the tool call resolves to "Williamsburg" via the 36-neighborhood map, including aliases and landmarks.</li>
-          <li><strong>Filter state from tool params</strong> &mdash; Categories, time_filter, free_only, and date_range come directly from the <code>search_events</code> tool call parameters. These are structured and validated &mdash; the system of record for filter state.</li>
-          <li><strong>Event pool</strong> &mdash; <code>getEvents("Williamsburg")</code> queries the in-memory cache, applies filters from the tool params, and returns matched events sorted by proximity.</li>
-        </ul>
-        <p style="margin-top: 12px;">This is the key architectural decision (P1): <strong>structured tool calls own state, free-text owns language</strong>. Session state is derived from the agent brain's tool call params, never parsed from free-text LLM output. The handler saves <code>activeFilters</code> as <code>lastFilters</code> from tool call params.</p>
-      </div>
-    </details>
-
-    <details>
-      <summary><span class="step-label">Step 4</span> Event fetching &amp; curation <span class="step-preview">14 &rarr; 15 tagged events</span></summary>
-      <div class="detail-body">
-        <p><code>getEvents("Williamsburg")</code> queries the in-memory cache. The cache was built at 10am from 22 scrapers. Events are already deduped and sorted by proximity to Williamsburg's center coordinates.</p>
-        <p>Say it returns 14 events. Before entering the tagged pool, <code>curation.js</code> runs deterministic quality filters:</p>
-        <ul>
-          <li><strong>filterKidsEvents</strong> &mdash; Drops NYC Parks events that match children's patterns ("storytime", "toddler", "ages 3-5"). Without this, Claude would occasionally recommend a toddler puppet show alongside a DJ set.</li>
-          <li><strong>filterIncomplete</strong> &mdash; Drops events below a completeness threshold (missing name, venue, or time). Prevents Claude from recommending "TBA at TBD".</li>
-          <li><strong>validatePerennialActivity</strong> &mdash; Perennial picks (always-good bars/venues) are only included if they have a specific activity tonight (trivia, live jazz, DJ). Removes generic "nice bar" suggestions that don't answer "what's happening tonight?"</li>
-        </ul>
-        <p>After curation: 12 events remain. Plus 2 perennial picks with tonight activities. The curated events are serialized with enrichment fields (source_vibe, venue_size, interaction_format, recurring) and returned to the agent brain for SMS composition. For this filterless first message, the brain picks freely from the full pool.</p>
-      </div>
-    </details>
-
-    <details>
-      <summary><span class="step-label">Step 5</span> SMS composition <span class="step-preview">~1.5s, lightweight prompt</span></summary>
-      <div class="detail-body">
-        <p><code>brainCompose</code> takes the matched events and writes the SMS. It uses a lightweight ~400-token system prompt (<code>BRAIN_COMPOSE_SYSTEM</code>) focused on voice, format, and the 480-char limit. The compose prompt includes source vibe tiers so the model prefers discovery/niche picks over mainstream platforms.</p>
-        <p>The compose call returns the SMS text directly &mdash; no JSON parsing needed. The agent brain architecture separates <strong>reasoning</strong> (tool calling step) from <strong>rendering</strong> (compose step), keeping each focused and cheap.</p>
-        <p>Cost: ~$0.0005 total for both steps. Latency: ~2-3s end-to-end.</p>
-      </div>
-    </details>
-
-    <details>
-      <summary><span class="step-label">Step 7</span> Send, save &amp; persist filters <span class="step-preview">289 of 480 chars</span></summary>
-      <div class="detail-body">
-        <p>The SMS text (289 characters, under the 480-char cap) is sent via Twilio. The handler saves the session atomically via <code>saveResponseFrame()</code> &mdash; picks, event map, neighborhood, and <strong>active filters</strong> (derived from the tool call params). A JSONL trace captures the full request for evals.</p>
-        <p>Now when the user texts <strong>"2"</strong>, <code>checkMechanical</code> matches it as a details request, looks up pick #2 (Baby's All Right) from <code>session.lastPicks</code>, and sends the full event details with a link. No AI call needed ($0).</p>
-        <p>When they text <strong>"how about comedy"</strong>, the agent brain calls <code>search_events({ neighborhood: "williamsburg", categories: ["comedy"] })</code>. The handler executes the tool, fetches comedy events, and <code>brainCompose</code> writes the SMS (~$0.0005).</p>
-      </div>
-    </details>
-
-    <div class="card" style="border-left: 3px solid var(--purple);">
-      <h3 style="color: var(--purple);">Fallback</h3>
-      <p>If Gemini returns a 503, the agent brain falls back to <strong>Anthropic Claude Haiku</strong> for the same tool-calling flow. The fallback is transparent &mdash; same tools, same handler logic, different provider.</p>
-    </div>
-
-    <div class="card">
-      <h3>Total cost &amp; timing</h3>
-      <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 4px;">
-        <div>
-          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">~$0.0005</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">AI cost per message</div>
-        </div>
-        <div>
-          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">~2-3s</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">end-to-end latency</div>
-        </div>
-        <div>
-          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">2</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">AI calls (brain + compose)</div>
-        </div>
-        <div>
-          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">289</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">chars (of 480 max)</div>
+      <!-- Step 1 -->
+      <div class="timeline-step">
+        <div class="timeline-dot"></div>
+        <div class="timeline-card">
+          <div class="timeline-card-header">
+            <span class="timeline-module">request-guard.js</span>
+            <div class="timeline-meta"><span class="cost">$0</span> <span>&lt;1ms</span></div>
+          </div>
+          <p class="timeline-desc">TCPA opt-out, Twilio dedup, per-user AI budget ($0.10/day)</p>
         </div>
       </div>
+
+      <!-- Step 2 -->
+      <div class="timeline-step">
+        <div class="timeline-dot"></div>
+        <div class="timeline-card">
+          <div class="timeline-card-header">
+            <span class="timeline-module">handler.js</span>
+            <div class="timeline-meta"><span class="cost">$0</span> <span>&lt;1ms</span></div>
+          </div>
+          <p class="timeline-desc">Orchestrator: routes to checkMechanical, then agent brain</p>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="timeline-step">
+        <div class="timeline-dot"></div>
+        <div class="timeline-card">
+          <div class="timeline-card-header">
+            <span class="timeline-module">checkMechanical</span>
+            <div class="timeline-meta"><span class="cost">$0</span> <span>&lt;1ms</span></div>
+          </div>
+          <p class="timeline-desc">Pattern match for help + TCPA keywords only. ~95% pass-through.</p>
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="timeline-step">
+        <div class="timeline-dot"></div>
+        <div class="timeline-card">
+          <div class="timeline-card-header">
+            <span class="timeline-module">agent-brain.js</span>
+            <div class="timeline-meta"><span class="cost">$0</span> <span>&lt;1ms</span></div>
+          </div>
+          <p class="timeline-desc">Orchestrator: dispatches to brain-llm.js and brain-execute.js</p>
+        </div>
+      </div>
+
+      <!-- Step 5 (PAID) -->
+      <div class="timeline-step paid">
+        <div class="timeline-dot"></div>
+        <div class="timeline-card">
+          <div class="timeline-card-header">
+            <span class="timeline-module">brain-llm.js</span>
+            <div class="timeline-meta"><span class="cost">$0.0005</span> <span>~2s</span></div>
+          </div>
+          <p class="timeline-desc">Gemini 2.5 Flash Lite with tool calling. Routes via <code>search_events</code> or <code>respond</code>.</p>
+          <details>
+            <summary>View system prompt &#8595;</summary>
+          </details>
+        </div>
+      </div>
+
+      <!-- Step 6 -->
+      <div class="timeline-step">
+        <div class="timeline-dot"></div>
+        <div class="timeline-card">
+          <div class="timeline-card-header">
+            <span class="timeline-module">brain-execute.js</span>
+            <div class="timeline-meta"><span class="cost">$0</span> <span>&lt;50ms</span></div>
+          </div>
+          <p class="timeline-desc">Executes search_events: builds event pool, applies filters, resolves dates</p>
+        </div>
+      </div>
+
+      <!-- Step 7 (PAID) -->
+      <div class="timeline-step paid">
+        <div class="timeline-dot"></div>
+        <div class="timeline-card">
+          <div class="timeline-card-header">
+            <span class="timeline-module">brain-llm.js <span style="font-size:0.68rem;color:var(--text-muted)">(continuation)</span></span>
+            <div class="timeline-meta"><span class="cost">included</span> <span>~1s</span></div>
+          </div>
+          <p class="timeline-desc">Same Gemini chat session writes natural prose SMS via functionResponse</p>
+          <details>
+            <summary>View compose rules &#8595;</summary>
+          </details>
+        </div>
+      </div>
+
+      <!-- Step 8 -->
+      <div class="timeline-step">
+        <div class="timeline-dot"></div>
+        <div class="timeline-card">
+          <div class="timeline-card-header">
+            <span class="timeline-module">saveResponseFrame</span>
+            <div class="timeline-meta"><span class="cost">$0</span> <span>&lt;1ms</span></div>
+          </div>
+          <p class="timeline-desc">Atomic session write. One save path (P4). Tool call params become session state.</p>
+        </div>
+      </div>
+
+      <!-- Step 9 (PAID) -->
+      <div class="timeline-step paid">
+        <div class="timeline-dot"></div>
+        <div class="timeline-card">
+          <div class="timeline-card-header">
+            <span class="timeline-module">twilio.js</span>
+            <div class="timeline-meta"><span class="cost">$0.008</span></div>
+          </div>
+          <p class="timeline-desc">SMS delivered to user's phone</p>
+        </div>
+      </div>
+
     </div>
   </div>
 </section>
 
-<!-- 3. Data Pipeline -->
-<section id="data-pipeline">
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- SECTION 3: AGENT BRAIN DEEP DIVE                      -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="brain">
   <div class="container">
-    <p class="section-label">Data Pipeline</p>
-    <h2 class="section-title">Daily scrape, in-memory cache</h2>
-    <div class="section-body">
-      <p>Every morning at 10am ET, Pulse runs all 22 scrapers in parallel. Each scraper extracts structured event data from its source &mdash; parsing HTML, hitting APIs, or using Claude to extract from newsletters. Events are deduped across sources (hashed by name + venue + date), ranked by source trust weight, and cached in memory. No scraping happens in the hot request path.</p>
-    </div>
+    <div class="section-label">03 / Agent Brain</div>
+    <h2 class="section-title">Two Tools, One Chat Session</h2>
+    <p class="section-subtitle">The agent brain is a Gemini chat session with structured tool calling. No regex. No intent classifiers. Just two tools.</p>
 
-    <div class="flow">
-      <div class="flow-node node-yellow">10am ET &mdash; daily cron trigger</div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-blue">
-        sources/ &mdash; 22 scrapers in parallel
-        <div class="label">Skint, Skint Ongoing, Nonsense NYC, RA, Dice, BrooklynVegan, BAM, Yutori, Screen Slate, NYC Parks, DoNYC, Songkick, Luma, Eventbrite, NYPL, EventbriteComedy, EventbriteArts, TinyCupboard, BrooklynCC, NYCTrivia, BKMag, Sofar Sounds</div>
+    <div class="brain-grid">
+
+      <!-- Panel 1: File Split -->
+      <div class="brain-panel">
+        <div class="brain-panel-title">3-File Split</div>
+        <div class="file-tree">
+          <div class="root">agent-brain.js</div>
+          <div style="padding-left:8px; color:var(--text-muted); font-size:0.68rem;">orchestrator <span class="lines">~450 lines</span></div>
+          <div class="child">brain-llm.js</div>
+          <div style="padding-left:28px; color:var(--text-muted); font-size:0.68rem;">LLM calls + compose <span class="lines">~550 lines</span></div>
+          <div class="child">brain-execute.js</div>
+          <div style="padding-left:28px; color:var(--text-muted); font-size:0.68rem;">tool execution + pools <span class="lines">~530 lines</span></div>
+        </div>
+        <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border); font-family:var(--font-mono); font-size:0.68rem; color:var(--text-muted); line-height:1.7;">
+          No circular deps.<br>
+          Re-exports preserve all existing imports.
+        </div>
       </div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-green">
-        venues.js &mdash; auto-learn coordinates
-        <div class="label">Sources with lat/lng teach the shared venue map</div>
+
+      <!-- Panel 2: Tool Schemas -->
+      <div class="brain-panel">
+        <div class="brain-panel-title">2 Tools</div>
+        <div class="tool-schema">
+          <div class="tool-name">search_events</div>
+          <div>&nbsp;&nbsp;<span class="prop-key">neighborhood</span> <span class="prop-type">string</span></div>
+          <div>&nbsp;&nbsp;<span class="prop-key">category</span> <span class="prop-type">enum</span></div>
+          <div style="padding-left:16px;"><span class="prop-enum">comedy, jazz, live_music, dj, trivia, film, theater, art, dance, community, food_drink, spoken_word, classical, nightlife</span></div>
+          <div>&nbsp;&nbsp;<span class="prop-key">categories</span> <span class="prop-type">array</span></div>
+          <div>&nbsp;&nbsp;<span class="prop-key">free_only</span> <span class="prop-type">boolean</span></div>
+          <div>&nbsp;&nbsp;<span class="prop-key">time_after</span> <span class="prop-type">string</span> <span class="prop-enum">HH:MM</span></div>
+          <div>&nbsp;&nbsp;<span class="prop-key">date_range</span> <span class="prop-type">enum</span></div>
+          <div style="padding-left:16px;"><span class="prop-enum">today, tomorrow, this_weekend, this_week, next_week</span></div>
+          <div>&nbsp;&nbsp;<span class="prop-highlight">intent</span> <span class="prop-type">enum</span></div>
+          <div style="padding-left:16px;"><span class="prop-enum">new_search, refine, pivot, more, details</span></div>
+          <div>&nbsp;&nbsp;<span class="prop-key">pick_reference</span> <span class="prop-type">string</span></div>
+
+          <hr class="tool-divider">
+
+          <div class="tool-name">respond</div>
+          <div>&nbsp;&nbsp;<span class="prop-key">message</span> <span class="prop-type">string</span> <span class="prop-enum">max 480 chars</span></div>
+          <div>&nbsp;&nbsp;<span class="prop-key">intent</span> <span class="prop-type">enum</span></div>
+          <div style="padding-left:16px;"><span class="prop-enum">greeting, thanks, farewell, off_topic, clarify, acknowledge</span></div>
+        </div>
+
+        <div class="callout-p1">
+          <strong>P1:</strong> Tool call params ARE the state. Filters, intent, and neighborhood come from structured tool calls — never parsed from free text.
+        </div>
       </div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-purple">
-        events.js &mdash; dedup, rank, cache
-        <div class="label">Cross-source dedup by name+venue+date. Higher-trust source wins.</div>
+
+      <!-- Panel 3: Fallback Chain -->
+      <div class="brain-panel">
+        <div class="brain-panel-title">Fallback Chain</div>
+        <div class="fallback-chain">
+          <div class="chain-label">Tool Calling</div>
+          <div><span class="chain-primary">Gemini 2.5 Flash Lite</span></div>
+          <div class="chain-arrow">&#8595; failure</div>
+          <div><span class="chain-fallback">Claude Haiku 4.5</span></div>
+
+          <div class="chain-label">SMS Composition</div>
+          <div><span class="chain-primary">Same Gemini session</span></div>
+          <div style="padding-left:8px; font-size:0.66rem; color:var(--text-muted);">(continuation via functionResponse)</div>
+          <div class="chain-arrow">&#8595; failure</div>
+          <div><span class="chain-fallback">brainCompose</span></div>
+          <div style="padding-left:8px; font-size:0.66rem; color:var(--text-muted);">(standalone Gemini call)</div>
+          <div class="chain-arrow">&#8595; failure</div>
+          <div><span class="chain-fallback">Claude Haiku 4.5</span></div>
+        </div>
       </div>
+
     </div>
   </div>
 </section>
 
-<!-- 3. Message Flow -->
-<section id="message-flow">
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- SECTION 4: PIPELINE (placeholder)                     -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="pipeline">
   <div class="container">
-    <p class="section-label">Message Flow</p>
-    <h2 class="section-title">One path, five layers</h2>
-    <div class="section-body">
-      <p>Every message flows through the same pipeline. <code>checkMechanical</code> handles $0 shortcuts (bare numbers, "more", "help", greetings/thanks/bye). Everything else goes to the <strong>agent brain</strong> &mdash; Gemini 2.5 Flash Lite with tool calling, followed by a lightweight <code>brainCompose</code> step for SMS text. Not every layer runs on every request &mdash; "details" only needs the session, "more" reuses the existing pool.</p>
-    </div>
-
-    <div class="flow">
-      <div class="flow-node node-coral">
-        <strong>1. Incoming SMS</strong>
-        <div class="label">Twilio webhook delivers the message to handler.js</div>
-      </div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-dim">
-        <strong>2. Guard rails</strong>
-        <div class="label">TCPA opt-out &rarr; dedup (5min MessageSid cache) &rarr; $0.10/day AI budget</div>
-      </div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-blue">
-        <strong>3. checkMechanical</strong>
-        <div class="label">$0 shortcuts: help, numbers 1-5, "more", greetings, thanks, bye</div>
-      </div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-purple">
-        <strong>4. callAgentBrain</strong>
-        <div class="label">Gemini 2.5 Flash Lite tool calling: search_events, get_details, respond. ~$0.0005.</div>
-      </div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-green">
-        <strong>5. brainCompose &rarr; saveResponseFrame</strong>
-        <div class="label">SMS composition &rarr; Twilio send &rarr; atomic session save (picks, filters from tool params) &rarr; JSONL trace</div>
-      </div>
-    </div>
+    <div class="section-label">04 / Pipeline</div>
+    <h2 class="section-title">Event Pipeline</h2>
+    <p class="placeholder-text">Coming soon</p>
   </div>
 </section>
 
-<!-- 4. Routing & Filters -->
-<section id="routing">
-  <div class="container">
-    <p class="section-label">Routing</p>
-    <h2 class="section-title">Mechanical shortcuts + agent brain</h2>
-    <div class="section-body">
-      <p><code>checkMechanical</code> handles $0 shortcuts &mdash; patterns that need zero semantic understanding. Everything else goes through the <strong>agent brain</strong> (Gemini 2.5 Flash Lite tool calling), where structured tool call parameters are the system of record for intent and filter state.</p>
-    </div>
-
-    <div class="card-grid">
-      <div class="card">
-        <h3>checkMechanical ($0)</h3>
-        <p>Bare numbers 1-5 for details, "more" for next batch, "help", greetings/thanks/bye. Pattern-matched, no AI cost.</p>
-      </div>
-      <div class="card">
-        <h3>Agent brain (~$0.0005)</h3>
-        <p>Everything semantic: neighborhoods, categories, vibes, time, free events, compound queries ("free jazz in williamsburg tonight"), off-topic deflection. Gemini 2.5 Flash Lite with 3 tools: <code>search_events</code>, <code>get_details</code>, <code>respond</code>.</p>
-      </div>
-    </div>
-
-    <div class="example" style="margin-top: 20px;">
-      <div class="example-turn">
-        <span class="turn-user">User</span>
-        <span class="turn-msg">"williamsburg"</span>
-        <span class="turn-route">agent brain &rarr; search_events &rarr; ~$0.0005</span>
-      </div>
-      <div class="example-turn">
-        <span class="turn-user">User</span>
-        <span class="turn-msg">"how about comedy"</span>
-        <span class="turn-route">agent brain &rarr; search_events({categories: ["comedy"]}) &rarr; ~$0.0005</span>
-      </div>
-      <div class="example-turn">
-        <span class="turn-user">User</span>
-        <span class="turn-msg">"2"</span>
-        <span class="turn-route">checkMechanical &rarr; details &rarr; $0</span>
-      </div>
-      <div class="example-turn">
-        <span class="turn-user">User</span>
-        <span class="turn-msg">"more"</span>
-        <span class="turn-route">checkMechanical &rarr; more &rarr; $0</span>
-      </div>
-      <div class="example-turn">
-        <span class="turn-user">User</span>
-        <span class="turn-msg">"any more free comedy stuff"</span>
-        <span class="turn-route">agent brain &rarr; search_events({categories: ["comedy"], free_only: true}) &rarr; ~$0.0005</span>
-      </div>
-      <div class="example-turn">
-        <span class="turn-user">User</span>
-        <span class="turn-msg">"forget the comedy"</span>
-        <span class="turn-route">agent brain &rarr; search_events({}) &rarr; ~$0.0005</span>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top: 20px;">
-      <h3>Structured tool calls own state</h3>
-      <p>Filter state (categories, time_filter, free_only, date_range) comes from the agent brain's <code>search_events</code> tool call parameters &mdash; structured and validated. The handler saves <code>activeFilters</code> as <code>lastFilters</code> from tool call params via <code>saveResponseFrame</code>. The LLM never reports state in free text &mdash; only in structured tool calls.</p>
-      <p style="margin-top: 8px;">Filters persist across turns because the agent brain sees session context and can include or drop filters in each new <code>search_events</code> call. Intent types (<code>new_search</code>, <code>refine</code>, <code>pivot</code>) control whether neighborhood switches preserve existing filters.</p>
-    </div>
-  </div>
-</section>
-
-<!-- 5. Source Registry -->
-<section id="sources">
-  <div class="container">
-    <p class="section-label">Sources</p>
-    <h2 class="section-title">22 event sources, ranked by trust</h2>
-    <div class="section-body">
-      <p>Events are deduplicated across sources using a hash of name + venue + date. When the same event appears in multiple sources, the version from the higher-trust source wins. Sources with geo data (lat/lng) also teach venue coordinates to the shared venue map. Each source belongs to a <strong>vibe tier</strong> &mdash; discovery (indie newsletters, curated blogs), niche (single-venue or specialized), platform (structured aggregators), or mainstream (large ticketing platforms).</p>
-    </div>
-
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Source</th>
-            <th>Weight</th>
-            <th>Method</th>
-            <th>Tier</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td colspan="4" style="font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--green); padding: 12px 16px 6px; border-bottom: none;">Discovery</td></tr>
-          <tr>
-            <td class="source-name">Skint</td>
-            <td class="weight-high">0.9</td>
-            <td>Gmail &rarr; Claude extraction</td>
-            <td>discovery</td>
-          </tr>
-          <tr>
-            <td class="source-name">Skint Ongoing</td>
-            <td class="weight-high">0.9</td>
-            <td>Gmail &rarr; Claude extraction</td>
-            <td>discovery</td>
-          </tr>
-          <tr>
-            <td class="source-name">Nonsense NYC</td>
-            <td class="weight-high">0.9</td>
-            <td>Gmail &rarr; Claude extraction</td>
-            <td>discovery</td>
-          </tr>
-          <tr>
-            <td class="source-name">Screen Slate</td>
-            <td class="weight-high">0.9</td>
-            <td>Gmail &rarr; Claude extraction</td>
-            <td>discovery</td>
-          </tr>
-          <tr>
-            <td class="source-name">BKMag</td>
-            <td class="weight-high">0.9</td>
-            <td>RSS + Cheerio</td>
-            <td>discovery</td>
-          </tr>
-          <tr>
-            <td class="source-name">BrooklynVegan</td>
-            <td class="weight-mid">0.8</td>
-            <td>Cheerio HTML</td>
-            <td>discovery</td>
-          </tr>
-          <tr>
-            <td class="source-name">Yutori</td>
-            <td class="weight-mid">0.8</td>
-            <td>Gmail &rarr; Claude extraction</td>
-            <td>discovery</td>
-          </tr>
-          <tr><td colspan="4" style="font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--blue); padding: 12px 16px 6px; border-bottom: none;">Niche</td></tr>
-          <tr>
-            <td class="source-name">Luma</td>
-            <td class="weight-high">0.9</td>
-            <td>JSON API</td>
-            <td>niche</td>
-          </tr>
-          <tr>
-            <td class="source-name">BAM</td>
-            <td class="weight-mid">0.8</td>
-            <td>JSON API</td>
-            <td>niche</td>
-          </tr>
-          <tr>
-            <td class="source-name">NYC Parks</td>
-            <td class="weight-mid">0.75</td>
-            <td>JSON API</td>
-            <td>niche</td>
-          </tr>
-          <tr>
-            <td class="source-name">TinyCupboard</td>
-            <td class="weight-mid">0.75</td>
-            <td>JSON-LD</td>
-            <td>niche</td>
-          </tr>
-          <tr>
-            <td class="source-name">BrooklynCC</td>
-            <td class="weight-mid">0.75</td>
-            <td>Cheerio HTML</td>
-            <td>niche</td>
-          </tr>
-          <tr>
-            <td class="source-name">NYCTrivia</td>
-            <td class="weight-mid">0.75</td>
-            <td>Cheerio HTML</td>
-            <td>niche</td>
-          </tr>
-          <tr>
-            <td class="source-name">NYPL</td>
-            <td class="weight-low">0.7</td>
-            <td>Cheerio HTML</td>
-            <td>niche</td>
-          </tr>
-          <tr>
-            <td class="source-name">Sofar Sounds</td>
-            <td class="weight-mid">0.8</td>
-            <td>Cheerio HTML (DoNYC)</td>
-            <td>niche</td>
-          </tr>
-          <tr><td colspan="4" style="font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--purple); padding: 12px 16px 6px; border-bottom: none;">Platform</td></tr>
-          <tr>
-            <td class="source-name">Resident Advisor</td>
-            <td class="weight-high">0.85</td>
-            <td>JSON API</td>
-            <td>platform</td>
-          </tr>
-          <tr>
-            <td class="source-name">Dice</td>
-            <td class="weight-mid">0.8</td>
-            <td>JSON API</td>
-            <td>platform</td>
-          </tr>
-          <tr>
-            <td class="source-name">DoNYC</td>
-            <td class="weight-mid">0.75</td>
-            <td>Cheerio HTML</td>
-            <td>platform</td>
-          </tr>
-          <tr>
-            <td class="source-name">Songkick</td>
-            <td class="weight-mid">0.75</td>
-            <td>Cheerio HTML</td>
-            <td>platform</td>
-          </tr>
-          <tr><td colspan="4" style="font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--yellow); padding: 12px 16px 6px; border-bottom: none;">Mainstream</td></tr>
-          <tr>
-            <td class="source-name">Eventbrite</td>
-            <td class="weight-low">0.7</td>
-            <td>Cheerio HTML</td>
-            <td>mainstream</td>
-          </tr>
-          <tr>
-            <td class="source-name">EventbriteComedy</td>
-            <td class="weight-low">0.7</td>
-            <td>Cheerio HTML (search pages)</td>
-            <td>mainstream</td>
-          </tr>
-          <tr>
-            <td class="source-name">EventbriteArts</td>
-            <td class="weight-low">0.7</td>
-            <td>Cheerio HTML (search pages)</td>
-            <td>mainstream</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
-
-<!-- 6. Session & Conversation -->
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- SECTION 5: SESSIONS (placeholder)                     -->
+<!-- ══════════════════════════════════════════════════════ -->
 <section id="sessions">
   <div class="container">
-    <p class="section-label">Sessions</p>
-    <h2 class="section-title">Multi-turn conversation state</h2>
-    <div class="section-body">
-      <p>Each phone number gets a session that persists for <strong>2 hours</strong>. The session tracks what the user has been shown, what filters they've applied, and what neighborhoods they've visited. This lets follow-up messages like "how about comedy" or "later tonight" modify the active context rather than starting over.</p>
-    </div>
-
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Field</th>
-            <th>Type</th>
-            <th>Purpose</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="source-name">lastPicks</td>
-            <td>array</td>
-            <td>Most recent picks returned by compose</td>
-          </tr>
-          <tr>
-            <td class="source-name">lastEvents</td>
-            <td>object</td>
-            <td>Map of event objects offered in the last batch (for details lookup)</td>
-          </tr>
-          <tr>
-            <td class="source-name">lastNeighborhood</td>
-            <td>string</td>
-            <td>Neighborhood from the last events response</td>
-          </tr>
-          <tr>
-            <td class="source-name">lastFilters</td>
-            <td>object</td>
-            <td>Active filters: category, vibe, time_after, free_only</td>
-          </tr>
-          <tr>
-            <td class="source-name">conversationHistory</td>
-            <td>array</td>
-            <td>Last 6 turns (300 chars each) &mdash; sent to agent brain as context</td>
-          </tr>
-          <tr>
-            <td class="source-name">allPicks</td>
-            <td>array</td>
-            <td>Cumulative picks across all "more" batches</td>
-          </tr>
-          <tr>
-            <td class="source-name">allOfferedIds</td>
-            <td>array</td>
-            <td>All event IDs ever shown &mdash; excluded on "more" to avoid repeats</td>
-          </tr>
-          <tr>
-            <td class="source-name">visitedHoods</td>
-            <td>array</td>
-            <td>Neighborhoods visited this session (dedup travel nudges)</td>
-          </tr>
-          <tr>
-            <td class="source-name">pendingNearby</td>
-            <td>string</td>
-            <td>Neighborhood stored during a travel nudge ("would you travel to X?")</td>
-          </tr>
-          <tr>
-            <td class="source-name">pendingNearbyEvents</td>
-            <td>object</td>
-            <td>Pre-loaded events for the nudge neighborhood</td>
-          </tr>
-          <tr>
-            <td class="source-name">pendingFilters</td>
-            <td>object</td>
-            <td>Saved filters when asking user for a neighborhood</td>
-          </tr>
-          <tr>
-            <td class="source-name">pendingMessage</td>
-            <td>string</td>
-            <td>Original message stored with pending filters</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <div class="section-label">05 / Sessions</div>
+    <h2 class="section-title">Session State Machine</h2>
+    <p class="placeholder-text">Coming soon</p>
   </div>
 </section>
 
-<!-- 7. Agent Brain Architecture -->
-<section id="agent-brain">
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- SECTION 6: COST MODEL (placeholder)                   -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="cost">
   <div class="container">
-    <p class="section-label">Agent Brain</p>
-    <h2 class="section-title">Tool calling + lightweight compose</h2>
-    <div class="section-body">
-      <p>The agent brain splits reasoning from rendering. <strong>Step 1:</strong> Gemini 2.5 Flash Lite receives the user message, session context, and available tools, then calls the appropriate tool with structured parameters. <strong>Step 2:</strong> <code>brainCompose</code> takes the matched events and writes the SMS using a lightweight ~400-token system prompt focused on voice, format, and the 480-char limit.</p>
-      <p>This architecture replaced the previous unified LLM + composable skills approach. Tool calling gives us structured state (P1) without parsing free text, and the lightweight compose prompt avoids the over-filtering problems that conditional skills were designed to solve.</p>
-    </div>
-
-    <div class="card-grid" style="margin-top: 24px;">
-      <div class="card">
-        <h3 style="color: var(--coral);">search_events</h3>
-        <p>The primary tool. Accepts <code>neighborhood</code>, <code>categories</code> (array for multi-category OR), <code>time_filter</code>, <code>free_only</code>, <code>date_range</code>, and <code>intent</code> (new_search, refine, pivot). The handler executes the search deterministically against the event cache.</p>
-      </div>
-      <div class="card">
-        <h3 style="color: var(--blue);">get_details</h3>
-        <p>Returns full details for a specific event by pick number. Used when the user asks about a specific pick ("tell me more about 2").</p>
-      </div>
-      <div class="card">
-        <h3 style="color: var(--green);">respond</h3>
-        <p>For conversational responses that don't need event data &mdash; greetings, off-topic deflection, clarification. Returns text directly without searching events.</p>
-      </div>
-      <div class="card">
-        <h3 style="color: var(--purple);">brainCompose</h3>
-        <p>Not a tool &mdash; a separate Gemini call after tool execution. Receives the matched events with enrichment fields (source_vibe, venue_size, interaction_format) and writes the SMS text. ~400-token system prompt focused on voice, format, and 480-char limit.</p>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top: 20px;">
-      <h3>Why tool calling over monolithic prompts?</h3>
-      <p>The previous unified LLM architecture used a single Claude Haiku call with 12 conditional skill modules to handle intent, event selection, and SMS composition in one pass. Tool calling separates these concerns: the brain figures out <em>what to search for</em> (structured params), the handler <em>executes the search</em> (deterministic), and the compose step <em>writes the SMS</em> (lightweight prompt). This eliminates filter-state parsing from free text (P1), reduces prompt complexity, and halves the per-message cost.</p>
-    </div>
+    <div class="section-label">06 / Cost Model</div>
+    <h2 class="section-title">Cost Per Message</h2>
+    <p class="placeholder-text">Coming soon</p>
   </div>
 </section>
 
-<!-- 8. Quality & Eval -->
-<section id="eval">
-  <div class="container">
-    <p class="section-label">Quality</p>
-    <h2 class="section-title">5-layer eval system</h2>
-    <div class="section-body">
-      <p>Quality is measured offline against stored request traces. The eval system runs in layers, from fast deterministic checks to expensive LLM judges. Each layer catches different failure modes.</p>
-    </div>
+<div style="height:80px;"></div>
 
-    <ul class="layer-list">
-      <li>
-        <span class="layer-num">1</span>
-        <span><strong>Unit tests</strong> &mdash; Pure function tests (formatters, geo, neighborhoods). Fast, no API calls. Run on every push.</span>
-      </li>
-      <li>
-        <span class="layer-num">2</span>
-        <span><strong>Code evals</strong> &mdash; 24 deterministic trace checks: 480-char limit, valid intent, valid neighborhood, picked events exist, filter match alignment, time filter accuracy, discovery lean, and more. Free and instant. (<code>evals/code-evals.js</code>)</span>
-      </li>
-      <li>
-        <span class="layer-num">3</span>
-        <span><strong>Extraction audit</strong> &mdash; Tier 1: verify Claude-extracted evidence quotes appear verbatim in source text. Tier 2: optional LLM judge for semantic accuracy. (<code>evals/extraction-audit.js</code>)</span>
-      </li>
-      <li>
-        <span class="layer-num">4</span>
-        <span><strong>Pipeline evals</strong> &mdash; Multi-turn scenario tests with expected outcomes. Trace assertions check intent, neighborhood, event presence, and banned phrases. (<code>scripts/run-scenario-evals.js</code>)</span>
-      </li>
-      <li>
-        <span class="layer-num">5</span>
-        <span><strong>LLM judges + A/B</strong> &mdash; Tone judge ("sounds like a friend, not a bot?"), relevance judge, and model-vs-model preference tests. Expensive, run on demand. (<code>evals/judge-evals.js</code>, <code>scripts/run-ab-eval.js</code>)</span>
-      </li>
-    </ul>
+<script>
+(function() {
+  // ── CONVERSATION DATA ──
+  const CONVO = [
+    {
+      role: 'user',
+      text: 'bushwick',
+      annotation: 'checkMechanical: miss\ncallAgentBrain: search_events(\n  neighborhood: "Bushwick",\n  intent: "new_search"\n)\n47 events in pool, 3 picks composed\ncost: $0.0005 | latency: 2.1s'
+    },
+    {
+      role: 'pulse',
+      text: "Tiny Cupboard\u2019s got a free open mic tonight at 8, and there\u2019s a killer DJ set at Elsewhere at 10 ($15). Or something chill \u2014 Bushwick Comedy has stand-up at 9, free. Any of these sound good?",
+      annotation: 'Gemini continuation \u2192 prose SMS\nsaveResponseFrame \u2192 session updated\ntwilio.js \u2192 SMS out ($0.008)'
+    },
+    {
+      role: 'user',
+      text: '2',
+      annotation: 'search_events(\n  intent: "details",\n  pick_reference: "2"\n)\nFuzzy match \u2192 Elsewhere DJ set\ncost: $0.0005'
+    },
+    {
+      role: 'pulse',
+      text: "Elsewhere is that massive warehouse venue \u2014 tonight\u2019s a deep house night with DJ Honeypot. Doors at 10, gets going around 11. $15 at the door. https://elsewhere.zone/tonight",
+      annotation: 'continueWithResults \u2192 detail SMS\n480 chars | includes URL'
+    },
+    {
+      role: 'user',
+      text: 'how about comedy',
+      annotation: 'search_events(\n  neighborhood: "Bushwick",\n  category: "comedy",\n  intent: "refine"\n)\nFilters persist from session (P1)'
+    },
+    {
+      role: 'pulse',
+      text: "Bushwick Comedy\u2019s got free stand-up at 9 tonight \u2014 always a good crowd. And Tiny Cupboard has improv at 10 ($5). Reply 1 or 2 for details.",
+      annotation: 'Refined: comedy + Bushwick\n2 picks composed\ncost: $0.0005'
+    },
+  ];
 
-    <div class="code-block"><span class="hl-dim"># Run the eval layers</span>
-$ npm run eval              <span class="hl-dim"># Layer 2: code evals on stored traces</span>
-$ npm run eval:judges       <span class="hl-dim"># Layers 2+5: code evals + LLM judges</span>
-$ node scripts/run-scenario-evals.js   <span class="hl-dim"># Layer 4: multi-turn scenarios</span>
-$ node scripts/run-ab-eval.js          <span class="hl-dim"># Layer 5: A/B comparison</span></div>
-  </div>
-</section>
+  const phoneMessages = document.getElementById('phoneMessages');
+  const annotationSlots = document.getElementById('annotationSlots');
+  const replayBtn = document.getElementById('replayBtn');
+  let playing = false;
+  let timeouts = [];
 
-<!-- 9. Observability -->
-<section id="observability">
-  <div class="container">
-    <p class="section-label">Observability</p>
-    <h2 class="section-title">Traces, alerts, dashboards</h2>
-    <div class="section-body">
-      <p>Every request writes a structured trace. Health monitoring catches scrape failures and slow responses. Three dashboards provide real-time visibility.</p>
-    </div>
+  function reset() {
+    timeouts.forEach(t => clearTimeout(t));
+    timeouts = [];
+    phoneMessages.innerHTML = '';
+    annotationSlots.innerHTML = '';
+    replayBtn.style.display = 'none';
+    playing = false;
+  }
 
-    <div class="card-grid">
-      <div class="card">
-        <h3>Request traces</h3>
-        <p>Per-request JSONL records capture intent, neighborhood, picked events, AI costs, timing, and the full SMS response. Daily rotation with 4-file max. A 200-entry ring buffer powers the eval UI.</p>
-      </div>
-      <div class="card">
-        <h3>Email alerts</h3>
-        <p>Health alerts fire on scrape failures (6hr cooldown). Runtime alerts fire on slow responses or errors (30min per-type cooldown). Sent via Resend. No-op if API key is unset.</p>
-      </div>
-      <div class="card">
-        <h3>Health dashboard</h3>
-        <p>Per-source timing, success/failure status, history sparklines, extraction quality metrics. Available at <code>/health</code>.</p>
-      </div>
-      <div class="card">
-        <h3>Cost tracking</h3>
-        <p>Per-user daily budget of $0.10. Provider-aware pricing (Haiku vs Gemini). Budget resets daily on NYC timezone. Friendly message when exceeded.</p>
-      </div>
-    </div>
-  </div>
-</section>
+  function play() {
+    if (playing) return;
+    reset();
+    playing = true;
 
-<footer>
-  <div class="footer-inner">
-    <span class="footer-brand">Pulse</span>
-    <span class="footer-note">Built in Brooklyn</span>
-  </div>
-</footer>
+    // Pre-create DOM elements
+    const msgEls = [];
+    const annEls = [];
+    CONVO.forEach((item, i) => {
+      const msgEl = document.createElement('div');
+      msgEl.className = 'msg ' + (item.role === 'user' ? 'msg-user' : 'msg-pulse');
+      msgEl.textContent = item.text;
+      phoneMessages.appendChild(msgEl);
+      msgEls.push(msgEl);
+
+      const annEl = document.createElement('div');
+      annEl.className = 'annotation';
+      annEl.textContent = item.annotation;
+      annotationSlots.appendChild(annEl);
+      annEls.push(annEl);
+    });
+
+    // Staggered reveal
+    CONVO.forEach((_, i) => {
+      const t = setTimeout(() => {
+        msgEls[i].classList.add('visible');
+        annEls[i].classList.add('visible');
+        // Scroll phone to bottom
+        phoneMessages.scrollTop = phoneMessages.scrollHeight;
+        // Show replay after last
+        if (i === CONVO.length - 1) {
+          setTimeout(() => {
+            replayBtn.style.display = 'inline-block';
+            playing = false;
+          }, 600);
+        }
+      }, 1500 * (i + 1));
+      timeouts.push(t);
+    });
+  }
+
+  replayBtn.addEventListener('click', () => {
+    reset();
+    setTimeout(play, 100);
+  });
+
+  // IntersectionObserver: auto-play when hero is visible
+  const heroSection = document.getElementById('hero');
+  let hasPlayed = false;
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting && !hasPlayed) {
+        hasPlayed = true;
+        play();
+      }
+    });
+  }, { threshold: 0.3 });
+  observer.observe(heroSection);
+
+  // ── JUMP NAV ACTIVE STATE ──
+  const jumpLinks = document.querySelectorAll('.jump-nav a');
+  const sections = document.querySelectorAll('section[id]');
+  const jumpObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        jumpLinks.forEach(l => l.classList.remove('active'));
+        const match = document.querySelector('.jump-nav a[href="#' + entry.target.id + '"]');
+        if (match) match.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => jumpObserver.observe(s));
+})();
+</script>
 
 </body>
 </html>
