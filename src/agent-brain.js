@@ -23,7 +23,7 @@ const { sendSMS, maskPhone } = require('./twilio');
 const { startTrace, saveTrace, recordAICost } = require('./traces');
 const { getSession, setSession, addToHistory } = require('./session');
 const { trackAICost } = require('./request-guard');
-const { handleHelp, handleDetails, handleMore } = require('./intent-handlers');
+const { handleHelp, handleMore } = require('./intent-handlers');
 const { updateProfile } = require('./preference-profile');
 const { getNycDateString } = require('./geo');
 const { smartTruncate } = require('./formatters');
@@ -85,21 +85,16 @@ const BRAIN_TOOLS = [
             enum: ['today', 'tomorrow', 'this_weekend', 'this_week', 'next_week'],
           },
           intent: {
-            type: 'STRING', description: 'What the user is doing: new_search (first request or starting over), refine (adding/tightening a filter), pivot (changing topic/category)',
-            enum: ['new_search', 'refine', 'pivot'],
+            type: 'STRING', description: 'What the user is doing: new_search (first request or starting over), refine (adding/tightening a filter), pivot (changing topic/category), more (show additional picks from same search), details (get details about a specific pick)',
+            enum: ['new_search', 'refine', 'pivot', 'more', 'details'],
+          },
+          pick_reference: {
+            type: 'STRING',
+            description: 'How the user referenced a previously shown pick. Can be a number ("2"), event name ("the comedy one"), or venue name ("Elsewhere"). Only used with intent: "details".',
+            nullable: true,
           },
         },
         required: ['intent'],
-      },
-    }, {
-      name: 'get_details',
-      description: 'Get details about a previously shown event pick. Use when the user sends a number referencing a pick list, or asks about a specific event from the list.',
-      parameters: {
-        type: 'OBJECT',
-        properties: {
-          pick_number: { type: 'INTEGER', description: 'Pick number 1-5 from the last shown list' },
-        },
-        required: ['pick_number'],
       },
     }, {
       name: 'respond',
@@ -449,20 +444,10 @@ async function callAgentBrainAnthropic(message, session, phone, trace, brainStar
           free_only: { type: 'boolean', description: 'Only show free events' },
           time_after: { type: 'string', description: 'Only events after this time, HH:MM 24hr format' },
           date_range: { type: 'string', enum: ['today', 'tomorrow', 'this_weekend', 'this_week', 'next_week'] },
-          intent: { type: 'string', enum: ['new_search', 'refine', 'pivot'] },
+          intent: { type: 'string', enum: ['new_search', 'refine', 'pivot', 'more', 'details'] },
+          pick_reference: { type: 'string', description: 'Reference to a previously shown pick (number, name, or venue). Used with intent: details.' },
         },
         required: ['intent'],
-      },
-    },
-    {
-      name: 'get_details',
-      description: 'Get details about a previously shown event pick.',
-      input_schema: {
-        type: 'object',
-        properties: {
-          pick_number: { type: 'integer', description: 'Pick number 1-5' },
-        },
-        required: ['pick_number'],
       },
     },
     {
@@ -1113,19 +1098,6 @@ async function executeSearchEvents(params, session, phone, trace) {
   };
 }
 
-// --- Tool execution: get_details ---
-
-async function executeGetDetails(params, session, phone, trace) {
-  // Reuse existing handleDetails by building a ctx-like object
-  const route = {
-    intent: 'details',
-    event_reference: String(params.pick_number),
-  };
-
-  // Return info so handleAgentBrainRequest can dispatch
-  return { dispatchMechanical: true, route };
-}
-
 // --- Tool execution: respond ---
 
 async function executeRespond(params, session, phone, trace) {
@@ -1351,21 +1323,6 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
       } else {
         // Anthropic path or no chat — use legacy brainCompose
         execResult = await executeSearchEvents(brainResult.params, session, phone, trace);
-      }
-    } else if (brainResult.tool === 'get_details') {
-      execResult = await executeGetDetails(brainResult.params, session, phone, trace);
-
-      if (execResult.dispatchMechanical) {
-        // Dispatch to existing handleDetails
-        const ctx = {
-          phone, message, masked, session, trace,
-          route: execResult.route,
-          finalizeTrace,
-          trackAICost: (usage, provider) => trackAICost(phone, usage, provider),
-          recordAICost,
-        };
-        await handleDetails(ctx);
-        return trace.id;
       }
     } else if (brainResult.tool === 'respond') {
       execResult = await executeRespond(brainResult.params, session, phone, trace);
