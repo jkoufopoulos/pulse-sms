@@ -25,26 +25,24 @@ Pulse turns a simple text message into a curated night out. A user texts a neigh
 
 ## How Conversations Work
 
-Pulse routes every incoming message through a two-tier system: a fast deterministic pre-router and an LLM call. The handler owns all filter state deterministically — the LLM never manages filters, it only composes from a pre-tagged event pool. Two LLM paths exist: the unified flow (default) and the agent brain (gated).
+Pulse routes every incoming message through `checkMechanical` (fast $0 shortcuts) then the agent brain (Gemini tool calling). Session state is derived from the agent's structured tool call parameters — never parsed from free-text output.
 
-**Pre-router (~15% of messages, zero AI cost)** — Pattern-matches mechanical shortcuts: help, numbers 1-5 for details, "more", greetings/thanks/bye, event name matches, and session-aware filter detection ("how about comedy", "free", "later tonight"). Filter detections are injected into the LLM branch — the pre-router never composes responses for these.
+**Agent brain (primary path, ~$0.0005/call)** — Gemini 2.5 Flash Lite with tool calling. `checkMechanical` handles $0 shortcuts (bare numbers 1-5, "more", "help", greetings/thanks/bye), then `callAgentBrain` invokes 3 tools (`search_events`, `get_details`, `respond`), followed by `brainCompose` for lightweight SMS composition. 2-3s typical latency. Tool call params (`search_events` args) are the system of record for filters and intent. Falls back to Anthropic Haiku on Gemini 503s. 99.9% code eval pass rate.
 
-**Unified LLM call (default path, ~$0.001/call)** — A single Claude Haiku call that understands intent AND composes the SMS response. Handles neighborhoods, compound requests, off-topic deflection, nudge accepts, boroughs, and all semantic understanding. Receives a tagged event pool where filter-matched events are marked `[MATCH]`.
-
-**Agent brain (`PULSE_AGENT_BRAIN=true`, ~$0.0005/call)** — Alternative path using Gemini 2.5 Flash Lite with tool calling. `checkMechanical` handles $0 shortcuts, then `callAgentBrain` invokes 3 tools (`search_events`, `get_details`, `respond`), followed by `brainCompose` for lightweight SMS composition. 2-3s typical latency. Falls back to Anthropic Haiku on Gemini 503s.
+**Unified flow (fallback, ~$0.001/call)** — A single Claude Haiku call that understands intent AND composes the SMS response. Activates when `PULSE_AGENT_BRAIN` is not set. Uses pre-router for filter detection and `mergeFilters` for deterministic state. Legacy path retained as fallback.
 
 A typical multi-turn conversation:
 ```
-User: "williamsburg"           → unified: Haiku composes Williamsburg picks ($0.001)
-User: "how about comedy"       → pre-router detects comedy filter → unified: tagged pool, comedy [MATCH] ($0.001)
-User: "2"                      → pre-router: details on pick #2 ($0)
-User: "try bushwick"           → unified: comedy filter persists via mergeFilters, Bushwick comedy tagged [MATCH] ($0.001)
-User: "later tonight"          → pre-router detects time filter → unified: comedy+late compound, both filters applied ($0.001)
-User: "forget the comedy"      → pre-router: clear_filters → unified: fresh Bushwick picks, no filters ($0.001)
-User: "more"                   → pre-router: next batch of picks ($0)
+User: "williamsburg"           → agent brain: search_events({neighborhood: "williamsburg"}) ($0.0005)
+User: "how about comedy"       → agent brain: search_events({neighborhood: "williamsburg", categories: ["comedy"]}) ($0.0005)
+User: "2"                      → checkMechanical: details on pick #2 ($0)
+User: "try bushwick"           → agent brain: search_events({neighborhood: "bushwick", categories: ["comedy"]}) ($0.0005)
+User: "later tonight"          → agent brain: search_events({neighborhood: "bushwick", categories: ["comedy"], time_filter: "late_night"}) ($0.0005)
+User: "forget the comedy"      → agent brain: search_events({neighborhood: "bushwick"}) ($0.0005)
+User: "more"                   → checkMechanical: next batch of picks ($0)
 ```
 
-**Filter state flow:** The handler resolves filters deterministically using `mergeFilters(lastFilters, preDetectedFilters)`. Filters persist across neighborhood switches, nudge accepts, and conversational responses. The LLM sees a tagged event pool (`[MATCH]` events first, padded with unmatched) and a `SPARSE` flag when matches are thin. After the LLM responds, the handler saves `activeFilters` as `lastFilters` — never the LLM's guess.
+**Filter state flow:** The handler reads filter state from the agent brain's `search_events` tool call params (categories, time_filter, free_only, date_range). These are structured and validated — safe state sources. After the response, the handler saves `activeFilters` as `lastFilters` via `saveResponseFrame`. On the legacy unified-flow path, `mergeFilters(lastFilters, preDetectedFilters)` compounds filters deterministically instead.
 
 Session state (neighborhood, last picks, active filters) persists for 2 hours per phone number.
 
@@ -57,78 +55,72 @@ Daily scrape (10am ET)              Incoming SMS
         │                                │
         ▼                                ▼
    sources/                         handler.js
-   (23 entries across               (request-guard.js:           $0
-    21 scraper modules)              TCPA, dedup, budget)
+   (22 entries across               (request-guard.js:           $0
+    20 scraper modules)              TCPA, dedup, budget)
         │                                │
-        ├─► venues.js              pre-router.js ◄── session.js
-        │   (auto-learn             (mechanical        (14 fields,
-        │    coords,                 shortcuts)         2hr TTL)
-        │    persist)                    │
-        ▼                    ┌──────────┼──────────────┐
-   events.js            mechanical   filter detect   no match
-   (cache, dedup,       shortcuts    (comedy/time/   (85% of
-    source health)     (help, 1-5,   free/vibe/      messages)
-        │               more, bye)   clear)              │
-        │                  │            │                │
-        │                  ▼            │                │
-        │            intent-handlers    │                │
-        │            (help, details,    │                │
-        │             more, convo)      │                │
-        │                  │            └──► merge ◄────┘
-        │                  │                  │
-        │                $0 AI           pipeline.js
-        │                                mergeFilters()         $0
-        │                                buildTaggedPool()
-        │                     ┌── [MATCH] + unmatched events
-        │                     │   + ACTIVE_FILTER / SPARSE
-        │                     ▼
-        │              ┌─────────────────────────────┐
-        │              │  PULSE_AGENT_BRAIN=true?     │
-        │              ├──── yes ────┬──── no ────────┤
-        │              ▼             ▼                │
-        │     agent-brain.js    ai.js/unifiedRespond  │
-        │     (Gemini 2.5       (Claude Haiku,        │
-        └─►   Flash Lite,       1 call)    ~$0.001   │
-              tool calling      skills/ + prompts.js  │
-              + brainCompose)   (15 conditional       │
-              ~$0.0005          modules)              │
-              └──────────┬───────────┘                │
-                         ▼
-                   handler saves                    $0
-                   activeFilters → lastFilters
-                   (deterministic, not LLM-derived)
-                         │
-                   formatters.js (480-char)
-                         │
-                   twilio.js (send SMS)            ~$0.008
+        ├─► venues.js              checkMechanical ◄── session.js
+        │   (auto-learn             ($0 shortcuts:      (12 fields,
+        │    coords,                 1-5, more,          2hr TTL)
+        │    persist)                help, bye)
+        ▼                               │
+   events.js                 ┌──────────┼──────────┐
+   (cache, dedup,         matched     no match
+    source health)       (intent-     (85% of
+        │                handlers)    messages)
+        │                   │              │
+        │                 $0 AI            ▼
+        │                          callAgentBrain
+        │                          (Gemini 2.5 Flash Lite
+        │                           tool calling)
+        │                               │
+        │                     ┌─────────┼─────────┐
+        │                     ▼         ▼         ▼
+        │               search_events  get_    respond
+        │               (hood, cats,   details
+        └─►              time, date,
+                         free, intent)
+                              │
+                         brainCompose            ~$0.0005
+                         (SMS composition)
+                              │
+                         handler saves              $0
+                         activeFilters → lastFilters
+                         (from tool call params)
+                              │
+                         formatters.js (480-char)
+                              │
+                         twilio.js (send SMS)    ~$0.008
+
+Fallback: unified-flow.js (Claude Haiku, ~$0.001/call)
+          activates when PULSE_AGENT_BRAIN is not set
 ```
 
 **Key modules** (all under `src/`):
 
 | Module | Role |
 |--------|------|
-| `handler.js` | Orchestrator: pre-router → filter resolution → tagged pool → unified LLM → deterministic session save |
+| `handler.js` | Orchestrator: checkMechanical → agent brain (or unified-flow fallback) → deterministic session save |
 | `request-guard.js` | TCPA opt-out, Twilio dedup, per-user AI budget ($0.10/day prod), IP rate limiting |
-| `unified-flow.js` | Unified LLM orchestration: context resolution, LLM call, response handling, zero-match |
-| `pre-router.js` | Deterministic intent matching + session-aware filter detection. Returns `null` → unified LLM |
+| `unified-flow.js` | Fallback LLM orchestration (Claude Haiku): context resolution, LLM call, response handling, zero-match |
+| `pre-router.js` | Deterministic intent matching + session-aware filter detection. Used by unified-flow fallback path |
 | `pipeline.js` | `mergeFilters`, `buildTaggedPool`, `eventMatchesFilters`, `saveResponseFrame` (atomic session writes) |
 | `ai.js` | `unifiedRespond` (single Haiku call), `composeResponse` (handleMore), `extractEvents` (scrape-time) |
-| `agent-brain.js` | Agent brain path: `checkMechanical` ($0), `callAgentBrain` (Gemini tool calling), `brainCompose`. Gated by `PULSE_AGENT_BRAIN=true` |
+| `agent-brain.js` | Primary LLM path: `checkMechanical` ($0), `callAgentBrain` (Gemini tool calling), `brainCompose`. Enabled by `PULSE_AGENT_BRAIN=true` |
 | `prompts.js` | System prompts: `UNIFIED_SYSTEM`, `DETAILS_SYSTEM`, `EXTRACTION_PROMPT` |
-| `session.js` | Per-phone session store, 2hr TTL, 14 fields |
+| `session.js` | Per-phone session store, 2hr TTL, 12 fields |
 | `events.js` | Daily event cache + disk persistence, cross-source dedup, quality gates, source vibe stamping |
-| `source-registry.js` | Single source of truth for all 23 source entries across 21 scraper modules (weights, tiers, fetch functions) |
+| `source-registry.js` | Single source of truth for all 23 source entries across 20 scraper modules (weights, tiers, fetch functions) |
 | `model-router.js` | Complexity scoring (0-100), routes Haiku vs Gemini Flash |
 
 Other modules: `intent-handlers.js` (help/details/more/convo), `geo.js` + `neighborhoods.js` (36 NYC hoods), `venues.js` (auto-learning coords), `formatters.js` (480-char cap), `twilio.js`, `traces.js`, `alerts.js`, `preference-profile.js`, `referral.js`, `card.js`, `curation.js`, `source-health.js`, `db.js` (SQLite).
 
-Sources: 23 entries across 21 scraper modules in `sources/` — see `source-registry.js` for the full list. Evals: 6 modules in `src/evals/`. Scripts: 13 runners in `scripts/`. UIs: 7 dashboards served by `server.js`.
+Sources: 22 entries across 20 scraper modules in `sources/` — see `source-registry.js` for the full list. Evals: 6 modules in `src/evals/`. Scripts: 13 runners in `scripts/`. UIs: 7 dashboards served by `server.js`.
 
 ## Design Principles (do not violate)
 
-- **P1: Code owns state, LLM owns language** — Never read structured fields from LLM output to set session state. The handler saves `activeFilters` as `lastFilters` deterministically. The LLM composes from a tagged pool but never manages filter state.
+- **P1: Structured tool calls own state, free-text owns language** — Session state is derived from the agent brain's tool call params (`search_events` args), never parsed from free-text LLM output. Tool params are structured and validated — safe state sources. The handler saves `activeFilters` as `lastFilters` from tool call params.
 - **P4: One save path** — Every SMS-sending path must end with `saveResponseFrame`. No `setSession` terminal writes.
-- **P6: Deterministic extraction first** — Compound filters ("free comedy") should be pre-router regex, not LLM-reported.
+- **P6: Mechanical shortcuts for $0 operations, LLM for everything else** — `checkMechanical` handles bare numbers, "more", "help" at $0. All semantic understanding (compounds, filters, intent) goes to the agent brain's tool calling.
 - **480-char SMS limit** — All responses capped at 480 chars.
 - **TCPA compliance** — STOP/UNSUBSCRIBE/CANCEL/QUIT silently dropped (no reply).
 - **Per-user daily AI budget** — $0.10/day prod, $10 test. `trackAICost` accumulates; `isOverBudget` blocks.
@@ -140,7 +132,7 @@ Sources: 23 entries across 21 scraper modules in `sources/` — see `source-regi
 
 Required: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `ANTHROPIC_API_KEY`, `TAVILY_API_KEY` (required at boot, not used in hot path).
 
-Optional: `PORT` (default 3000), `PULSE_TEST_MODE=true` (enables simulator), `PULSE_AGENT_BRAIN=true` (enables agent brain path), `GEMINI_API_KEY` (agent brain + fallback provider), `TICKETMASTER_API_KEY`, `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`/`GMAIL_REFRESH_TOKEN` (newsletter scrapers), `RESEND_API_KEY`/`ALERT_EMAIL` (email alerts), `PULSE_NO_RATE_LIMIT=true`, `PULSE_CARD_ENABLED=true` (enables branded card pages; default off, uses direct source URLs), `PULSE_CARD_DOMAIN`, `PULSE_LINK_PREVIEWS=true` (sends each pick's URL as a separate SMS for iMessage link previews).
+Optional: `PORT` (default 3000), `PULSE_TEST_MODE=true` (enables simulator), `PULSE_AGENT_BRAIN=true` (enables agent brain — primary LLM path), `GEMINI_API_KEY` (agent brain + fallback provider), `TICKETMASTER_API_KEY`, `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`/`GMAIL_REFRESH_TOKEN` (newsletter scrapers), `RESEND_API_KEY`/`ALERT_EMAIL` (email alerts), `PULSE_NO_RATE_LIMIT=true`, `PULSE_CARD_ENABLED=true` (enables branded card pages; default off, uses direct source URLs), `PULSE_CARD_DOMAIN`, `PULSE_LINK_PREVIEWS=true` (sends each pick's URL as a separate SMS for iMessage link previews).
 
 Model overrides: `PULSE_MODEL_COMPOSE`, `PULSE_MODEL_EXTRACT`, `PULSE_MODEL_ROUTE`, `PULSE_MODEL_ROUTE_GEMINI`, `PULSE_ROUTE_PROVIDER`.
 

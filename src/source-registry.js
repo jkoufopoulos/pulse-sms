@@ -1,4 +1,4 @@
-const { fetchSkintEvents, fetchSkintOngoingEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchNonsenseNYC, fetchDoNYCEvents, fetchBAMEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents, fetchTicketmasterEvents, fetchYutoriEvents, fetchScreenSlateEvents, fetchLumaEvents, fetchTinyCupboardEvents, fetchBrooklynCCEvents, fetchNYCTriviaEvents, fetchBKMagEvents, fetchSofarSoundsEvents } = require('./sources');
+const { fetchSkintEvents, fetchSkintOngoingEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchNonsenseNYC, fetchDoNYCEvents, fetchBAMEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents, fetchYutoriEvents, fetchScreenSlateEvents, fetchLumaEvents, fetchTinyCupboardEvents, fetchBrooklynCCEvents, fetchNYCTriviaEvents, fetchBKMagEvents, fetchSofarSoundsEvents } = require('./sources');
 
 // Source tier classification for compose prompt
 const SOURCE_TIERS = {
@@ -15,7 +15,8 @@ const SOURCE_TIERS = {
   NYCParks: 'secondary',
   DoNYC: 'secondary',
   Songkick: 'secondary',
-  Ticketmaster: 'secondary',
+  // Ticketmaster removed — 826 events, 70% Broadway/tourist theater. ~30 useful jazz/indie events
+  // don't justify the noise. Key venues (Birdland, Blue Note, Brooklyn Bowl) covered by other sources.
   Eventbrite: 'secondary',
   Luma: 'curated',
   NYPL: 'secondary',
@@ -48,7 +49,8 @@ const SOURCES = [
   { label: 'NYCParks',         fetch: fetchNYCParksEvents,      weight: 0.75, mergeRank: 0, endpoint: 'https://www.nycgovparks.org/events' },
   { label: 'DoNYC',            fetch: fetchDoNYCEvents,         weight: 0.75, mergeRank: 1, endpoint: 'https://donyc.com/events/today' },
   { label: 'Songkick',         fetch: fetchSongkickEvents,      weight: 0.75, mergeRank: 2, endpoint: 'https://www.songkick.com/metro-areas/7644-us-new-york/today' },
-  { label: 'Ticketmaster',     fetch: fetchTicketmasterEvents,  weight: 0.75, mergeRank: 3, endpoint: 'https://app.ticketmaster.com' },
+  // Ticketmaster removed — 826 events, 70% Broadway/tourist. Birdland/Blue Note covered by Dice/Songkick.
+  // Scraper preserved at sources/ticketmaster.js. Re-enable if users request Broadway/theater.
   { label: 'Luma',              fetch: fetchLumaEvents,          weight: 0.9,  mergeRank: 0, endpoint: 'https://api.lu.ma/discover/get-paginated-events' },
   { label: 'Eventbrite',       fetch: fetchEventbriteEvents,    weight: 0.7,  mergeRank: 1, endpoint: 'https://www.eventbrite.com/d/ny--new-york/events--today/' },
   { label: 'NYPL',             fetch: fetchNYPLEvents,          weight: 0.7,  mergeRank: 2, endpoint: 'https://www.eventbrite.com/o/new-york-public-library-for-the-performing-arts-5993389089' },
