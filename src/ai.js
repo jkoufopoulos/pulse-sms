@@ -1,117 +1,7 @@
-const Anthropic = require('@anthropic-ai/sdk');
-const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
+const { generate: llmGenerate } = require('./llm');
+const { MODELS } = require('./model-config');
 const { EXTRACTION_PROMPT, DETAILS_SYSTEM } = require('./prompts');
 const { smartTruncate, isSearchUrl } = require('./formatters');
-
-let client = null;
-function getClient() {
-  if (!client) client = new Anthropic();
-  return client;
-}
-
-function withTimeout(promise, ms, label) {
-  const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
-  );
-  return Promise.race([promise, timeout]);
-}
-
-let geminiClient = null;
-function getGeminiClient() {
-  if (!geminiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return null;
-    geminiClient = new GoogleGenerativeAI(apiKey);
-  }
-  return geminiClient;
-}
-
-const MODELS = {
-  compose: process.env.PULSE_MODEL_COMPOSE || 'gemini-2.5-flash',
-  extract: process.env.PULSE_MODEL_EXTRACT || 'gemini-2.5-flash',
-};
-
-// Gemini fallback chain: flash → flash-lite → Haiku
-// On quota/rate-limit errors (429), try the next Gemini model before falling to Anthropic.
-const GEMINI_FALLBACK = 'gemini-2.5-flash-lite';
-function isQuotaError(err) {
-  return err.message && (err.message.includes('429') || err.message.includes('quota') || err.message.includes('Too Many Requests'));
-}
-
-// Safety settings for all Gemini calls — block dangerous content but allow normal event text
-function checkGeminiFinish(response, label) {
-  const reason = response.candidates?.[0]?.finishReason;
-  if (reason && reason !== 'STOP') {
-    console.warn(`${label}: finishReason=${reason}`);
-    if (reason === 'SAFETY' || reason === 'MAX_TOKENS') {
-      throw new Error(`Gemini ${label}: ${reason}`);
-    }
-  }
-}
-
-const GEMINI_SAFETY = [
-  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-];
-
-
-/**
- * Extract events via Google Gemini Flash.
- */
-async function extractWithGemini(systemPrompt, userPrompt, modelName) {
-  const genAI = getGeminiClient();
-  const gemModel = genAI.getGenerativeModel({
-    model: modelName || MODELS.extract,
-    systemInstruction: systemPrompt,
-    safetySettings: GEMINI_SAFETY,
-    generationConfig: { maxOutputTokens: 4096, temperature: 0, responseMimeType: 'application/json' },
-  });
-
-  const result = await withTimeout(
-    gemModel.generateContent({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }] }),
-    90_000, 'extractWithGemini'
-  );
-  const response = result.response;
-  checkGeminiFinish(response, 'extractWithGemini');
-  const text = response.text() || '';
-  const usageMetadata = response.usageMetadata;
-  const usage = usageMetadata ? {
-    input_tokens: usageMetadata.promptTokenCount || 0,
-    output_tokens: usageMetadata.candidatesTokenCount || 0,
-  } : null;
-
-  return { text, usage, provider: 'gemini' };
-}
-
-/**
- * Compose details via Google Gemini Flash (plain text, not JSON).
- */
-async function detailsWithGemini(systemPrompt, userPrompt, modelName) {
-  const genAI = getGeminiClient();
-  const gemModel = genAI.getGenerativeModel({
-    model: modelName || MODELS.compose,
-    systemInstruction: systemPrompt,
-    safetySettings: GEMINI_SAFETY,
-    generationConfig: { maxOutputTokens: 1024, temperature: 0.8 },
-  });
-
-  const result = await withTimeout(
-    gemModel.generateContent({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }] }),
-    15_000, 'detailsWithGemini'
-  );
-  const response = result.response;
-  checkGeminiFinish(response, 'detailsWithGemini');
-  const text = response.text() || '';
-  const usageMetadata = response.usageMetadata;
-  const usage = usageMetadata ? {
-    input_tokens: usageMetadata.promptTokenCount || 0,
-    output_tokens: usageMetadata.candidatesTokenCount || 0,
-  } : null;
-
-  return { text, usage, provider: 'gemini' };
-}
 
 
 /**
@@ -134,45 +24,20 @@ ${rawText}
 Extract all events and venues into the JSON format specified in your instructions.`;
 
   const resolvedModel = model || MODELS.extract;
+  const timeout = sourceName === 'yutori' ? 90_000 : 60_000;
   let text, usage, provider;
-  if (resolvedModel.startsWith('gemini-') && getGeminiClient()) {
-    try {
-      const result = await extractWithGemini(EXTRACTION_PROMPT, userPrompt);
-      text = result.text; usage = result.usage; provider = 'gemini';
-    } catch (err) {
-      if (isQuotaError(err) && resolvedModel !== GEMINI_FALLBACK) {
-        try {
-          console.warn(`Gemini ${resolvedModel} extractEvents quota hit, trying ${GEMINI_FALLBACK}`);
-          const result = await extractWithGemini(EXTRACTION_PROMPT, userPrompt, GEMINI_FALLBACK);
-          text = result.text; usage = result.usage; provider = 'gemini';
-        } catch (err2) {
-          console.warn(`Gemini fallback extractEvents also failed, falling back to Anthropic: ${err2.message}`);
-          const timeout = sourceName === 'yutori' ? 90000 : 60000;
-          const response = await getClient().messages.create({ model: 'claude-haiku-4-5-20251001', max_tokens: 8192, system: EXTRACTION_PROMPT, messages: [{ role: 'user', content: userPrompt }] }, { timeout, maxRetries: 0 });
-          text = response.content?.[0]?.text || '';
-          usage = response.usage || null;
-          provider = 'anthropic';
-        }
-      } else {
-        console.warn(`Gemini extractEvents failed, falling back to Anthropic: ${err.message}`);
-        const timeout = sourceName === 'yutori' ? 90000 : 60000;
-        const response = await getClient().messages.create({ model: 'claude-haiku-4-5-20251001', max_tokens: 8192, system: EXTRACTION_PROMPT, messages: [{ role: 'user', content: userPrompt }] }, { timeout, maxRetries: 0 });
-        text = response.content?.[0]?.text || '';
-        usage = response.usage || null;
-        provider = 'anthropic';
-      }
-    }
-  } else {
-    const timeout = sourceName === 'yutori' ? 90000 : 60000;
-    const response = await getClient().messages.create({
-      model: resolvedModel,
-      max_tokens: 8192,
-      system: EXTRACTION_PROMPT,
-      messages: [{ role: 'user', content: userPrompt }],
-    }, { timeout, maxRetries: 0 });
-    text = response.content?.[0]?.text || '';
-    usage = response.usage || null;
-    provider = 'anthropic';
+
+  try {
+    const result = await llmGenerate(resolvedModel, EXTRACTION_PROMPT, userPrompt, {
+      maxTokens: 8192, temperature: 0, json: true, timeout,
+    });
+    text = result.text; usage = result.usage; provider = result.provider;
+  } catch (err) {
+    console.warn(`extractEvents ${resolvedModel} failed, falling back to ${MODELS.fallback}: ${err.message}`);
+    const result = await llmGenerate(MODELS.fallback, EXTRACTION_PROMPT, userPrompt, {
+      maxTokens: 8192, temperature: 0, json: true, timeout,
+    });
+    text = result.text; usage = result.usage; provider = result.provider;
   }
 
   const parsed = parseJsonFromResponse(text);
@@ -330,52 +195,20 @@ Why you recommended it: ${pickReason || 'solid pick for the neighborhood'}
 
 Write the details text. Include this URL: ${bestUrl}`;
 
+  const resolvedModel = skipGemini ? MODELS.fallback : MODELS.details;
   let text, usage, provider;
-  if (!skipGemini && MODELS.compose.startsWith('gemini-') && getGeminiClient()) {
-    try {
-      const result = await detailsWithGemini(DETAILS_SYSTEM, userPrompt);
-      text = result.text; usage = result.usage; provider = 'gemini';
-    } catch (err) {
-      if (isQuotaError(err) && MODELS.compose !== GEMINI_FALLBACK) {
-        try {
-          console.warn(`Gemini ${MODELS.compose} composeDetails quota hit, trying ${GEMINI_FALLBACK}`);
-          const result = await detailsWithGemini(DETAILS_SYSTEM, userPrompt, GEMINI_FALLBACK);
-          text = result.text; usage = result.usage; provider = 'gemini';
-        } catch (err2) {
-          console.warn(`Gemini fallback composeDetails also failed, falling back to Anthropic: ${err2.message}`);
-          const response = await withTimeout(getClient().messages.create({
-            model: 'claude-haiku-4-5-20251001',
-            max_tokens: 256,
-            system: DETAILS_SYSTEM,
-            messages: [{ role: 'user', content: userPrompt }],
-          }, { timeout: 8000 }), 10000, 'composeDetails');
-          text = response.content?.[0]?.text || '';
-          usage = response.usage || null;
-          provider = 'anthropic';
-        }
-      } else {
-        console.warn(`Gemini composeDetails failed, falling back to Anthropic: ${err.message}`);
-        const response = await withTimeout(getClient().messages.create({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 256,
-          system: DETAILS_SYSTEM,
-          messages: [{ role: 'user', content: userPrompt }],
-        }, { timeout: 8000 }), 10000, 'composeDetails');
-        text = response.content?.[0]?.text || '';
-        usage = response.usage || null;
-        provider = 'anthropic';
-      }
-    }
-  } else {
-    const response = await withTimeout(getClient().messages.create({
-      model: MODELS.compose,
-      max_tokens: 256,
-      system: DETAILS_SYSTEM,
-      messages: [{ role: 'user', content: userPrompt }],
-    }, { timeout: 8000 }), 10000, 'composeDetails');
-    text = response.content?.[0]?.text || '';
-    usage = response.usage || null;
-    provider = 'anthropic';
+
+  try {
+    const result = await llmGenerate(resolvedModel, DETAILS_SYSTEM, userPrompt, {
+      maxTokens: 1024, temperature: 0.8, timeout: 15_000,
+    });
+    text = result.text; usage = result.usage; provider = result.provider;
+  } catch (err) {
+    console.warn(`composeDetails ${resolvedModel} failed, falling back to ${MODELS.fallback}: ${err.message}`);
+    const result = await llmGenerate(MODELS.fallback, DETAILS_SYSTEM, userPrompt, {
+      maxTokens: 256, timeout: 10_000,
+    });
+    text = result.text; usage = result.usage; provider = result.provider;
   }
 
   // Model might return JSON or plain text — handle both
