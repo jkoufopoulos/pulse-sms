@@ -86,3 +86,25 @@ check('new source (<3 history): not quarantined', newResult.quarantined === fals
 for (const k of ['TestGuard', 'TestFieldDrift', 'TestDupes', 'TestDates', 'TestNewSource']) {
   delete sh[k];
 }
+
+// --- postScrapeAudit ---
+console.log('\npostScrapeAudit:');
+
+const { postScrapeAudit } = require('../../src/scrape-guard');
+
+// Mock fetchMap with a source that has low completeness pass rate
+const mockFetchMap = {
+  BAM: {
+    events: [
+      { id: '1', source_name: 'BAM', name: 'Show', venue_name: null, is_free: false, category: 'theater', date_local: '2026-03-05' },
+      { id: '2', source_name: 'BAM', name: 'Film', venue_name: null, is_free: false, category: 'film', date_local: '2026-03-05' },
+    ],
+    status: 'ok',
+    durationMs: 100,
+    error: null,
+  },
+};
+
+const auditResult = postScrapeAudit(mockFetchMap, mockFetchMap.BAM.events, {});
+check('postScrapeAudit returns alerts array', Array.isArray(auditResult.alerts));
+check('postScrapeAudit returns completeness results', !!auditResult.completeness);

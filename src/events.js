@@ -7,8 +7,6 @@ const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues, lookupVenu
 const { filterIncomplete, filterKidsEvents } = require('./curation');
 const { eventMatchesFilters, failsTimeGate } = require('./pipeline');
 const { computeCompleteness, backfillEvidence, backfillDateTimes } = require('./sources/shared');
-const { runExtractionAudit } = require('./evals/extraction-audit');
-const { checkSourceCompleteness } = require('./evals/source-completeness');
 const { captureExtractionInput, getExtractionInputs, clearExtractionInputs } = require('./extraction-capture');
 const { checkBaseline } = require('./scrape-guard');
 
@@ -531,26 +529,19 @@ async function refreshCache() {
     // Alert on sources that have been failing for 3+ consecutive scrapes
     alertOnFailingSources();
 
-    // Run extraction audit (deterministic tier only — fast, free)
+    // Post-scrape audit: completeness + extraction quality checks with alerting
     try {
-      const auditReport = runExtractionAudit(validEvents, getExtractionInputs());
-      if (auditReport.summary.total > 0) {
-        console.log(`Extraction audit: ${auditReport.summary.passed}/${auditReport.summary.total} events pass (${auditReport.summary.passRate}), ${auditReport.summary.issues} issues`);
-        // Save report to disk
+      const { postScrapeAudit } = require('./scrape-guard');
+      const auditResult = postScrapeAudit(fetchMap, validEvents, getExtractionInputs());
+      if (auditResult.extraction?.summary?.total > 0) {
+        console.log(`Extraction audit: ${auditResult.extraction.summary.passed}/${auditResult.extraction.summary.total} events pass (${auditResult.extraction.summary.passRate})`);
         const reportsDir = path.join(__dirname, '../data/reports');
         fs.mkdirSync(reportsDir, { recursive: true });
         const reportFile = path.join(reportsDir, `extraction-audit-${new Date().toISOString().slice(0, 10)}.json`);
-        fs.writeFileSync(reportFile, JSON.stringify(auditReport, null, 2));
+        fs.writeFileSync(reportFile, JSON.stringify(auditResult.extraction, null, 2));
       }
     } catch (err) {
-      console.error('Extraction audit failed:', err.message);
-    }
-
-    // Run source field-completeness checks (structured sources only)
-    try {
-      checkSourceCompleteness(fetchMap);
-    } catch (err) {
-      console.error('Source completeness check failed:', err.message);
+      console.error('Post-scrape audit failed:', err.message);
     }
 
     // Run scrape audit (all sources — format, completeness, counts)
