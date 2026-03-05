@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bestie Traces</title>
+<title>Pulse Traces</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -705,9 +705,9 @@
     <div id="td-not-picked"></div>
   </div>
 
-  <!-- Bestie SMS bubble -->
+  <!-- Pulse SMS bubble -->
   <div class="trace-section">
-    <div class="bubble-label">Bestie SMS</div>
+    <div class="bubble-label">Pulse SMS</div>
     <div class="bubble-bestie" id="td-bestie-msg"></div>
     <div class="char-count" id="td-char-count"></div>
   </div>
@@ -1522,7 +1522,7 @@ function showTraceDetail(t) {
     notPickedSection.style.display = 'none';
   }
 
-  // Bestie SMS
+  // Pulse SMS
   document.getElementById('td-bestie-msg').textContent = t.output_sms || '(empty)';
   document.getElementById('td-char-count').textContent = `${t.output_sms_length || 0} / 480 chars`;
 

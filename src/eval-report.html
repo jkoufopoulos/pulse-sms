@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bestie Eval Reports</title>
+<title>Pulse Eval Reports</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -1108,7 +1108,7 @@
 
 <div class="header">
   <div>
-    <h1><span>Bestie</span> Eval Reports</h1>
+    <h1><span>Pulse</span> Eval Reports</h1>
     <p style="font-size:13px;color:#777;margin-top:4px">Scenario, regression, and extraction audit results. Select a report to view, compare runs, or override false failures.</p>
   </div>
 </div>
@@ -1418,7 +1418,7 @@ function renderRegressionReport() {
 
   // Principle breakdown
   html += '<div class="section-header">Principles</div>';
-  html += '<div class="section-explainer">Architecture principles (P1-P7) that govern how Bestie splits work between code and AI. Each has specific behavioral assertions.</div>';
+  html += '<div class="section-explainer">Architecture principles (P1-P7) that govern how Pulse splits work between code and AI. Each has specific behavioral assertions.</div>';
   html += '<div class="principle-grid">';
   var principleIds = Object.keys(byPrinciple).sort();
   principleIds.forEach(function(pid) {
@@ -2226,7 +2226,7 @@ function renderScenarioCard(s, sortIdx) {
       html += '<div class="judgment-section">';
       html += '<h4>Judge Verdict <span class="status-pill ' + (s.judgment.overall_pass ? 'pass' : 'fail') + '" style="margin-left:8px">' +
         (s.judgment.overall_pass ? 'PASS' : 'FAIL') + '</span></h4>';
-      html += '<div class="section-explainer">An LLM judge (Sonnet) reads the conversation and grades whether Bestie behaved correctly — tone, relevance, filter respect, and conversation flow.</div>';
+      html += '<div class="section-explainer">An LLM judge (Sonnet) reads the conversation and grades whether Pulse behaved correctly — tone, relevance, filter respect, and conversation flow.</div>';
 
       // Failure modes right after verdict header
       if (s.judgment.failure_modes_triggered && s.judgment.failure_modes_triggered.length > 0) {
