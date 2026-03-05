@@ -141,9 +141,23 @@ function buildBrainSystemPrompt(session) {
     : 'No prior session.';
 
   const historyBlock = session?.conversationHistory?.length > 0
-    ? '\nRecent conversation:\n' + session.conversationHistory.slice(-6).map(h =>
-      `${h.role === 'user' ? 'User' : 'Pulse'}: ${h.content.slice(0, 120)}`
-    ).join('\n')
+    ? '\nRecent conversation:\n' + session.conversationHistory.slice(-10).map(h => {
+      if (h.role === 'user') return `User: "${h.content.slice(0, 150)}"`;
+      if (h.role === 'tool_call' && h.meta) {
+        const params = Object.entries(h.meta.params || {})
+          .filter(([, v]) => v != null && v !== '')
+          .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+          .join(', ');
+        return `> ${h.meta.name}(${params})`;
+      }
+      if (h.role === 'tool_result' && h.meta) {
+        if (h.meta.match_count === 0) return '> No matches found';
+        const picks = (h.meta.picks || []).map(p => `${p.name} (${p.category})`).join(', ');
+        return `> ${h.meta.match_count} matches${h.meta.neighborhood ? ' in ' + h.meta.neighborhood : ''}${picks ? '. Showed: ' + picks : ''}`;
+      }
+      if (h.role === 'assistant') return `Pulse: "${h.content.slice(0, 150)}"`;
+      return null;
+    }).filter(Boolean).join('\n')
     : '';
 
   return `You are the routing brain for Pulse, an NYC nightlife SMS bot.
