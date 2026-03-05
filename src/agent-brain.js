@@ -934,9 +934,14 @@ async function welcomeCompose(events) {
   return { sms_text: sms, picks: parsed.picks || [], _raw: raw, _usage: usage, _provider: 'anthropic' };
 }
 
-// --- Tool execution: search_events ---
+// --- Pool building: search_events steps 1-6 ---
 
-async function executeSearchEvents(params, session, phone, trace) {
+/**
+ * Build the event pool for a search_events call.
+ * Steps 1-6: resolve neighborhood, build filters, fetch events, build tagged pool, handle zero match.
+ * Does NOT compose — returns pool + metadata for the caller to compose.
+ */
+async function buildSearchPool(params, session, phone, trace) {
   // 1. Resolve neighborhood from brain params or session
   let hood = null;
   let borough = null;
@@ -1058,40 +1063,64 @@ async function executeSearchEvents(params, session, phone, trace) {
     });
     setSession(phone, { lastZeroMatch: true });
 
-    return { sms: zeroResp.message, intent: 'events', picks: [], activeFilters };
+    return {
+      zeroMatch: { sms: zeroResp.message, intent: 'events', picks: [], activeFilters },
+    };
   }
 
-  // 7. Compose SMS from pool via lightweight brain compose
+  // Compute excludeIds and suggestedHood for compose
   const prevPickIds = (session?.allPicks || session?.lastPicks || []).map(p => p.event_id);
   const prevOfferedIds = session?.allOfferedIds || [];
   const excludeIds = [...new Set([...prevPickIds, ...prevOfferedIds])];
   const suggestedHood = (isSparse || matchCount === 0) && nearbyHoods.length > 0 ? nearbyHoods[0] : null;
 
-  const composeStart = Date.now();
-  const result = await brainCompose(events, {
-    neighborhood: hood,
-    nearbyHoods,
+  return {
+    zeroMatch: null,
+    pool: events,
+    curated,
     activeFilters,
-    isSparse,
-    isCitywide,
-    isBorough,
-    borough,
-    matchCount,
+    hood, borough, isBorough, isCitywide,
+    matchCount, hardCount, softCount, isSparse,
+    nearbyHoods,
+    suggestedHood,
     excludeIds,
-    suggestedNeighborhood: suggestedHood,
+  };
+}
+
+// --- Tool execution: search_events ---
+
+async function executeSearchEvents(params, session, phone, trace) {
+  const poolResult = await buildSearchPool(params, session, phone, trace);
+
+  // Zero match → return immediately
+  if (poolResult.zeroMatch) return poolResult.zeroMatch;
+
+  // Compose SMS from pool via lightweight brain compose
+  const composeStart = Date.now();
+  const result = await brainCompose(poolResult.pool, {
+    neighborhood: poolResult.hood,
+    nearbyHoods: poolResult.nearbyHoods,
+    activeFilters: poolResult.activeFilters,
+    isSparse: poolResult.isSparse,
+    isCitywide: poolResult.isCitywide,
+    isBorough: poolResult.isBorough,
+    borough: poolResult.borough,
+    matchCount: poolResult.matchCount,
+    excludeIds: poolResult.excludeIds,
+    suggestedNeighborhood: poolResult.suggestedHood,
   });
   trace.composition.latency_ms = Date.now() - composeStart;
   trace.composition.raw_response = result._raw || null;
-  trace.composition.active_filters = activeFilters;
-  trace.composition.neighborhood_used = hood;
+  trace.composition.active_filters = poolResult.activeFilters;
+  trace.composition.neighborhood_used = poolResult.hood;
 
   recordAICost(trace, 'compose', result._usage, result._provider);
   trackAICost(phone, result._usage, result._provider);
 
   // Validate picks with name-match fallback for near-duplicate events
-  const eventMap = buildEventMap(curated);
-  for (const e of events) eventMap[e.id] = e;
-  const allEvents = [...curated, ...events.filter(e => !eventMap[e.id] || eventMap[e.id] === e)];
+  const eventMap = buildEventMap(poolResult.curated);
+  for (const e of poolResult.pool) eventMap[e.id] = e;
+  const allEvents = [...poolResult.curated, ...poolResult.pool.filter(e => !eventMap[e.id] || eventMap[e.id] === e)];
   const validPicks = validatePicks(result.picks, allEvents);
 
   trace.composition.picks = validPicks.map(p => {
@@ -1110,26 +1139,26 @@ async function executeSearchEvents(params, session, phone, trace) {
     };
   });
 
-  // 8. Save session — tool params become the state (P1: code owns state)
+  // Save session — tool params become the state (P1: code owns state)
   saveResponseFrame(phone, {
     picks: validPicks,
     eventMap,
-    neighborhood: hood,
-    borough,
-    filters: activeFilters,
+    neighborhood: poolResult.hood,
+    borough: poolResult.borough,
+    filters: poolResult.activeFilters,
     offeredIds: validPicks.map(p => p.event_id),
-    visitedHoods: [...new Set([...(session?.visitedHoods || []), hood || borough || 'citywide'])],
-    pending: suggestedHood ? { neighborhood: suggestedHood, filters: activeFilters } : null,
+    visitedHoods: [...new Set([...(session?.visitedHoods || []), poolResult.hood || poolResult.borough || 'citywide'])],
+    pending: poolResult.suggestedHood ? { neighborhood: poolResult.suggestedHood, filters: poolResult.activeFilters } : null,
   });
 
-  updateProfile(phone, { neighborhood: hood, filters: activeFilters, responseType: 'event_picks' })
+  updateProfile(phone, { neighborhood: poolResult.hood, filters: poolResult.activeFilters, responseType: 'event_picks' })
     .catch(err => console.error('profile update failed:', err.message));
 
   return {
     sms: result.sms_text,
     intent: validPicks.length > 0 ? 'events' : 'conversational',
     picks: validPicks,
-    activeFilters,
+    activeFilters: poolResult.activeFilters,
     eventMap,
   };
 }
@@ -1340,4 +1369,4 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
   return trace.id;
 }
 
-module.exports = { checkMechanical, callAgentBrain, handleAgentBrainRequest, resolveDateRange, brainCompose, welcomeCompose, handleWelcome, validatePicks };
+module.exports = { checkMechanical, callAgentBrain, handleAgentBrainRequest, resolveDateRange, brainCompose, welcomeCompose, handleWelcome, validatePicks, buildSearchPool };
