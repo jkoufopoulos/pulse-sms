@@ -10,7 +10,6 @@ require('./unit/geo.test');
 require('./unit/formatters.test');
 const venues = require('./unit/venues.test');
 require('./unit/pipeline.test');
-require('./unit/pre-router.test');
 require('./unit/ai.test');
 require('./unit/curation.test');
 require('./unit/scrapers.test');

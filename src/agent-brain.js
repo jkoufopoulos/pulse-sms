@@ -1,11 +1,9 @@
 /**
  * Agent Brain — LLM-powered intent routing via Gemini Flash tool calling.
  *
- * Replaces the regex pre-router for everything except truly mechanical shortcuts
- * (bare numbers, "more", "help"). The brain understands user intent via tool
- * calling and returns structured params that drive deterministic event execution.
- *
- * Gated behind PULSE_AGENT_BRAIN=true for A/B testing.
+ * Handles all routing except truly mechanical shortcuts (bare numbers, "more",
+ * "help"). The brain understands user intent via tool calling and returns
+ * structured params that drive deterministic event execution.
  *
  * Architecture:
  *   1. checkMechanical() — $0, handles help/numbers/more

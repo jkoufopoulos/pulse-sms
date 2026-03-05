@@ -153,3 +153,23 @@ check('event with date_local', getEventDate({ date_local: '2026-02-18' }) === '2
 check('event with start_time_local', /^\d{4}-\d{2}-\d{2}$/.test(getEventDate({ start_time_local: '2026-02-18T21:00:00' })));
 check('event with neither → null', getEventDate({}) === null);
 check('prefers date_local', getEventDate({ date_local: '2026-02-18', start_time_local: '2026-02-19T10:00:00' }) === '2026-02-18');
+
+// ---- getAdjacentNeighborhoods ----
+console.log('\ngetAdjacentNeighborhoods:');
+
+const { getAdjacentNeighborhoods } = require('../../src/geo');
+
+const evAdjacent = getAdjacentNeighborhoods('East Village', 3);
+check('EV returns 3 neighbors', evAdjacent.length === 3);
+check('EV neighbors exclude cross-borough Wburg', !evAdjacent.includes('Williamsburg'));
+check('EV does not include itself', !evAdjacent.includes('East Village'));
+
+const astoriaAdjacent = getAdjacentNeighborhoods('Astoria', 3);
+check('Astoria returns 3 neighbors', astoriaAdjacent.length === 3);
+check('Astoria first neighbor not UES (cross-borough penalty)', astoriaAdjacent[0] !== 'Upper East Side');
+
+const ftGreeneAdjacent = getAdjacentNeighborhoods('Fort Greene', 5);
+check('Fort Greene count=5 returns 5', ftGreeneAdjacent.length === 5);
+
+check('count=1 returns 1', getAdjacentNeighborhoods('East Village', 1).length === 1);
+check('unknown neighborhood → empty', getAdjacentNeighborhoods('Narnia', 3).length === 0);

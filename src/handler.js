@@ -171,7 +171,7 @@ async function handleMessage(phone, message) {
 // =======================================================
 
 /**
- * Dispatch pre-router mechanical shortcuts (referral, help, conversational, details, more).
+ * Dispatch mechanical shortcuts (referral, help, conversational, details, more).
  * All paths are terminal: sendSMS + finalizeTrace + return.
  */
 async function dispatchPreRouterIntent(route, ctx) {

@@ -192,7 +192,7 @@ function buildZeroMatchResponse(hood, activeFilters, adjacentHoods) {
  * Merge two filter objects with explicit-key semantics.
  * If a key EXISTS in incoming (even with value null/false), it overrides.
  * If a key is ABSENT from incoming, fall back to existing (enables compounding).
- * This lets pre-router set only the keys it detects, compounding with existing filters,
+ * This lets the caller set only the keys it detects, compounding with existing filters,
  * while also enabling partial clearing (e.g. { category: null } clears category only).
  */
 function mergeFilters(existing, incoming) {
@@ -352,7 +352,7 @@ function buildTaggedPool(events, activeFilters, { citywide = false } = {}) {
 }
 
 /**
- * Map LLM subcategory values to canonical categories (matches pre-router.js catMap).
+ * Map LLM subcategory values to canonical categories.
  */
 const CATEGORY_NORMALIZE = {
   jazz: 'live_music', rock: 'live_music', indie: 'live_music', folk: 'live_music',
