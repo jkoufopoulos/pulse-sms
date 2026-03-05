@@ -16,6 +16,22 @@
     padding-bottom: 80px;
   }
 
+  /* ── Shared nav ── */
+  .bestie-nav {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; height: 36px;
+    background: #111; border-bottom: 1px solid #222;
+    padding: 0 16px; font-size: 13px;
+    margin: -24px -24px 24px -24px;
+  }
+  .bestie-nav-link {
+    color: #888; text-decoration: none; padding: 0 12px;
+    line-height: 36px; transition: color 0.15s;
+  }
+  .bestie-nav-link:hover { color: #ccc; }
+  .bestie-nav-link.active { color: #FF6B35; font-weight: 600; }
+  .bestie-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
+
   .container { max-width: 900px; margin: 0 auto; }
 
   h1 { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 20px; }
@@ -218,6 +234,19 @@
 </style>
 </head>
 <body>
+
+<nav class="bestie-nav">
+  <a href="/health" class="bestie-nav-link">Health</a>
+  <a href="/events" class="bestie-nav-link">Events</a>
+  <span class="bestie-nav-sep"></span>
+  <a href="/eval" class="bestie-nav-link">Traces</a>
+  <a href="/eval-report" class="bestie-nav-link">Reports</a>
+  <a href="/eval-quality" class="bestie-nav-link active">Quality</a>
+  <a href="/evals" class="bestie-nav-link">Eval Guide</a>
+  <span class="bestie-nav-sep"></span>
+  <a href="/test" class="bestie-nav-link">Simulator</a>
+</nav>
+
 <div class="container">
   <h1><span>Pulse</span> Quality Evals</h1>
 
