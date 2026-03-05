@@ -31,6 +31,7 @@ The server must be running for pipeline evals, scenario evals, and A/B evals. Un
 | Multi-turn conversations | `node scripts/run-scenario-evals.js` | ~$0.20 | ~5min |
 | Model A/B comparison | `node scripts/run-ab-eval.js` | ~$0.30 | ~5min |
 | Browse traces interactively | Open `/eval` in browser | Free | -- |
+| Quality eval conversations | `npm run eval:quality` | ~$0.50 | ~5min |
 | Check source health | Open `/health` in browser | Free | -- |
 | View last audit report | `GET /api/eval/audit` | Free | -- |
 
@@ -130,7 +131,7 @@ Key things to look for:
 
 **What it checks:** End-to-end SMS pipeline correctness — does the right intent get routed, the right neighborhood resolved, the right events picked, and the right SMS format produced?
 
-**Test cases:** 105 synthetic cases in `data/fixtures/synthetic-cases.json` plus 262 multi-turn scenarios and 124 regression scenarios (386 total golden dataset), covering:
+**Test cases:** 105 synthetic cases in `data/fixtures/synthetic-cases.json` plus 293 multi-turn scenarios and 124 regression scenarios (417 total golden dataset), covering:
 - 8 neighborhoods x 3 phrasings (direct, slang, question)
 - Landmark and subway-based neighborhood references
 - Free intent, more intent, details intent, help intent
@@ -139,7 +140,7 @@ Key things to look for:
 - Edge cases (emoji-only, single char, gibberish, very long messages)
 - Session context (same hood, different hood)
 - Filters (comedy, music, jazz, art, theater, vibes)
-- Multi-turn conversation flows across 5 categories (happy path, edge case, filter drift, poor experience, abuse)
+- Multi-turn conversation flows across 6 categories (happy path, edge case, filter drift, poor experience, abuse/off-topic, editorial)
 
 ### Code evals only (free, fast)
 
@@ -179,7 +180,7 @@ Runs 24 deterministic checks per trace:
 
 **Behavioral:**
 21. `off_topic_redirect` — conversational responses redirect to events
-22. `filter_intent_gating` — LLM modify ignored when pre-router set filters (P1)
+22. `filter_intent_gating` — filter state derived from agent brain tool call params (P1)
 23. `split_validation_effective` — reports split-mode intervention stats (informational)
 24. `discovery_lean` — measures editorial lean toward discovery/niche sources (informational)
 
@@ -230,7 +231,7 @@ Tags appear in the report JSON for comparison across runs.
 
 **What it checks:** Behavioral correctness across multi-turn conversations — does the bot handle conversation flows naturally? Does session context carry forward? Does it handle edge cases gracefully?
 
-**Test cases:** `data/fixtures/multi-turn-scenarios.json` (262 scenarios across 5 categories: happy path, edge case, filter drift, poor experience, abuse) — scripted conversations with expected behavior descriptions and known failure modes.
+**Test cases:** `data/fixtures/multi-turn-scenarios.json` (293 scenarios across 6 categories: happy path, edge case, filter drift, poor experience, abuse/off-topic, editorial) — scripted conversations with expected behavior descriptions and known failure modes.
 
 **Run:**
 ```bash
@@ -248,6 +249,9 @@ node scripts/run-scenario-evals.js --name="events then details"
 
 # Against deployed server:
 node scripts/run-scenario-evals.js --url=https://web-production-c8fdb.up.railway.app
+
+# Only agent-brain-specific scenarios:
+node scripts/run-scenario-evals.js --pipeline agent_brain
 
 # With LLM judge (costs API tokens):
 node scripts/run-scenario-evals.js --judge
@@ -295,7 +299,7 @@ node scripts/run-regression-evals.js
 node scripts/run-regression-evals.js --url=https://web-production-c8fdb.up.railway.app
 ```
 
-**When to run:** After any change that touches handler.js, pipeline.js, pre-router.js, or session state logic. These catch principle violations that scenario evals might miss.
+**When to run:** After any change that touches handler.js, agent-brain.js, pipeline.js, or session state logic. These catch principle violations that scenario evals might miss.
 
 ---
 
@@ -382,6 +386,21 @@ Key things to look for:
 
 ---
 
+## Layer 6: Quality Evals
+
+**What it checks:** Rubric-based quality assessment of multi-turn conversations. An LLM judge scores editorial voice, pick relevance, personality, and SMS formatting against a detailed rubric.
+
+**Run:**
+```bash
+npm run eval:quality
+```
+
+**Read the output:** Results saved to `data/reports/` as JSON. Browse interactively at `/eval-quality`.
+
+**When to run:** After prompt changes, model swaps, or editorial voice adjustments. Complements code evals (which check correctness) with quality assessment (which checks tone and editorial taste).
+
+---
+
 ## Full End-to-End Eval Run
 
 Here's the complete sequence for a thorough quality check — for example, after a prompt change or model swap:
@@ -410,17 +429,20 @@ npm run eval:judges
 # 5. Scenario evals — multi-turn behavioral checks (~$0.20, ~5 min)
 node scripts/run-scenario-evals.js
 
-# 6. (Optional) A/B eval — only if comparing models (~$0.30, ~5 min)
+# 6. Quality evals — editorial voice and tone (~$0.50, ~5 min)
+npm run eval:quality
+
+# 7. (Optional) A/B eval — only if comparing models (~$0.30, ~5 min)
 node scripts/run-ab-eval.js
 
-# 7. (Optional) Full extraction audit with LLM tier (~$0.01, ~10s)
+# 8. (Optional) Full extraction audit with LLM tier (~$0.01, ~10s)
 curl -X POST http://localhost:3000/api/eval/audit | jq .summary
 
-# 8. Check reports
+# 9. Check reports
 ls -t data/reports/*.json | head -5
 ```
 
-Total cost for a full run (steps 1-5): ~$0.70. Time: ~20 minutes.
+Total cost for a full run (steps 1-6): ~$1.20. Time: ~25 minutes.
 
 ### Quick smoke test (free, 5 min)
 
