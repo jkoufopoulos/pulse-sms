@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bestie — Architecture</title>
+  <title>Pulse — Architecture</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -484,7 +484,7 @@
 
 <nav>
   <div class="nav-inner">
-    <a href="index.html" class="nav-logo">Bestie</a>
+    <a href="index.html" class="nav-logo">Pulse</a>
     <span class="nav-sep">/</span>
     <span class="nav-page">Architecture</span>
   </div>
@@ -493,8 +493,8 @@
 <!-- Header -->
 <header class="page-header">
   <div class="container">
-    <h1>How Bestie <em>works</em></h1>
-    <p class="subtitle">A text message comes in. 23 scrapers, a unified AI layer, a tagged event pool, and a 480-character limit later, a recommendation goes out.</p>
+    <h1>How Pulse <em>works</em></h1>
+    <p class="subtitle">A text message comes in. 22 scrapers, an agent brain with tool calling, and a 480-character limit later, a recommendation goes out.</p>
   </div>
 </header>
 
@@ -504,15 +504,15 @@
     <p class="section-label">Overview</p>
     <h2 class="section-title">Text in, picks out</h2>
     <div class="section-body">
-      <p>Bestie is an SMS-based AI assistant that recommends NYC nightlife and events. A user texts a neighborhood name and gets back curated picks within seconds. The entire experience happens in a single SMS thread &mdash; no app, no account, no links until asked.</p>
-      <p>Behind the scenes, Bestie scrapes <strong>23 event sources</strong> every morning, deduplicates and caches them in memory, then uses a lightweight <strong>pre-router</strong> for mechanical shortcuts and one of two AI paths for everything semantic: the <strong>unified LLM</strong> (Claude Haiku, single call) or the <strong>agent brain</strong> (Gemini 2.5 Flash Lite tool calling, ~$0.0005/msg). Both understand intent, pick events from a tagged pool, and write the SMS &mdash; the agent brain does it via structured tool calls instead of a monolithic prompt.</p>
+      <p>Pulse is an SMS-based AI assistant that recommends NYC nightlife and events. A user texts a neighborhood name and gets back curated picks within seconds. The entire experience happens in a single SMS thread &mdash; no app, no account, no links until asked.</p>
+      <p>Behind the scenes, Pulse scrapes <strong>22 event sources</strong> every morning, deduplicates and caches them in memory, then routes every message through <code>checkMechanical</code> for $0 shortcuts (bare numbers, "more", "help", greetings) and the <strong>agent brain</strong> (Gemini 2.5 Flash Lite tool calling, ~$0.0005/msg) for everything else. The agent brain uses three structured tools &mdash; <code>search_events</code>, <code>get_details</code>, <code>respond</code> &mdash; to understand intent, pick events, and compose the SMS.</p>
     </div>
 
     <div class="stats">
-      <span class="stat"><em>23</em> event sources</span>
+      <span class="stat"><em>22</em> event sources</span>
       <span class="stat"><em>36</em> neighborhoods</span>
       <span class="stat"><em>480</em> char SMS cap</span>
-      <span class="stat"><em>~15%</em> pre-routed (zero AI)</span>
+      <span class="stat"><em>~$0.0005</em> per message</span>
       <span class="stat"><em>2hr</em> session TTL</span>
     </div>
   </div>
@@ -541,142 +541,78 @@
     </details>
 
     <details>
-      <summary><span class="step-label">Step 2</span> Routing &mdash; pre-router miss, unified LLM <span class="step-preview">~400ms, ~$0.001</span></summary>
+      <summary><span class="step-label">Step 2</span> Routing &mdash; mechanical miss, agent brain <span class="step-preview">~2s, ~$0.0005</span></summary>
       <div class="detail-body">
-        <p><code>pre-router.js</code> checks the message against mechanical shortcuts: help, numbers 1-5, "more", greetings, thanks, bye, impatient follow-ups, and event name matches from session picks. "williamsburg" doesn't match any of these &mdash; it's a semantic request that needs real understanding.</p>
-        <p>The message falls through to the <strong>unified LLM</strong> path. Before calling the LLM, the handler resolves the neighborhood from the message, fetches events, builds a tagged pool, and assembles the full context. The LLM handles intent understanding, event selection, and SMS composition in a single call.</p>
-        <p>The pre-router only handles ~15% of messages &mdash; purely mechanical patterns where no AI is needed. Everything semantic (neighborhoods, categories, vibes, compound queries, off-topic deflection) goes through the unified LLM for better understanding.</p>
+        <p><code>checkMechanical</code> in <code>agent-brain.js</code> checks the message against $0 shortcuts: help, bare numbers 1-5, "more", greetings, thanks, bye. "williamsburg" doesn't match any of these &mdash; it's a semantic request that needs the agent brain.</p>
+        <p>The message goes to <code>callAgentBrain</code>, which sends the message, session context, and event pool to <strong>Gemini 2.5 Flash Lite</strong> with three tools: <code>search_events</code> (neighborhood, categories, time, free, intent), <code>get_details</code>, and <code>respond</code>. The model calls <code>search_events</code> with the structured parameters it understands from the message.</p>
+        <p>Mechanical shortcuts handle a small percentage of messages at $0 cost. Everything semantic (neighborhoods, categories, vibes, compound queries, off-topic deflection) goes through the agent brain's tool calling.</p>
       </div>
     </details>
 
     <details>
-      <summary><span class="step-label">Step 3</span> Filter resolution &amp; tagged pool <span class="step-preview">deterministic, $0</span></summary>
+      <summary><span class="step-label">Step 3</span> Tool execution &amp; event fetching <span class="step-preview">deterministic, $0</span></summary>
       <div class="detail-body">
-        <p>Before calling the LLM, the handler builds the event context deterministically:</p>
+        <p>The agent brain calls <code>search_events</code> with structured parameters. The handler executes the tool deterministically:</p>
         <ul>
-          <li><strong>Neighborhood extraction</strong> &mdash; <code>extractNeighborhood("williamsburg")</code> resolves the alias to "Williamsburg" from the 36-neighborhood map, including aliases and landmarks.</li>
-          <li><strong>Filter resolution</strong> &mdash; <code>mergeFilters(session.lastFilters, incoming)</code> compounds active filters. For a first message, filters are empty. On follow-ups like "how about comedy", the category filter is merged with any existing filters.</li>
-          <li><strong>Tagged pool</strong> &mdash; <code>buildTaggedPool(events, activeFilters)</code> tags each event with <code>filter_match: true/false</code>. Matched events come first (up to 10), padded to 15 with unmatched events. The LLM sees <code>[MATCH]</code> tags on matching events but gets the full pool.</li>
+          <li><strong>Neighborhood resolution</strong> &mdash; The <code>neighborhood</code> param from the tool call resolves to "Williamsburg" via the 36-neighborhood map, including aliases and landmarks.</li>
+          <li><strong>Filter state from tool params</strong> &mdash; Categories, time_filter, free_only, and date_range come directly from the <code>search_events</code> tool call parameters. These are structured and validated &mdash; the system of record for filter state.</li>
+          <li><strong>Event pool</strong> &mdash; <code>getEvents("Williamsburg")</code> queries the in-memory cache, applies filters from the tool params, and returns matched events sorted by proximity.</li>
         </ul>
-        <p style="margin-top: 12px;">This is the key architectural decision: <strong>the handler owns all filter state</strong>. The LLM never manages filters &mdash; it just sees a tagged pool and composes from it. Filters persist deterministically across neighborhood switches, nudge accepts, and conversational responses.</p>
+        <p style="margin-top: 12px;">This is the key architectural decision (P1): <strong>structured tool calls own state, free-text owns language</strong>. Session state is derived from the agent brain's tool call params, never parsed from free-text LLM output. The handler saves <code>activeFilters</code> as <code>lastFilters</code> from tool call params.</p>
       </div>
     </details>
 
     <details>
       <summary><span class="step-label">Step 4</span> Event fetching &amp; curation <span class="step-preview">14 &rarr; 15 tagged events</span></summary>
       <div class="detail-body">
-        <p><code>getEvents("Williamsburg")</code> queries the in-memory cache. The cache was built at 10am from 23 scrapers. Events are already deduped and sorted by proximity to Williamsburg's center coordinates.</p>
+        <p><code>getEvents("Williamsburg")</code> queries the in-memory cache. The cache was built at 10am from 22 scrapers. Events are already deduped and sorted by proximity to Williamsburg's center coordinates.</p>
         <p>Say it returns 14 events. Before entering the tagged pool, <code>curation.js</code> runs deterministic quality filters:</p>
         <ul>
           <li><strong>filterKidsEvents</strong> &mdash; Drops NYC Parks events that match children's patterns ("storytime", "toddler", "ages 3-5"). Without this, Claude would occasionally recommend a toddler puppet show alongside a DJ set.</li>
           <li><strong>filterIncomplete</strong> &mdash; Drops events below a completeness threshold (missing name, venue, or time). Prevents Claude from recommending "TBA at TBD".</li>
           <li><strong>validatePerennialActivity</strong> &mdash; Perennial picks (always-good bars/venues) are only included if they have a specific activity tonight (trivia, live jazz, DJ). Removes generic "nice bar" suggestions that don't answer "what's happening tonight?"</li>
         </ul>
-        <p>After curation: 12 events remain. Plus 2 perennial picks with tonight activities. <code>buildTaggedPool()</code> tags each event as <code>[MATCH]</code> or unmatched based on active filters, then sends up to 15 to the unified LLM (matched first, padded with unmatched). For this filterless first message, all events are unmatched &mdash; the LLM picks freely.</p>
+        <p>After curation: 12 events remain. Plus 2 perennial picks with tonight activities. The curated events are serialized with enrichment fields (source_vibe, venue_size, interaction_format, recurring) and returned to the agent brain for SMS composition. For this filterless first message, the brain picks freely from the full pool.</p>
       </div>
     </details>
 
     <details>
-      <summary><span class="step-label">Step 5</span> Prompt assembly <span class="step-preview">5 of 12 skills ON</span></summary>
+      <summary><span class="step-label">Step 5</span> SMS composition <span class="step-preview">~1.5s, lightweight prompt</span></summary>
       <div class="detail-body">
-        <p><code>buildUnifiedPrompt()</code> assembles the system prompt from the <code>UNIFIED_SYSTEM</code> base plus conditional skill modules. The user prompt includes the tagged event pool (with <code>[MATCH]</code> tags), any active filter context (<code>ACTIVE_FILTER</code>, <code>MATCH_COUNT</code>, <code>SPARSE</code>), conversation history, and the user's message. For this first-message-to-Williamsburg request:</p>
-        <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
-          <div style="display: flex; gap: 8px; align-items: baseline;">
-            <span style="color: var(--green); font-size: 0.82rem; font-weight: 700; min-width: 18px;">ON</span>
-            <span style="color: var(--text); font-weight: 600; font-size: 0.88rem;">core</span>
-            <span style="color: var(--text-dim); font-size: 0.82rem;">&mdash; always included. Persona, format, 480-char limit.</span>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: baseline;">
-            <span style="color: var(--green); font-size: 0.82rem; font-weight: 700; min-width: 18px;">ON</span>
-            <span style="color: var(--text); font-weight: 600; font-size: 0.88rem;">sourceTiers</span>
-            <span style="color: var(--text-dim); font-size: 0.82rem;">&mdash; always included. Tells Claude to prefer Skint/Nonsense picks over Eventbrite.</span>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: baseline;">
-            <span style="color: var(--green); font-size: 0.82rem; font-weight: 700; min-width: 18px;">ON</span>
-            <span style="color: var(--text); font-weight: 600; font-size: 0.88rem;">tonightPriority</span>
-            <span style="color: var(--text-dim); font-size: 0.82rem;">&mdash; at least one event is today. Tells Claude: a decent tonight event beats a great tomorrow event.</span>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: baseline;">
-            <span style="color: var(--green); font-size: 0.82rem; font-weight: 700; min-width: 18px;">ON</span>
-            <span style="color: var(--text); font-weight: 600; font-size: 0.88rem;">perennialFraming</span>
-            <span style="color: var(--text-dim); font-size: 0.82rem;">&mdash; batch includes perennial picks. Tells Claude: lead with the activity, not the venue name.</span>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: baseline;">
-            <span style="color: var(--green); font-size: 0.82rem; font-weight: 700; min-width: 18px;">ON</span>
-            <span style="color: var(--text); font-weight: 600; font-size: 0.88rem;">nearbySuggestion</span>
-            <span style="color: var(--text-dim); font-size: 0.82rem;">&mdash; nearby hoods provided. Claude can suggest Greenpoint/Bushwick if picks are thin.</span>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: baseline;">
-            <span style="color: var(--text-muted); font-size: 0.82rem; font-weight: 700; min-width: 18px;">off</span>
-            <span style="color: var(--text-muted); font-weight: 600; font-size: 0.88rem;">neighborhoodMismatch</span>
-            <span style="color: var(--text-muted); font-size: 0.82rem;">&mdash; events ARE in Williamsburg, so no mismatch disclaimer needed.</span>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: baseline;">
-            <span style="color: var(--text-muted); font-size: 0.82rem; font-weight: 700; min-width: 18px;">off</span>
-            <span style="color: var(--text-muted); font-weight: 600; font-size: 0.88rem;">freeEmphasis / activityAdherence / conversationAwareness</span>
-            <span style="color: var(--text-muted); font-size: 0.82rem;">&mdash; no filters, no activity keyword, no history.</span>
-          </div>
-        </div>
-        <p style="margin-top: 12px;">The assembled prompt is ~800 tokens. Without the skills system, the prompt would always include every instruction (~1,400 tokens), wasting context on irrelevant rules and sometimes confusing Claude. For example, including "ACTIVITY ADHERENCE" when the user didn't ask for a specific activity caused Claude to over-filter and return fewer picks.</p>
-      </div>
-    </details>
-
-    <details>
-      <summary><span class="step-label">Step 6</span> Unified LLM call <span class="step-preview">~800ms, ~$0.001</span></summary>
-      <div class="detail-body">
-        <p><code>unifiedRespond()</code> sends the assembled system prompt (base + skills), the tagged event pool, filter context, conversation history, and the user's message to <strong>Claude Haiku</strong> in a single call. Claude understands the intent, picks 2-3 events from the pool, and writes the SMS text &mdash; all in one pass.</p>
-        <p>Claude returns structured JSON:</p>
-        <div class="code-block" style="margin-top: 8px;">{
-  "type": "event_picks",
-  "sms_text": "Tonight in Williamsburg:\n\n1) DJ set at Good Room — always goes off on Fridays. 10pm, $15\n\n2) Indie at Baby's All Right — solid lineup tonight. 8pm, $18\n\n3) Free comedy at Muchmore's — underground standup, BYOB vibes. 9pm\n\nReply 1-3 for details or MORE for extra picks",
-  "picks": [
-    { "rank": 1, "event_id": "dice-good-room-0221", "why": "reliable Friday DJ night" },
-    { "rank": 2, "event_id": "bv-babys-0221", "why": "strong indie lineup" },
-    { "rank": 3, "event_id": "skint-muchmores-0221", "why": "free comedy, unique" }
-  ],
-  "clear_filters": false
-}</div>
-        <p>The output contract is minimal: <code>type</code>, <code>sms_text</code>, <code>picks</code>, and <code>clear_filters</code>. All other state (neighborhood, filters, pending context) is derived deterministically by the handler &mdash; the LLM never reports state, only text and event selections.</p>
-        <p>Cost: ~$0.001 (Haiku, single call). Latency: ~800ms.</p>
+        <p><code>brainCompose</code> takes the matched events and writes the SMS. It uses a lightweight ~400-token system prompt (<code>BRAIN_COMPOSE_SYSTEM</code>) focused on voice, format, and the 480-char limit. The compose prompt includes source vibe tiers so the model prefers discovery/niche picks over mainstream platforms.</p>
+        <p>The compose call returns the SMS text directly &mdash; no JSON parsing needed. The agent brain architecture separates <strong>reasoning</strong> (tool calling step) from <strong>rendering</strong> (compose step), keeping each focused and cheap.</p>
+        <p>Cost: ~$0.0005 total for both steps. Latency: ~2-3s end-to-end.</p>
       </div>
     </details>
 
     <details>
       <summary><span class="step-label">Step 7</span> Send, save &amp; persist filters <span class="step-preview">289 of 480 chars</span></summary>
       <div class="detail-body">
-        <p>The SMS text (289 characters, under the 480-char cap) is sent via Twilio. The handler saves the session atomically via <code>saveResponseFrame()</code> &mdash; picks, event map, neighborhood, and <strong>active filters</strong>. Filters are persisted deterministically by the handler, not from the LLM's output. A JSONL trace captures the full request for evals.</p>
-        <p>Now when the user texts <strong>"2"</strong>, the pre-router matches it as <code>intent: "details"</code>, looks up pick #2 (Baby's All Right) from <code>session.lastPicks</code>, and sends the full event details with a link. No AI call needed ($0).</p>
-        <p>When they text <strong>"how about comedy"</strong>, it falls through to the unified LLM. The handler merges <code>{ category: "comedy" }</code> with any existing filters, builds a new tagged pool with comedy events marked <code>[MATCH]</code>, and the LLM composes picks that prefer the matches (~$0.001).</p>
+        <p>The SMS text (289 characters, under the 480-char cap) is sent via Twilio. The handler saves the session atomically via <code>saveResponseFrame()</code> &mdash; picks, event map, neighborhood, and <strong>active filters</strong> (derived from the tool call params). A JSONL trace captures the full request for evals.</p>
+        <p>Now when the user texts <strong>"2"</strong>, <code>checkMechanical</code> matches it as a details request, looks up pick #2 (Baby's All Right) from <code>session.lastPicks</code>, and sends the full event details with a link. No AI call needed ($0).</p>
+        <p>When they text <strong>"how about comedy"</strong>, the agent brain calls <code>search_events({ neighborhood: "williamsburg", categories: ["comedy"] })</code>. The handler executes the tool, fetches comedy events, and <code>brainCompose</code> writes the SMS (~$0.0005).</p>
       </div>
     </details>
 
     <div class="card" style="border-left: 3px solid var(--purple);">
-      <h3 style="color: var(--purple);">Agent Brain</h3>
-      <p>The agent brain is the primary (and only) LLM path. <strong>Gemini 2.5 Flash Lite tool calling</strong> (~$0.0005/msg, 2-3s) with three tools: <code>search_events</code> (with multi-category OR), <code>get_details</code>, <code>respond</code>. A lightweight <code>brainCompose</code> call generates the final SMS. Falls back to Claude Haiku on Gemini 503s.</p>
+      <h3 style="color: var(--purple);">Fallback</h3>
+      <p>If Gemini returns a 503, the agent brain falls back to <strong>Anthropic Claude Haiku</strong> for the same tool-calling flow. The fallback is transparent &mdash; same tools, same handler logic, different provider.</p>
     </div>
 
     <div class="card">
       <h3>Total cost &amp; timing</h3>
       <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 4px;">
         <div>
-          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">~$0.001</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">AI cost (unified Haiku)</div>
+          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">~$0.0005</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">AI cost per message</div>
         </div>
         <div>
-          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--purple);">~$0.0005</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">AI cost (agent brain)</div>
+          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">~2-3s</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">end-to-end latency</div>
         </div>
         <div>
-          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">~1.2s</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">latency (unified)</div>
-        </div>
-        <div>
-          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--purple);">~2-3s</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">latency (agent brain)</div>
-        </div>
-        <div>
-          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">1</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">AI call (unified)</div>
+          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">2</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">AI calls (brain + compose)</div>
         </div>
         <div>
           <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">289</div>
@@ -693,15 +629,15 @@
     <p class="section-label">Data Pipeline</p>
     <h2 class="section-title">Daily scrape, in-memory cache</h2>
     <div class="section-body">
-      <p>Every morning at 10am ET, Bestie runs all 23 scrapers in parallel. Each scraper extracts structured event data from its source &mdash; parsing HTML, hitting APIs, or using Claude to extract from newsletters. Events are deduped across sources (hashed by name + venue + date), ranked by source trust weight, and cached in memory. No scraping happens in the hot request path.</p>
+      <p>Every morning at 10am ET, Pulse runs all 22 scrapers in parallel. Each scraper extracts structured event data from its source &mdash; parsing HTML, hitting APIs, or using Claude to extract from newsletters. Events are deduped across sources (hashed by name + venue + date), ranked by source trust weight, and cached in memory. No scraping happens in the hot request path.</p>
     </div>
 
     <div class="flow">
       <div class="flow-node node-yellow">10am ET &mdash; daily cron trigger</div>
       <div class="flow-arrow"></div>
       <div class="flow-node node-blue">
-        sources/ &mdash; 23 scrapers in parallel
-        <div class="label">Skint, Skint Ongoing, Nonsense NYC, RA, Dice, BrooklynVegan, BAM, SmallsLIVE, Yutori, Screen Slate, NYC Parks, DoNYC, Songkick, Ticketmaster, Luma, Eventbrite, NYPL, EventbriteComedy, EventbriteArts, TinyCupboard, BrooklynCC, NYCTrivia, BKMag</div>
+        sources/ &mdash; 22 scrapers in parallel
+        <div class="label">Skint, Skint Ongoing, Nonsense NYC, RA, Dice, BrooklynVegan, BAM, Yutori, Screen Slate, NYC Parks, DoNYC, Songkick, Luma, Eventbrite, NYPL, EventbriteComedy, EventbriteArts, TinyCupboard, BrooklynCC, NYCTrivia, BKMag, Sofar Sounds</div>
       </div>
       <div class="flow-arrow"></div>
       <div class="flow-node node-green">
@@ -721,9 +657,9 @@
 <section id="message-flow">
   <div class="container">
     <p class="section-label">Message Flow</p>
-    <h2 class="section-title">Two paths, seven layers</h2>
+    <h2 class="section-title">One path, five layers</h2>
     <div class="section-body">
-      <p>Each message takes one of two paths. ~15% are <strong>mechanical shortcuts</strong> (help, numbers, "more", greetings) handled instantly by the pre-router with zero AI cost. The other ~85% go through the <strong>unified LLM path</strong> where a single Claude Haiku call handles intent, event selection, and SMS composition. Not every layer runs on every request &mdash; "details" only needs the session, "more" reuses the existing pool.</p>
+      <p>Every message flows through the same pipeline. <code>checkMechanical</code> handles $0 shortcuts (bare numbers, "more", "help", greetings/thanks/bye). Everything else goes to the <strong>agent brain</strong> &mdash; Gemini 2.5 Flash Lite with tool calling, followed by a lightweight <code>brainCompose</code> step for SMS text. Not every layer runs on every request &mdash; "details" only needs the session, "more" reuses the existing pool.</p>
     </div>
 
     <div class="flow">
@@ -738,28 +674,18 @@
       </div>
       <div class="flow-arrow"></div>
       <div class="flow-node node-blue">
-        <strong>3. Pre-router</strong>
-        <div class="label">Mechanical shortcuts (~15%): help, numbers 1-5, "more", greetings, event name match. $0.</div>
-      </div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-green">
-        <strong>4. Filter resolution &amp; tagged pool</strong>
-        <div class="label">mergeFilters() &rarr; getEvents() &rarr; curation &rarr; buildTaggedPool() with [MATCH] tags. $0.</div>
-      </div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-yellow">
-        <strong>5. Prompt assembly</strong>
-        <div class="label">UNIFIED_SYSTEM base + conditional skill modules + ACTIVE_FILTER/SPARSE context</div>
+        <strong>3. checkMechanical</strong>
+        <div class="label">$0 shortcuts: help, numbers 1-5, "more", greetings, thanks, bye</div>
       </div>
       <div class="flow-arrow"></div>
       <div class="flow-node node-purple">
-        <strong>6. Unified LLM call</strong>
-        <div class="label">Claude Haiku: intent + event selection + SMS text in one pass. ~$0.001.</div>
+        <strong>4. callAgentBrain</strong>
+        <div class="label">Gemini 2.5 Flash Lite tool calling: search_events, get_details, respond. ~$0.0005.</div>
       </div>
       <div class="flow-arrow"></div>
-      <div class="flow-node node-coral">
-        <strong>7. Send, save &amp; persist filters</strong>
-        <div class="label">SMS via Twilio &rarr; saveResponseFrame() (picks, filters, neighborhood) &rarr; JSONL trace</div>
+      <div class="flow-node node-green">
+        <strong>5. brainCompose &rarr; saveResponseFrame</strong>
+        <div class="label">SMS composition &rarr; Twilio send &rarr; atomic session save (picks, filters from tool params) &rarr; JSONL trace</div>
       </div>
     </div>
   </div>
@@ -769,19 +695,19 @@
 <section id="routing">
   <div class="container">
     <p class="section-label">Routing</p>
-    <h2 class="section-title">Pre-router + unified LLM</h2>
+    <h2 class="section-title">Mechanical shortcuts + agent brain</h2>
     <div class="section-body">
-      <p>The <strong>pre-router</strong> handles only mechanical shortcuts &mdash; patterns that need zero semantic understanding. Everything else goes through a <strong>single unified Claude Haiku call</strong> that handles intent, event selection, and SMS composition in one pass. Filter state is owned entirely by the handler, not the LLM.</p>
+      <p><code>checkMechanical</code> handles $0 shortcuts &mdash; patterns that need zero semantic understanding. Everything else goes through the <strong>agent brain</strong> (Gemini 2.5 Flash Lite tool calling), where structured tool call parameters are the system of record for intent and filter state.</p>
     </div>
 
     <div class="card-grid">
       <div class="card">
-        <h3>Pre-router (~15%, $0)</h3>
-        <p>Mechanical shortcuts only: help, numbers 1-5 for details, "more" for next batch, greetings/thanks/bye, event name match from session, impatient follow-ups ("hello??"), and explicit filter clearing ("forget the comedy").</p>
+        <h3>checkMechanical ($0)</h3>
+        <p>Bare numbers 1-5 for details, "more" for next batch, "help", greetings/thanks/bye. Pattern-matched, no AI cost.</p>
       </div>
       <div class="card">
-        <h3>Unified LLM (~85%, ~$0.001)</h3>
-        <p>Everything semantic: neighborhoods, categories, vibes, time, free events, compound queries ("free jazz in williamsburg tonight"), nudge accepts, borough handling, off-topic deflection. Single Claude Haiku call with a tagged event pool.</p>
+        <h3>Agent brain (~$0.0005)</h3>
+        <p>Everything semantic: neighborhoods, categories, vibes, time, free events, compound queries ("free jazz in williamsburg tonight"), off-topic deflection. Gemini 2.5 Flash Lite with 3 tools: <code>search_events</code>, <code>get_details</code>, <code>respond</code>.</p>
       </div>
     </div>
 
@@ -789,39 +715,39 @@
       <div class="example-turn">
         <span class="turn-user">User</span>
         <span class="turn-msg">"williamsburg"</span>
-        <span class="turn-route">unified LLM &rarr; ~$0.001</span>
+        <span class="turn-route">agent brain &rarr; search_events &rarr; ~$0.0005</span>
       </div>
       <div class="example-turn">
         <span class="turn-user">User</span>
         <span class="turn-msg">"how about comedy"</span>
-        <span class="turn-route">unified LLM + [MATCH] tags &rarr; ~$0.001</span>
+        <span class="turn-route">agent brain &rarr; search_events({categories: ["comedy"]}) &rarr; ~$0.0005</span>
       </div>
       <div class="example-turn">
         <span class="turn-user">User</span>
         <span class="turn-msg">"2"</span>
-        <span class="turn-route">pre-router &rarr; details &rarr; $0</span>
+        <span class="turn-route">checkMechanical &rarr; details &rarr; $0</span>
       </div>
       <div class="example-turn">
         <span class="turn-user">User</span>
         <span class="turn-msg">"more"</span>
-        <span class="turn-route">pre-router &rarr; more &rarr; ~$0.001</span>
+        <span class="turn-route">checkMechanical &rarr; more &rarr; $0</span>
       </div>
       <div class="example-turn">
         <span class="turn-user">User</span>
         <span class="turn-msg">"any more free comedy stuff"</span>
-        <span class="turn-route">unified LLM + compound filters &rarr; ~$0.001</span>
+        <span class="turn-route">agent brain &rarr; search_events({categories: ["comedy"], free_only: true}) &rarr; ~$0.0005</span>
       </div>
       <div class="example-turn">
         <span class="turn-user">User</span>
         <span class="turn-msg">"forget the comedy"</span>
-        <span class="turn-route">pre-router &rarr; clear_filters &rarr; ~$0.001</span>
+        <span class="turn-route">agent brain &rarr; search_events({}) &rarr; ~$0.0005</span>
       </div>
     </div>
 
     <div class="card" style="margin-top: 20px;">
-      <h3>Tagged event pool &amp; deterministic filter state</h3>
-      <p>When a user applies filters (category, time, vibe, free), the handler compounds them deterministically via <code>mergeFilters()</code> and builds a tagged pool via <code>buildTaggedPool()</code>. Each event is tagged <code>[MATCH]</code> or unmatched. The LLM sees the full pool but prefers <code>[MATCH]</code> events. When matches are sparse (&lt;3), the LLM gets a <code>SPARSE</code> flag and honestly acknowledges limited options instead of silently omitting the filter.</p>
-      <p style="margin-top: 8px;">Filters persist across neighborhood switches, nudge accepts, and conversational responses. The LLM never manages filter state &mdash; it only composes from what the handler provides.</p>
+      <h3>Structured tool calls own state</h3>
+      <p>Filter state (categories, time_filter, free_only, date_range) comes from the agent brain's <code>search_events</code> tool call parameters &mdash; structured and validated. The handler saves <code>activeFilters</code> as <code>lastFilters</code> from tool call params via <code>saveResponseFrame</code>. The LLM never reports state in free text &mdash; only in structured tool calls.</p>
+      <p style="margin-top: 8px;">Filters persist across turns because the agent brain sees session context and can include or drop filters in each new <code>search_events</code> call. Intent types (<code>new_search</code>, <code>refine</code>, <code>pivot</code>) control whether neighborhood switches preserve existing filters.</p>
     </div>
   </div>
 </section>
@@ -830,7 +756,7 @@
 <section id="sources">
   <div class="container">
     <p class="section-label">Sources</p>
-    <h2 class="section-title">23 event sources, ranked by trust</h2>
+    <h2 class="section-title">22 event sources, ranked by trust</h2>
     <div class="section-body">
       <p>Events are deduplicated across sources using a hash of name + venue + date. When the same event appears in multiple sources, the version from the higher-trust source wins. Sources with geo data (lat/lng) also teach venue coordinates to the shared venue map. Each source belongs to a <strong>vibe tier</strong> &mdash; discovery (indie newsletters, curated blogs), niche (single-venue or specialized), platform (structured aggregators), or mainstream (large ticketing platforms).</p>
     </div>
@@ -903,12 +829,6 @@
             <td>niche</td>
           </tr>
           <tr>
-            <td class="source-name">SmallsLIVE</td>
-            <td class="weight-mid">0.8</td>
-            <td>Cheerio HTML</td>
-            <td>niche</td>
-          </tr>
-          <tr>
             <td class="source-name">NYC Parks</td>
             <td class="weight-mid">0.75</td>
             <td>JSON API</td>
@@ -938,6 +858,12 @@
             <td>Cheerio HTML</td>
             <td>niche</td>
           </tr>
+          <tr>
+            <td class="source-name">Sofar Sounds</td>
+            <td class="weight-mid">0.8</td>
+            <td>Cheerio HTML (DoNYC)</td>
+            <td>niche</td>
+          </tr>
           <tr><td colspan="4" style="font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--purple); padding: 12px 16px 6px; border-bottom: none;">Platform</td></tr>
           <tr>
             <td class="source-name">Resident Advisor</td>
@@ -964,12 +890,6 @@
             <td>platform</td>
           </tr>
           <tr><td colspan="4" style="font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--yellow); padding: 12px 16px 6px; border-bottom: none;">Mainstream</td></tr>
-          <tr>
-            <td class="source-name">Ticketmaster</td>
-            <td class="weight-mid">0.75</td>
-            <td>JSON API</td>
-            <td>mainstream</td>
-          </tr>
           <tr>
             <td class="source-name">Eventbrite</td>
             <td class="weight-low">0.7</td>
@@ -1036,7 +956,7 @@
           <tr>
             <td class="source-name">conversationHistory</td>
             <td>array</td>
-            <td>Last 6 turns (300 chars each) &mdash; sent to unified LLM call</td>
+            <td>Last 6 turns (300 chars each) &mdash; sent to agent brain as context</td>
           </tr>
           <tr>
             <td class="source-name">allPicks</td>
@@ -1079,103 +999,39 @@
   </div>
 </section>
 
-<!-- 7. Prompt Architecture -->
-<section id="prompts">
+<!-- 7. Agent Brain Architecture -->
+<section id="agent-brain">
   <div class="container">
-    <p class="section-label">Prompts</p>
-    <h2 class="section-title">Unified prompt + composable skills</h2>
+    <p class="section-label">Agent Brain</p>
+    <h2 class="section-title">Tool calling + lightweight compose</h2>
     <div class="section-body">
-      <p>The unified LLM call uses a base system prompt (<code>UNIFIED_SYSTEM</code>) that handles intent understanding, event selection, and SMS composition. On top of this, <strong>12 conditional skill modules</strong> are appended based on request context. The user prompt includes the tagged event pool with <code>[MATCH]</code> tags, filter context (<code>ACTIVE_FILTER</code>, <code>MATCH_COUNT</code>, <code>SPARSE</code>), and conversation history.</p>
-      <p><strong>Why conditional skills?</strong> When Claude sees "ACTIVITY ADHERENCE: if none match, say honestly you don't have that tonight" on a request where the user didn't ask for an activity, it sometimes over-filters and returns fewer picks. Including "NEIGHBORHOOD MISMATCH: acknowledge this upfront" when events ARE in the right neighborhood caused Claude to add unnecessary disclaimers. Each skill solves a specific failure mode, and only fires when that failure mode is possible.</p>
+      <p>The agent brain splits reasoning from rendering. <strong>Step 1:</strong> Gemini 2.5 Flash Lite receives the user message, session context, and available tools, then calls the appropriate tool with structured parameters. <strong>Step 2:</strong> <code>brainCompose</code> takes the matched events and writes the SMS using a lightweight ~400-token system prompt focused on voice, format, and the 480-char limit.</p>
+      <p>This architecture replaced the previous unified LLM + composable skills approach. Tool calling gives us structured state (P1) without parsing free text, and the lightweight compose prompt avoids the over-filtering problems that conditional skills were designed to solve.</p>
     </div>
 
-    <details open style="margin-top: 24px;">
-      <summary style="color: var(--coral);">core <span class="skill-condition">&mdash; always on. Persona, format, 480-char limit.</span></summary>
-      <div class="detail-body">
-        <p>Defines who Claude is and how to write. This is the only skill that's always included.</p>
-        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">You are Bestie: an NYC "plugged-in friend" who curates the best upcoming events. You text like a real person — warm, opinionated, concise. Never robotic.
-
-PICK PRIORITY ORDER:
-1. Tonight first: if an event's day is "TODAY", prefer it over tomorrow events.
-2. Source tier: among tonight options, prefer unstructured and primary over secondary.
-3. Neighborhood match: strongly prefer events in the user's requested neighborhood.
-4. Curation taste: prefer gallery openings, DJ nights at small venues, indie concerts, comedy shows, themed pop-ups, and unique one-off events. Avoid corporate events, hotel bars, tourist traps, and chain venues.
-
-VOICE: you're a friend texting picks. Light NYC shorthand OK.
-Each numbered pick should feel opinionated — "always a vibe", "goes off late", "legendary basement spot".
-CHARACTER LIMIT: 480 characters total for sms_text.</div>
+    <div class="card-grid" style="margin-top: 24px;">
+      <div class="card">
+        <h3 style="color: var(--coral);">search_events</h3>
+        <p>The primary tool. Accepts <code>neighborhood</code>, <code>categories</code> (array for multi-category OR), <code>time_filter</code>, <code>free_only</code>, <code>date_range</code>, and <code>intent</code> (new_search, refine, pivot). The handler executes the search deterministically against the event cache.</p>
       </div>
-    </details>
-
-    <details>
-      <summary>sourceTiers <span class="skill-condition">&mdash; always on. Editorial trust hierarchy.</span></summary>
-      <div class="detail-body">
-        <p><strong>Problem it solves:</strong> Without this, Claude treats all events equally. An Eventbrite "networking mixer" looks the same as a Nonsense NYC underground art party. This skill teaches Claude our editorial hierarchy.</p>
-        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">SOURCE VIBE TIERS — use source_vibe to break ties between similar events:
-- "discovery" (Skint, Nonsense NYC, BrooklynVegan, Screen Slate, BKMag, Yutori): curated editorial picks — trust these, they've been hand-selected.
-- "niche" (SmallsLIVE, TinyCupboard, BrooklynCC, BAM, NYPL, NYCTrivia, NYCParks, Luma): specialized single-venue or domain-specific sources.
-- "platform" (RA, Dice, DoNYC, Songkick): structured aggregator listings.
-- "mainstream" (Ticketmaster, Eventbrite): large ticketing platforms — use as last resort.</div>
+      <div class="card">
+        <h3 style="color: var(--blue);">get_details</h3>
+        <p>Returns full details for a specific event by pick number. Used when the user asks about a specific pick ("tell me more about 2").</p>
       </div>
-    </details>
-
-    <details>
-      <summary>tonightPriority <span class="skill-condition">&mdash; when today events exist in batch</span></summary>
-      <div class="detail-body">
-        <p><strong>Problem it solves:</strong> Claude naturally prefers the "best" event regardless of date. A great concert tomorrow looks better than a decent DJ set tonight. But the user texted now &mdash; they probably want something tonight.</p>
-        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">TONIGHT PRIORITY: A decent tonight event beats a great tomorrow event — the user is asking what's happening now.</div>
+      <div class="card">
+        <h3 style="color: var(--green);">respond</h3>
+        <p>For conversational responses that don't need event data &mdash; greetings, off-topic deflection, clarification. Returns text directly without searching events.</p>
       </div>
-    </details>
-
-    <details>
-      <summary>neighborhoodMismatch <span class="skill-condition">&mdash; when NO events match the requested hood</span></summary>
-      <div class="detail-body">
-        <p><strong>Problem it solves:</strong> When the user asks for the Upper West Side but all events are in Hell's Kitchen, Claude would silently show the Hell's Kitchen events. The user assumes they're in UWS. This skill forces Claude to acknowledge the mismatch upfront.</p>
-        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">NEIGHBORHOOD MISMATCH: NONE of the events are in the requested neighborhood. You MUST acknowledge this upfront — e.g. "Not much tonight on the UWS, but nearby in Hell's Kitchen:"</div>
+      <div class="card">
+        <h3 style="color: var(--purple);">brainCompose</h3>
+        <p>Not a tool &mdash; a separate Gemini call after tool execution. Receives the matched events with enrichment fields (source_vibe, venue_size, interaction_format) and writes the SMS text. ~400-token system prompt focused on voice, format, and 480-char limit.</p>
       </div>
-    </details>
+    </div>
 
-    <details>
-      <summary>perennialFraming <span class="skill-condition">&mdash; when batch includes perennial picks</span></summary>
-      <div class="detail-body">
-        <p><strong>Problem it solves:</strong> Perennials are always-good venues (bars with trivia, jazz clubs). Without framing, Claude writes "Black Rabbit is a solid bar" instead of "Black Rabbit has great trivia tonight at 8." It also needs to know when to lean on perennials (thin scrape nights) vs. skip them (plenty of events).</p>
-        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">PERENNIAL PICKS: Items with source_name "perennial" are bars/venues always worth visiting.
-- Lead with the activity: "Black Rabbit has great trivia tonight at 8" not "Black Rabbit is a solid bar."
-- THIN EVENTS (1-3 scraped events): Lead with the event, then add a perennial.
-- RICH EVENTS (4+ scraped events): Perennials are optional. Skip or mention one only if it has something specific and great happening.
-- Frame as personal recs — "always a good time" — never "if nothing else works."</div>
-      </div>
-    </details>
-
-    <details>
-      <summary>activityAdherence <span class="skill-condition">&mdash; when user asks for trivia, karaoke, jazz, etc.</span></summary>
-      <div class="detail-body">
-        <p><strong>Problem it solves:</strong> When someone texts "trivia in fort greene" and there's no trivia, Claude would recommend random events as alternatives. This is misleading &mdash; the user specifically wants trivia. This skill tells Claude to be honest about the miss rather than silently substituting.</p>
-        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">ACTIVITY ADHERENCE: The user asked for a specific type of activity. If NONE of the events match, do NOT recommend unrelated events. Instead, say honestly you don't have that tonight.
-DAY-SPECIFIC CLAIMS: NEVER say an event happens on a particular day (e.g. "trivia on Thursdays") unless you can verify from the event data that today IS that day.</div>
-      </div>
-    </details>
-
-    <details>
-      <summary>conversationAwareness <span class="skill-condition">&mdash; when session has conversation history</span></summary>
-      <div class="detail-body">
-        <p><strong>Problem it solves:</strong> Two specific bugs: (1) User asks for "tomorrow" events but Claude defaults to tonight-first priority &mdash; this skill overrides that. (2) Claude recommends events it already showed in earlier turns. (Filter persistence is now handled deterministically by the handler via <code>mergeFilters()</code>, not the LLM.)</p>
-        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">CONVERSATION AWARENESS:
-- TEMPORAL INTENT: If user asks about "tomorrow", prefer TOMORROW events. Override the "tonight first" rule.
-- REPEAT AVOIDANCE: Do not recommend events already mentioned in conversation history.</div>
-      </div>
-    </details>
-
-    <details>
-      <summary style="color: var(--text-dim);">5 more conditional skills <span class="skill-condition">&mdash; lastBatch, freeEmphasis, pendingIntent, venueFraming, nearbySuggestion</span></summary>
-      <div class="detail-body">
-        <p><strong>lastBatch</strong> &mdash; Fires on the final "more" batch. Removes the "Reply MORE for extra picks" CTA since there are no more picks. Appends a nearby neighborhood suggestion.</p>
-        <p><strong>freeEmphasis</strong> &mdash; Fires when user asked for free events. Tells Claude to list free events even if they seem niche &mdash; the user specifically wants free.</p>
-        <p><strong>pendingIntent</strong> &mdash; Fires when restoring a deferred request. User said "free comedy" with no neighborhood, then sent "bushwick" &mdash; this skill passes the original request so Claude knows the full intent.</p>
-        <p><strong>venueFraming</strong> &mdash; Fires when results include permanent venues without specific events. Tells Claude to frame them as "solid spots to check out" rather than events with specific times.</p>
-        <p><strong>nearbySuggestion</strong> &mdash; Fires when nearby neighborhoods are provided. Tells Claude to suggest travel when picks are thin: "Slim pickings in Fort Greene &mdash; Park Slope is right nearby, want picks from there?"</p>
-      </div>
-    </details>
+    <div class="card" style="margin-top: 20px;">
+      <h3>Why tool calling over monolithic prompts?</h3>
+      <p>The previous unified LLM architecture used a single Claude Haiku call with 12 conditional skill modules to handle intent, event selection, and SMS composition in one pass. Tool calling separates these concerns: the brain figures out <em>what to search for</em> (structured params), the handler <em>executes the search</em> (deterministic), and the compose step <em>writes the SMS</em> (lightweight prompt). This eliminates filter-state parsing from free text (P1), reduces prompt complexity, and halves the per-message cost.</p>
+    </div>
   </div>
 </section>
 
@@ -1195,7 +1051,7 @@ DAY-SPECIFIC CLAIMS: NEVER say an event happens on a particular day (e.g. "trivi
       </li>
       <li>
         <span class="layer-num">2</span>
-        <span><strong>Code evals</strong> &mdash; 9 deterministic trace checks: 480-char limit, valid intent, valid neighborhood, picked events exist, no truncated URLs. Free and instant. (<code>evals/code-evals.js</code>)</span>
+        <span><strong>Code evals</strong> &mdash; 24 deterministic trace checks: 480-char limit, valid intent, valid neighborhood, picked events exist, filter match alignment, time filter accuracy, discovery lean, and more. Free and instant. (<code>evals/code-evals.js</code>)</span>
       </li>
       <li>
         <span class="layer-num">3</span>
@@ -1251,7 +1107,7 @@ $ node scripts/run-ab-eval.js          <span class="hl-dim"># Layer 5: A/B compa
 
 <footer>
   <div class="footer-inner">
-    <span class="footer-brand">Bestie</span>
+    <span class="footer-brand">Pulse</span>
     <span class="footer-note">Built in Brooklyn</span>
   </div>
 </footer>
