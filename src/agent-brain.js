@@ -408,10 +408,11 @@ async function callAgentBrain(message, session, phone, trace) {
     },
   });
 
+  const chat = model.startChat();
   let result;
   try {
     result = await withTimeout(
-      model.generateContent({ contents: [{ role: 'user', parts: [{ text: message }] }] }),
+      chat.sendMessage(message),
       10_000, 'callAgentBrain'
     );
   } catch (err) {
@@ -449,6 +450,7 @@ async function callAgentBrain(message, session, phone, trace) {
         usage: extractGeminiUsage(response),
         provider: 'gemini',
         latency_ms: Date.now() - brainStart,
+        chat: null,
       };
     }
     // No tool call and no text — fall back to Anthropic
@@ -465,6 +467,7 @@ async function callAgentBrain(message, session, phone, trace) {
     usage,
     provider: 'gemini',
     latency_ms: Date.now() - brainStart,
+    chat,
   };
 }
 
@@ -544,6 +547,7 @@ async function callAgentBrainAnthropic(message, session, phone, trace, brainStar
         usage: response.usage || null,
         provider: 'anthropic',
         latency_ms: Date.now() - brainStart,
+        chat: null,
       };
     }
     throw new Error('Agent brain Anthropic returned no tool call');
@@ -555,6 +559,7 @@ async function callAgentBrainAnthropic(message, session, phone, trace, brainStar
     usage: response.usage || null,
     provider: 'anthropic',
     latency_ms: Date.now() - brainStart,
+    chat: null,
   };
 }
 
