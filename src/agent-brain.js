@@ -142,11 +142,11 @@ function buildBrainSystemPrompt(session) {
 
   const historyBlock = session?.conversationHistory?.length > 0
     ? '\nRecent conversation:\n' + session.conversationHistory.slice(-6).map(h =>
-      `${h.role === 'user' ? 'User' : 'Bestie'}: ${h.content.slice(0, 120)}`
+      `${h.role === 'user' ? 'User' : 'Pulse'}: ${h.content.slice(0, 120)}`
     ).join('\n')
     : '';
 
-  return `You are the routing brain for Bestie, an NYC nightlife SMS bot.
+  return `You are the routing brain for Pulse, an NYC nightlife SMS bot.
 Your job: understand what the user wants, call the right tool, and — when you receive event results back — write a warm, opinionated SMS with picks.
 
 CRITICAL RULE: When a user mentions ANY neighborhood name, borough name, or NYC location — ALWAYS call search_events. A bare neighborhood name like "williamsburg" or "LES" means "show me events there." This is the most common message type.
@@ -403,7 +403,7 @@ async function callAgentBrain(message, session, phone, trace) {
     safetySettings: GEMINI_SAFETY,
     tools: BRAIN_TOOLS,
     generationConfig: {
-      maxOutputTokens: 256,
+      maxOutputTokens: 1024,
       temperature: 0,
     },
   });
@@ -648,7 +648,7 @@ function serializePoolForContinuation(poolResult) {
 // --- Lightweight compose for brain path ---
 // ~400 tokens system prompt vs ~2000+ for unified. No routing, no intent, just write the SMS.
 
-const BRAIN_COMPOSE_SYSTEM = `You are Bestie, an NYC nightlife SMS bot. Write a short, warm SMS recommending events.
+const BRAIN_COMPOSE_SYSTEM = `You are Pulse, an NYC nightlife SMS bot. Write a short, warm SMS recommending events.
 
 FORMAT (MANDATORY — always use numbered picks):
 Line 1: Short intro (e.g. "Tonight in East Village:")
@@ -689,10 +689,10 @@ const BRAIN_COMPOSE_SCHEMA = {
   required: ['sms_text', 'picks'],
 };
 
-const WELCOME_COMPOSE_SYSTEM = `You are Bestie, an NYC nightlife and events SMS bot. Compose a WELCOME message for a brand-new user.
+const WELCOME_COMPOSE_SYSTEM = `You are Pulse, an NYC nightlife and events SMS bot. Compose a WELCOME message for a brand-new user.
 
 FORMAT (MANDATORY):
-Line 1: "I'm Bestie \u2014 your plugged-in friend for NYC. Tell me what you're into tonight, just ask. Here's a few things on my radar:"
+Line 1: "I'm Pulse \u2014 your plugged-in friend for NYC. Tell me what you're into tonight, just ask. Here's a few things on my radar:"
 Blank line
 Then 3 numbered picks with emoji category markers:
 1) [emoji] Event description \u2014 time, price
@@ -1219,7 +1219,7 @@ async function handleWelcome(phone, session, trace) {
   }));
 
   if (topEvents.length === 0) {
-    const sms = "Hey! I'm Bestie \u2014 I find the stuff in NYC you won't find on Instagram. Tell me a neighborhood, a vibe, or what you're in the mood for tonight.";
+    const sms = "Hey! I'm Pulse \u2014 I find the stuff in NYC you won't find on Instagram. Tell me a neighborhood, a vibe, or what you're in the mood for tonight.";
     saveResponseFrame(phone, { picks: [], eventMap: {}, neighborhood: null, filters: null, offeredIds: [] });
     return { sms, intent: 'conversational', picks: [], activeFilters: {}, eventMap: {} };
   }
@@ -1322,7 +1322,66 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
     let execResult;
 
     if (brainResult.tool === 'search_events') {
-      execResult = await executeSearchEvents(brainResult.params, session, phone, trace);
+      const poolResult = await buildSearchPool(brainResult.params, session, phone, trace);
+
+      if (poolResult.zeroMatch) {
+        execResult = poolResult.zeroMatch;
+      } else if (brainResult.chat) {
+        // Single-turn: continue same Gemini session with event results
+        try {
+          const eventData = serializePoolForContinuation(poolResult);
+          const composeResult = await continueWithResults(brainResult.chat, eventData, trace);
+
+          recordAICost(trace, 'compose', composeResult._usage, composeResult._provider);
+          trackAICost(phone, composeResult._usage, composeResult._provider);
+          trace.composition.raw_response = composeResult._raw || null;
+          trace.composition.active_filters = poolResult.activeFilters;
+          trace.composition.neighborhood_used = poolResult.hood;
+
+          // Validate picks + save session
+          const eventMap = buildEventMap(poolResult.curated);
+          for (const e of poolResult.pool) eventMap[e.id] = e;
+          const allEvents = [...poolResult.curated, ...poolResult.pool.filter(e => !eventMap[e.id] || eventMap[e.id] === e)];
+          const validPicks = validatePicks(composeResult.picks, allEvents);
+
+          trace.composition.picks = validPicks.map(p => {
+            const evt = eventMap[p.event_id];
+            return { ...p, date_local: evt?.date_local || null, event_name: evt?.name || null,
+              venue_name: evt?.venue_name || null, neighborhood: evt?.neighborhood || null,
+              category: evt?.category || null, is_free: evt?.is_free ?? null,
+              price_display: evt?.price_display || null, start_time_local: evt?.start_time_local || null,
+              source_vibe: evt?.source_vibe || null };
+          });
+
+          saveResponseFrame(phone, {
+            picks: validPicks, eventMap,
+            neighborhood: poolResult.hood, borough: poolResult.borough,
+            filters: poolResult.activeFilters,
+            offeredIds: validPicks.map(p => p.event_id),
+            visitedHoods: [...new Set([...(session?.visitedHoods || []), poolResult.hood || poolResult.borough || 'citywide'])],
+            pending: poolResult.suggestedHood ? { neighborhood: poolResult.suggestedHood, filters: poolResult.activeFilters } : null,
+          });
+
+          updateProfile(phone, { neighborhood: poolResult.hood, filters: poolResult.activeFilters, responseType: 'event_picks' })
+            .catch(err => console.error('profile update failed:', err.message));
+
+          execResult = {
+            sms: composeResult.sms_text,
+            intent: validPicks.length > 0 ? 'events' : 'conversational',
+            picks: validPicks,
+            activeFilters: poolResult.activeFilters,
+            eventMap,
+          };
+        } catch (err) {
+          // Fallback to standalone brainCompose if continuation fails
+          console.warn('Single-turn continuation failed, falling back to brainCompose:', err.message);
+          trace.brain_error = (trace.brain_error || '') + ` continuation: ${err.message}`;
+          execResult = await executeSearchEvents(brainResult.params, session, phone, trace);
+        }
+      } else {
+        // Anthropic path or no chat — use legacy brainCompose
+        execResult = await executeSearchEvents(brainResult.params, session, phone, trace);
+      }
     } else if (brainResult.tool === 'get_details') {
       execResult = await executeGetDetails(brainResult.params, session, phone, trace);
 
@@ -1355,7 +1414,7 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
     trace.brain_error = err.message;
 
     // Send a friendly error message
-    const sms = "Bestie hit a snag — try again in a sec!";
+    const sms = "Pulse hit a snag — try again in a sec!";
     await sendSMS(phone, sms);
     finalizeTrace(sms, 'error');
 
