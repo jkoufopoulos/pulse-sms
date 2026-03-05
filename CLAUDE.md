@@ -27,7 +27,7 @@ Pulse turns a simple text message into a curated night out. A user texts a neigh
 
 Pulse routes every incoming message through `checkMechanical` (fast $0 shortcuts) then the agent brain (Gemini tool calling). Session state is derived from the agent's structured tool call parameters — never parsed from free-text output.
 
-**Agent brain (primary path, ~$0.0005/call)** — Gemini 2.5 Flash Lite with tool calling. `checkMechanical` handles $0 shortcuts (bare numbers 1-5, "more", "help", greetings/thanks/bye), then `callAgentBrain` invokes 3 tools (`search_events`, `get_details`, `respond`), followed by `brainCompose` for lightweight SMS composition. 2-3s typical latency. Tool call params (`search_events` args) are the system of record for filters and intent. Falls back to Anthropic Haiku on Gemini 503s. 99.9% code eval pass rate.
+**Agent brain (sole path, ~$0.0005/call)** — Gemini 2.5 Flash Lite with tool calling. `checkMechanical` handles $0 shortcuts (bare numbers 1-5, "more", "help", greetings/thanks/bye), then `callAgentBrain` invokes 3 tools (`search_events`, `get_details`, `respond`), followed by `brainCompose` for lightweight SMS composition. 2-3s typical latency. Tool call params (`search_events` args) are the system of record for filters and intent. Falls back to Anthropic Haiku on Gemini failure. 99.9% code eval pass rate.
 
 A typical multi-turn conversation:
 ```
@@ -40,7 +40,7 @@ User: "forget the comedy"      → agent brain: search_events({neighborhood: "bu
 User: "more"                   → checkMechanical: next batch of picks ($0)
 ```
 
-**Filter state flow:** The handler reads filter state from the agent brain's `search_events` tool call params (categories, time_filter, free_only, date_range). These are structured and validated — safe state sources. After the response, the handler saves `activeFilters` as `lastFilters` via `saveResponseFrame`. On the legacy unified-flow path, `mergeFilters(lastFilters, preDetectedFilters)` compounds filters deterministically instead.
+**Filter state flow:** The handler reads filter state from the agent brain's `search_events` tool call params (categories, time_filter, free_only, date_range). These are structured and validated — safe state sources. After the response, the handler saves `activeFilters` as `lastFilters` via `saveResponseFrame`.
 
 Session state (neighborhood, last picks, active filters) persists for 2 hours per phone number.
 
@@ -54,7 +54,7 @@ Daily scrape (10am ET)              Incoming SMS
         ▼                                ▼
    sources/                         handler.js
    (22 entries across               (request-guard.js:           $0
-    20 scraper modules)              TCPA, dedup, budget)
+    19 scraper modules)              TCPA, dedup, budget)
         │                                │
         ├─► venues.js              checkMechanical ◄── session.js
         │   (auto-learn             ($0 shortcuts:      (12 fields,
@@ -95,26 +95,23 @@ Daily scrape (10am ET)              Incoming SMS
 
 | Module | Role |
 |--------|------|
-| `handler.js` | Orchestrator: checkMechanical → agent brain (or unified-flow fallback) → deterministic session save |
+| `handler.js` | Orchestrator: checkMechanical → agent brain → deterministic session save |
 | `request-guard.js` | TCPA opt-out, Twilio dedup, per-user AI budget ($0.10/day prod), IP rate limiting |
-| `unified-flow.js` | Fallback LLM orchestration (Claude Haiku): context resolution, LLM call, response handling, zero-match |
-| `pre-router.js` | Deterministic intent matching + session-aware filter detection. Used by unified-flow fallback path |
-| `pipeline.js` | `mergeFilters`, `buildTaggedPool`, `eventMatchesFilters`, `saveResponseFrame` (atomic session writes) |
-| `ai.js` | `unifiedRespond` (single Haiku call), `composeResponse` (handleMore), `extractEvents` (scrape-time) |
-| `agent-brain.js` | Primary LLM path: `checkMechanical` ($0), `callAgentBrain` (Gemini tool calling), `brainCompose`. Falls back to Claude Haiku on Gemini 503s |
-| `prompts.js` | System prompts: `UNIFIED_SYSTEM`, `DETAILS_SYSTEM`, `EXTRACTION_PROMPT` |
+| `agent-brain.js` | Sole LLM path: `checkMechanical` ($0), `callAgentBrain` (Gemini tool calling), `brainCompose`. Falls back to Claude Haiku on Gemini failure |
+| `pipeline.js` | `buildTaggedPool`, `eventMatchesFilters`, `saveResponseFrame` (atomic session writes) |
+| `ai.js` | `extractEvents` (scrape-time), `composeDetails` (event detail composition) |
+| `prompts.js` | System prompts: `BRAIN_SYSTEM`, `BRAIN_COMPOSE_SYSTEM`, `DETAILS_SYSTEM`, `EXTRACTION_PROMPT` |
 | `session.js` | Per-phone session store, 2hr TTL, 12 fields |
 | `events.js` | Daily event cache + disk persistence, cross-source dedup, quality gates, source vibe stamping |
-| `source-registry.js` | Single source of truth for all 23 source entries across 20 scraper modules (weights, tiers, fetch functions) |
-| `model-router.js` | Complexity scoring (0-100), routes Haiku vs Gemini Flash |
+| `source-registry.js` | Single source of truth for all 22 source entries across 19 scraper modules (weights, tiers, fetch functions) |
 
 Other modules: `intent-handlers.js` (help/details/more/convo), `geo.js` + `neighborhoods.js` (36 NYC hoods), `venues.js` (auto-learning coords), `formatters.js` (480-char cap), `twilio.js`, `traces.js`, `alerts.js`, `preference-profile.js`, `referral.js`, `card.js`, `curation.js`, `source-health.js`, `db.js` (SQLite).
 
-Sources: 22 entries across 20 scraper modules in `sources/` — see `source-registry.js` for the full list. Evals: 6 modules in `src/evals/`. Scripts: 13 runners in `scripts/`. UIs: 7 dashboards served by `server.js`.
+Sources: 22 entries across 19 scraper modules in `sources/` — see `source-registry.js` for the full list. Evals: 6 modules in `src/evals/`. Scripts: 13 runners in `scripts/`. UIs: 8 dashboards served by `server.js`.
 
 ## Design Principles (do not violate)
 
-- **P1: Structured tool calls own state, free-text owns language** — Session state is derived from the agent brain's tool call params (`search_events` args), never parsed from free-text LLM output. Tool params are structured and validated — safe state sources. The handler saves `activeFilters` as `lastFilters` from tool call params.
+- **P1: Structured tool calls own state, free-text owns language** — Session state is derived from the agent brain's tool call params (`search_events` args), never parsed from free-text LLM output. Tool params are structured and validated — the sole source of truth for filters and intent.
 - **P4: One save path** — Every SMS-sending path must end with `saveResponseFrame`. No `setSession` terminal writes.
 - **P6: Mechanical shortcuts for $0 operations, LLM for everything else** — `checkMechanical` handles bare numbers, "more", "help" at $0. All semantic understanding (compounds, filters, intent) goes to the agent brain's tool calling.
 - **480-char SMS limit** — All responses capped at 480 chars.
@@ -126,11 +123,11 @@ Sources: 22 entries across 20 scraper modules in `sources/` — see `source-regi
 
 ## Env Vars
 
-Required: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `ANTHROPIC_API_KEY`, `TAVILY_API_KEY` (required at boot, not used in hot path).
+Required: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`.
 
-Optional: `PORT` (default 3000), `PULSE_TEST_MODE=true` (enables simulator), `GEMINI_API_KEY` (agent brain + fallback provider), `TICKETMASTER_API_KEY`, `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`/`GMAIL_REFRESH_TOKEN` (newsletter scrapers), `RESEND_API_KEY`/`ALERT_EMAIL` (email alerts), `PULSE_NO_RATE_LIMIT=true`, `PULSE_CARD_ENABLED=true` (enables branded card pages; default off, uses direct source URLs), `PULSE_CARD_DOMAIN`, `PULSE_LINK_PREVIEWS=true` (sends each pick's URL as a separate SMS for iMessage link previews).
+Optional: `PORT` (default 3000), `PULSE_TEST_MODE=true` (enables simulator), `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`/`GMAIL_REFRESH_TOKEN` (newsletter scrapers), `RESEND_API_KEY`/`ALERT_EMAIL` (email alerts), `PULSE_NO_RATE_LIMIT=true`, `PULSE_CARD_ENABLED=true` (enables branded card pages; default off, uses direct source URLs), `PULSE_CARD_DOMAIN`, `PULSE_LINK_PREVIEWS=true` (sends each pick's URL as a separate SMS for iMessage link previews).
 
-Model overrides: `PULSE_MODEL_COMPOSE`, `PULSE_MODEL_EXTRACT`, `PULSE_MODEL_ROUTE`, `PULSE_MODEL_ROUTE_GEMINI`, `PULSE_ROUTE_PROVIDER`.
+Model overrides: `PULSE_MODEL_COMPOSE`, `PULSE_MODEL_EXTRACT`.
 
 ## Running
 
