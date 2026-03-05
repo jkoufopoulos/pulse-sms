@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse Quality Evals</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0a0a0a;
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 24px;
+    padding-bottom: 80px;
+  }
+
+  .container { max-width: 900px; margin: 0 auto; }
+
+  h1 { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 20px; }
+  h1 span { color: #FF6B35; }
+
+  /* ── Controls ── */
+  .controls {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+  }
+  .controls select {
+    background: #0a0a0a;
+    border: 1px solid #333;
+    color: #e0e0e0;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    width: 100%;
+    max-width: 500px;
+    cursor: pointer;
+  }
+  .controls select:focus { outline: none; border-color: #FF6B35; }
+
+  /* ── Summary cards ── */
+  .summary-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .summary-card {
+    flex: 1;
+    min-width: 120px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+  }
+  .summary-card .label {
+    font-size: 12px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .summary-card .score {
+    font-size: 32px;
+    font-weight: 700;
+  }
+  .summary-card .meta {
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+  }
+
+  .score-green { color: #27ae60; }
+  .score-yellow { color: #f39c12; }
+  .score-red { color: #e74c3c; }
+
+  /* ── Sparkline ── */
+  .sparkline-wrap {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  .sparkline-wrap .spark-title {
+    font-size: 12px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  .sparkline-wrap svg {
+    display: block;
+    width: 100%;
+    height: 60px;
+  }
+  .sparkline-wrap svg text {
+    fill: #888;
+    font-size: 11px;
+    font-family: inherit;
+  }
+  .sparkline-wrap svg polyline {
+    fill: none;
+    stroke: #FF6B35;
+    stroke-width: 2;
+  }
+  .sparkline-wrap svg circle {
+    fill: #FF6B35;
+  }
+
+  /* ── Filter buttons ── */
+  .filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #888;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-btn:hover { border-color: #555; color: #ccc; }
+  .filter-btn.active {
+    background: #2a2a2a;
+    border-color: #FF6B35;
+    color: #e0e0e0;
+  }
+
+  /* ── Conversation cards ── */
+  .convo {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    overflow: hidden;
+  }
+  .convo-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .convo-header:hover { background: #222; }
+  .convo-name { font-weight: 600; font-size: 14px; }
+  .convo-score { font-weight: 700; font-size: 15px; }
+  .convo-body { display: none; padding: 0 16px 16px; }
+  .convo.open .convo-body { display: block; }
+
+  .turn { margin-bottom: 16px; }
+  .turn:last-child { margin-bottom: 0; }
+  .turn-user {
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 6px;
+  }
+  .turn-response {
+    background: #111;
+    border: 1px solid #2a2a2a;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-bottom: 8px;
+  }
+  .turn-scores {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .turn-scores .badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: #222;
+    border: 1px solid #333;
+  }
+  .turn-note {
+    font-size: 12px;
+    color: #888;
+    font-style: italic;
+    line-height: 1.4;
+  }
+
+  /* ── Empty state ── */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #666;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .empty-state code {
+    background: #1a1a1a;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #aaa;
+  }
+
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1><span>Pulse</span> Quality Evals</h1>
+
+  <div class="controls">
+    <select id="reportSelect">
+      <option value="">Loading reports...</option>
+    </select>
+  </div>
+
+  <div id="summaryRow" class="summary-row hidden"></div>
+
+  <div id="sparklineWrap" class="sparkline-wrap hidden">
+    <div class="spark-title">Score trend (last 10 reports)</div>
+    <svg id="sparklineSvg" viewBox="0 0 400 60" preserveAspectRatio="none"></svg>
+  </div>
+
+  <div id="filtersRow" class="filters hidden">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="voice">Voice &lt; 3</button>
+    <button class="filter-btn" data-filter="picks">Picks &lt; 3</button>
+    <button class="filter-btn" data-filter="density">Density &lt; 3</button>
+  </div>
+
+  <div id="convoList"></div>
+
+  <div id="emptyState" class="empty-state hidden">
+    No quality reports yet. Run <code>npm run eval:quality</code> to generate your first report.
+  </div>
+</div>
+
+<script>
+(function() {
+  const reportSelect = document.getElementById('reportSelect');
+  const summaryRow = document.getElementById('summaryRow');
+  const sparklineWrap = document.getElementById('sparklineWrap');
+  const sparklineSvg = document.getElementById('sparklineSvg');
+  const filtersRow = document.getElementById('filtersRow');
+  const convoList = document.getElementById('convoList');
+  const emptyState = document.getElementById('emptyState');
+
+  let reportSummaries = [];
+  let currentReport = null;
+  let activeFilter = 'all';
+
+  function esc(s) {
+    if (!s) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function scoreClass(n) {
+    if (n >= 4) return 'score-green';
+    if (n >= 3) return 'score-yellow';
+    return 'score-red';
+  }
+
+  function fmt(n) {
+    return (typeof n === 'number') ? n.toFixed(1) : '--';
+  }
+
+  // ── Load report list ──
+  async function loadReportList() {
+    try {
+      const res = await fetch('/api/eval-reports?type=quality');
+      if (!res.ok) throw new Error(res.statusText);
+      reportSummaries = await res.json();
+    } catch (e) {
+      reportSummaries = [];
+    }
+
+    if (reportSummaries.length === 0) {
+      reportSelect.innerHTML = '<option value="">No reports available</option>';
+      emptyState.classList.remove('hidden');
+      return;
+    }
+
+    emptyState.classList.add('hidden');
+    reportSelect.innerHTML = reportSummaries.map(r => {
+      const ts = new Date(r.timestamp).toLocaleString();
+      const label = ts + '  |  avg ' + (r.avg_score != null ? r.avg_score.toFixed(1) : '?') + '  |  ' + (r.conversations || '?') + ' convos';
+      return '<option value="' + esc(r.filename) + '">' + esc(label) + '</option>';
+    }).join('');
+
+    renderSparkline();
+    loadReport(reportSummaries[0].filename);
+  }
+
+  // ── Load a single report ──
+  async function loadReport(filename) {
+    if (!filename) return;
+    try {
+      const res = await fetch('/api/eval-reports/' + encodeURIComponent(filename));
+      if (!res.ok) throw new Error(res.statusText);
+      currentReport = await res.json();
+    } catch (e) {
+      currentReport = null;
+      convoList.innerHTML = '<div class="empty-state">Failed to load report.</div>';
+      return;
+    }
+    renderSummary();
+    renderConversations();
+  }
+
+  // ── Summary cards ──
+  function renderSummary() {
+    if (!currentReport || !currentReport.summary) {
+      summaryRow.classList.add('hidden');
+      return;
+    }
+    const s = currentReport.summary;
+    const cards = [
+      { label: 'Overall', value: s.avg_score },
+      { label: 'Voice', value: s.voice },
+      { label: 'Picks', value: s.picks },
+      { label: 'Density', value: s.density }
+    ];
+
+    const metaParts = [];
+    if (s.conversations) metaParts.push(s.conversations + ' convos');
+    if (currentReport.judge_model) metaParts.push(currentReport.judge_model);
+    if (currentReport.judge_cost != null) metaParts.push('$' + currentReport.judge_cost.toFixed(4));
+    if (currentReport.elapsed_seconds != null) metaParts.push(currentReport.elapsed_seconds.toFixed(1) + 's');
+    const metaStr = metaParts.join(' / ');
+
+    summaryRow.innerHTML = cards.map((c, i) => {
+      return '<div class="summary-card">' +
+        '<div class="label">' + esc(c.label) + '</div>' +
+        '<div class="score ' + scoreClass(c.value) + '">' + fmt(c.value) + '</div>' +
+        (i === 0 && metaStr ? '<div class="meta">' + esc(metaStr) + '</div>' : '') +
+        '</div>';
+    }).join('');
+    summaryRow.classList.remove('hidden');
+  }
+
+  // ── Sparkline ──
+  function renderSparkline() {
+    if (reportSummaries.length < 2) {
+      sparklineWrap.classList.add('hidden');
+      return;
+    }
+
+    const data = reportSummaries.slice(0, 10).reverse();
+    const scores = data.map(r => r.avg_score != null ? r.avg_score : 0);
+    const minV = Math.min(...scores) - 0.3;
+    const maxV = Math.max(...scores) + 0.3;
+    const range = maxV - minV || 1;
+
+    const padX = 30;
+    const padY = 14;
+    const w = 400 - padX * 2;
+    const h = 60 - padY * 2;
+
+    const points = scores.map((v, i) => {
+      const x = padX + (scores.length === 1 ? w / 2 : (i / (scores.length - 1)) * w);
+      const y = padY + h - ((v - minV) / range) * h;
+      return { x, y, v };
+    });
+
+    const polyPoints = points.map(p => p.x + ',' + p.y).join(' ');
+    const circles = points.map(p => '<circle cx="' + p.x + '" cy="' + p.y + '" r="3"/>').join('');
+
+    const first = points[0];
+    const last = points[points.length - 1];
+    const labels =
+      '<text x="' + first.x + '" y="' + (first.y - 6) + '" text-anchor="middle">' + first.v.toFixed(1) + '</text>' +
+      '<text x="' + last.x + '" y="' + (last.y - 6) + '" text-anchor="middle">' + last.v.toFixed(1) + '</text>';
+
+    sparklineSvg.innerHTML = '<polyline points="' + polyPoints + '"/>' + circles + labels;
+    sparklineWrap.classList.remove('hidden');
+  }
+
+  // ── Filter buttons ──
+  filtersRow.addEventListener('click', function(e) {
+    const btn = e.target.closest('.filter-btn');
+    if (!btn) return;
+    filtersRow.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilter = btn.dataset.filter;
+    renderConversations();
+  });
+
+  // ── Conversations ──
+  function renderConversations() {
+    if (!currentReport || !currentReport.conversations) {
+      convoList.innerHTML = '';
+      filtersRow.classList.add('hidden');
+      return;
+    }
+
+    filtersRow.classList.remove('hidden');
+
+    let convos = currentReport.conversations.slice();
+
+    // Apply filter
+    if (activeFilter !== 'all') {
+      convos = convos.filter(c => {
+        return c.turns && c.turns.some(t => t.scores && t.scores[activeFilter] < 3);
+      });
+    }
+
+    // Sort worst-first
+    convos.sort((a, b) => (a.avg_score || 0) - (b.avg_score || 0));
+
+    if (convos.length === 0) {
+      convoList.innerHTML = '<div class="empty-state">No conversations match this filter.</div>';
+      return;
+    }
+
+    convoList.innerHTML = convos.map((c, ci) => {
+      const turnsHtml = (c.turns || []).map(t => {
+        const scoreBadges = t.scores ? Object.entries(t.scores).map(([k, v]) => {
+          return '<span class="badge"><span style="color:#888">' + esc(k) + ':</span> <span class="' + scoreClass(v) + '">' + v + '</span></span>';
+        }).join('') : '';
+
+        return '<div class="turn">' +
+          '<div class="turn-user">User: ' + esc(t.user) + '</div>' +
+          '<div class="turn-response">' + esc(t.response) + '</div>' +
+          '<div class="turn-scores">' + scoreBadges + '</div>' +
+          (t.note ? '<div class="turn-note">' + esc(t.note) + '</div>' : '') +
+          '</div>';
+      }).join('');
+
+      return '<div class="convo" data-idx="' + ci + '">' +
+        '<div class="convo-header">' +
+        '<span class="convo-name">' + esc(c.name) + '</span>' +
+        '<span class="convo-score ' + scoreClass(c.avg_score) + '">' + fmt(c.avg_score) + '</span>' +
+        '</div>' +
+        '<div class="convo-body">' + turnsHtml + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
+  // ── Toggle expand ──
+  convoList.addEventListener('click', function(e) {
+    const header = e.target.closest('.convo-header');
+    if (!header) return;
+    header.parentElement.classList.toggle('open');
+  });
+
+  // ── Report selector ──
+  reportSelect.addEventListener('change', function() {
+    if (this.value) loadReport(this.value);
+  });
+
+  // ── Init ──
+  loadReportList();
+})();
+</script>
+</body>
+</html>
