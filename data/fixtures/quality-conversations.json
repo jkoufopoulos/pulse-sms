@@ -1,43 +1,62 @@
 [
   {
-    "name": "cold neighborhood open",
+    "name": "new user: prepopulated signup",
+    "turns": [
+      { "user": "Hey, I'd like to START receiving messages about what's going on tonight." },
+      { "user": "2" },
+      { "user": "more" }
+    ]
+  },
+  {
+    "name": "new user: just says hey",
+    "turns": [
+      { "user": "hey" },
+      { "user": "bushwick" }
+    ]
+  },
+  {
+    "name": "new user: neighborhood cold open",
     "turns": [
       { "user": "bushwick" }
     ]
   },
   {
-    "name": "category with neighborhood",
+    "name": "new user: specific request cold open",
     "turns": [
       { "user": "jazz in west village" }
     ]
   },
   {
-    "name": "vibe request",
+    "name": "returning: one word category",
     "turns": [
-      { "user": "anything weird tonight" }
-    ]
-  },
-  {
-    "name": "one word category",
-    "turns": [
+      { "user": "hey" },
       { "user": "techno" }
     ]
   },
   {
-    "name": "free filter",
+    "name": "returning: vibe request",
     "turns": [
+      { "user": "hey" },
+      { "user": "anything weird tonight" }
+    ]
+  },
+  {
+    "name": "returning: free filter",
+    "turns": [
+      { "user": "hey" },
       { "user": "free stuff in greenpoint" }
     ]
   },
   {
-    "name": "group context",
+    "name": "returning: group context",
     "turns": [
+      { "user": "hey" },
       { "user": "4 of us looking for something fun in williamsburg tonight" },
       { "user": "anything cheaper?" }
     ]
   },
   {
-    "name": "multi-turn browse and filter",
+    "name": "returning: browse then filter",
     "turns": [
       { "user": "east village" },
       { "user": "any comedy?" },
@@ -45,7 +64,7 @@
     ]
   },
   {
-    "name": "pivot mid-conversation",
+    "name": "returning: pivot mid-conversation",
     "turns": [
       { "user": "les" },
       { "user": "actually bushwick" },
@@ -53,14 +72,14 @@
     ]
   },
   {
-    "name": "skeptic follow-up",
+    "name": "returning: skeptic follow-up",
     "turns": [
       { "user": "williamsburg" },
       { "user": "those sound basic" }
     ]
   },
   {
-    "name": "minimal effort",
+    "name": "returning: minimal effort",
     "turns": [
       { "user": "vibes" }
     ]
