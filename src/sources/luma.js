@@ -248,12 +248,29 @@ async function fetchLumaEvents() {
       });
     }
 
-    console.log(`Luma: ${events.length} events (after date/location filter)`);
+    // Editorial filter: drop professional/corporate events that don't fit the nightlife/discovery vibe
+    const LUMA_NOISE_RE = /\b(networking|coworking|pitch\s+and|founders?\b|office hours|bootcamp|webinar|accelerator|hackathon|investor|startup|fundrais|venture|incubator|summit|conference|certification|training|demo\s+day|pre-seed|seed\s+round)\b/i;
+    const beforeFilter = events.length;
+    const filtered = events.filter(e => {
+      // Drop keyword-matched professional events
+      if (LUMA_NOISE_RE.test(e.name)) return false;
+      // Drop weekday events starting before 5pm ET (21:00 UTC in EDT)
+      const t = e.start_time_local;
+      if (t) {
+        const dt = new Date(t);
+        const utcHour = dt.getUTCHours();
+        const day = dt.getUTCDay(); // 0=Sun, 6=Sat
+        const isWeekday = day >= 1 && day <= 5;
+        if (isWeekday && utcHour >= 7 && utcHour < 21) return false;
+      }
+      return true;
+    });
+    console.log(`Luma: ${filtered.length} events (${beforeFilter} before editorial filter)`);
 
     // Enrich with descriptions from detail API
-    await enrichFromDetailAPI(events);
+    await enrichFromDetailAPI(filtered);
 
-    return events;
+    return filtered;
   } catch (err) {
     console.error('Luma error:', err.message);
     return [];

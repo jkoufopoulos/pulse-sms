@@ -88,8 +88,16 @@ async function fetchNYCParksEvents() {
       });
     }
 
-    console.log(`NYC Parks: ${events.length} events`);
-    return events;
+    // Editorial filter: keep art, performance, film, cultural events; drop fitness, nature, volunteering
+    const PARKS_DROP_SUBCATS = new Set(['fitness', 'nature', 'volunteer', 'birding', 'shape-up-nyc', 'c247']);
+    const PARKS_DROP_RE = /\b(total body|zumba|cardio|stretching|pilates|yoga|NYRR|open run|beachgrass|plant ecology)\b/i;
+    const filtered = events.filter(e => {
+      if (e.subcategory && PARKS_DROP_SUBCATS.has(e.subcategory)) return false;
+      if (PARKS_DROP_RE.test(e.name)) return false;
+      return true;
+    });
+    console.log(`NYC Parks: ${filtered.length} events (${events.length} before editorial filter)`);
+    return filtered;
   } catch (err) {
     console.error('NYC Parks error:', err.message);
     return [];

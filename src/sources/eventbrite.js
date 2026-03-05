@@ -101,8 +101,11 @@ function parseEventbriteServerData(html) {
     });
   }
 
-  console.log(`Eventbrite: parsed ${events.length} events from __SERVER_DATA__`);
-  return events;
+  // Editorial filter: drop professional/corporate events
+  const EB_NOISE_RE = /\b(conference|summit|webinar|certification|training|sellers|B2B|enterprise|fundrais|investor|startup accelerator|bootcamp|masterclass|professional development)\b/i;
+  const filtered = events.filter(e => !EB_NOISE_RE.test(e.name));
+  console.log(`Eventbrite: parsed ${filtered.length} events from __SERVER_DATA__ (${events.length} before editorial filter)`);
+  return filtered;
 }
 
 function parseEventbriteJsonLd(html) {
