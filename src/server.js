@@ -332,6 +332,20 @@ app.get('/api/geo/neighborhoods', (req, res) => {
   res.sendFile(require('path').join(__dirname, 'public', 'nyc-neighborhoods.geojson'));
 });
 
+// Digest history
+app.get('/digests', (req, res) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
+  res.sendFile(require('path').join(__dirname, 'digest-ui.html'));
+});
+app.get('/api/digests', (req, res) => {
+  try {
+    const { getDigests } = require('./db');
+    res.json(getDigests(30));
+  } catch (err) {
+    res.json([]);
+  }
+});
+
 // Event card page — shareable Pulse URLs with OG meta tags
 app.get('/e/:eventId', (req, res) => {
   const pulsePhone = process.env.TWILIO_PHONE_NUMBER || '+16467226926';
