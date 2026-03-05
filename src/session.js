@@ -1,5 +1,5 @@
-// --- Session store for DETAILS/MORE/FREE ---
-// Maps phone → { lastPicks, lastEvents, lastNeighborhood, timestamp }
+// --- Session store ---
+// Maps phone → { lastPicks, lastEvents, lastNeighborhood, ... } (12 fields + timestamp)
 // In-memory Map + debounced disk write to data/sessions.json.
 // Phone numbers hashed on disk via SHA-256 (same as preference-profile.js).
 
@@ -72,12 +72,10 @@ function setResponseState(phone, frame) {
     allOfferedIds: frame.offeredIds ?? [],
     lastEvents: frame.eventMap ?? {},
     lastNeighborhood: frame.neighborhood ?? null,
-    lastDateRange: frame.dateRange ?? null,
     lastFilters: frame.filters ?? null,
     lastBorough: frame.borough ?? null,
     visitedHoods: frame.visitedHoods ?? [],
     pendingNearby: frame.pendingNearby ?? null,
-    pendingNearbyEvents: frame.pendingNearbyEvents ?? null,
     pendingFilters: frame.pendingFilters ?? null,
     pendingMessage: frame.pendingMessage ?? null,
     lastResponseHadPicks: frame.lastResponseHadPicks ?? false,
@@ -127,12 +125,10 @@ function scheduleDiskWrite() {
           allOfferedIds: session.allOfferedIds || [],
           lastEvents: session.lastEvents || {},
           lastNeighborhood: session.lastNeighborhood || null,
-          lastDateRange: session.lastDateRange || null,
           lastFilters: session.lastFilters || null,
           lastBorough: session.lastBorough || null,
           visitedHoods: session.visitedHoods || [],
           pendingNearby: session.pendingNearby || null,
-          pendingNearbyEvents: session.pendingNearbyEvents || null,
           pendingFilters: session.pendingFilters || null,
           pendingMessage: session.pendingMessage || null,
           timestamp: session.timestamp,

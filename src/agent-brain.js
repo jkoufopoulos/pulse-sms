@@ -240,12 +240,13 @@ function checkMechanical(message, session) {
     }
   }
 
-  // Greetings
+  // Greetings — only handle mechanically if user has an active session.
+  // First-time greetings fall through to agent brain → welcome flow.
   if (/^(hey|hi|hello|yo|sup|what's up|wassup|hola|howdy)$/i.test(lower)) {
-    if (session?.lastPicks?.length > 0) {
+    if (session?.lastPicks?.length > 0 || session?.lastNeighborhood) {
       return { intent: 'conversational', reply: "Hey! What are you in the mood for tonight? Drop a vibe, a category, or a neighborhood." };
     }
-    return { intent: 'conversational', reply: "Hey! What are you in the mood for tonight? Drop a vibe, a category, or a neighborhood." };
+    return null; // Fall through to welcome flow for first-time users
   }
 
   // Thanks
@@ -273,15 +274,15 @@ function checkMechanical(message, session) {
     if (session?.lastPicks?.length > 0) {
       return { intent: 'conversational', reply: `Your ${session.lastNeighborhood || ''} picks are above — reply a number for details, MORE for extra picks, or try a different neighborhood.` };
     }
-    return { intent: 'conversational', reply: "Hey! Tell me what you're looking for — comedy, jazz, something weird — or a neighborhood." };
+    return null; // Fall through to welcome flow for first-time users
   }
 
   // Impatient follow-up
   if (/^(hello\?+|hey\?+|\?\?+|yo\?+|you there\??|helloooo+|hellooo+)$/i.test(lower)) {
-    if (session?.lastPicks?.length > 0) {
+    if (session?.lastPicks?.length > 0 || session?.lastNeighborhood) {
       return { intent: 'conversational', reply: `Sorry for the wait! Your ${session.lastNeighborhood || 'picks'} should be above — reply MORE for extra picks or try a different neighborhood.` };
     }
-    return { intent: 'conversational', reply: "Hey! Tell me what you're looking for — comedy, jazz, something weird — or a neighborhood." };
+    return null; // Fall through to welcome flow for first-time users
   }
 
   return null; // → agent brain
@@ -1128,8 +1129,11 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
   if (!getSession(phone)) setSession(phone, {});
   addToHistory(phone, 'user', message);
 
-  // First-message welcome flow: intercept cold opens for new users
-  if (isFirstMessage(session)) {
+  // First-message welcome flow: intercept vague cold opens for new users.
+  // Skip if the message has specific intent (neighborhood, category, time, etc.)
+  // — those should go through the normal agent brain for targeted results.
+  const hasSpecificIntent = extractNeighborhood(message) || detectBorough(message);
+  if (isFirstMessage(session) && !hasSpecificIntent) {
     try {
       const welcomeResult = await handleWelcome(phone, session, trace);
       trace.routing.pre_routed = true;

@@ -403,17 +403,9 @@ Google Places deferred — the signals it provides (Popular Times, review count,
 
 **North star:** Pulse is a single agent loop that works with any tool-calling model, owns the full conversation, and builds a relationship with each user over time.
 
-**Phase 1: Unified Agent Loop** — Delete unified-flow, one code path
+**Phase 1: Unified Agent Loop** — ✅ Done (2026-03-05)
 
-Refactor `callAgentBrain` to accept a model provider parameter. Try Gemini first, fall back to Claude on failure — same tools, same flow, different model. Delete the legacy unified-flow path entirely.
-
-- `callAgentBrain(message, session, phone, trace, { provider })` — model-agnostic agent loop
-- Gemini → Claude fallback within the same code path (same tools, same `search_events`/`get_details`/`respond`)
-- Extract `checkMechanical` + `getAdjacentNeighborhoods` to utils — decouple from pre-router
-- Delete: `unified-flow.js`, `pre-router.js` (most of it), `src/skills/` directory, `model-router.js`
-- ~~Remove `PULSE_AGENT_BRAIN` env var~~ — **Done** (2026-03-05)
-- Risk: Claude tool calling costs ~2-5x more than Gemini. Fallback-only, so cost impact proportional to Gemini failure rate (<1%).
-- Eval: full scenario suite against single-path architecture. Pass rate must match or exceed 99.9%.
+Deleted unified-flow.js, model-router.js, pre-router.js, compose skills (~1,300 lines removed). Agent brain is the sole code path. Gemini→Anthropic fallback within the same agent loop. Code eval: 99.87% (40,723/40,776). Plan: `docs/plans/2026-03-05-unified-agent-loop.md`.
 
 **Phase 2: Single-Turn Agent** — Merge routing + compose into one generation
 
