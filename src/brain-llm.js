@@ -2,93 +2,75 @@
  * brain-llm.js — LLM calling, continuation, and compose for the agent brain.
  */
 
-const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
 const { NEIGHBORHOODS } = require('./neighborhoods');
 const { getNycDateString } = require('./geo');
 const { describeFilters } = require('./pipeline');
 const { smartTruncate } = require('./formatters');
+const { callWithTools: llmCallWithTools, continueChat: llmContinueChat, generate: llmGenerate } = require('./llm');
+const { MODELS } = require('./model-config');
 
 // --- Neighborhood list for system prompt ---
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
 
-// --- Gemini client ---
-let geminiClient = null;
-function getGeminiClient() {
-  if (!geminiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return null;
-    geminiClient = new GoogleGenerativeAI(apiKey);
-  }
-  return geminiClient;
-}
-
-const GEMINI_SAFETY = [
-  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-];
-
-// --- Tool definitions (Gemini function calling format) ---
+// --- Tool definitions (neutral format — lowercase JSON Schema types, flat array) ---
 
 const BRAIN_TOOLS = [
   {
-    functionDeclarations: [{
-      name: 'search_events',
-      description: 'Search for event recommendations. Use when the user wants to see events, asks about a neighborhood, mentions a category, or requests any kind of activity.',
-      parameters: {
-        type: 'OBJECT',
-        properties: {
-          neighborhood: { type: 'STRING', description: 'NYC neighborhood name, or empty string for citywide', nullable: true },
-          category: {
-            type: 'STRING', description: 'Primary event category filter. Use for single-category requests.',
-            nullable: true,
+    name: 'search_events',
+    description: 'Search for event recommendations. Use when the user wants to see events, asks about a neighborhood, mentions a category, or requests any kind of activity.',
+    parameters: {
+      type: 'object',
+      properties: {
+        neighborhood: { type: 'string', description: 'NYC neighborhood name, or empty string for citywide', nullable: true },
+        category: {
+          type: 'string', description: 'Primary event category filter. Use for single-category requests.',
+          nullable: true,
+          enum: ['comedy', 'jazz', 'live_music', 'dj', 'trivia', 'film', 'theater',
+            'art', 'dance', 'community', 'food_drink', 'spoken_word', 'classical', 'nightlife'],
+        },
+        categories: {
+          type: 'array', description: 'Multiple category filters — use when user wants more than one type (e.g. "music and trivia", "comedy or art"). Events matching ANY category are included. Only use this OR category, not both.',
+          nullable: true,
+          items: {
+            type: 'string',
             enum: ['comedy', 'jazz', 'live_music', 'dj', 'trivia', 'film', 'theater',
               'art', 'dance', 'community', 'food_drink', 'spoken_word', 'classical', 'nightlife'],
           },
-          categories: {
-            type: 'ARRAY', description: 'Multiple category filters — use when user wants more than one type (e.g. "music and trivia", "comedy or art"). Events matching ANY category are included. Only use this OR category, not both.',
-            nullable: true,
-            items: {
-              type: 'STRING',
-              enum: ['comedy', 'jazz', 'live_music', 'dj', 'trivia', 'film', 'theater',
-                'art', 'dance', 'community', 'food_drink', 'spoken_word', 'classical', 'nightlife'],
-            },
-          },
-          free_only: { type: 'BOOLEAN', description: 'Only show free events' },
-          time_after: { type: 'STRING', description: 'Only events after this time, HH:MM 24hr format (e.g. "22:00")', nullable: true },
-          date_range: {
-            type: 'STRING', description: 'Date scope for the search',
-            nullable: true,
-            enum: ['today', 'tomorrow', 'this_weekend', 'this_week', 'next_week'],
-          },
-          intent: {
-            type: 'STRING', description: 'What the user is doing: new_search (first request or starting over), refine (adding/tightening a filter), pivot (changing topic/category), more (show additional picks from same search), details (get details about a specific pick)',
-            enum: ['new_search', 'refine', 'pivot', 'more', 'details'],
-          },
-          pick_reference: {
-            type: 'STRING',
-            description: 'How the user referenced a previously shown pick. Can be a number ("2"), event name ("the comedy one"), or venue name ("Elsewhere"). Only used with intent: "details".',
-            nullable: true,
-          },
         },
-        required: ['intent'],
-      },
-    }, {
-      name: 'respond',
-      description: 'Respond conversationally when no event search is needed. Use for greetings, thanks, farewells, off-topic chat, or when the user needs clarification.',
-      parameters: {
-        type: 'OBJECT',
-        properties: {
-          message: { type: 'STRING', description: 'SMS response text, max 480 chars. Be warm, brief. ALWAYS end with a redirect to events (e.g. "Drop a neighborhood or tell me what you are in the mood for!" or "Text me a neighborhood to get started!")' },
-          intent: {
-            type: 'STRING',
-            enum: ['greeting', 'thanks', 'farewell', 'off_topic', 'clarify', 'acknowledge'],
-          },
+        free_only: { type: 'boolean', description: 'Only show free events' },
+        time_after: { type: 'string', description: 'Only events after this time, HH:MM 24hr format (e.g. "22:00")', nullable: true },
+        date_range: {
+          type: 'string', description: 'Date scope for the search',
+          nullable: true,
+          enum: ['today', 'tomorrow', 'this_weekend', 'this_week', 'next_week'],
         },
-        required: ['message', 'intent'],
+        intent: {
+          type: 'string', description: 'What the user is doing: new_search (first request or starting over), refine (adding/tightening a filter), pivot (changing topic/category), more (show additional picks from same search), details (get details about a specific pick)',
+          enum: ['new_search', 'refine', 'pivot', 'more', 'details'],
+        },
+        pick_reference: {
+          type: 'string',
+          description: 'How the user referenced a previously shown pick. Can be a number ("2"), event name ("the comedy one"), or venue name ("Elsewhere"). Only used with intent: "details".',
+          nullable: true,
+        },
       },
-    }],
+      required: ['intent'],
+    },
+  },
+  {
+    name: 'respond',
+    description: 'Respond conversationally when no event search is needed. Use for greetings, thanks, farewells, off-topic chat, or when the user needs clarification.',
+    parameters: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', description: 'SMS response text, max 480 chars. Be warm, brief. ALWAYS end with a redirect to events (e.g. "Drop a neighborhood or tell me what you are in the mood for!" or "Text me a neighborhood to get started!")' },
+        intent: {
+          type: 'string',
+          enum: ['greeting', 'thanks', 'farewell', 'off_topic', 'clarify', 'acknowledge'],
+        },
+      },
+      required: ['message', 'intent'],
+    },
   },
 ];
 
@@ -218,214 +200,87 @@ Return JSON: { "sms_text": "the full SMS", "picks": [{"rank": 1, "event_id": "id
 The picks array MUST reference events mentioned in sms_text.`;
 }
 
-// --- Call the agent brain (Gemini Flash with tool calling) ---
-
-function withTimeout(promise, ms, label) {
-  const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
-  );
-  return Promise.race([promise, timeout]);
-}
+// --- Call the agent brain (tool calling via llm.js) ---
 
 async function callAgentBrain(message, session, phone, trace) {
   const systemPrompt = buildBrainSystemPrompt(session);
   const brainStart = Date.now();
 
-  const genAI = getGeminiClient();
-  if (!genAI) {
-    throw new Error('GEMINI_API_KEY not set — agent brain requires Gemini');
-  }
-
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash-lite',
-    systemInstruction: systemPrompt,
-    safetySettings: GEMINI_SAFETY,
-    tools: BRAIN_TOOLS,
-    generationConfig: {
-      maxOutputTokens: 1024,
-      temperature: 0,
-    },
-  });
-
-  const chat = model.startChat();
-  let result;
   try {
-    result = await withTimeout(
-      chat.sendMessage(message),
-      10_000, 'callAgentBrain'
-    );
+    const result = await llmCallWithTools(MODELS.brain, systemPrompt, message, BRAIN_TOOLS, { timeout: 10_000 });
+
+    if (!result.tool) {
+      return {
+        tool: 'respond',
+        params: { message: result.text, intent: 'clarify' },
+        usage: result.usage,
+        provider: result.provider,
+        latency_ms: Date.now() - brainStart,
+        chat: result.chat,
+      };
+    }
+
+    return {
+      tool: result.tool,
+      params: result.params,
+      usage: result.usage,
+      provider: result.provider,
+      latency_ms: Date.now() - brainStart,
+      chat: result.chat,
+    };
   } catch (err) {
-    // Fallback to Anthropic if Gemini fails
-    console.warn(`Agent brain Gemini failed, falling back to Anthropic: ${err.message}`);
-    trace.brain_error = `gemini: ${err.message}`;
-    return callAgentBrainAnthropic(message, session, phone, trace, brainStart);
-  }
+    console.warn(`Agent brain ${MODELS.brain} failed, falling back to ${MODELS.fallback}: ${err.message}`);
+    trace.brain_error = `${MODELS.brain}: ${err.message}`;
 
-  const response = result.response;
-  const candidate = response.candidates?.[0];
-  const finishReason = candidate?.finishReason;
-  if (finishReason && finishReason !== 'STOP') {
-    console.warn(`Agent brain finishReason=${finishReason}`);
-    if (finishReason === 'SAFETY') {
-      throw new Error(`Agent brain blocked by safety filter`);
-    }
-    // MALFORMED_FUNCTION_CALL or other non-STOP reasons — fall back to Anthropic
-    if (finishReason === 'MALFORMED_FUNCTION_CALL' || finishReason === 'MAX_TOKENS') {
-      console.warn(`Agent brain Gemini ${finishReason}, falling back to Anthropic`);
-      return callAgentBrainAnthropic(message, session, phone, trace, brainStart);
-    }
-  }
+    try {
+      const result = await llmCallWithTools(MODELS.fallback, systemPrompt, message, BRAIN_TOOLS, { timeout: 10_000 });
 
-  // Extract function call from response
-  const parts = candidate?.content?.parts || [];
-  const fnCall = parts.find(p => p.functionCall);
-  if (!fnCall?.functionCall) {
-    // No tool call — try to extract text response as conversational
-    const textPart = parts.find(p => p.text);
-    if (textPart?.text) {
+      if (!result.tool) {
+        return {
+          tool: 'respond',
+          params: { message: result.text, intent: 'clarify' },
+          usage: result.usage,
+          provider: result.provider,
+          latency_ms: Date.now() - brainStart,
+          chat: result.chat,
+        };
+      }
+
       return {
-        tool: 'respond',
-        params: { message: smartTruncate(textPart.text), intent: 'clarify' },
-        usage: extractGeminiUsage(response),
-        provider: 'gemini',
+        tool: result.tool,
+        params: result.params,
+        usage: result.usage,
+        provider: result.provider,
         latency_ms: Date.now() - brainStart,
-        chat: null,
+        chat: result.chat,
       };
+    } catch (err2) {
+      throw new Error(`Both ${MODELS.brain} and ${MODELS.fallback} failed: ${err2.message}`);
     }
-    // No tool call and no text — fall back to Anthropic
-    console.warn('Agent brain Gemini returned no tool call, falling back to Anthropic');
-    return callAgentBrainAnthropic(message, session, phone, trace, brainStart);
   }
-
-  const { name, args } = fnCall.functionCall;
-  const usage = extractGeminiUsage(response);
-
-  return {
-    tool: name,
-    params: args || {},
-    usage,
-    provider: 'gemini',
-    latency_ms: Date.now() - brainStart,
-    chat,
-  };
-}
-
-function extractGeminiUsage(response) {
-  const usageMetadata = response.usageMetadata;
-  return usageMetadata ? {
-    input_tokens: usageMetadata.promptTokenCount || 0,
-    output_tokens: usageMetadata.candidatesTokenCount || 0,
-  } : null;
-}
-
-// --- Anthropic fallback for brain ---
-
-async function callAgentBrainAnthropic(message, session, phone, trace, brainStart) {
-  const Anthropic = require('@anthropic-ai/sdk');
-  const client = new Anthropic();
-  const systemPrompt = buildBrainSystemPrompt(session);
-
-  const anthropicTools = [
-    {
-      name: 'search_events',
-      description: 'Search for event recommendations. Use when the user wants to see events.',
-      input_schema: {
-        type: 'object',
-        properties: {
-          neighborhood: { type: 'string', description: 'NYC neighborhood name or null for citywide' },
-          category: { type: 'string', enum: ['comedy', 'jazz', 'live_music', 'dj', 'trivia', 'film', 'theater', 'art', 'dance', 'community', 'food_drink', 'spoken_word', 'classical', 'nightlife'], description: 'Single category filter' },
-          categories: { type: 'array', items: { type: 'string', enum: ['comedy', 'jazz', 'live_music', 'dj', 'trivia', 'film', 'theater', 'art', 'dance', 'community', 'food_drink', 'spoken_word', 'classical', 'nightlife'] }, description: 'Multiple categories — use when user wants more than one type' },
-          free_only: { type: 'boolean', description: 'Only show free events' },
-          time_after: { type: 'string', description: 'Only events after this time, HH:MM 24hr format' },
-          date_range: { type: 'string', enum: ['today', 'tomorrow', 'this_weekend', 'this_week', 'next_week'] },
-          intent: { type: 'string', enum: ['new_search', 'refine', 'pivot', 'more', 'details'] },
-          pick_reference: { type: 'string', description: 'Reference to a previously shown pick (number, name, or venue). Used with intent: details.' },
-        },
-        required: ['intent'],
-      },
-    },
-    {
-      name: 'respond',
-      description: 'Respond conversationally when no event search is needed.',
-      input_schema: {
-        type: 'object',
-        properties: {
-          message: { type: 'string', description: 'SMS response text, max 480 chars. ALWAYS end with a redirect to events (e.g. "Drop a neighborhood or tell me what you are in the mood for!")' },
-          intent: { type: 'string', enum: ['greeting', 'thanks', 'farewell', 'off_topic', 'clarify', 'acknowledge'] },
-        },
-        required: ['message', 'intent'],
-      },
-    },
-  ];
-
-  const response = await withTimeout(client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 256,
-    system: systemPrompt,
-    tools: anthropicTools,
-    messages: [{ role: 'user', content: message }],
-  }, { timeout: 10000 }), 12000, 'callAgentBrainAnthropic');
-
-  const toolBlock = response.content.find(b => b.type === 'tool_use');
-  if (!toolBlock) {
-    const textBlock = response.content.find(b => b.type === 'text');
-    if (textBlock?.text) {
-      return {
-        tool: 'respond',
-        params: { message: smartTruncate(textBlock.text), intent: 'clarify' },
-        usage: response.usage || null,
-        provider: 'anthropic',
-        latency_ms: Date.now() - brainStart,
-        chat: null,
-      };
-    }
-    throw new Error('Agent brain Anthropic returned no tool call');
-  }
-
-  return {
-    tool: toolBlock.name,
-    params: toolBlock.input || {},
-    usage: response.usage || null,
-    provider: 'anthropic',
-    latency_ms: Date.now() - brainStart,
-    chat: null,
-  };
 }
 
 /**
- * Continue the Gemini chat session with search_events results.
- * Sends functionResponse → model writes SMS in the same context.
+ * Continue the chat session with search_events results via llm.js.
+ * Sends tool result back → model writes SMS in the same context.
  * Returns { sms_text, picks, _raw, _usage, _provider }
  */
 async function continueWithResults(chat, eventData, trace) {
   const composeStart = Date.now();
 
   try {
-    const result = await withTimeout(
-      chat.sendMessage([{
-        functionResponse: {
-          name: 'search_events',
-          response: eventData,
-        },
-      }]),
-      10_000, 'continueWithResults'
-    );
-
-    const response = result.response;
-    const text = response.text();
-    const usage = extractGeminiUsage(response);
-
+    const result = await llmContinueChat(chat, 'search_events', eventData, { timeout: 10_000 });
     trace.composition.latency_ms = Date.now() - composeStart;
 
-    const parsed = JSON.parse(stripCodeFences(text));
+    const parsed = JSON.parse(stripCodeFences(result.text));
     const sms = smartTruncate(parsed.sms_text);
 
     return {
       sms_text: sms,
       picks: reconcilePicks(sms, parsed.picks || []),
-      _raw: text,
-      _usage: usage,
-      _provider: 'gemini',
+      _raw: result.text,
+      _usage: result.usage,
+      _provider: result.provider,
     };
   } catch (err) {
     console.warn('continueWithResults failed:', err.message);
@@ -564,7 +419,7 @@ function reconcilePicks(smsText, picks) {
 }
 
 /**
- * Lightweight compose — Gemini Flash with minimal prompt, Anthropic fallback.
+ * Lightweight compose via llm.js, with fallback.
  * Returns { sms_text, picks, _raw, _usage, _provider }
  */
 async function brainCompose(events, options = {}) {
@@ -600,56 +455,27 @@ async function brainCompose(events, options = {}) {
   const lastBatchNote = isLastBatch ? `\nLAST BATCH: These are the final picks. Do NOT say "Reply MORE". Instead end with: "${exhaustionMessage || 'That\'s everything I\'ve got!'}"` : '';
   const userPrompt = `Neighborhood: ${hoodLabel}${filterDesc ? `\nFilter: ${filterDesc}` : ''}\nMATCH count: ${matchCount}${sparseNote}${excludeNote}${suggestNote}${lastBatchNote}\n\nEVENTS (${events.length}):\n${eventListStr}`;
 
-  // Try Gemini Flash first (skip if caller knows Gemini is down)
-  const genAI = options.skipGemini ? null : getGeminiClient();
-  if (genAI) {
-    try {
-      // Use flash-lite for compose — minimal thinking, much faster for simple generation
-      const model = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash-lite',
-        systemInstruction: BRAIN_COMPOSE_SYSTEM,
-        safetySettings: GEMINI_SAFETY,
-        generationConfig: {
-          maxOutputTokens: 1024,
-          temperature: 0.6,
-          responseMimeType: 'application/json',
-          responseSchema: BRAIN_COMPOSE_SCHEMA,
-        },
-      });
-      const result = await withTimeout(
-        model.generateContent({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }] }),
-        10_000, 'brainCompose'
-      );
-      const text = result.response.text();
-      const usage = { input_tokens: result.response.usageMetadata?.promptTokenCount || 0,
-                      output_tokens: result.response.usageMetadata?.candidatesTokenCount || 0 };
-      const parsed = JSON.parse(stripCodeFences(text));
-      const sms = smartTruncate(parsed.sms_text);
-      return { sms_text: sms, picks: reconcilePicks(sms, parsed.picks || []), _raw: text, _usage: usage, _provider: 'gemini' };
-    } catch (err) {
-      console.warn('brainCompose Gemini failed, falling back to Anthropic:', err.message);
-    }
+  try {
+    const result = await llmGenerate(MODELS.compose, BRAIN_COMPOSE_SYSTEM, userPrompt, {
+      maxTokens: 1024, temperature: 0.6, json: true, jsonSchema: BRAIN_COMPOSE_SCHEMA, timeout: 10_000,
+    });
+    const parsed = JSON.parse(stripCodeFences(result.text));
+    const sms = smartTruncate(parsed.sms_text);
+    return { sms_text: sms, picks: reconcilePicks(sms, parsed.picks || []), _raw: result.text, _usage: result.usage, _provider: result.provider };
+  } catch (err) {
+    console.warn(`brainCompose ${MODELS.compose} failed, falling back to ${MODELS.fallback}: ${err.message}`);
+    const result = await llmGenerate(MODELS.fallback, BRAIN_COMPOSE_SYSTEM, userPrompt, {
+      maxTokens: 512, temperature: 0.6, json: true, timeout: 12_000,
+    });
+    const parsed = JSON.parse(stripCodeFences(result.text));
+    const sms = smartTruncate(parsed.sms_text);
+    return { sms_text: sms, picks: reconcilePicks(sms, parsed.picks || []), _raw: result.text, _usage: result.usage, _provider: result.provider };
   }
-
-  // Anthropic fallback
-  const Anthropic = require('@anthropic-ai/sdk');
-  const client = new Anthropic();
-  const response = await withTimeout(client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 512,
-    system: BRAIN_COMPOSE_SYSTEM + '\n\nReturn ONLY valid JSON, no other text.',
-    messages: [{ role: 'user', content: userPrompt }],
-  }, { timeout: 10000 }), 12000, 'brainCompose-anthropic');
-  const raw = response.content?.[0]?.text || '';
-  const usage = response.usage || {};
-  const parsed = JSON.parse(stripCodeFences(raw));
-  const sms = smartTruncate(parsed.sms_text);
-  return { sms_text: sms, picks: reconcilePicks(sms, parsed.picks || []), _raw: raw, _usage: usage, _provider: 'anthropic' };
 }
 
 /**
  * Compose a welcome message from interestingness-ranked events.
- * Uses the same Gemini -> Anthropic fallback as brainCompose.
+ * Uses the same primary -> fallback pattern as brainCompose.
  */
 async function welcomeCompose(events) {
   const todayNyc = getNycDateString(0);
@@ -666,60 +492,28 @@ async function welcomeCompose(events) {
 
   const userPrompt = `Pick 3 events for a welcome message. Events ranked by interestingness (best first):\n\n${eventLines}`;
 
-  // Try Gemini first
-  const client = getGeminiClient();
-  if (client) {
-    try {
-      const model = client.getGenerativeModel({
-        model: process.env.PULSE_MODEL_ROUTE_GEMINI || 'gemini-2.5-flash-lite',
-        systemInstruction: WELCOME_COMPOSE_SYSTEM,
-        safetySettings: GEMINI_SAFETY,
-        generationConfig: {
-          maxOutputTokens: 1024,
-          temperature: 0.7,
-          responseMimeType: 'application/json',
-          responseSchema: BRAIN_COMPOSE_SCHEMA,
-        },
-      });
-      const result = await withTimeout(
-        model.generateContent({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }] }),
-        10_000, 'welcomeCompose'
-      );
-      const text = result.response.text();
-      const usage = {
-        input_tokens: result.response.usageMetadata?.promptTokenCount || 0,
-        output_tokens: result.response.usageMetadata?.candidatesTokenCount || 0,
-      };
-      const parsed = JSON.parse(stripCodeFences(text));
-      const sms = smartTruncate(parsed.sms_text);
-      return { sms_text: sms, picks: parsed.picks || [], _raw: text, _usage: usage, _provider: 'gemini' };
-    } catch (err) {
-      console.warn('welcomeCompose Gemini failed, falling back to Anthropic:', err.message);
-    }
+  try {
+    const result = await llmGenerate(MODELS.compose, WELCOME_COMPOSE_SYSTEM, userPrompt, {
+      maxTokens: 1024, temperature: 0.7, json: true, jsonSchema: BRAIN_COMPOSE_SCHEMA, timeout: 10_000,
+    });
+    const parsed = JSON.parse(stripCodeFences(result.text));
+    const sms = smartTruncate(parsed.sms_text);
+    return { sms_text: sms, picks: parsed.picks || [], _raw: result.text, _usage: result.usage, _provider: result.provider };
+  } catch (err) {
+    console.warn(`welcomeCompose ${MODELS.compose} failed, falling back to ${MODELS.fallback}: ${err.message}`);
+    const result = await llmGenerate(MODELS.fallback, WELCOME_COMPOSE_SYSTEM, userPrompt, {
+      maxTokens: 512, temperature: 0.7, json: true, timeout: 12_000,
+    });
+    const parsed = JSON.parse(stripCodeFences(result.text));
+    const sms = smartTruncate(parsed.sms_text);
+    return { sms_text: sms, picks: parsed.picks || [], _raw: result.text, _usage: result.usage, _provider: result.provider };
   }
-
-  // Anthropic fallback
-  const Anthropic = require('@anthropic-ai/sdk');
-  const anthropicClient = new Anthropic();
-  const response = await withTimeout(anthropicClient.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 512,
-    system: WELCOME_COMPOSE_SYSTEM + '\n\nReturn ONLY valid JSON, no other text.',
-    messages: [{ role: 'user', content: userPrompt }],
-  }, { timeout: 10000 }), 12000, 'welcomeCompose-anthropic');
-  const raw = response.content?.[0]?.text || '';
-  const usage = response.usage || {};
-  const parsed = JSON.parse(stripCodeFences(raw));
-  const sms = smartTruncate(parsed.sms_text);
-  return { sms_text: sms, picks: parsed.picks || [], _raw: raw, _usage: usage, _provider: 'anthropic' };
 }
 
 module.exports = {
-  getGeminiClient, GEMINI_SAFETY, BRAIN_TOOLS,
+  BRAIN_TOOLS,
   buildBrainSystemPrompt,
-  withTimeout,
-  callAgentBrain, callAgentBrainAnthropic, extractGeminiUsage,
-  continueWithResults, serializePoolForContinuation,
+  callAgentBrain, continueWithResults, serializePoolForContinuation,
   brainCompose, welcomeCompose,
   stripCodeFences, reconcilePicks,
   BRAIN_COMPOSE_SYSTEM, BRAIN_COMPOSE_SCHEMA, WELCOME_COMPOSE_SYSTEM,

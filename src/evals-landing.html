@@ -17,20 +17,20 @@
   }
 
   /* ── Shared nav ── */
-  .bestie-nav {
+  .pulse-nav {
     position: sticky; top: 0; z-index: 100;
     display: flex; align-items: center; height: 36px;
     background: #111; border-bottom: 1px solid #222;
     padding: 0 16px; font-size: 13px;
     margin: -24px -24px 24px -24px;
   }
-  .bestie-nav-link {
+  .pulse-nav-link {
     color: #888; text-decoration: none; padding: 0 12px;
     line-height: 36px; transition: color 0.15s;
   }
-  .bestie-nav-link:hover { color: #ccc; }
-  .bestie-nav-link.active { color: #FF6B35; font-weight: 600; }
-  .bestie-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
+  .pulse-nav-link:hover { color: #ccc; }
+  .pulse-nav-link.active { color: #FF6B35; font-weight: 600; }
+  .pulse-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
 
   /* ── Header ── */
   .header {
@@ -230,7 +230,7 @@
   /* ── Responsive ── */
   @media (max-width: 600px) {
     body { padding: 12px; }
-    .bestie-nav { margin: -12px -12px 12px -12px; }
+    .pulse-nav { margin: -12px -12px 12px -12px; }
     .header h1 { font-size: 20px; }
     .card-grid { grid-template-columns: 1fr; }
     .how-grid { grid-template-columns: 1fr; }
@@ -239,17 +239,17 @@
 </head>
 <body>
 
-<nav class="bestie-nav">
-  <a href="/health" class="bestie-nav-link">Health</a>
-  <a href="/events" class="bestie-nav-link">Events</a>
-  <a href="/digests" class="bestie-nav-link">Digests</a>
-  <span class="bestie-nav-sep"></span>
-  <a href="/eval" class="bestie-nav-link">Traces</a>
-  <a href="/eval-report" class="bestie-nav-link">Reports</a>
-  <a href="/eval-quality" class="bestie-nav-link">Quality</a>
-  <a href="/evals" class="bestie-nav-link active">Eval Guide</a>
-  <span class="bestie-nav-sep"></span>
-  <a href="/test" class="bestie-nav-link">Simulator</a>
+<nav class="pulse-nav">
+  <a href="/health" class="pulse-nav-link">Health</a>
+  <a href="/events" class="pulse-nav-link">Events</a>
+  <a href="/digests" class="pulse-nav-link">Digests</a>
+  <span class="pulse-nav-sep"></span>
+  <a href="/eval" class="pulse-nav-link">Traces</a>
+  <a href="/eval-report" class="pulse-nav-link">Reports</a>
+  <a href="/eval-quality" class="pulse-nav-link">Quality</a>
+  <a href="/evals" class="pulse-nav-link active">Eval Guide</a>
+  <span class="pulse-nav-sep"></span>
+  <a href="/test" class="pulse-nav-link">Simulator</a>
 </nav>
 
 <div class="header">
