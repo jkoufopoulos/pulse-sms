@@ -745,7 +745,7 @@
     <div class="hero-text">
       <div class="hero-proof">
         <span><span class="dot"></span> Live now</span>
-        <span>36 neighborhoods</span>
+        <span>75 neighborhoods</span>
         <span>Free to use</span>
       </div>
       <h1>NYC events.<br><em>One text away.</em></h1>
@@ -811,8 +811,8 @@
       </div>
       <div class="basics-item wide">
         <div class="basics-item-text">
-          <h3>36 neighborhoods across the city</h3>
-          <p>Manhattan, Brooklyn, and Queens. From warehouse shows in Bushwick to jazz on the Upper West Side.</p>
+          <h3>75 neighborhoods across five boroughs</h3>
+          <p>Manhattan, Brooklyn, Queens, the Bronx, and Staten Island. From warehouse shows in Bushwick to jazz on the Upper West Side.</p>
         </div>
         <div class="hood-tags">
           <span class="hood-tag">East Village</span>
@@ -827,6 +827,9 @@
           <span class="hood-tag">SoHo</span>
           <span class="hood-tag">Bed-Stuy</span>
           <span class="hood-tag">Prospect Heights</span>
+          <span class="hood-tag">Jackson Heights</span>
+          <span class="hood-tag">Flushing</span>
+          <span class="hood-tag">Fordham</span>
         </div>
       </div>
     </div>
@@ -966,32 +969,25 @@
     await wait(2000);
     hideTyping();
 
-    // Pulse response
+    // Pulse response — natural prose, no numbered lists (matches current agent behavior)
     addRawBubble(
-      'Tonight in East Village:<br><br>' +
-      '1. Jazz at Smalls &mdash; 7:30pm, $20<br>' +
-      '2. Stand-up at Eastville &mdash; 8pm, $12<br>' +
-      '3. DJ set at Nublu &mdash; 10pm, free<br><br>' +
-      'Reply # for details, "more" for extras',
+      'East Village tonight has some good ones. Smalls has a jazz set at 7:30 ($20), Eastville is doing stand-up at 8 ($12), and there\u2019s a free DJ set at Nublu starting at 10. Want details on any of those, or should I keep digging?',
       'sms-recv'
     );
 
     await wait(1400);
 
     // User asks for details
-    addBubble('1', 'sms-sent');
+    addBubble('the jazz one', 'sms-sent');
 
     await wait(600);
     showTyping();
     await wait(1800);
     hideTyping();
 
-    // Detail response
+    // Detail response — natural prose
     addRawBubble(
-      'Jazz at Smalls<br>' +
-      '7:30pm &mdash; 183 W 10th St<br>' +
-      'Late-night jazz in a legendary basement club. Two sets nightly, BYOB-friendly. $20 cover.<br>' +
-      'smallslive.com',
+      'Smalls Jazz Club &mdash; 183 W 10th St, 7:30pm. Legendary basement club with two sets nightly, BYOB-friendly. $20 cover. One of those places that makes you feel like you found something special. smallslive.com',
       'sms-recv'
     );
 

@@ -17,19 +17,19 @@
   }
 
   /* ── Shared nav ── */
-  .bestie-nav {
+  .pulse-nav {
     align-self: stretch;
     display: flex; align-items: center; height: 36px;
     background: #111; border-bottom: 1px solid #222;
     padding: 0 16px; font-size: 13px; flex-shrink: 0;
   }
-  .bestie-nav-link {
+  .pulse-nav-link {
     color: #888; text-decoration: none; padding: 0 12px;
     line-height: 36px; transition: color 0.15s;
   }
-  .bestie-nav-link:hover { color: #ccc; }
-  .bestie-nav-link.active { color: #FF6B35; font-weight: 600; }
-  .bestie-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
+  .pulse-nav-link:hover { color: #ccc; }
+  .pulse-nav-link.active { color: #FF6B35; font-weight: 600; }
+  .pulse-nav-sep { width: 1px; height: 16px; background: #333; margin: 0 4px; flex-shrink: 0; }
 
   .phone {
     width: 100vw;
@@ -270,17 +270,17 @@
 </head>
 <body>
 
-<nav class="bestie-nav">
-  <a href="/health" class="bestie-nav-link">Health</a>
-  <a href="/events" class="bestie-nav-link">Events</a>
-  <a href="/digests" class="bestie-nav-link">Digests</a>
-  <span class="bestie-nav-sep"></span>
-  <a href="/eval" class="bestie-nav-link">Traces</a>
-  <a href="/eval-report" class="bestie-nav-link">Reports</a>
-  <a href="/eval-quality" class="bestie-nav-link">Quality</a>
-  <a href="/evals" class="bestie-nav-link">Eval Guide</a>
-  <span class="bestie-nav-sep"></span>
-  <a href="/test" class="bestie-nav-link active">Simulator</a>
+<nav class="pulse-nav">
+  <a href="/health" class="pulse-nav-link">Health</a>
+  <a href="/events" class="pulse-nav-link">Events</a>
+  <a href="/digests" class="pulse-nav-link">Digests</a>
+  <span class="pulse-nav-sep"></span>
+  <a href="/eval" class="pulse-nav-link">Traces</a>
+  <a href="/eval-report" class="pulse-nav-link">Reports</a>
+  <a href="/eval-quality" class="pulse-nav-link">Quality</a>
+  <a href="/evals" class="pulse-nav-link">Eval Guide</a>
+  <span class="pulse-nav-sep"></span>
+  <a href="/test" class="pulse-nav-link active">Simulator</a>
 </nav>
 
 <div class="phone">
@@ -306,9 +306,9 @@
   </div>
 
   <div class="messages" id="messages">
-    <div class="msg system">SMS Simulator &mdash; messages hit the live pipeline (~$0.001/msg AI cost)</div>
-    <div class="msg received">Hey! I'm Pulse — I dig through the best of what's happening in NYC daily that you'll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.</div>
-    <div class="msg received">Text me a neighborhood like "Bushwick" or a vibe like "jazz tonight" to start exploring. I'll send picks — reply a number for details, "more" to keep going, or just tell me what you're looking for. The more you text, the better it gets.</div>
+    <div class="msg system">SMS Simulator &mdash; messages hit the live pipeline (~$0.0005/msg AI cost)</div>
+    <div class="msg received">Hey! I'm Pulse &mdash; I dig through the best of what's happening in NYC daily that you'll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.</div>
+    <div class="msg received">Text me a neighborhood like "Bushwick" or a vibe like "something weird tonight" to start exploring.</div>
   </div>
 
   <div class="typing-indicator" id="typing">
@@ -336,9 +336,9 @@ let SESSION_PHONE = '+1555' + String(Math.floor(Math.random() * 9000000 + 100000
 
 function newSession() {
   SESSION_PHONE = '+1555' + String(Math.floor(Math.random() * 9000000 + 1000000));
-  messagesEl.innerHTML = '<div class="msg system">SMS Simulator \u2014 messages hit the live pipeline (~$0.001/msg AI cost)</div>' +
+  messagesEl.innerHTML = '<div class="msg system">SMS Simulator \u2014 messages hit the live pipeline (~$0.0005/msg AI cost)</div>' +
     '<div class="msg received">Hey! I\u2019m Pulse \u2014 I dig through the best of what\u2019s happening in NYC daily that you\u2019ll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.</div>' +
-    '<div class="msg received">Text me a neighborhood like \u201cBushwick\u201d or a vibe like \u201cjazz tonight\u201d to start exploring. I\u2019ll send picks \u2014 reply a number for details, \u201cmore\u201d to keep going, or just tell me what you\u2019re looking for. The more you text, the better it gets.</div>';
+    '<div class="msg received">Text me a neighborhood like \u201cBushwick\u201d or a vibe like \u201csomething weird tonight\u201d to start exploring.</div>';
 }
 
 function updateClock() {

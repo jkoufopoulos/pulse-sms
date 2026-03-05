@@ -2,6 +2,11 @@
   "name": "pulse-sms",
   "version": "2.0.0",
   "description": "SMS-based AI assistant for NYC event discovery",
+  "homepage": "https://web-production-c8fdb.up.railway.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jkoufopoulos/pulse-sms"
+  },
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
