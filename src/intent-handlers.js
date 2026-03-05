@@ -3,7 +3,7 @@ const { sendSMS } = require('./twilio');
 const { formatEventDetails, smartTruncate } = require('./formatters');
 const { getAdjacentNeighborhoods } = require('./geo');
 const { filterByTimeAfter } = require('./geo');
-const { resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, executeQuery } = require('./pipeline');
+const { resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
 const { generateReferralCode } = require('./referral');
 const { extractNeighborhood, NEIGHBORHOODS } = require('./neighborhoods');
@@ -163,67 +163,6 @@ async function handleDetails(ctx) {
 }
 
 /**
- * Record trace data for events sent to LLM and call executeQuery.
- * Replaces the composeAndSend closure — now uses the unified prompt path.
- */
-async function composeViaExecuteQuery(events, ctx, { hood, activeFilters, excludeIds, skills } = {}) {
-  const history = ctx.session?.conversationHistory || [];
-  const now = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-
-  // Record trace data
-  ctx.trace.events.sent_to_claude = events.length;
-  ctx.trace.events.sent_ids = events.map(e => e.id);
-  ctx.trace.events.sent_pool = events.map(e => ({
-    id: e.id,
-    name: e.name,
-    venue_name: e.venue_name,
-    neighborhood: e.neighborhood,
-    category: e.category,
-    start_time_local: e.start_time_local,
-    date_local: e.date_local,
-    is_free: e.is_free,
-    price_display: e.price_display,
-    source_name: e.source_name,
-    filter_match: e.filter_match,
-    ticket_url: e.ticket_url || null,
-  }));
-
-  const composeStart = Date.now();
-  const result = await executeQuery(ctx.message, events, {
-    session: ctx.session,
-    neighborhood: hood,
-    conversationHistory: history,
-    currentTime: now,
-    validNeighborhoods: NEIGHBORHOOD_NAMES,
-    activeFilters,
-    excludeIds,
-    hasConversationHistory: history.length > 0,
-    ...skills,
-  });
-  ctx.trace.composition.latency_ms = Date.now() - composeStart;
-  ctx.recordAICost?.(ctx.trace, 'compose', result._usage, result._provider);
-  ctx.trackAICost?.(result._usage, result._provider);
-  ctx.trace.composition.raw_response = result._raw || null;
-  ctx.trace.composition.picks = (result.picks || []).map(p => {
-    const evt = events.find(e => e.id === p.event_id);
-    return {
-      ...p,
-      date_local: evt?.date_local || null,
-      event_name: evt?.name || null,
-      venue_name: evt?.venue_name || null,
-      neighborhood: evt?.neighborhood || null,
-      category: evt?.category || null,
-      is_free: evt?.is_free ?? null,
-      price_display: evt?.price_display || null,
-      start_time_local: evt?.start_time_local || null,
-    };
-  });
-  ctx.trace.composition.neighborhood_used = hood;
-
-  return result;
-}
-
-/**
  * Lightweight compose via agent brain's brainCompose (flash-lite).
  * Used when PULSE_AGENT_BRAIN=true. Same trace recording as composeViaExecuteQuery.
  */
@@ -319,7 +258,7 @@ async function handleMore(ctx) {
       ctx.trace.events.candidates_count = dedupedPool.length;
       ctx.trace.events.candidate_ids = dedupedPool.map(e => e.id);
       const skills = isLastBatch ? { isLastBatch: true, exhaustionSuggestion: exhaust.message } : {};
-      const composeFn = process.env.PULSE_AGENT_BRAIN === 'true' ? composeViaBrain : composeViaExecuteQuery;
+      const composeFn = composeViaBrain;
       const result = await composeFn(composeRemaining, ctx, { hood, activeFilters, excludeIds: [...allShownIds], skills });
 
       // Name-based dedup: filter out picks that share a name with previously shown events
