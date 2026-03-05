@@ -89,13 +89,15 @@ function clearSession(phone) {
   scheduleDiskWrite();
 }
 
-const MAX_HISTORY_TURNS = 6;
+const MAX_HISTORY_TURNS = 10;
 
-function addToHistory(phone, role, content) {
+function addToHistory(phone, role, content, meta) {
   const session = sessions.get(phone) || sessions.get(hashPhone(phone));
   if (!session) return;
   if (!session.conversationHistory) session.conversationHistory = [];
-  session.conversationHistory.push({ role, content: content.slice(0, 300) });
+  const entry = { role, content: content.slice(0, 300) };
+  if (meta) entry.meta = meta;
+  session.conversationHistory.push(entry);
   if (session.conversationHistory.length > MAX_HISTORY_TURNS) {
     session.conversationHistory = session.conversationHistory.slice(-MAX_HISTORY_TURNS);
   }
