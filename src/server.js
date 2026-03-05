@@ -329,6 +329,13 @@ app.get('/e/:eventId', (req, res) => {
   const domain = process.env.PULSE_CARD_DOMAIN || `${req.protocol}://${req.get('host')}`;
   const formattedPhone = bestiePhone.replace(/\D/g, '').replace(/^1(\d{3})(\d{3})(\d{4})$/, '($1) $2-$3');
   const event = getEventById(req.params.eventId);
+  if (process.env.PULSE_CARD_ENABLED !== 'true') {
+    if (event) {
+      const directUrl = event.ticket_url || event.source_url;
+      if (directUrl) return res.redirect(302, directUrl);
+    }
+    return res.send(renderStaleCard(formattedPhone, bestiePhone));
+  }
   if (event) {
     const refCode = req.query.ref || null;
     res.send(renderEventCard(event, formattedPhone, bestiePhone, domain, refCode));

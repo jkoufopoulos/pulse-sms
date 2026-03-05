@@ -9,7 +9,7 @@ const { handleHelp, handleConversational, handleDetails, handleMore } = require(
 const { sendRuntimeAlert } = require('./alerts');
 const { getEventById } = require('./events');
 const { lookupReferralCode, recordAttribution } = require('./referral');
-const { saveResponseFrame, buildEventMap } = require('./pipeline');
+const { saveResponseFrame, buildEventMap, sendPickUrls } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
 const { routeModel } = require('./model-router');
 const { processedMessages, OPT_OUT_KEYWORDS, isOverBudget, trackAICost, getCostSummary, getBudgetUsedPct, ipRateLimits, IP_RATE_LIMIT, IP_RATE_WINDOW, clearGuardIntervals } = require('./request-guard');
@@ -454,6 +454,7 @@ async function handleDegradedFallback(unifiedCtx, phone, session, trace, finaliz
   }));
 
   await sendSMS(phone, sms);
+  await sendPickUrls(phone, picks, eventMap);
   finalizeTrace(sms, 'events');
 
   // Fire-and-forget runtime alert

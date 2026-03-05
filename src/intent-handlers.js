@@ -113,10 +113,13 @@ async function handleDetails(ctx) {
       return;
     }
     if (event) {
-      // Generate referral code and Bestie URL for shareable details
-      const refCode = generateReferralCode(ctx.phone, event.id);
-      const domain = process.env.PULSE_CARD_DOMAIN || 'https://web-production-c8fdb.up.railway.app';
-      const bestieUrl = `${domain}/e/${event.id}?ref=${refCode}`;
+      // Generate referral code and Bestie URL for shareable details (when cards enabled)
+      let bestieUrl;
+      if (process.env.PULSE_CARD_ENABLED === 'true') {
+        const refCode = generateReferralCode(ctx.phone, event.id);
+        const domain = process.env.PULSE_CARD_DOMAIN || 'https://web-production-c8fdb.up.railway.app';
+        bestieUrl = `${domain}/e/${event.id}?ref=${refCode}`;
+      }
 
       try {
         const composeStart = Date.now();

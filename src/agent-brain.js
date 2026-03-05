@@ -20,7 +20,7 @@ const { extractNeighborhood, NEIGHBORHOODS, BOROUGHS, detectBorough } = require(
 const { getAdjacentNeighborhoods } = require('./pre-router');
 const { getEvents, getEventsForBorough, getEventsCitywide, getCacheStatus } = require('./events');
 const { filterKidsEvents } = require('./curation');
-const { buildTaggedPool, buildEventMap, saveResponseFrame, mergeFilters, buildZeroMatchResponse, describeFilters } = require('./pipeline');
+const { buildTaggedPool, buildEventMap, saveResponseFrame, mergeFilters, buildZeroMatchResponse, describeFilters, sendPickUrls } = require('./pipeline');
 const { sendSMS, maskPhone } = require('./twilio');
 const { startTrace, saveTrace, recordAICost } = require('./traces');
 const { getSession, setSession, addToHistory } = require('./session');
@@ -860,6 +860,7 @@ async function executeSearchEvents(params, session, phone, trace) {
     intent: validPicks.length > 0 ? 'events' : 'conversational',
     picks: validPicks,
     activeFilters,
+    eventMap,
   };
 }
 
@@ -960,6 +961,7 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
 
     // Send SMS and finalize
     await sendSMS(phone, execResult.sms);
+    if (execResult.picks) await sendPickUrls(phone, execResult.picks, execResult.eventMap);
     finalizeTrace(execResult.sms, execResult.intent);
 
   } catch (err) {

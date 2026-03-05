@@ -507,4 +507,21 @@ async function executeQuery(message, events, options = {}) {
   return result;
 }
 
-module.exports = { applyFilters, resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, describeFilters, buildZeroMatchResponse, mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, normalizeFilterIntent, failsTimeGate, executeQuery };
+/**
+ * Send individual URLs for each picked event as separate SMS messages.
+ * iMessage renders rich link previews for standalone URLs.
+ * Gated by PULSE_LINK_PREVIEWS env var.
+ */
+async function sendPickUrls(phone, picks, eventMap) {
+  if (process.env.PULSE_LINK_PREVIEWS !== 'true') return;
+  if (!picks || picks.length === 0) return;
+  const { sendSMS } = require('./twilio');
+  for (const pick of picks) {
+    const event = eventMap?.[pick.event_id];
+    if (!event) continue;
+    const url = event.ticket_url || event.source_url;
+    if (url) await sendSMS(phone, url);
+  }
+}
+
+module.exports = { applyFilters, resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, describeFilters, buildZeroMatchResponse, mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, normalizeFilterIntent, failsTimeGate, executeQuery, sendPickUrls };

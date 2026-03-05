@@ -140,7 +140,7 @@ Sources: 23 entries across 21 scraper modules in `sources/` — see `source-regi
 
 Required: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `ANTHROPIC_API_KEY`, `TAVILY_API_KEY` (required at boot, not used in hot path).
 
-Optional: `PORT` (default 3000), `PULSE_TEST_MODE=true` (enables simulator), `PULSE_AGENT_BRAIN=true` (enables agent brain path), `GEMINI_API_KEY` (agent brain + fallback provider), `TICKETMASTER_API_KEY`, `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`/`GMAIL_REFRESH_TOKEN` (newsletter scrapers), `RESEND_API_KEY`/`ALERT_EMAIL` (email alerts), `PULSE_NO_RATE_LIMIT=true`, `PULSE_CARD_DOMAIN`.
+Optional: `PORT` (default 3000), `PULSE_TEST_MODE=true` (enables simulator), `PULSE_AGENT_BRAIN=true` (enables agent brain path), `GEMINI_API_KEY` (agent brain + fallback provider), `TICKETMASTER_API_KEY`, `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`/`GMAIL_REFRESH_TOKEN` (newsletter scrapers), `RESEND_API_KEY`/`ALERT_EMAIL` (email alerts), `PULSE_NO_RATE_LIMIT=true`, `PULSE_CARD_ENABLED=true` (enables branded card pages; default off, uses direct source URLs), `PULSE_CARD_DOMAIN`, `PULSE_LINK_PREVIEWS=true` (sends each pick's URL as a separate SMS for iMessage link previews).
 
 Model overrides: `PULSE_MODEL_COMPOSE`, `PULSE_MODEL_EXTRACT`, `PULSE_MODEL_ROUTE`, `PULSE_MODEL_ROUTE_GEMINI`, `PULSE_ROUTE_PROVIDER`.
 

@@ -5,7 +5,7 @@ const { getSession, setSession } = require('./session');
 const { getAdjacentNeighborhoods } = require('./pre-router');
 const { getEvents, getEventsForBorough, getEventsCitywide, getCacheStatus } = require('./events');
 const { filterKidsEvents } = require('./curation');
-const { buildEventMap, saveResponseFrame, mergeFilters, normalizeFilterIntent, buildTaggedPool, buildZeroMatchResponse, executeQuery } = require('./pipeline');
+const { buildEventMap, saveResponseFrame, mergeFilters, normalizeFilterIntent, buildTaggedPool, buildZeroMatchResponse, executeQuery, sendPickUrls } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
 const { trackAICost } = require('./request-guard');
 
@@ -372,6 +372,7 @@ async function handleUnifiedResponse(result, unifiedCtx, phone, session, trace, 
 
   // Send SMS first — ensures user always gets a response even if session save fails
   await sendSMS(phone, result.sms_text);
+  await sendPickUrls(phone, filterCompliantPicks, eventMap);
 
   // One-time preference tip after first successful picks response
   const isFirstPicks = filterCompliantPicks.length > 0
