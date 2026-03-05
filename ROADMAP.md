@@ -58,18 +58,21 @@ Validate structural contracts in the hot path (do `picks[].event_id` values exis
 ## Current Architecture
 
 ```
-message -> checkMechanical ($0 shortcuts: 1-5, more, help, greetings)
+message -> checkMechanical (help + TCPA only, $0)
   -> callAgentBrain (Gemini 2.5 Flash Lite chat session + tool calling)
-  -> search_events: buildSearchPool → functionResponse → same session writes SMS
-  -> get_details / respond: unchanged
+  -> search_events (search/refine/pivot/more/details): buildSearchPool or executeMore/executeDetails → functionResponse → same session writes natural prose SMS
+  -> respond: conversational (greetings, thanks, bye)
   -> atomic save (saveResponseFrame) -> SMS
 ```
+
+2 tools: `search_events` (all event intents) + `respond` (conversation). Natural prose SMS — no numbered lists.
 
 Fallback chain: continuation failure → brainCompose, Gemini failure → Anthropic Haiku.
 
 **Key decisions:**
 - **(2026-03-05, Phase 1):** Deleted unified-flow.js, model-router.js, pre-router.js, src/skills/ (~1,300 lines). Agent brain is the only code path.
 - **(2026-03-05, Phase 2):** Single Gemini chat session for search_events. The model that understands intent writes the SMS via multi-turn tool calling. brainCompose kept for handleMore.
+- **(2026-03-05, Phase 4):** Collapsed tools 3→2 (deleted get_details). checkMechanical reduced to help+TCPA. Natural prose replaces numbered lists. Agent handles more/details natively via search_events intents.
 
 ---
 
@@ -140,12 +143,9 @@ Merged routing + compose into a single Gemini chat session using multi-turn tool
 
 Added structured conversation history: tool calls (name + params), tool results (picks + match count + neighborhood), and user/assistant messages. Agent sees its own decisions across turns. History cap bumped 6 -> 10. Session fields kept for deterministic code -- removal deferred. Code eval: 98.6% regression (up from 98.4%).
 
-**Phase 4: Agent-Native Details and More** -- Move mechanical handlers into the agent
+**Phase 4: Agent-Native Details and More** -- **Done (2026-03-05)**
 
-- Remove `checkMechanical` for numbers and "more" -- agent handles them as tool calls
-- `get_details` enhanced: agent can reference by number, name, or description ("that comedy one")
-- Keep `checkMechanical` only for: "help" (canned, $0), STOP/opt-out (TCPA compliance)
-- Cost: ~$0.0005 per detail/more request (currently $0). Negligible at current volume.
+Collapsed tools from 3 to 2 (deleted `get_details`). `search_events` handles more/details via intent param + `pick_reference`. `checkMechanical` reduced to help + TCPA only. Numbered pick lists replaced with natural prose SMS. Agent references picks by number, name, venue, or category via fuzzy matching (`executeDetails`). ~310 lines of dead code removed from intent-handlers.js.
 
 **Phase 5: Preference Learning in the Loop** -- The agent knows you
 
@@ -207,7 +207,7 @@ Added structured conversation history: tool calls (name + params), tool results 
 
 | Period | Highlights |
 |--------|-----------|
-| Mar 5 | Phase 1: unified agent loop. Phase 2: single-turn agent (Gemini multi-turn tool calling). Phase 3: structured conversation history (tool calls, params, picks in history). First-message welcome flow. Quality eval runner + browse page. Scrape guard (baseline gates + post-scrape audit). |
+| Mar 5 | Phase 1: unified agent loop. Phase 2: single-turn agent. Phase 3: structured conversation history. Phase 4: agent-native details/more (natural prose, 3→2 tools, fuzzy pick matching). First-message welcome flow. Quality eval runner + browse page. Scrape guard (baseline gates + post-scrape audit). |
 | Mar 3 | Eval suite audit (34 new scenarios, 417 total). Community layer Phase 2 (editorial voice, source vibe, venue size, interaction format). Skint multi-day parsing. Description coverage for Luma/Songkick/DoNYC. |
 | Mar 2 | Agent brain (`agent-brain.js`) with 99.9% code eval. Cross-source recurrence detection (485 patterns). Gemini Flash fallback chain. Broad query support (citywide + date range). New sources: Tiny Cupboard, Brooklyn Comedy Collective, NYC Trivia League, BK Mag, Sofar Sounds. EventbriteComedy fix (0 -> 55 events). |
 | Mar 1 | Prompt audit (tool_use, tone reduction, shared sections). Structural filter drift fix (Step 2b). Degraded-mode fallback. Code eval accuracy overhaul (99.8%). Fragility audit (16 issues fixed). New sources: Luma, Screen Slate, Skint Ongoing. Dice multi-category. Scrape audit dashboards. Price coverage 27% -> 79%. Neighborhood resolution gap 171 -> 80. SQLite event store. 286 golden scenarios. |
