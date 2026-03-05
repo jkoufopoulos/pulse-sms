@@ -526,6 +526,266 @@
       font-size: 0.68rem;
     }
 
+    /* ── PROMPT BLOCKS ── */
+    .prompt-block { margin: 16px 0; }
+    .prompt-block summary {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--coral);
+      cursor: pointer;
+      padding: 12px 16px;
+      background: rgba(255,255,255,0.02);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      list-style: none;
+    }
+    .prompt-block summary::-webkit-details-marker { display: none; }
+    .prompt-block summary::before { content: '+ '; }
+    .prompt-block[open] summary::before { content: '- '; }
+    .prompt-block pre {
+      margin-top: 8px;
+      padding: 16px;
+      background: rgba(255,255,255,0.02);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.6;
+      color: var(--text-dim);
+      overflow-x: auto;
+      white-space: pre-wrap;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    /* ── PIPELINE ── */
+    .pipe-flow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      margin-bottom: 48px;
+    }
+    .pipe-node {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 24px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text);
+      text-align: center;
+      min-width: 280px;
+      max-width: 420px;
+    }
+    .pipe-node-dim {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+    .pipe-arrow {
+      font-size: 1.2rem;
+      color: var(--text-muted);
+      line-height: 1;
+      padding: 4px 0;
+    }
+    .pipe-fork {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+      justify-content: center;
+    }
+    .pipe-fork-branch {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+    .pipe-node-pass {
+      border-color: var(--green);
+      color: var(--green);
+    }
+    .pipe-node-quarantine {
+      border-color: var(--coral);
+      color: var(--coral);
+    }
+    .source-pills-section { margin-top: 48px; }
+    .tier-legend {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .tier-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+    }
+    .tier-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .source-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .source-pill {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      padding: 6px 12px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+    .pill-discovery { background: var(--coral-dim); color: var(--coral); }
+    .pill-niche { background: rgba(210,168,255,0.12); color: var(--purple); }
+    .pill-platform { background: rgba(88,166,255,0.12); color: var(--blue); }
+    .pill-mainstream { background: rgba(255,255,255,0.04); color: var(--text-muted); }
+
+    /* ── SESSIONS ── */
+    .session-iso {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      margin-bottom: 48px;
+    }
+    .session-bubble {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+    .session-phone {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--coral);
+      margin-bottom: 16px;
+    }
+    .session-fields {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 2;
+      color: var(--text-dim);
+    }
+    .session-fields .sf-key { color: var(--text-muted); }
+    .session-fields .sf-val { color: var(--text); }
+    .session-wall {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0 16px;
+      min-width: 60px;
+    }
+    .session-wall-line {
+      width: 2px;
+      flex: 1;
+      background: var(--coral);
+      opacity: 0.3;
+    }
+    .session-wall-label {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      color: var(--coral);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      writing-mode: vertical-lr;
+      text-orientation: mixed;
+      padding: 12px 0;
+      white-space: nowrap;
+    }
+    .session-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .session-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 20px;
+    }
+    .session-card-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .session-card-desc {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+
+    /* ── COST ── */
+    .cost-bars { margin-bottom: 32px; }
+    .cost-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+    .cost-bar-label {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text);
+      min-width: 80px;
+      text-align: right;
+    }
+    .cost-bar {
+      height: 32px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+    }
+    .cost-bar-ai {
+      background: rgba(88,166,255,0.15);
+      color: var(--blue);
+      border: 1px solid rgba(88,166,255,0.3);
+    }
+    .cost-bar-sms {
+      background: var(--coral-dim);
+      color: var(--coral);
+      border: 1px solid rgba(255,107,66,0.3);
+    }
+    .cost-total {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--text);
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+    .cost-insight {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+    .cost-budget {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text-dim);
+    }
+    .page-footer {
+      text-align: center;
+      padding: 40px 24px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
     /* ── PLACEHOLDER SECTIONS ── */
     .placeholder-text {
       font-family: var(--font-mono);
@@ -555,6 +815,31 @@
       }
       section {
         padding: 56px 0;
+      }
+      .session-iso {
+        flex-direction: column;
+      }
+      .session-wall {
+        flex-direction: row;
+        writing-mode: horizontal-tb;
+        padding: 12px 0;
+        min-width: auto;
+      }
+      .session-wall-line {
+        width: auto;
+        height: 2px;
+        flex: 1;
+      }
+      .session-wall-label {
+        writing-mode: horizontal-tb;
+        padding: 0 12px;
+      }
+      .session-cards {
+        grid-template-columns: 1fr;
+      }
+      .pipe-fork {
+        flex-direction: column;
+        align-items: center;
       }
     }
 
@@ -691,6 +976,7 @@
           <p class="timeline-desc">Gemini 2.5 Flash Lite with tool calling. Routes via <code>search_events</code> or <code>respond</code>.</p>
           <details>
             <summary>View system prompt &#8595;</summary>
+            <p style="padding:12px 0 0; font-size:0.78rem; color:var(--text-dim);"><a href="#prompts" style="color:var(--coral); text-decoration:none;">See full prompts below &#8595;</a></p>
           </details>
         </div>
       </div>
@@ -718,6 +1004,7 @@
           <p class="timeline-desc">Same Gemini chat session writes natural prose SMS via functionResponse</p>
           <details>
             <summary>View compose rules &#8595;</summary>
+            <p style="padding:12px 0 0; font-size:0.78rem; color:var(--text-dim);"><a href="#prompts" style="color:var(--coral); text-decoration:none;">See full prompts below &#8595;</a></p>
           </details>
         </div>
       </div>
@@ -829,6 +1116,261 @@
       </div>
 
     </div>
+
+    <!-- System Prompts -->
+    <div id="prompts" style="margin-top: 56px;">
+      <h3 style="font-family:var(--font-display); font-weight:700; font-size:1.3rem; margin-bottom:24px; color:var(--text);">System Prompts</h3>
+
+      <details class="prompt-block">
+        <summary>BRAIN_SYSTEM &mdash; Routing brain + SMS composition (dynamic, session-aware)</summary>
+        <pre>You are the routing brain for Pulse, an NYC nightlife SMS bot.
+Your job: understand what the user wants, call the right tool, and &mdash; when you receive event results back &mdash; write a warm, opinionated SMS with picks.
+
+CRITICAL RULE: When a user mentions ANY neighborhood name, borough name, or NYC location &mdash; ALWAYS call search_events. A bare neighborhood name like "williamsburg" or "LES" means "show me events there." This is the most common message type.
+
+TOOLS:
+- search_events: User wants events OR wants to interact with previously shown events. Call this for: neighborhoods, categories, time filters, "more" / "what else", detail requests (numbers, event names, "tell me about..."), and anything event-related. When in doubt, prefer search_events over respond.
+- respond: ONLY for pure conversational messages with zero event intent: greetings ("hey"), thanks ("thanks!"), farewells ("bye"), or clearly off-topic questions. Write a brief warm SMS (max 480 chars).
+
+EXAMPLES:
+- "williamsburg" &rarr; search_events(neighborhood: "Williamsburg", intent: "new_search")
+- "bushwick" &rarr; search_events(neighborhood: "Bushwick", intent: "new_search")
+- "LES" &rarr; search_events(neighborhood: "Lower East Side", intent: "new_search")
+- "brooklyn" &rarr; search_events(neighborhood: "Brooklyn", intent: "new_search")
+- "what's happening tonight" &rarr; search_events(date_range: "today", intent: "new_search")
+- "comedy" &rarr; search_events(category: "comedy", intent: "new_search")
+- "free stuff in greenpoint" &rarr; search_events(neighborhood: "Greenpoint", free_only: true, intent: "new_search")
+- "cool stuff this weekend" &rarr; search_events(date_range: "this_weekend", intent: "new_search")
+- "music and trivia" &rarr; search_events(categories: ["live_music", "trivia"], intent: "new_search")
+- "how about comedy" &rarr; search_events(category: "comedy", intent: "refine")
+- "later in the week" &rarr; search_events(date_range: "this_week", intent: "refine")
+- "try bushwick" (with existing categories) &rarr; search_events(neighborhood: "Bushwick", intent: "refine")
+- "actually trivia in greenpoint" &rarr; search_events(neighborhood: "Greenpoint", category: "trivia", intent: "pivot")
+- "forget the comedy" &rarr; search_events(intent: "pivot")
+- "more" &rarr; search_events(intent: "more")
+- "what else" &rarr; search_events(intent: "more")
+- "2" &rarr; search_events(intent: "details", pick_reference: "2")
+- "tell me about the comedy one" &rarr; search_events(intent: "details", pick_reference: "the comedy one")
+- "thanks!" &rarr; respond(message: "Enjoy your night! Text me anytime.", intent: "thanks")
+- "hey" &rarr; respond(message: "Hey! Drop a neighborhood or tell me what you're in the mood for.", intent: "greeting")
+- "yes" / "yeah" / "sure" (with pending suggestion) &rarr; search_events with the suggested neighborhood
+
+MULTI-CATEGORY: When the user mentions 2+ categories ("music and trivia", "comedy or art"), use the categories array. For single categories, use the category field. Do not use both.
+
+INTENT RULES for search_events:
+- "new_search": First message with no prior session context, or user explicitly starting over
+- "refine": Adding/changing a filter while keeping others. Includes neighborhood switches.
+- "pivot": Explicitly changing what they're looking for ("forget the comedy", "actually trivia instead")
+- "more": User wants more picks from the same search ("more", "what else", "next")
+- "details": User is asking about a specific event from the last batch. Set pick_reference to however they referenced it.
+- When switching neighborhoods, prefer "refine" so categories/time filters persist
+- When switching categories/topics, prefer "pivot" so stale filters are cleared
+
+NEIGHBORHOOD RESOLUTION:
+- Valid neighborhoods: Williamsburg, Bushwick, Greenpoint, ... and 33 more.
+- Common aliases: LES = Lower East Side, UES = Upper East Side, etc.
+- Borough names (Brooklyn, Queens, Manhattan, Bronx) &rarr; pass as neighborhood
+
+DATE RANGE:
+- "tonight" / "today" &rarr; "today"
+- "tomorrow" &rarr; "tomorrow"
+- "this weekend" &rarr; "this_weekend"
+- "this week" &rarr; "this_week"
+- "next week" &rarr; "next_week"
+
+SESSION CONTEXT:
+${sessionContext}${historyBlock}
+
+AFTER TOOL EXECUTION:
+When you call search_events and receive event results back, write the SMS response directly as JSON.
+
+COMPOSE RULES:
+- Write natural, conversational prose &mdash; NOT a numbered list.
+- Prefer TODAY over tomorrow. Prefer soonest events.
+- Favor discovery: lead with source_vibe:"discovery" events, intimate venues, interesting one-offs.
+- EVERY pick MUST include: event name, venue name, your opinionated take, start time, and price
+- Under 480 characters total. No URLs.
+- Voice: friend texting. Opinionated, concise, warm.
+
+Return JSON: { "sms_text": "...", "picks": [{"rank": 1, "event_id": "...", "why": "..."}] }</pre>
+      </details>
+
+      <details class="prompt-block">
+        <summary>BRAIN_COMPOSE_SYSTEM &mdash; Lightweight SMS compose fallback</summary>
+        <pre>You are Pulse, an NYC nightlife SMS bot. Write a short, warm SMS recommending events.
+
+COMPOSE RULES:
+- Write natural, conversational prose &mdash; NOT a numbered list. Weave 1-3 picks into a warm message like a friend texting.
+- Example: "Tiny Cupboard's got a free open mic tonight at 8, and there's a killer jazz quartet at Blue Note at 9:30 ($20). Any of these sound good?"
+- Pick 1-3 best events from the provided list. Prefer [MATCH] events first, then others.
+- Prefer TODAY over tomorrow. Prefer soonest events.
+- Favor discovery: lead with source_vibe:"discovery" events, intimate venues, interesting one-offs. When you see interaction_format:"interactive" + recurring, mention it naturally ("every Tuesday, great for becoming a regular").
+- EVERY pick MUST include: event name, venue name, your opinionated take, start time, and price ("$20", "free", "cover")
+- Label TODAY as "tonight", TOMORROW as "tomorrow", further out by day name
+- [NEARBY] events: mention the actual neighborhood naturally. If ALL picks are [NEARBY], lead with "Not much in [hood] tonight, but nearby..."
+- If SPARSE, be honest about slim pickings but still show what's available
+- Under 480 characters total. No URLs.
+- Voice: friend texting. Opinionated, concise, warm.
+
+Return JSON: { "sms_text": "the full SMS", "picks": [{"rank": 1, "event_id": "id from the event", "why": "short reason"}] }
+The picks array MUST reference events mentioned in sms_text.</pre>
+      </details>
+
+      <details class="prompt-block">
+        <summary>WELCOME_COMPOSE_SYSTEM &mdash; First-message welcome format</summary>
+        <pre>You are Pulse, an NYC nightlife and events SMS bot. Compose a WELCOME message for a brand-new user.
+
+FORMAT (MANDATORY):
+Line 1: "I'm Pulse &mdash; your plugged-in friend for NYC. Tell me what you're into tonight, just ask. Here's a few things on my radar:"
+Blank line
+Then 3 numbered picks with emoji category markers:
+1) [emoji] Event description &mdash; time, price
+2) [emoji] Event description &mdash; time, price
+3) [emoji] Event description &mdash; time, price
+Blank line
+Last line: "Any of those sound good? Or tell me a vibe, a neighborhood, whatever."
+
+EMOJI MAP:
+comedy/theater: &#x1F3AD;
+live_music/jazz/dj/nightlife: &#x1F3B5;
+art: &#x1F3A8;
+film: &#x1F3AC;
+community/trivia/food_drink: &#x1F389;
+other: &#x2728;
+
+RULES:
+- Pick exactly 3 events from the provided list. They are pre-ranked by interestingness &mdash; respect the ranking but you may reorder slightly for narrative flow.
+- Each pick MUST include: event name, venue name, neighborhood in parentheses, time, and price ("$20", "free", "cover").
+- Make each pick sound like a tip from a friend who just found out about it. Opinionated, vivid, concise.
+- Label TODAY events as "tonight", TOMORROW as "tomorrow".
+- Under 480 characters total. No URLs.
+- Do NOT change the intro line or the CTA line &mdash; use them exactly as specified above.
+
+Return JSON: { "sms_text": "the full SMS", "picks": [{"rank": 1, "event_id": "id", "why": "short reason"}] }</pre>
+      </details>
+
+      <details class="prompt-block">
+        <summary>DETAILS_SYSTEM &mdash; Event detail composition</summary>
+        <pre>&lt;role&gt;
+You are Pulse: an NYC "plugged-in friend" texting about a spot you recommended. Write like a real person &mdash; warm, opinionated, concise. Never robotic.
+&lt;/role&gt;
+
+&lt;content_priority&gt;
+Include details in this order. If you're running long, cut from the bottom:
+1. Vibe / what makes it worth going (lead with this)
+2. Time (tonight at 9, doors at 10, etc.)
+3. Price or "free"
+4. URL (always include if provided)
+5. Address (only if space remains)
+&lt;/content_priority&gt;
+
+&lt;constraints&gt;
+CHARACTER LIMIT: 480 characters. This will be sent as SMS.
+Return only plain text. No JSON, no quotes, no preamble. Just the message itself.
+Do not use list format or bullet points. Write one natural paragraph like a text from a friend.
+Do not include Yelp URLs of any kind.
+&lt;/constraints&gt;
+
+&lt;examples&gt;
+INPUT:
+Event: Jazz Night at Smalls Jazz Club, West Village, tonight 9:30pm, $20 cover
+URL: https://smallslive.com/events/tonight
+
+OUTPUT:
+Smalls is one of those legendary jazz spots &mdash; tiny basement, incredible players, always a good crowd. Tonight at 9:30, $20 cover but worth every penny. https://smallslive.com/events/tonight
+(178 chars)
+&lt;/examples&gt;</pre>
+      </details>
+
+      <details class="prompt-block">
+        <summary>EXTRACTION_PROMPT &mdash; Scrape-time event extraction (used by 4 sources)</summary>
+        <pre>&lt;role&gt;
+You are an Event Extractor for Pulse (NYC). Convert messy source text into normalized event records.
+&lt;/role&gt;
+
+&lt;rules&gt;
+VENUES vs EVENTS
+- If a venue hosts a specific event, extract the EVENT with the venue as venue_name.
+- Source text may include bars, restaurants, game spots, pool halls, arcades, or other venues.
+
+SOURCE URLs
+- Raw text may contain [Source: URL] markers before each item.
+- Always prefer per-item [Source: URL] over the top-level source_url input.
+
+TRUTH + SAFETY
+- Extract only what is explicitly present in the source text.
+- Do not guess venues, neighborhoods, prices, or descriptions.
+- If a field is missing, set it null.
+
+DATE RESOLUTION
+- The retrieval timestamp (retrieved_at_nyc) tells you today's date and day of week.
+- If the text contains explicit date headers, use that exact date for events in that section.
+- "today"/"tonight" &rarr; use retrieved_at_nyc date.
+- Always set date_local to the resolved YYYY-MM-DD. If you cannot resolve the date, set date_local null.
+
+EXTRACTION CONFIDENCE SCALE
+- 0.9+: name + date/time + location clearly present
+- 0.7&ndash;0.85: name + (date OR time window) + partial location
+- 0.4&ndash;0.65: name is clear but time/location ambiguous
+- &lt; 0.4: too ambiguous; set needs_review to true
+
+RECURRENCE DETECTION
+- If the source text describes a recurring event ("every Tuesday", "weekly"),
+  set is_recurring to true and extract recurrence_day and recurrence_time.
+
+DEDUPE HINT
+- If multiple items describe the same event, output them separately; downstream will dedupe.
+&lt;/rules&gt;
+
+&lt;output_format&gt;
+Return STRICT JSON with an array of events:
+{
+  "events": [
+    {
+      "source_name": "string",
+      "source_url": "string or null",
+      "name": "string",
+      "description_short": "1-2 sentence description",
+      "venue_name": "string or null",
+      "neighborhood": "string or null",
+      "category": "art|nightlife|live_music|comedy|community|food_drink|theater|other",
+      "start_time_local": "ISO datetime or null",
+      "date_local": "YYYY-MM-DD or null",
+      "is_free": "boolean or null",
+      "price_display": "string or null",
+      "extraction_confidence": 0.0,
+      "needs_review": false,
+      "is_recurring": "boolean",
+      "recurrence_day": "monday|...|sunday or null",
+      "recurrence_time": "HH:MM (24hr) or null"
+    }
+  ]
+}
+&lt;/output_format&gt;
+
+&lt;examples&gt;
+INPUT (Skint-style newsletter):
+source_name: theskint
+raw_text: "FREE: DJ Honeypot at Mood Ring (Bushwick) tonight 10pm-2am. $5 suggested donation."
+
+OUTPUT:
+{
+  "events": [{
+    "source_name": "theskint",
+    "name": "DJ Honeypot",
+    "venue_name": "Mood Ring",
+    "neighborhood": "Bushwick",
+    "category": "nightlife",
+    "date_local": "2026-02-15",
+    "is_free": true,
+    "price_display": "$5 suggested donation",
+    "extraction_confidence": 0.9
+  }]
+}
+&lt;/examples&gt;</pre>
+      </details>
+    </div>
+
   </div>
 </section>
 
@@ -838,8 +1380,74 @@
 <section id="pipeline">
   <div class="container">
     <div class="section-label">04 / Pipeline</div>
-    <h2 class="section-title">Event Pipeline</h2>
-    <p class="placeholder-text">Coming soon</p>
+    <h2 class="section-title">22 Sources, One Cache</h2>
+    <p class="section-subtitle">Every day at 10am ET, 19 scrapers run in parallel. Events pass through quality gates, get geocoded, and land in a single JSON cache.</p>
+
+    <div class="pipe-flow">
+      <div class="pipe-node">10am ET cron trigger</div>
+      <div class="pipe-arrow">&darr;</div>
+      <div class="pipe-node">source-registry.js<div class="pipe-node-dim">22 entries across 19 modules</div></div>
+      <div class="pipe-arrow">&darr;</div>
+      <div class="pipe-node">19 scrapers (parallel)<div class="pipe-node-dim">4 use LLM extraction, 15 parse structured APIs</div></div>
+      <div class="pipe-arrow">&darr;</div>
+      <div class="pipe-node">scrape-guard.js<div class="pipe-node-dim">4 checks: confidence &ge; 0.4, completeness &ge; 0.4, not needs_review, has name</div></div>
+      <div class="pipe-arrow">&darr;</div>
+      <div class="pipe-fork">
+        <div class="pipe-fork-branch">
+          <div class="pipe-node pipe-node-pass">Pass</div>
+          <div class="pipe-arrow" style="color:var(--green);">&darr;</div>
+        </div>
+        <div class="pipe-fork-branch">
+          <div class="pipe-node pipe-node-quarantine">Quarantine</div>
+          <div style="font-family:var(--font-mono); font-size:0.68rem; color:var(--text-muted); padding-top:8px;">logged, not served</div>
+        </div>
+      </div>
+      <div class="pipe-node">merge + cross-source dedup<div class="pipe-node-dim">ID = hash(name + venue + date). Higher-weight source wins.</div></div>
+      <div class="pipe-arrow">&darr;</div>
+      <div class="pipe-node">geocode + source vibe stamp<div class="pipe-node-dim">venues.js auto-learns coords. events.js stamps SOURCE_VIBE tier.</div></div>
+      <div class="pipe-arrow">&darr;</div>
+      <div class="pipe-node" style="border-color:var(--coral);">data/events-cache.json<div class="pipe-node-dim">isCacheFresh() skips re-scrape if &lt;20hr old</div></div>
+    </div>
+
+    <div class="source-pills-section">
+      <h3 style="font-family:var(--font-display); font-weight:700; font-size:1.1rem; margin-bottom:16px; color:var(--text);">Source Coverage</h3>
+
+      <div class="tier-legend">
+        <div class="tier-legend-item"><div class="tier-dot" style="background:var(--coral);"></div><span style="color:var(--coral);">Discovery</span></div>
+        <div class="tier-legend-item"><div class="tier-dot" style="background:var(--purple);"></div><span style="color:var(--purple);">Niche</span></div>
+        <div class="tier-legend-item"><div class="tier-dot" style="background:var(--blue);"></div><span style="color:var(--blue);">Platform</span></div>
+        <div class="tier-legend-item"><div class="tier-dot" style="background:var(--text-muted);"></div><span style="color:var(--text-muted);">Mainstream</span></div>
+      </div>
+
+      <div class="source-pills">
+        <span class="source-pill pill-discovery">Skint (0.9)</span>
+        <span class="source-pill pill-discovery">SkintOngoing (0.9)</span>
+        <span class="source-pill pill-discovery">NonsenseNYC (0.9)</span>
+        <span class="source-pill pill-discovery">Yutori (0.8)</span>
+        <span class="source-pill pill-discovery">ScreenSlate (0.9)</span>
+        <span class="source-pill pill-discovery">BKMag (0.9)</span>
+        <span class="source-pill pill-niche">RA (0.85)</span>
+        <span class="source-pill pill-niche">Dice (0.8)</span>
+        <span class="source-pill pill-niche">BrooklynVegan (0.8)</span>
+        <span class="source-pill pill-niche">BAM (0.8)</span>
+        <span class="source-pill pill-niche">Luma (0.9)</span>
+        <span class="source-pill pill-niche">SofarSounds (0.8)</span>
+        <span class="source-pill pill-platform">DoNYC (0.75)</span>
+        <span class="source-pill pill-platform">Songkick (0.75)</span>
+        <span class="source-pill pill-platform">NYCParks (0.75)</span>
+        <span class="source-pill pill-platform">TinyCupboard (0.75)</span>
+        <span class="source-pill pill-platform">BrooklynCC (0.75)</span>
+        <span class="source-pill pill-platform">NYCTrivia (0.75)</span>
+        <span class="source-pill pill-mainstream">Eventbrite (0.7)</span>
+        <span class="source-pill pill-mainstream">EventbriteComedy (0.7)</span>
+        <span class="source-pill pill-mainstream">EventbriteArts (0.7)</span>
+        <span class="source-pill pill-mainstream">NYPL (0.7)</span>
+      </div>
+
+      <div style="font-family:var(--font-mono); font-size:0.72rem; color:var(--text-dim); padding:12px 16px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm);">
+        4 sources use LLM extraction (Skint, NonsenseNYC, Yutori, ScreenSlate) &mdash; see <a href="#prompts" style="color:var(--coral); text-decoration:none;">EXTRACTION_PROMPT</a> above
+      </div>
+    </div>
   </div>
 </section>
 
@@ -849,8 +1457,53 @@
 <section id="sessions">
   <div class="container">
     <div class="section-label">05 / Sessions</div>
-    <h2 class="section-title">Session State Machine</h2>
-    <p class="placeholder-text">Coming soon</p>
+    <h2 class="section-title">Per-Phone Isolation</h2>
+    <p class="section-subtitle">Every phone number gets its own session. No shared state, no cross-talk, no leakage.</p>
+
+    <div class="session-iso">
+      <div class="session-bubble">
+        <div class="session-phone">+1 (917) ***-**42</div>
+        <div class="session-fields">
+          <div><span class="sf-key">neighborhood:</span> <span class="sf-val">Bushwick</span></div>
+          <div><span class="sf-key">picks:</span> <span class="sf-val">3 shown</span></div>
+          <div><span class="sf-key">filters:</span> <span class="sf-val">comedy</span></div>
+          <div><span class="sf-key">history:</span> <span class="sf-val">4 turns</span></div>
+        </div>
+      </div>
+      <div class="session-wall">
+        <div class="session-wall-line"></div>
+        <div class="session-wall-label">no shared state</div>
+        <div class="session-wall-line"></div>
+      </div>
+      <div class="session-bubble">
+        <div class="session-phone">+1 (347) ***-**87</div>
+        <div class="session-fields">
+          <div><span class="sf-key">neighborhood:</span> <span class="sf-val">LES</span></div>
+          <div><span class="sf-key">picks:</span> <span class="sf-val">2 shown</span></div>
+          <div><span class="sf-key">filters:</span> <span class="sf-val">free + jazz</span></div>
+          <div><span class="sf-key">history:</span> <span class="sf-val">6 turns</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="session-cards">
+      <div class="session-card">
+        <div class="session-card-title">Keyed by phone #</div>
+        <div class="session-card-desc">In-memory Map uses From phone as key. Every read/write scoped to one user.</div>
+      </div>
+      <div class="session-card">
+        <div class="session-card-title">Per-phone mutex</div>
+        <div class="session-card-desc">acquireLock(phone) serializes concurrent SMS from the same number.</div>
+      </div>
+      <div class="session-card">
+        <div class="session-card-title">SHA-256 on disk</div>
+        <div class="session-card-desc">Phone numbers hashed before writing to sessions.json. Raw numbers never touch disk.</div>
+      </div>
+      <div class="session-card">
+        <div class="session-card-title">2hr TTL + cleanup</div>
+        <div class="session-card-desc">Sessions auto-expire. Garbage collected every 10 minutes.</div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -861,11 +1514,30 @@
   <div class="container">
     <div class="section-label">06 / Cost Model</div>
     <h2 class="section-title">Cost Per Message</h2>
-    <p class="placeholder-text">Coming soon</p>
+    <p class="section-subtitle">Two paid steps per message. The split is lopsided.</p>
+
+    <div class="cost-bars">
+      <div class="cost-bar-row">
+        <div class="cost-bar-label">$0.0005</div>
+        <div class="cost-bar cost-bar-ai" style="width: 6%;">AI</div>
+        <span style="font-family:var(--font-mono); font-size:0.68rem; color:var(--text-dim);">Gemini 2.5 Flash Lite</span>
+      </div>
+      <div class="cost-bar-row">
+        <div class="cost-bar-label">$0.008</div>
+        <div class="cost-bar cost-bar-sms" style="width: 94%;">SMS delivery</div>
+        <span style="font-family:var(--font-mono); font-size:0.68rem; color:var(--text-dim);">Twilio</span>
+      </div>
+    </div>
+
+    <div class="cost-total">Total: $0.0085 per message</div>
+
+    <div class="cost-insight">The dumb pipe costs 16x more than the AI.</div>
+
+    <div class="cost-budget">Daily per-user AI budget: $0.10 &mdash; enforced by request-guard.js</div>
   </div>
 </section>
 
-<div style="height:80px;"></div>
+<footer class="page-footer">Built by Justin Koufopoulos &middot; March 2026</footer>
 
 <script>
 (function() {
