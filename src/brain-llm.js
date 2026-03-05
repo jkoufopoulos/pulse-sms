@@ -7,6 +7,7 @@ const { NEIGHBORHOODS } = require('./neighborhoods');
 const { getNycDateString } = require('./geo');
 const { describeFilters } = require('./pipeline');
 const { smartTruncate } = require('./formatters');
+const { toGeminiTools, toAnthropicTools } = require('./llm');
 
 // --- Neighborhood list for system prompt ---
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
@@ -29,66 +30,65 @@ const GEMINI_SAFETY = [
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
 ];
 
-// --- Tool definitions (Gemini function calling format) ---
+// --- Tool definitions (neutral format — lowercase JSON Schema types, flat array) ---
 
 const BRAIN_TOOLS = [
   {
-    functionDeclarations: [{
-      name: 'search_events',
-      description: 'Search for event recommendations. Use when the user wants to see events, asks about a neighborhood, mentions a category, or requests any kind of activity.',
-      parameters: {
-        type: 'OBJECT',
-        properties: {
-          neighborhood: { type: 'STRING', description: 'NYC neighborhood name, or empty string for citywide', nullable: true },
-          category: {
-            type: 'STRING', description: 'Primary event category filter. Use for single-category requests.',
-            nullable: true,
+    name: 'search_events',
+    description: 'Search for event recommendations. Use when the user wants to see events, asks about a neighborhood, mentions a category, or requests any kind of activity.',
+    parameters: {
+      type: 'object',
+      properties: {
+        neighborhood: { type: 'string', description: 'NYC neighborhood name, or empty string for citywide', nullable: true },
+        category: {
+          type: 'string', description: 'Primary event category filter. Use for single-category requests.',
+          nullable: true,
+          enum: ['comedy', 'jazz', 'live_music', 'dj', 'trivia', 'film', 'theater',
+            'art', 'dance', 'community', 'food_drink', 'spoken_word', 'classical', 'nightlife'],
+        },
+        categories: {
+          type: 'array', description: 'Multiple category filters — use when user wants more than one type (e.g. "music and trivia", "comedy or art"). Events matching ANY category are included. Only use this OR category, not both.',
+          nullable: true,
+          items: {
+            type: 'string',
             enum: ['comedy', 'jazz', 'live_music', 'dj', 'trivia', 'film', 'theater',
               'art', 'dance', 'community', 'food_drink', 'spoken_word', 'classical', 'nightlife'],
           },
-          categories: {
-            type: 'ARRAY', description: 'Multiple category filters — use when user wants more than one type (e.g. "music and trivia", "comedy or art"). Events matching ANY category are included. Only use this OR category, not both.',
-            nullable: true,
-            items: {
-              type: 'STRING',
-              enum: ['comedy', 'jazz', 'live_music', 'dj', 'trivia', 'film', 'theater',
-                'art', 'dance', 'community', 'food_drink', 'spoken_word', 'classical', 'nightlife'],
-            },
-          },
-          free_only: { type: 'BOOLEAN', description: 'Only show free events' },
-          time_after: { type: 'STRING', description: 'Only events after this time, HH:MM 24hr format (e.g. "22:00")', nullable: true },
-          date_range: {
-            type: 'STRING', description: 'Date scope for the search',
-            nullable: true,
-            enum: ['today', 'tomorrow', 'this_weekend', 'this_week', 'next_week'],
-          },
-          intent: {
-            type: 'STRING', description: 'What the user is doing: new_search (first request or starting over), refine (adding/tightening a filter), pivot (changing topic/category), more (show additional picks from same search), details (get details about a specific pick)',
-            enum: ['new_search', 'refine', 'pivot', 'more', 'details'],
-          },
-          pick_reference: {
-            type: 'STRING',
-            description: 'How the user referenced a previously shown pick. Can be a number ("2"), event name ("the comedy one"), or venue name ("Elsewhere"). Only used with intent: "details".',
-            nullable: true,
-          },
         },
-        required: ['intent'],
-      },
-    }, {
-      name: 'respond',
-      description: 'Respond conversationally when no event search is needed. Use for greetings, thanks, farewells, off-topic chat, or when the user needs clarification.',
-      parameters: {
-        type: 'OBJECT',
-        properties: {
-          message: { type: 'STRING', description: 'SMS response text, max 480 chars. Be warm, brief. ALWAYS end with a redirect to events (e.g. "Drop a neighborhood or tell me what you are in the mood for!" or "Text me a neighborhood to get started!")' },
-          intent: {
-            type: 'STRING',
-            enum: ['greeting', 'thanks', 'farewell', 'off_topic', 'clarify', 'acknowledge'],
-          },
+        free_only: { type: 'boolean', description: 'Only show free events' },
+        time_after: { type: 'string', description: 'Only events after this time, HH:MM 24hr format (e.g. "22:00")', nullable: true },
+        date_range: {
+          type: 'string', description: 'Date scope for the search',
+          nullable: true,
+          enum: ['today', 'tomorrow', 'this_weekend', 'this_week', 'next_week'],
         },
-        required: ['message', 'intent'],
+        intent: {
+          type: 'string', description: 'What the user is doing: new_search (first request or starting over), refine (adding/tightening a filter), pivot (changing topic/category), more (show additional picks from same search), details (get details about a specific pick)',
+          enum: ['new_search', 'refine', 'pivot', 'more', 'details'],
+        },
+        pick_reference: {
+          type: 'string',
+          description: 'How the user referenced a previously shown pick. Can be a number ("2"), event name ("the comedy one"), or venue name ("Elsewhere"). Only used with intent: "details".',
+          nullable: true,
+        },
       },
-    }],
+      required: ['intent'],
+    },
+  },
+  {
+    name: 'respond',
+    description: 'Respond conversationally when no event search is needed. Use for greetings, thanks, farewells, off-topic chat, or when the user needs clarification.',
+    parameters: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', description: 'SMS response text, max 480 chars. Be warm, brief. ALWAYS end with a redirect to events (e.g. "Drop a neighborhood or tell me what you are in the mood for!" or "Text me a neighborhood to get started!")' },
+        intent: {
+          type: 'string',
+          enum: ['greeting', 'thanks', 'farewell', 'off_topic', 'clarify', 'acknowledge'],
+        },
+      },
+      required: ['message', 'intent'],
+    },
   },
 ];
 
@@ -240,7 +240,7 @@ async function callAgentBrain(message, session, phone, trace) {
     model: 'gemini-2.5-flash-lite',
     systemInstruction: systemPrompt,
     safetySettings: GEMINI_SAFETY,
-    tools: BRAIN_TOOLS,
+    tools: toGeminiTools(BRAIN_TOOLS),
     generationConfig: {
       maxOutputTokens: 1024,
       temperature: 0,
@@ -325,44 +325,11 @@ async function callAgentBrainAnthropic(message, session, phone, trace, brainStar
   const client = new Anthropic();
   const systemPrompt = buildBrainSystemPrompt(session);
 
-  const anthropicTools = [
-    {
-      name: 'search_events',
-      description: 'Search for event recommendations. Use when the user wants to see events.',
-      input_schema: {
-        type: 'object',
-        properties: {
-          neighborhood: { type: 'string', description: 'NYC neighborhood name or null for citywide' },
-          category: { type: 'string', enum: ['comedy', 'jazz', 'live_music', 'dj', 'trivia', 'film', 'theater', 'art', 'dance', 'community', 'food_drink', 'spoken_word', 'classical', 'nightlife'], description: 'Single category filter' },
-          categories: { type: 'array', items: { type: 'string', enum: ['comedy', 'jazz', 'live_music', 'dj', 'trivia', 'film', 'theater', 'art', 'dance', 'community', 'food_drink', 'spoken_word', 'classical', 'nightlife'] }, description: 'Multiple categories — use when user wants more than one type' },
-          free_only: { type: 'boolean', description: 'Only show free events' },
-          time_after: { type: 'string', description: 'Only events after this time, HH:MM 24hr format' },
-          date_range: { type: 'string', enum: ['today', 'tomorrow', 'this_weekend', 'this_week', 'next_week'] },
-          intent: { type: 'string', enum: ['new_search', 'refine', 'pivot', 'more', 'details'] },
-          pick_reference: { type: 'string', description: 'Reference to a previously shown pick (number, name, or venue). Used with intent: details.' },
-        },
-        required: ['intent'],
-      },
-    },
-    {
-      name: 'respond',
-      description: 'Respond conversationally when no event search is needed.',
-      input_schema: {
-        type: 'object',
-        properties: {
-          message: { type: 'string', description: 'SMS response text, max 480 chars. ALWAYS end with a redirect to events (e.g. "Drop a neighborhood or tell me what you are in the mood for!")' },
-          intent: { type: 'string', enum: ['greeting', 'thanks', 'farewell', 'off_topic', 'clarify', 'acknowledge'] },
-        },
-        required: ['message', 'intent'],
-      },
-    },
-  ];
-
   const response = await withTimeout(client.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 256,
     system: systemPrompt,
-    tools: anthropicTools,
+    tools: toAnthropicTools(BRAIN_TOOLS),
     messages: [{ role: 'user', content: message }],
   }, { timeout: 10000 }), 12000, 'callAgentBrainAnthropic');
 
