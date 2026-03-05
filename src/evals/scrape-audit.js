@@ -44,6 +44,9 @@ const SOURCE_MINIMUMS = {
 // Per-event checks
 // ============================================================
 
+// Checks split into structural (actionable, affects pass rate) and coverage (informational, known gaps)
+const COVERAGE_CHECKS = new Set(['price_coverage']);
+
 const checks = {
   date_format_valid(event) {
     const d = event.date_local;
@@ -152,17 +155,26 @@ function runScrapeAudit(events, fetchMap) {
     const src = event.source_name || 'unknown';
 
     if (!sourceStats[src]) {
-      sourceStats[src] = { total: 0, passed: 0, failures: {} };
+      sourceStats[src] = { total: 0, passed: 0, failures: {}, coverage: {} };
     }
     const stats = sourceStats[src];
     stats.total++;
 
-    if (failures.length === 0) {
+    // Split failures into structural (affects pass rate) and coverage (informational)
+    const structuralFailures = failures.filter(f => !COVERAGE_CHECKS.has(f.name));
+    const coverageFailures = failures.filter(f => COVERAGE_CHECKS.has(f.name));
+
+    if (structuralFailures.length === 0) {
       stats.passed++;
     } else {
-      for (const f of failures) {
+      for (const f of structuralFailures) {
         stats.failures[f.name] = (stats.failures[f.name] || 0) + 1;
       }
+    }
+    for (const f of coverageFailures) {
+      stats.coverage[f.name] = (stats.coverage[f.name] || 0) + 1;
+    }
+    if (structuralFailures.length > 0) {
       // Cap failing events to 10 per source
       if (!failingEvents[src]) failingEvents[src] = [];
       if (failingEvents[src].length < 10) {
@@ -170,7 +182,7 @@ function runScrapeAudit(events, fetchMap) {
           event_id: event.id,
           event_name: event.name,
           source: src,
-          failures: failures.map(f => ({ name: f.name, detail: f.detail })),
+          failures: structuralFailures.map(f => ({ name: f.name, detail: f.detail })),
         });
       }
     }

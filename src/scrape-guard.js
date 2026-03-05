@@ -68,12 +68,13 @@ function checkBaseline(label, events) {
     }
   }
 
-  // 3. Date sanity
+  // 3. Date sanity — use 30-day window (matches refreshCache date filter)
+  // Newsletter/film sources naturally have events weeks out; 7 days was too aggressive
   const today = getNycDateString(0);
-  const weekOut = getNycDateString(7);
+  const monthOut = getNycDateString(30);
   const datedEvents = events.filter(e => !!e.date_local);
   if (datedEvents.length > 0) {
-    const nearbyPct = datedEvents.filter(e => e.date_local >= today && e.date_local <= weekOut).length / datedEvents.length;
+    const nearbyPct = datedEvents.filter(e => e.date_local >= today && e.date_local <= monthOut).length / datedEvents.length;
     const avgDateCoverage = baseline.avgCoverage.date_local;
     if (nearbyPct < DATE_SANITY_THRESHOLD && avgDateCoverage >= DATE_SANITY_BASELINE_MIN) {
       return {
