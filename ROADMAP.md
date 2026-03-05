@@ -136,15 +136,9 @@ Deleted unified-flow.js, model-router.js, pre-router.js, src/skills/. One code p
 
 Merged routing + compose into a single Gemini chat session using multi-turn tool calling. The agent that understands user intent writes the SMS in the same generation via `functionResponse` continuation. `brainCompose` kept for `handleMore`. Fallback: `brainCompose` on continuation failure, Anthropic Haiku on Gemini failure. Code eval: 99.2% scenario, 98.4% regression.
 
-**Phase 3: Conversation History as State** -- Reduce session to accumulators
+**Phase 3: Conversation History as State** -- **Partial (2026-03-05)**
 
-Feed the agent its own tool call history so it can derive context without explicit session fields.
-
-- Conversation history includes tool calls + tool results (not just user/assistant text)
-- Remove from session: `lastNeighborhood`, `lastFilters`, `lastBorough`, `pendingNearby`, `pendingFilters`, `pendingMessage` -- all derivable from tool call history
-- Keep in session: `lastPicks`, `lastEvents` (event map cache), `allPicks`/`allOfferedIds` (dedup accumulators), `visitedHoods`, `lastResponseHadPicks`
-- Session: 12 fields -> 7 fields
-- Risk: agent may "forget" context if history truncated (currently 6 turns). May need 8-10 turns.
+Added structured conversation history: tool calls (name + params), tool results (picks + match count + neighborhood), and user/assistant messages. Agent sees its own decisions across turns. History cap bumped 6 -> 10. Session fields kept for deterministic code -- removal deferred. Code eval: 98.6% regression (up from 98.4%).
 
 **Phase 4: Agent-Native Details and More** -- Move mechanical handlers into the agent
 
@@ -213,7 +207,7 @@ Feed the agent its own tool call history so it can derive context without explic
 
 | Period | Highlights |
 |--------|-----------|
-| Mar 5 | Phase 1: unified agent loop (deleted unified-flow, pre-router, model-router, skills). Phase 2: single-turn agent (Gemini multi-turn tool calling — same session routes + composes). First-message welcome flow. Quality eval runner + browse page. |
+| Mar 5 | Phase 1: unified agent loop. Phase 2: single-turn agent (Gemini multi-turn tool calling). Phase 3: structured conversation history (tool calls, params, picks in history). First-message welcome flow. Quality eval runner + browse page. |
 | Mar 3 | Eval suite audit (34 new scenarios, 417 total). Community layer Phase 2 (editorial voice, source vibe, venue size, interaction format). Skint multi-day parsing. Description coverage for Luma/Songkick/DoNYC. |
 | Mar 2 | Agent brain (`agent-brain.js`) with 99.9% code eval. Cross-source recurrence detection (485 patterns). Gemini Flash fallback chain. Broad query support (citywide + date range). New sources: Tiny Cupboard, Brooklyn Comedy Collective, NYC Trivia League, BK Mag, Sofar Sounds. EventbriteComedy fix (0 -> 55 events). |
 | Mar 1 | Prompt audit (tool_use, tone reduction, shared sections). Structural filter drift fix (Step 2b). Degraded-mode fallback. Code eval accuracy overhaul (99.8%). Fragility audit (16 issues fixed). New sources: Luma, Screen Slate, Skint Ongoing. Dice multi-category. Scrape audit dashboards. Price coverage 27% -> 79%. Neighborhood resolution gap 171 -> 80. SQLite event store. 286 golden scenarios. |
