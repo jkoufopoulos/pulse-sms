@@ -947,22 +947,23 @@
     // Timestamp
     addEl('div', 'sms-time', 'Today, 6:42 PM');
 
-    // Welcome messages from Pulse (two-bubble intro)
+    // Welcome message — matches production handleWelcome (numbered emoji picks)
     showTyping();
     await wait(1200);
     hideTyping();
-    addRawBubble("Hey! I\u2019m Pulse \u2014 I dig through the best of what\u2019s happening in NYC daily that you\u2019ll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.", 'sms-recv');
-
-    await wait(600);
-    showTyping();
-    await wait(800);
-    hideTyping();
-    addRawBubble('Text me a neighborhood like \u201cBushwick\u201d or a vibe like \u201csomething weird tonight\u201d to start exploring.', 'sms-recv');
+    addRawBubble(
+      'I\u2019m Pulse \u2014 your plugged-in friend for NYC. Tell me what you\u2019re into tonight, just ask. Here\u2019s a few things on my radar:<br><br>' +
+      '1) \ud83c\udfb5 Jazz at Smalls (West Village) \u2014 tonight 7:30pm, $20<br>' +
+      '2) \ud83c\udfad Stand-up at Eastville (East Village) \u2014 tonight 8pm, $12<br>' +
+      '3) \ud83c\udfb6 DJ set at Nublu (East Village) \u2014 tonight 10pm, free<br><br>' +
+      'Any of those sound good? Or tell me a vibe, a neighborhood, whatever.',
+      'sms-recv'
+    );
 
     await wait(1400);
 
-    // User sends "east village"
-    addBubble('east village', 'sms-sent');
+    // User asks for details on a pick
+    addBubble('the jazz one', 'sms-sent');
 
     await wait(600);
     showTyping();
