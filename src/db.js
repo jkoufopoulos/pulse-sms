@@ -267,6 +267,24 @@ function deleteEventsBySource(sourceNames) {
   return d.prepare(`DELETE FROM events WHERE source_name IN (${ph})`).run(...allNames).changes;
 }
 
+/**
+ * Delete events from sources NOT in the active registry.
+ * Called at boot and after each scrape to enforce registry as single source of truth.
+ */
+function pruneInactiveSources(activeLabels) {
+  const d = getDb();
+  const allSources = d.prepare('SELECT DISTINCT source_name FROM events').all().map(r => r.source_name);
+  const activeSet = new Set([...activeLabels, ...activeLabels.map(l => l.toLowerCase())]);
+  const inactive = allSources.filter(s => !activeSet.has(s));
+  if (inactive.length === 0) return 0;
+  const ph = inactive.map(() => '?').join(', ');
+  const result = d.prepare(`DELETE FROM events WHERE source_name IN (${ph})`).run(...inactive);
+  if (result.changes > 0) {
+    console.log(`Pruned ${result.changes} events from inactive sources: ${inactive.join(', ')}`);
+  }
+  return result.changes;
+}
+
 // --- Recurring patterns ---
 
 const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -596,6 +614,7 @@ module.exports = {
   getEventByIdFromDb,
   pruneOldEvents,
   deleteEventsBySource,
+  pruneInactiveSources,
   upsertPattern,
   getActivePatterns,
   generateOccurrences,

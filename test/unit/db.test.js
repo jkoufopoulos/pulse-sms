@@ -458,4 +458,34 @@ function upsertEvents(db, events) {
   db.close();
 }
 
+// 18. pruneInactiveSources
+{
+  const testDb = createTestDb();
+
+  console.log('\nInactive source pruning:');
+
+  // Insert events from active and inactive sources
+  const now2 = new Date().toISOString();
+  testDb.prepare(`INSERT INTO events (id, source_name, name, scraped_at, updated_at, date_local) VALUES (?, ?, ?, ?, ?, ?)`).run('evt-active', 'DoNYC', 'Active Event', now2, now2, '2026-03-05');
+  testDb.prepare(`INSERT INTO events (id, source_name, name, scraped_at, updated_at, date_local) VALUES (?, ?, ?, ?, ?, ?)`).run('evt-stale', 'ticketmaster', 'Stale Event', now2, now2, '2026-03-05');
+  testDb.prepare(`INSERT INTO events (id, source_name, name, scraped_at, updated_at, date_local) VALUES (?, ?, ?, ?, ?, ?)`).run('evt-stale2', 'smallslive', 'Stale Event 2', now2, now2, '2026-03-05');
+
+  // Simulate pruning
+  const activeLabels = ['DoNYC', 'RA'];
+  const allSources = testDb.prepare('SELECT DISTINCT source_name FROM events').all().map(r => r.source_name);
+  const activeSet = new Set([...activeLabels, ...activeLabels.map(l => l.toLowerCase())]);
+  const inactive = allSources.filter(s => !activeSet.has(s));
+  if (inactive.length > 0) {
+    const ph = inactive.map(() => '?').join(', ');
+    testDb.prepare(`DELETE FROM events WHERE source_name IN (${ph})`).run(...inactive);
+  }
+
+  const remaining = testDb.prepare('SELECT id FROM events').all();
+  check('pruneInactiveSources keeps active events', remaining.some(r => r.id === 'evt-active'));
+  check('pruneInactiveSources removes ticketmaster', !remaining.some(r => r.id === 'evt-stale'));
+  check('pruneInactiveSources removes smallslive', !remaining.some(r => r.id === 'evt-stale2'));
+  check('pruneInactiveSources leaves 1 event', remaining.length === 1);
+  testDb.close();
+}
+
 module.exports = {};

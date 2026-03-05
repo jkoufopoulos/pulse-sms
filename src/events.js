@@ -289,9 +289,10 @@ const CACHE_FILE = path.join(__dirname, '../data/events-cache.json');
 
 // Load persisted event cache on boot — try SQLite first, fall back to JSON
 try {
-  const { getEventsInRange, generateOccurrences, importFromJsonCache } = require('./db');
+  const { getEventsInRange, generateOccurrences, importFromJsonCache, pruneInactiveSources } = require('./db');
   // Auto-import JSON cache on first boot with SQLite
   importFromJsonCache(CACHE_FILE);
+  pruneInactiveSources(SOURCE_LABELS);
   const today = getNycDateString(0);
   const weekOut = getNycDateString(7);
   const dbEvents = getEventsInRange(today, weekOut);
@@ -478,6 +479,7 @@ async function refreshCache() {
       const db = require('./db');
       db.upsertEvents(validEvents);
       db.pruneOldEvents(getNycDateString(-30));
+      db.pruneInactiveSources(SOURCE_LABELS);
       // Detect recurring patterns from historical data
       try {
         db.detectRecurringPatterns();
