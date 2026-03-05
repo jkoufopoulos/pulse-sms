@@ -1,31 +1,27 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-03 (Editorial voice + discovery signals reframe)
+> Last updated: 2026-03-05 (Agent brain promoted to primary architecture)
 
 ---
 
 ## Architecture Principles
 
-These principles govern how Pulse splits work between deterministic code and LLM calls. They were developed from regression eval failures, reviewed across multiple models, and represent consensus.
+These principles govern how Pulse splits work between deterministic code and LLM tool calling. They were developed from regression eval failures, reviewed across multiple models, and updated when the agent brain became the primary architecture (2026-03-05).
 
-### P1. Code Owns State, LLM Owns Language
+### P1. Structured Tool Calls Own State, Free-Text Owns Language
 
-The LLM is never the system of record for structured data. Session state, filters, neighborhood resolution, event selection logic — all owned by deterministic code. The LLM reads well-formed tagged inputs and produces natural language output.
+Session state is derived from structured, validated sources — never parsed from free-text LLM output. In the agent brain (primary path), the LLM's tool call parameters (`search_events` args: neighborhood, categories, time_filter, date_range, free_only, intent) ARE the system of record for filters and intent. Tool params are machine-readable, schema-validated, and deterministic — they're safe state sources. The LLM's free-text SMS output is for the user, not for the system.
 
-**In practice:** `mergeFilters()` compounds filters deterministically. `buildTaggedPool()` tags matching events with `[MATCH]` (hard match) or `[SOFT]` (broad category match where subcategory is set — e.g. jazz within live_music). The LLM sees the tagged pool and writes copy — it doesn't manage or report filter state.
+**In practice:** The agent brain calls `search_events({ neighborhood: "bushwick", categories: ["comedy"], free_only: true })`. The handler reads these tool params to set `activeFilters` and `lastNeighborhood`. On the legacy unified-flow path, `mergeFilters()` compounds filters deterministically from pre-router detections and `buildTaggedPool()` tags matching events with `[MATCH]`.
 
-**Anti-pattern:** Reading `filters_used` from LLM output and merging it into session state. This makes the LLM a secondary source of truth. If it hallucinates a filter, we persist it. We tried this (2026-02-22) and reverted it because it violates this principle.
+**Anti-pattern:** Parsing the LLM's free-text SMS response (or any unstructured output field) to extract state like filters or neighborhood. Tool call params are fine — they're structured and validated. Free-text output is not. We tried reading `filters_used` from LLM output (2026-02-22) and reverted it because it made the LLM a secondary source of truth for state.
 
-### P2. Separate Reasoning from Rendering
+**History:** The original P1 ("Code Owns State, LLM Owns Language") was designed for the unified-flow path where the LLM returned `filter_intent` as a structured field that was unreliable. The agent brain's tool calling architecture makes the boundary cleaner: tool params = state, free text = language.
 
-If the LLM must both understand intent and write compelling copy, those should be separate operations. The reasoning pass returns a small validated struct. The rendering pass takes well-formed data and returns text.
+### ~~P2. Separate Reasoning from Rendering~~ — **Retired**
 
-**Current state:** One unified Haiku call does both. Its output contract has 4 structured fields — `type`, `sms_text`, `picks`, `filter_intent`. Step 3 removed the 4 redundant state-management fields. The `filter_intent` migration (2026-03-01) replaced the `clear_filters` boolean with a granular `{ action, updates }` object. The unified path now uses `tool_use` with `tool_choice` for guaranteed structured output (2026-03-01 prompt audit).
-
-**Target state:** Reasoning call → `{ type, picks[], filter_intent }` (3 fields, validated via tool_use). Rendering call → `sms_text` (pure copy, lightweight parser). Everything else derived by code.
-
-**Constraint:** The previous two-call architecture was abandoned because calls disagreed on state. The new split must have code own all state between calls — nothing from reasoning output passes to the rendering call except event data.
+Originally proposed splitting LLM calls into a reasoning pass (structured output) and a rendering pass (copy). Abandoned — the unified path with `tool_use` + `tool_choice` achieves structured output without two-call complexity. The agent brain path (Gemini tool calling) also combines reasoning and rendering successfully. Dead code (`REASON_SYSTEM`, `RENDER_SYSTEM`, `reasonIntent`, `renderSms`) was cleaned up.
 
 ### P3. Extract at the Boundary, Then Trust Internal Types
 
@@ -37,9 +33,7 @@ Wherever the LLM produces structured data, validate and normalize it once at the
 
 Every code path that sends an SMS must end with the same atomic session save function. No hand-built `setSession` merges, no conditional field sets, no paths that "forget" to save filters.
 
-**Current state (12 save sites):** 8 `setSession` merges + 4 `saveResponseFrame` atomics. Each `setSession` sets a different subset of fields. Every bug in the P1 regression traced to a path that saved state differently.
-
-**Target state (2 categories):** Ephemeral writes (staging before LLM call) use `setSession`. Terminal writes (after every SMS send) use `saveResponseFrame`. No exceptions.
+**Current state (2 categories):** Ephemeral writes (staging before LLM call) use `setSession`. Terminal writes (after every SMS send) use `saveResponseFrame`. `handleHelp`, `handleConversational`, and `referral_expired` paths were the last holdouts using bare `setSession` terminally — fixed 2026-03-05.
 
 ### P5. Minimal LLM Output Contract
 
@@ -47,15 +41,15 @@ Every structured field in the LLM output is a surface for hallucination and drif
 
 **Current:** Contract has 4 fields: `type`, `sms_text`, `picks`, `filter_intent` (was 8 fields before Step 3). `filter_intent: { action: "none"|"clear_all"|"modify", updates }` enables granular filter modifications from LLM, not just clear-all. Schema enforced via `tool_use` with `tool_choice` on unified path (2026-03-01 prompt audit) — eliminates JSON parsing failures.
 
-### P6. Deterministic Extraction Covers Common Cases
+### P6. Mechanical Shortcuts for $0 Operations, LLM for Everything Else
 
-Don't rely on the LLM for structure that pattern matching can handle. Reserve the LLM for genuinely ambiguous language (vibes, implicit intent, complex references).
+Use deterministic code only for operations that don't need language understanding and can be handled at $0. Everything else — including compound filters, semantic intent, and ambiguous language — goes to the agent brain's tool calling.
 
-**Pattern-matchable (should be in pre-router):** "free comedy", "late jazz", "free stuff tonight", "comedy in bushwick"
+**$0 mechanical (checkMechanical):** Bare numbers 1-5 (details), "more" (next batch), "help" (canned response), greetings/thanks/bye. These are pattern-matched and never hit the LLM.
 
-**Genuinely needs LLM:** "something lowkey", "what would you recommend for a first date", "that jazz thing from earlier"
+**Agent brain handles natively:** "free comedy in bushwick", "later in the week", "how about something lowkey", "trivia or art stuff in greenpoint". The LLM expresses intent through structured tool params (`search_events` args), not fragile regex.
 
-**Risk mitigation:** The pre-router is additive — it returns detected filters for the LLM to see in the tagged pool. If it misses a compound, the LLM still sees untagged events and can select freely. Silent failure degrades to "unfiltered picks" rather than "wrong picks."
+**History:** The original P6 ("Deterministic Extraction Covers Common Cases") pushed compound filters like "free comedy" into pre-router regex. This was fragile — it couldn't handle "later in the week", mid-session compounds, or multi-category requests. The agent brain handles these natively via tool params, making the pre-router's compound regex vestigial. The pre-router's role is now limited to `checkMechanical` shortcuts.
 
 ### P7. Validate the Contract, Not the Content
 
@@ -75,13 +69,17 @@ Eval results revealed three root architectural patterns causing failures:
 2. **Flat session merge** — `setSession` does `{ ...existing, ...data }`. If a handler doesn't explicitly set a field, the previous value persists.
 3. **Geographic pool vs semantic scope** — `getEvents(hood)` returns events by proximity radius. When MORE exhausts in-hood events, it shows nearby-neighborhood events without telling the user.
 
-### Target Architecture
+### Target Architecture (Agent Brain — Primary Path)
 
 ```
-message → pre-router (compound extraction) → filter merge → tagged pool
-  → LLM-reason(type, picks, filter_intent) → validate boundary → code derives all state
-  → LLM-render(events + context → sms_text) → atomic save → SMS
+message → checkMechanical ($0 shortcuts: 1-5, more, help)
+  → callAgentBrain (Gemini tool calling)
+  → tool execution (search_events / get_details / respond)
+  → brainCompose (lightweight SMS composition)
+  → atomic save (saveResponseFrame) → SMS
 ```
+
+Fallback: Claude Haiku activates within the same agent loop on Gemini failure.
 
 ### Migration Status
 
@@ -99,9 +97,9 @@ message → pre-router (compound extraction) → filter merge → tagged pool
 | 7 | `executeQuery` pipeline — single prompt path for unified flow | P4 | **Done** (unified path). Legacy `routeMessage`, `composeResponse`, `ROUTE_SYSTEM`, `COMPOSE_SYSTEM` still exist for `handleMore` path. |
 | 8 | Scoped event fetching — `neighborhood`/`borough` scope | — | Planned |
 
-Steps 1-3, 6-7 are done. Step 4 was implemented but abandoned — the unified path with `tool_use` achieves structured output without the complexity of two calls. Step 8 is planned.
+Steps 1-3, 6-7 are done. Step 4 was implemented but abandoned. Step 8 is planned. The agent brain (2026-03-02) superseded much of this migration — tool calling provides structured state natively, making the pre-router compound extraction (Step 2) and `filter_intent` schema (Step 2b) vestigial on the primary path. They remain active on the unified-flow fallback.
 
-**Key decision:** The unified path uses `tool_use` with `tool_choice` for guaranteed structured output (prompt audit, 2026-03-01). This eliminates the primary motivation for the reasoning/rendering split (P2) — schema compliance is now enforced without a separate reasoning call.
+**Key decision (2026-03-05):** The agent brain is the primary architecture. Tool call params (`search_events` args) are the system of record for state — cleaner than the unified path's `filter_intent` schema or pre-router compound regex. The unified-flow path (Claude Haiku + `tool_use`) is retained as fallback.
 
 ---
 
@@ -315,7 +313,7 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 
 ## Source Coverage
 
-### Current Sources (19 active)
+### Current Sources (23 entries across 21 scraper modules)
 
 | Source | Weight | Method | Strength |
 |--------|--------|--------|----------|
@@ -323,36 +321,42 @@ Pre-router mechanical shortcuts (greetings, help, thanks, bye) go through `handl
 | Skint Ongoing | 0.9 | HTML → deterministic parser | Series events (exhibitions, festivals) |
 | Nonsense NYC | 0.9 | Newsletter → Claude | Underground/DIY/weird |
 | Screen Slate | 0.9 | Newsletter → Claude | Indie/repertory film |
+| BK Mag | 0.9 | RSS + Cheerio HTML | Brooklyn weekend guide, curated |
+| Luma | 0.9 | JSON API | Community, food, art, social (~330/week) |
 | RA | 0.85 | GraphQL | Electronic/dance/nightlife |
 | Dice | 0.8 | `__NEXT_DATA__` JSON (6 categories) | Ticketed shows, DJ sets, comedy, theater |
 | BrooklynVegan | 0.8 | DoStuff JSON | Free shows, indie/rock |
 | BAM | 0.8 | JSON API | Film, theater, music, dance |
-| ~~SmallsLIVE~~ | ~~0.8~~ | ~~AJAX HTML~~ | ~~Removed: single-venue jazz, low volume~~ |
 | Yutori | 0.8 | Gmail + file briefings → Claude | Curated newsletters |
+| Sofar Sounds | 0.8 | Cheerio HTML (DoNYC venue page) | Secret concerts, 15+ neighborhoods |
 | NYC Parks | 0.75 | Schema.org | Free parks/outdoor events |
 | DoNYC | 0.75 | Cheerio HTML | Music, comedy, theater |
 | Songkick | 0.75 | JSON-LD | Concerts/music |
 | Ticketmaster | 0.75 | Discovery API | Indie filter: blocklist + $100 cap |
+| Tiny Cupboard | 0.75 | JSON-LD | Bushwick comedy, single-venue |
+| Brooklyn Comedy Collective | 0.75 | Squarespace HTML | East Williamsburg comedy, 4 stages |
+| NYC Trivia League | 0.75 | Cheerio HTML | Weekly trivia across 25+ venues, free |
 | Eventbrite | 0.7 | JSON-LD / `__SERVER_DATA__` | Broad aggregator |
-| Luma | 0.7 | JSON API | Community, food, art, social (~330/week) |
 | NYPL | 0.7 | Eventbrite organizer | Free library events |
-| EventbriteComedy/Arts | 0.7 | Same parser, category URLs | Comedy/art-specific |
+| EventbriteComedy | 0.7 | Eventbrite search pages | Comedy-specific |
+| EventbriteArts | 0.7 | Eventbrite search pages | Art-specific |
 
-**Inactive (scrapers preserved):** OhMyRockness (80% loss rate, all duplicates), Tavily (removed from hot path, used as exhaustion fallback only).
+**Inactive (scrapers preserved):** OhMyRockness (80% loss rate, all duplicates), SmallsLIVE (single-venue jazz, low volume), Tavily (removed from hot path).
 
 ### Category Gaps
 
 | Category | Coverage | Gap |
 |----------|----------|-----|
 | Electronic/dance | Strong (RA, Dice) | — |
-| Indie/rock/punk | Good (Songkick, BrooklynVegan, Dice) | — |
-| Comedy | Moderate (EventbriteComedy, DoNYC, Dice) | No dedicated comedy source |
+| Indie/rock/punk | Good (Songkick, BrooklynVegan, Dice, Sofar) | — |
+| Comedy | Good (TinyCupboard, BrooklynCC, EventbriteComedy, DoNYC, Dice) | 330 events from 10 sources |
+| Trivia | Good (NYC Trivia League, Yutori) | ~165 events/week |
 | Art/galleries | Moderate (EventbriteArts, Skint, Luma) | No gallery opening calendar |
 | Theater | Moderate (DoNYC, BAM, Dice) | No Broadway/off-Broadway source |
-| Community/social | Good (Luma, NYC Parks, Eventbrite) | — |
+| Community/social | Good (Luma, NYC Parks, Eventbrite, NYCTrivia) | — |
 | Food/drink | Moderate (Luma) | Single source for food events |
-| Underground/DIY | Single source (Nonsense NYC) | If it breaks, entire vibe gone |
-| Jazz | Moderate (Skint, DoNYC) | SmallsLIVE removed (low volume) |
+| Underground/DIY | Good (Nonsense NYC, Sofar Sounds, BKMag) | — |
+| Jazz | Moderate (Skint, DoNYC) | — |
 | Film | Good (Screen Slate, BAM, Skint Ongoing) | — |
 
 ---
@@ -395,14 +399,74 @@ Google Places deferred — the signals it provides (Popular Times, review count,
 - Capture persona signal in preference-profile.js so it persists across sessions
 - This is a compose skill + pick-ranking change, not a new pipeline
 
-### Near-term — Source + Quality
+### Agent-Native Evolution (Priority — 5 phases)
+
+**North star:** Pulse is a single agent loop that works with any tool-calling model, owns the full conversation, and builds a relationship with each user over time.
+
+**Phase 1: Unified Agent Loop** — Delete unified-flow, one code path
+
+Refactor `callAgentBrain` to accept a model provider parameter. Try Gemini first, fall back to Claude on failure — same tools, same flow, different model. Delete the legacy unified-flow path entirely.
+
+- `callAgentBrain(message, session, phone, trace, { provider })` — model-agnostic agent loop
+- Gemini → Claude fallback within the same code path (same tools, same `search_events`/`get_details`/`respond`)
+- Extract `checkMechanical` + `getAdjacentNeighborhoods` to utils — decouple from pre-router
+- Delete: `unified-flow.js`, `pre-router.js` (most of it), `src/skills/` directory, `model-router.js`
+- ~~Remove `PULSE_AGENT_BRAIN` env var~~ — **Done** (2026-03-05)
+- Risk: Claude tool calling costs ~2-5x more than Gemini. Fallback-only, so cost impact proportional to Gemini failure rate (<1%).
+- Eval: full scenario suite against single-path architecture. Pass rate must match or exceed 99.9%.
+
+**Phase 2: Single-Turn Agent** — Merge routing + compose into one generation
+
+Merge `callAgentBrain` and `brainCompose` into a single agent turn. The agent calls `search_events`, sees results inline, and writes the SMS in the same generation.
+
+- `search_events` tool returns event pool as tool result; agent continues generating → writes SMS directly
+- Delete `brainCompose` — the agent IS the composer
+- `respond` tool simplified or removed — agent writes conversational SMS directly
+- `get_details` tool returns event detail → agent writes detail SMS in same turn
+- Pool serialization: ~50-100 tokens/event × 15 events = ~1500 tokens. Fits in context.
+- Cost: ~$0.0008/call (up from ~$0.0005). Worth it for coherence — the agent that understood "something lowkey and weird" writes the copy.
+- Eval: A/B eval — single-turn vs two-call. Measure editorial quality, filter compliance, 480-char compliance.
+
+**Phase 3: Conversation History as State** — Reduce session to accumulators
+
+Feed the agent its own tool call history so it can derive context without explicit session fields.
+
+- Conversation history includes tool calls + tool results (not just user/assistant text)
+- Remove from session: `lastNeighborhood`, `lastFilters`, `lastBorough`, `pendingNearby`, `pendingFilters`, `pendingMessage` — all derivable from tool call history
+- Keep in session: `lastPicks`, `lastEvents` (event map cache), `allPicks`/`allOfferedIds` (dedup accumulators), `visitedHoods`, `lastResponseHadPicks`
+- Session: 12 fields → 7 fields
+- Risk: agent may "forget" context if history truncated (currently 6 turns). May need 8-10 turns or summarize older turns.
+- Eval: full suite, especially filter_drift and edge_case categories.
+
+**Phase 4: Agent-Native Details and More** — Move mechanical handlers into the agent
+
+The agent handles "2", "more", and natural language detail requests instead of mechanical pattern matching.
+
+- Remove `checkMechanical` for numbers and "more" — agent handles them as tool calls
+- `get_details` enhanced: agent can reference by number, name, or description ("that comedy one", "the jazz thing from earlier")
+- `search_events` with `intent: "more"` — agent decides whether to show more from same pool or suggest a pivot
+- Keep `checkMechanical` only for: "help" (canned, $0), STOP/opt-out (TCPA compliance)
+- Cost: ~$0.0005 per detail/more request (currently $0). Negligible at current volume. Capability gain: natural language references, smarter exhaustion handling.
+- Eval: details and more scenarios. Verify "2", "more", "tell me about the jazz one" all work.
+
+**Phase 5: Preference Learning in the Loop** — The agent knows you
+
+The agent reads the user's preference profile and adapts its editorial voice per user.
+
+- `preference-profile.js` data injected into agent system prompt
+- Agent adapts: discovery-heavy for explorers, venue-specific for regulars, community-focused for new-to-city users
+- Proactive persona detection: "new here", "solo tonight" → amplified community lean (subsumes Community Layer Phase 3)
+- Cross-session memory: "you went to trivia at Black Rabbit twice — they have one tonight"
+- Eval: new eval category for personalization. Verify the agent adapts without being creepy or presumptuous.
+
+### Source + Quality
 
 - Comedy source — Dedicated scraper for Comedy Cellar, UCB, Caveat, QED
 - Gallery/art source — Gallery listing aggregator or DoNYC art category
 - Happy hour detection — Identify recurring happy hours from event data and venue pages; surface as a filterable category ("happy hours near me")
 - ~~Niche/local-first ranking~~ — **Done** via three layers: (1) editorial lean in UNIFIED_SYSTEM + BRAIN_COMPOSE_SYSTEM prompts, (2) deterministic `vibeOrder` sort tiebreaker in `rankEventsByProximity`, `getEventsCitywide`, `getEventsForBorough` — discovery events surface first in pool, (3) `source_vibe` wired into traces (sent_pool + picks) for measurement. `discovery_lean` code eval tracks pick ratio. Eval results: 51% of picks from discovery/niche sources (up from 28% baseline), mainstream down to 5% of pool
 
-### Medium-term — Intelligence
+### Intelligence
 
 - Scout worker — Background process to fill neighborhood gaps after daily scrape
 - Perennial picks evolution — Auto-detect candidates from scrape data
@@ -410,21 +474,18 @@ Google Places deferred — the signals it provides (Popular Times, review count,
 - Self-healing scraper pipeline — Daily automated health check that detects scraper failures (0 events, parse errors, schema changes) and attempts self-repair: retry with backoff, fall back to cached data, alert on structural breakage. Build on existing `source-health.js` alerts + scrape audit
 - Web discovery crawlers — Scheduled crawlers that search for niche/interesting events beyond whitelisted sources. Targeted web searches (Tavily or similar) for neighborhood-specific terms ("bushwick pop-up", "LES gallery opening", "DIY warehouse show"), deduplicate against existing cache, feed into extraction pipeline
 - "Stumble" mode — Text "stumble" or "surprise me" and get 1-3 genuinely unexpected picks: hidden gems, one-night-only events, weird/unique happenings. Selection heuristic: low source frequency (appears in ≤1 source), unusual category, non-recurring, small venue. Different from citywide scan — optimizes for serendipity, not coverage
-- Better interest capture — Expand onboarding to capture 2-3 preference signals early ("what are you into?" or infer from first few interactions). Feed into preference-profile.js to build richer user profiles faster
 
-### Long-term — Infrastructure + Product
+### Infrastructure + Product
 
 - PostgreSQL — Persistent event storage, user sessions, conversation history
-- Preference learning — Profile capture done; next: inject profile into compose prompt for personalized picks
 - Profile-based event ranking — Score and re-rank the tagged event pool using user profile signals (preferred categories, neighborhoods, price sensitivity, past engagement). Profile-weighted events surface higher in picks without replacing filter logic
 - Proactive user alerts — For users with established profiles, send unsolicited texts when high-match events are discovered: "Hey, there's a free jazz thing in your neighborhood tonight." Requires opt-in, frequency caps, and a match-quality threshold to avoid spam
-- SMS map sharing — Generate a shareable map image or link showing picked event locations. Options: static map image (Mapbox/Google Static Maps API) embedded in MMS, or a short link to a lightweight map page. MMS costs more (~$0.02 vs $0.008) but visual impact is high for multi-pick responses
-- Group planning / voting — Multi-user coordination: one person texts "plan saturday with @friend1 @friend2", Pulse sends each person the same picks, collects votes (text back 1/2/3), reports consensus. Requires multi-phone session linking and a voting state machine. Could start simpler: shareable pick list link where friends vote via web
+- SMS map sharing — Generate a shareable map image or link showing picked event locations. Static map image (Mapbox/Google Static Maps API) embedded in MMS, or short link to lightweight map page
+- Group planning / voting — Multi-user coordination: shareable pick list link where friends vote via web
 - Referral analytics — Dashboard for referral code generation, card views, conversion rates
 - Paid tier — Stripe billing, $5-10/month unlimited
 - Push notifications — "Free rooftop thing near you starting in 30 min"
 - Multi-city — Same architecture, different sources
-- SQLite user profiles — implicit personalization, "my usual", weekend digest
 
 ---
 
@@ -439,7 +500,8 @@ Google Places deferred — the signals it provides (Popular Times, review count,
 | No horizontal scalability | Low | Single-process, in-memory sessions |
 | ~~Dead split-mode code~~ | ~~Low~~ | **Done** — deleted `REASON_SYSTEM`, `RENDER_SYSTEM`, `reasonIntent`, `renderSms`, `buildReasonPrompt`, `buildRenderPrompt`, `callSplitUnified`, `REASON_TOOL`, `REASON_GEMINI_SCHEMA`, `PULSE_SPLIT_MODE` gate (2026-03-01) |
 | ~~Legacy `handleMore` prompts~~ | ~~Low~~ | **Already done** — `routeMessage`, `composeResponse`, `ROUTE_SYSTEM`, `COMPOSE_SYSTEM` were already removed; `handleMore` uses `unifiedRespond` via `executeQuery` |
-| Preference learning not yet active | Low | Profiles captured but not injected into prompts |
+| Preference learning not yet active | Low | Profiles captured but not injected into prompts — Phase 5 of agent-native evolution |
+| unified-flow.js + pre-router.js + compose skills | Medium | ~1500 lines of legacy fallback code — Phase 1 deletes these |
 | ~~`cityScan` skill activation mismatch~~ | ~~Low~~ | **Removed** — dead code (`cityScan` + `venueFraming`), never activated |
 | ~~`architecture.html` references deleted flow~~ | ~~Low~~ | **Fixed** — removed two-call flow refs, updated session field description |
 | ~~UNIFIED/REASON prompt duplication~~ | ~~Low~~ | **Fixed** — extracted `SHARED_UNDERSTANDING(verb)` + `SHARED_GEOGRAPHY` constants (prompt audit, 2026-03-01) |
@@ -454,7 +516,7 @@ Google Places deferred — the signals it provides (Popular Times, review count,
 | Mar 3 | Eval suite audit + gap fill | Curator audit identified category imbalance + zero agent brain coverage. Fixed stale `trivia: 'community'` in CATEGORY_PARENTS. Updated food/drink scenario [54] (food_drink is real category). Promoted `discovery_lean` eval from informational to enforced (30% floor). Removed 3 duplicates. Added 34 scenarios: trivia (5), theater (4), community (4), nightlife (3), film (2), mid-session compounds (2), neighborhoods (2), recurrence (2), date ranges (3), agent brain (7). Added `--pipeline` flag to eval runner for gated agent brain scenarios. Suite: 262→293 multi-turn (286 default + 7 agent_brain). Audit: `data/reports/eval-audit-2026-03-03.md`. |
 | Mar 3 | Skint multi-day thru parsing + description coverage | Skint daily parser handles `tues thru sun:`, `tues thru 3/14:`, `(monthly)`/`(biweekly)` modifiers, and `►` bulleted sub-events with inherited `series_end`. `parseThruDate` now resolves day names. Description extraction added to Luma (API `description` field), Songkick (performer names from JSON-LD), DoNYC (detail page `.ds-event-description`). DoNYC `enrichPrices` → `enrichFromDetailPages` fetches for events missing price OR description. |
 | Mar 2 | Cross-source recurrence detection (Community Layer Phase 1) | `detectRecurringPatterns()` finds 205 patterns from 30-day historical data via SQL GROUP BY. NYC Trivia League + Yutori feed shared `processRecurrencePatterns()`. 790 events stamped `is_recurring` in serving cache. LLM surfaces "every Tues!" naturally via `recurringEvent` compose skill. `/health` shows pattern count. 485 active patterns in production. |
-| Mar 2 | Agent Brain prototype (`src/agent-brain.js`) | Parallel LLM routing path via Gemini Flash tool calling, gated behind `PULSE_AGENT_BRAIN=true`. Replaces regex pre-router for semantic messages. 3 tools: `search_events` (neighborhood/category/time/date_range/free_only + intent), `get_details`, `respond`. Mechanical pre-check ($0) for help/numbers/more. Gemini→Anthropic fallback on MALFORMED_FUNCTION_CALL/quota errors. `resolveDateRange()` converts enum→date objects. Addresses all 3 open bugs (date range recognition, temporal persistence, compound category pivot). ~$0.0004/msg vs ~$0.001 current. |
+| Mar 2 | Agent Brain (`src/agent-brain.js`) | Primary LLM routing path via Gemini Flash tool calling. 3 tools: `search_events` (neighborhood/category/time/date_range/free_only + intent), `get_details`, `respond`. Mechanical pre-check ($0) for help/numbers/more. Gemini→Anthropic fallback on MALFORMED_FUNCTION_CALL/quota errors. `resolveDateRange()` converts enum→date objects. Solved 3 bugs the deterministic path couldn't (date range recognition, temporal persistence, compound category pivot). 99.9% code eval pass rate. ~$0.0005/msg. Unified-flow (Claude Haiku) remains as fallback. |
 | Mar 2 | Gemini Flash → Flash Lite → Haiku fallback chain | Three-tier model cascade on quota errors across all 3 Gemini call sites; `isQuotaError()` helper; Flash default restored (was Flash Lite) |
 | Mar 2 | Broad query support (citywide category + date range) | party/parties + film/films/cinema/movie/movies in catMap, `parseDateRange()` for "this week"/"this weekend"/"tomorrow", filter-aware citywide pool (`filterAwareSort`), borough+neighborhood resolution fix ("brooklyn/williamsburg"), MULTI-DAY DATA prompt, 12 multi-turn + 5 regression scenarios |
 | Mar 1 | Prompt audit: best practices overhaul | tool_use for unified path (guaranteed JSON), self-verification checklist, tone reduction (31 ALL-CAPS → rationale-based), examples trimmed 18→8, negative→positive rewrites, shared prompt sections extracted (`SHARED_UNDERSTANDING`/`SHARED_GEOGRAPHY`), XML skill tags, user prompt restructured (data top, query bottom) |

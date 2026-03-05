@@ -651,8 +651,8 @@
     </details>
 
     <div class="card" style="border-left: 3px solid var(--purple);">
-      <h3 style="color: var(--purple);">Alternative path: Agent Brain</h3>
-      <p>When <code>PULSE_AGENT_BRAIN=true</code>, the unified LLM call (Steps 5-6) is replaced by <strong>Gemini 2.5 Flash Lite tool calling</strong> (~$0.0005/msg, 2-3s). Three tools: <code>search_events</code> (with multi-category OR), <code>get_details</code>, <code>respond</code>. A lightweight <code>brainCompose</code> call generates the final SMS. Falls back to Claude Haiku on Gemini 503s.</p>
+      <h3 style="color: var(--purple);">Agent Brain</h3>
+      <p>The agent brain is the primary (and only) LLM path. <strong>Gemini 2.5 Flash Lite tool calling</strong> (~$0.0005/msg, 2-3s) with three tools: <code>search_events</code> (with multi-category OR), <code>get_details</code>, <code>respond</code>. A lightweight <code>brainCompose</code> call generates the final SMS. Falls back to Claude Haiku on Gemini 503s.</p>
     </div>
 
     <div class="card">

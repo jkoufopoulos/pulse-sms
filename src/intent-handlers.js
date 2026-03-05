@@ -164,7 +164,7 @@ async function handleDetails(ctx) {
 
 /**
  * Lightweight compose via agent brain's brainCompose (flash-lite).
- * Used when PULSE_AGENT_BRAIN=true. Same trace recording as composeViaExecuteQuery.
+ * Lightweight compose via brainCompose (flash-lite). Same trace recording pattern.
  */
 async function composeViaBrain(events, ctx, { hood, activeFilters, excludeIds, skills } = {}) {
   // Lazy require to avoid circular dependency (agent-brain imports intent-handlers)

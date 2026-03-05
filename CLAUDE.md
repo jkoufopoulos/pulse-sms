@@ -29,8 +29,6 @@ Pulse routes every incoming message through `checkMechanical` (fast $0 shortcuts
 
 **Agent brain (primary path, ~$0.0005/call)** — Gemini 2.5 Flash Lite with tool calling. `checkMechanical` handles $0 shortcuts (bare numbers 1-5, "more", "help", greetings/thanks/bye), then `callAgentBrain` invokes 3 tools (`search_events`, `get_details`, `respond`), followed by `brainCompose` for lightweight SMS composition. 2-3s typical latency. Tool call params (`search_events` args) are the system of record for filters and intent. Falls back to Anthropic Haiku on Gemini 503s. 99.9% code eval pass rate.
 
-**Unified flow (fallback, ~$0.001/call)** — A single Claude Haiku call that understands intent AND composes the SMS response. Activates when `PULSE_AGENT_BRAIN` is not set. Uses pre-router for filter detection and `mergeFilters` for deterministic state. Legacy path retained as fallback.
-
 A typical multi-turn conversation:
 ```
 User: "williamsburg"           → agent brain: search_events({neighborhood: "williamsburg"}) ($0.0005)
@@ -91,8 +89,6 @@ Daily scrape (10am ET)              Incoming SMS
                               │
                          twilio.js (send SMS)    ~$0.008
 
-Fallback: unified-flow.js (Claude Haiku, ~$0.001/call)
-          activates when PULSE_AGENT_BRAIN is not set
 ```
 
 **Key modules** (all under `src/`):
@@ -105,7 +101,7 @@ Fallback: unified-flow.js (Claude Haiku, ~$0.001/call)
 | `pre-router.js` | Deterministic intent matching + session-aware filter detection. Used by unified-flow fallback path |
 | `pipeline.js` | `mergeFilters`, `buildTaggedPool`, `eventMatchesFilters`, `saveResponseFrame` (atomic session writes) |
 | `ai.js` | `unifiedRespond` (single Haiku call), `composeResponse` (handleMore), `extractEvents` (scrape-time) |
-| `agent-brain.js` | Primary LLM path: `checkMechanical` ($0), `callAgentBrain` (Gemini tool calling), `brainCompose`. Enabled by `PULSE_AGENT_BRAIN=true` |
+| `agent-brain.js` | Primary LLM path: `checkMechanical` ($0), `callAgentBrain` (Gemini tool calling), `brainCompose`. Falls back to Claude Haiku on Gemini 503s |
 | `prompts.js` | System prompts: `UNIFIED_SYSTEM`, `DETAILS_SYSTEM`, `EXTRACTION_PROMPT` |
 | `session.js` | Per-phone session store, 2hr TTL, 12 fields |
 | `events.js` | Daily event cache + disk persistence, cross-source dedup, quality gates, source vibe stamping |
@@ -132,7 +128,7 @@ Sources: 22 entries across 20 scraper modules in `sources/` — see `source-regi
 
 Required: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `ANTHROPIC_API_KEY`, `TAVILY_API_KEY` (required at boot, not used in hot path).
 
-Optional: `PORT` (default 3000), `PULSE_TEST_MODE=true` (enables simulator), `PULSE_AGENT_BRAIN=true` (enables agent brain — primary LLM path), `GEMINI_API_KEY` (agent brain + fallback provider), `TICKETMASTER_API_KEY`, `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`/`GMAIL_REFRESH_TOKEN` (newsletter scrapers), `RESEND_API_KEY`/`ALERT_EMAIL` (email alerts), `PULSE_NO_RATE_LIMIT=true`, `PULSE_CARD_ENABLED=true` (enables branded card pages; default off, uses direct source URLs), `PULSE_CARD_DOMAIN`, `PULSE_LINK_PREVIEWS=true` (sends each pick's URL as a separate SMS for iMessage link previews).
+Optional: `PORT` (default 3000), `PULSE_TEST_MODE=true` (enables simulator), `GEMINI_API_KEY` (agent brain + fallback provider), `TICKETMASTER_API_KEY`, `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`/`GMAIL_REFRESH_TOKEN` (newsletter scrapers), `RESEND_API_KEY`/`ALERT_EMAIL` (email alerts), `PULSE_NO_RATE_LIMIT=true`, `PULSE_CARD_ENABLED=true` (enables branded card pages; default off, uses direct source URLs), `PULSE_CARD_DOMAIN`, `PULSE_LINK_PREVIEWS=true` (sends each pick's URL as a separate SMS for iMessage link previews).
 
 Model overrides: `PULSE_MODEL_COMPOSE`, `PULSE_MODEL_EXTRACT`, `PULSE_MODEL_ROUTE`, `PULSE_MODEL_ROUTE_GEMINI`, `PULSE_ROUTE_PROVIDER`.
 

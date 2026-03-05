@@ -14,7 +14,7 @@
  *   node scripts/run-scenario-evals.js --url http://...           # Custom server
  *   node scripts/run-scenario-evals.js --concurrency 15          # Parallel scenarios (default: 10)
  *   node scripts/run-scenario-evals.js --judge                   # Enable LLM judge (off by default)
- *   node scripts/run-scenario-evals.js --pipeline agent_brain    # Run agent brain scenarios (server must have PULSE_AGENT_BRAIN=true)
+ *   node scripts/run-scenario-evals.js --pipeline agent_brain    # Run agent brain scenarios
  */
 
 require('dotenv').config();
