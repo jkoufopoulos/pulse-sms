@@ -107,12 +107,11 @@ function inferCategory(text) {
   const lower = text.toLowerCase();
   if (/\b(?:screening|cinema|repertory|35mm|restored?\s*print|midnight\s*show|film\s*forum|metrograph|nitehawk|ifc center|spectacle)\b/.test(lower)) return { category: 'art', subcategory: 'film' };
   if (/\b(?:stand-?up|improv|comedy)\b/.test(lower)) return { category: 'comedy', subcategory: null };
-  if (/\b(?:listening\s*session)\b/.test(lower)) return { category: 'music', subcategory: 'listening' };
+  if (/\b(?:listening\s*session)\b/.test(lower)) return { category: 'live_music', subcategory: 'listening' };
   if (/\b(?:dj\b|techno|house\s*music|rave|dance\s*party|dancehall|edm|underground\s*(?:edm|techno))\b/.test(lower)) return { category: 'nightlife', subcategory: null };
-  if (/\b(?:jazz|concert|live\s*music|album\s*release|indie\s*rock|songwriter|kora)\b/.test(lower)) return { category: 'music', subcategory: null };
+  if (/\b(?:jazz|concert|live\s*music|album\s*release|indie\s*rock|songwriter|kora)\b/.test(lower)) return { category: 'live_music', subcategory: null };
   if (/\b(?:art\s*opening|gallery|exhibition|installation)\b/.test(lower)) return { category: 'art', subcategory: null };
   if (/\b(?:book\s*launch|reading|literary|poetry)\b/.test(lower)) return { category: 'art', subcategory: 'literary' };
-  if (/\b(?:listening\s*session)\b/.test(lower)) return { category: 'music', subcategory: 'listening' };
   return { category: 'other', subcategory: null };
 }
 

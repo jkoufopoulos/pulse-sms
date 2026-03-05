@@ -45,7 +45,7 @@ function getNycDayContext() {
 const CATEGORY_PATTERNS = [
   { pattern: /\b(comedy|stand[- ]?up|improv|sketch|roast)\b/i, category: 'comedy' },
   { pattern: /\b(storytelling|stories|story\s+show|tale\b|open mic)\b/i, category: 'comedy' },
-  { pattern: /\b(jazz|dj\b|hip[- ]?hop|concert|live music|band\b|singer|songwriter|punk|rock\b|electronic|techno|house music|soul\b|funk|r&b|rap\b|classical|orchestra|symphony|opera)\b/i, category: 'music' },
+  { pattern: /\b(jazz|dj\b|hip[- ]?hop|concert|live music|band\b|singer|songwriter|punk|rock\b|electronic|techno|house music|soul\b|funk|r&b|rap\b|classical|orchestra|symphony|opera)\b/i, category: 'live_music' },
   { pattern: /\b(art\s+(opening|show|exhibition)|gallery|exhibition|sculpture|installation|mural)\b/i, category: 'art' },
   { pattern: /\b(film|movie|screening|cinema|documentary)\b/i, category: 'film' },
   { pattern: /\b(theater|theatre|play\b|musical|broadway|drama)\b/i, category: 'theater' },
