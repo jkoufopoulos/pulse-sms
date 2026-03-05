@@ -139,6 +139,77 @@ function scoreInterestingness(event) {
 }
 
 /**
+ * Select N picks from a scored pool, maximizing category diversity.
+ * Takes the highest-scored event, then picks from unseen categories, then fills remaining slots.
+ */
+function selectDiversePicks(scoredPool, count = 3) {
+  if (scoredPool.length === 0) return [];
+  const sorted = [...scoredPool].sort((a, b) => b.interestingness - a.interestingness);
+  const picks = [];
+  const usedCategories = new Set();
+
+  // First pass: one per category
+  for (const event of sorted) {
+    if (picks.length >= count) break;
+    if (!usedCategories.has(event.category)) {
+      picks.push(event);
+      usedCategories.add(event.category);
+    }
+  }
+
+  // Second pass: fill remaining slots with best available
+  if (picks.length < count) {
+    const pickIds = new Set(picks.map(p => p.id));
+    for (const event of sorted) {
+      if (picks.length >= count) break;
+      if (!pickIds.has(event.id)) picks.push(event);
+    }
+  }
+
+  return picks;
+}
+
+/**
+ * Get the top interestingness-ranked events for first-message / "surprise me" queries.
+ * Returns up to `count` events with category diversity enforced.
+ * Uses today+tomorrow date gate by default, widens to 7 days if pool is thin.
+ */
+async function getTopPicks(count = 10) {
+  if (eventCache.length === 0) {
+    await refreshCache();
+  }
+
+  const qualityFiltered = applyQualityGates(eventCache);
+  const todayNyc = getNycDateString(0);
+  const tomorrowNyc = getNycDateString(1);
+
+  // First try: today + tomorrow only
+  let dateFiltered = qualityFiltered.filter(e => {
+    const d = getEventDate(e);
+    if (!d) return false;
+    return d >= todayNyc && d <= tomorrowNyc;
+  });
+
+  // Widen to 7 days if pool is thin (< 5 scoreable events)
+  if (dateFiltered.length < 5) {
+    const weekOutNyc = getNycDateString(7);
+    dateFiltered = qualityFiltered.filter(e => {
+      const d = getEventDate(e);
+      if (!d) return false;
+      return d >= todayNyc && d <= weekOutNyc;
+    });
+  }
+
+  // Score each event
+  const scored = dateFiltered.map(e => ({
+    ...e,
+    interestingness: scoreInterestingness(e),
+  }));
+
+  return selectDiversePicks(scored, count);
+}
+
+/**
  * Source vibe signal — classifies source_name into discovery-factor tiers.
  * discovery: editorial picks, underground — the stuff your coolest friend knows about.
  * niche: focused, known but specific venues/orgs.
@@ -887,4 +958,4 @@ function scanCityWide(filters) {
     .map(([neighborhood, matchCount]) => ({ neighborhood, matchCount }));
 }
 
-module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, getEvents, getEventsForBorough, getEventsCitywide, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs, scanCityWide, scoreInterestingness };
+module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, getEvents, getEventsForBorough, getEventsCitywide, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs, scanCityWide, scoreInterestingness, selectDiversePicks, getTopPicks };

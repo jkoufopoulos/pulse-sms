@@ -233,3 +233,32 @@ check('platform one-off unknown venue = 2', scoreInterestingness({
 check('no source_vibe = platform default', scoreInterestingness({
   is_recurring: false, venue_size: 'medium',
 }) === 2);
+
+// ---- selectDiversePicks ----
+const { selectDiversePicks } = require('../../src/events');
+
+console.log('\nselectDiversePicks:');
+
+const scoredPool = [
+  { id: '1', category: 'comedy', interestingness: 6 },
+  { id: '2', category: 'comedy', interestingness: 5 },
+  { id: '3', category: 'live_music', interestingness: 5 },
+  { id: '4', category: 'art', interestingness: 4 },
+  { id: '5', category: 'comedy', interestingness: 4 },
+  { id: '6', category: 'nightlife', interestingness: 3 },
+];
+
+const picks = selectDiversePicks(scoredPool, 3);
+check('returns 3 picks', picks.length === 3);
+check('first pick is highest score', picks[0].id === '1');
+check('no two picks share a category', new Set(picks.map(p => p.category)).size === 3);
+
+const twoCategories = [
+  { id: '1', category: 'comedy', interestingness: 6 },
+  { id: '2', category: 'comedy', interestingness: 5 },
+  { id: '3', category: 'comedy', interestingness: 4 },
+];
+const picks2 = selectDiversePicks(twoCategories, 3);
+check('fills from best remaining when diversity exhausted', picks2.length === 3);
+
+check('empty pool returns empty', selectDiversePicks([], 3).length === 0);
