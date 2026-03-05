@@ -188,7 +188,6 @@ async function dispatchPreRouterIntent(route, ctx) {
           const welcomeResult = await handleWelcome(phone, session, trace);
           trace.routing.result = { intent: 'welcome_referral', confidence: 1.0 };
           await sendSMS(phone, welcomeResult.sms);
-          if (welcomeResult.picks?.length) await sendPickUrls(phone, welcomeResult.picks, welcomeResult.eventMap);
           finalizeTrace(welcomeResult.sms, 'referral');
           return;
         } catch (err) {
@@ -219,7 +218,6 @@ async function dispatchPreRouterIntent(route, ctx) {
         const welcomeResult = await handleWelcome(phone, session, trace);
         trace.routing.result = { intent: 'welcome_referral_expired', confidence: 1.0 };
         await sendSMS(phone, welcomeResult.sms);
-        if (welcomeResult.picks?.length) await sendPickUrls(phone, welcomeResult.picks, welcomeResult.eventMap);
         finalizeTrace(welcomeResult.sms, 'referral_expired');
         return;
       } catch (err) {

@@ -78,7 +78,7 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
       trace.brain_provider = 'welcome';
 
       await sendSMS(phone, welcomeResult.sms);
-      if (welcomeResult.picks?.length) await sendPickUrls(phone, welcomeResult.picks, welcomeResult.eventMap);
+      // No sendPickUrls on welcome — one message is enough before the user has asked for anything
       finalizeTrace(welcomeResult.sms, welcomeResult.intent);
       return trace.id;
     } catch (err) {
