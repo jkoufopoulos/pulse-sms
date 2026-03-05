@@ -150,7 +150,7 @@ function fixJsonNewlines(text) {
  * Used when user asks for more info on a pick (e.g. "what is last resort").
  * Returns { sms_text }
  */
-async function composeDetails(event, pickReason, { pulseUrl, skipGemini } = {}) {
+async function composeDetails(event, pickReason, { pulseUrl } = {}) {
   const now = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   // Build a Google Maps URL as fallback
@@ -195,7 +195,7 @@ Why you recommended it: ${pickReason || 'solid pick for the neighborhood'}
 
 Write the details text. Include this URL: ${bestUrl}`;
 
-  const resolvedModel = skipGemini ? MODELS.fallback : MODELS.details;
+  const resolvedModel = MODELS.details;
   let text, usage, provider;
 
   try {

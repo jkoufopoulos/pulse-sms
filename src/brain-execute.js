@@ -396,7 +396,7 @@ async function buildSearchPool(params, session, phone, trace) {
 
 // --- Tool execution: search_events ---
 
-async function executeSearchEvents(params, session, phone, trace, { skipGemini } = {}) {
+async function executeSearchEvents(params, session, phone, trace, _options = {}) {
   const poolResult = await buildSearchPool(params, session, phone, trace);
 
   // Zero match → return immediately
@@ -415,7 +415,6 @@ async function executeSearchEvents(params, session, phone, trace, { skipGemini }
     matchCount: poolResult.matchCount,
     excludeIds: poolResult.excludeIds,
     suggestedNeighborhood: poolResult.suggestedHood,
-    skipGemini,
   });
   trace.composition.latency_ms = Date.now() - composeStart;
   trace.composition.raw_response = result._raw || null;

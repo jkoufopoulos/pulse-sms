@@ -216,9 +216,12 @@ async function callWithTools(model, systemPrompt, message, tools, options = {}) 
     const candidate = response.candidates?.[0];
     const finishReason = candidate?.finishReason;
 
-    if (finishReason && finishReason !== 'STOP' && finishReason !== 'MALFORMED_FUNCTION_CALL' && finishReason !== 'MAX_TOKENS') {
+    if (finishReason && finishReason !== 'STOP') {
       if (finishReason === 'SAFETY') {
         throw new Error(`callWithTools blocked by safety filter`);
+      }
+      if (finishReason === 'MALFORMED_FUNCTION_CALL' || finishReason === 'MAX_TOKENS') {
+        throw new Error(`Gemini callWithTools: ${finishReason}`);
       }
     }
 
