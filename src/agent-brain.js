@@ -17,7 +17,7 @@
 
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
 const { extractNeighborhood, NEIGHBORHOODS, BOROUGHS, detectBorough } = require('./neighborhoods');
-const { getAdjacentNeighborhoods } = require('./pre-router');
+const { getAdjacentNeighborhoods } = require('./geo');
 const { getEvents, getEventsForBorough, getEventsCitywide, getCacheStatus } = require('./events');
 const { filterKidsEvents } = require('./curation');
 const { buildTaggedPool, buildEventMap, saveResponseFrame, mergeFilters, buildZeroMatchResponse, describeFilters, sendPickUrls } = require('./pipeline');

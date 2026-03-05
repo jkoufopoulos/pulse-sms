@@ -303,4 +303,20 @@ function filterByTimeAfter(events, timeAfterHHMM) {
   return filtered; // hard filter (P5)
 }
 
-module.exports = { resolveNeighborhood, rankEventsByProximity, getNycDateString, getNycUtcOffset, inferCategory, haversine, filterUpcomingEvents, getEventDate, parseAsNycTime, filterByTimeAfter };
+function getAdjacentNeighborhoods(hood, count = 3) {
+  const target = NEIGHBORHOODS[hood];
+  if (!target) return [];
+  const sourceBoro = HOOD_TO_BOROUGH[hood] || null;
+  return Object.entries(NEIGHBORHOODS)
+    .filter(([name]) => name !== hood)
+    .map(([name, data]) => {
+      const rawDist = Math.sqrt(Math.pow(target.lat - data.lat, 2) + Math.pow(target.lng - data.lng, 2));
+      const sameBoro = sourceBoro && HOOD_TO_BOROUGH[name] === sourceBoro;
+      return { name, dist: sameBoro ? rawDist : rawDist * 3 };
+    })
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, count)
+    .map(d => d.name);
+}
+
+module.exports = { resolveNeighborhood, rankEventsByProximity, getNycDateString, getNycUtcOffset, inferCategory, haversine, filterUpcomingEvents, getEventDate, parseAsNycTime, filterByTimeAfter, getAdjacentNeighborhoods };

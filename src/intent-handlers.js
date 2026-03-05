@@ -1,8 +1,7 @@
 const { composeDetails } = require('./ai');
 const { sendSMS } = require('./twilio');
-const { setSession } = require('./session');
 const { formatEventDetails, smartTruncate } = require('./formatters');
-const { getAdjacentNeighborhoods } = require('./pre-router');
+const { getAdjacentNeighborhoods } = require('./geo');
 const { filterByTimeAfter } = require('./geo');
 const { resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, executeQuery } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
@@ -38,9 +37,17 @@ function stripMoreReferences(text) {
 async function handleHelp(ctx) {
   const msg1 = "Hey! I'm Bestie — I dig through the best of what's happening in NYC daily that you'll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.";
   const msg2 = 'Text me a neighborhood like "Bushwick" or a vibe like "jazz tonight" to start exploring. I\'ll send picks — reply a number for details, "more" to keep going, or just tell me what you\'re looking for. The more you text, the better it gets.';
+  saveResponseFrame(ctx.phone, {
+    picks: ctx.session?.lastPicks || [],
+    eventMap: ctx.session?.lastEvents || {},
+    neighborhood: ctx.session?.lastNeighborhood || null,
+    filters: ctx.session?.lastFilters || null,
+    offeredIds: ctx.session?.allOfferedIds || [],
+    prevSession: ctx.session,
+    lastResponseHadPicks: false,
+  });
   await sendSMS(ctx.phone, msg1);
   await sendSMS(ctx.phone, msg2);
-  setSession(ctx.phone, { lastResponseHadPicks: false });
   console.log(`Help sent to ${ctx.masked}`);
   ctx.finalizeTrace(msg1 + '\n' + msg2, 'help');
 }
@@ -55,8 +62,16 @@ async function handleConversational(ctx) {
     );
   }
   const sms = smartTruncate(reply);
+  saveResponseFrame(ctx.phone, {
+    picks: ctx.session?.lastPicks || [],
+    eventMap: ctx.session?.lastEvents || {},
+    neighborhood: ctx.session?.lastNeighborhood || null,
+    filters: ctx.session?.lastFilters || null,
+    offeredIds: ctx.session?.allOfferedIds || [],
+    prevSession: ctx.session,
+    lastResponseHadPicks: false,
+  });
   await sendSMS(ctx.phone, sms);
-  setSession(ctx.phone, { lastResponseHadPicks: false });
   console.log(`Conversational reply sent to ${ctx.masked}`);
   ctx.finalizeTrace(sms, 'conversational');
 }
