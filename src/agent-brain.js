@@ -287,6 +287,13 @@ function checkMechanical(message, session) {
   return null; // → agent brain
 }
 
+/**
+ * Detect if this is a first-touch message (no session context).
+ */
+function isFirstMessage(session) {
+  return !session || (!session.lastPicks?.length && !session.lastNeighborhood && !session.conversationHistory?.length);
+}
+
 // --- Date range resolution ---
 
 function resolveDateRange(value) {
@@ -1047,6 +1054,70 @@ async function executeRespond(params, session, phone, trace) {
   return { sms, intent: 'conversational' };
 }
 
+/**
+ * Handle first-message welcome flow: fetch interestingness-ranked events,
+ * compose welcome+picks, save session, send SMS.
+ */
+async function handleWelcome(phone, session, trace) {
+  const { getTopPicks } = require('./events');
+
+  const eventsStart = Date.now();
+  const topEvents = await getTopPicks(10);
+  trace.events.getEvents_ms = Date.now() - eventsStart;
+  trace.events.candidates_count = topEvents.length;
+  trace.events.candidate_ids = topEvents.map(e => e.id);
+  trace.events.sent_to_claude = topEvents.length;
+  trace.events.sent_ids = topEvents.map(e => e.id);
+  trace.events.sent_pool = topEvents.map(e => ({
+    id: e.id, name: e.name, venue_name: e.venue_name, neighborhood: e.neighborhood,
+    category: e.category, start_time_local: e.start_time_local, date_local: e.date_local,
+    is_free: e.is_free, price_display: e.price_display, source_name: e.source_name,
+    source_vibe: e.source_vibe || null, interestingness: e.interestingness,
+  }));
+
+  if (topEvents.length === 0) {
+    const sms = "Hey! I'm Bestie \u2014 I find the stuff in NYC you won't find on Instagram. Tell me a neighborhood, a vibe, or what you're in the mood for tonight.";
+    saveResponseFrame(phone, { picks: [], eventMap: {}, neighborhood: null, filters: null, offeredIds: [] });
+    return { sms, intent: 'conversational', picks: [], activeFilters: {}, eventMap: {} };
+  }
+
+  const composeStart = Date.now();
+  const result = await welcomeCompose(topEvents);
+  trace.composition.latency_ms = Date.now() - composeStart;
+  trace.composition.raw_response = result._raw || null;
+  trace.composition.active_filters = {};
+  trace.composition.neighborhood_used = 'citywide';
+
+  recordAICost(trace, 'compose', result._usage, result._provider);
+  trackAICost(phone, result._usage, result._provider);
+
+  const eventMap = {};
+  for (const e of topEvents) eventMap[e.id] = e;
+  const validPicks = validatePicks(result.picks, topEvents);
+
+  trace.composition.picks = validPicks.map(p => {
+    const evt = eventMap[p.event_id];
+    return {
+      ...p, date_local: evt?.date_local || null, event_name: evt?.name || null,
+      venue_name: evt?.venue_name || null, neighborhood: evt?.neighborhood || null,
+      category: evt?.category || null, is_free: evt?.is_free ?? null,
+      price_display: evt?.price_display || null, start_time_local: evt?.start_time_local || null,
+      source_vibe: evt?.source_vibe || null,
+    };
+  });
+
+  saveResponseFrame(phone, {
+    picks: validPicks,
+    eventMap,
+    neighborhood: null,
+    filters: null,
+    offeredIds: validPicks.map(p => p.event_id),
+    visitedHoods: ['citywide'],
+  });
+
+  return { sms: result.sms_text, intent: 'events', picks: validPicks, activeFilters: {}, eventMap };
+}
+
 // --- Main orchestrator ---
 
 async function handleAgentBrainRequest(phone, message, session, trace, finalizeTrace) {
@@ -1056,6 +1127,26 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
   const history = session?.conversationHistory || [];
   if (!getSession(phone)) setSession(phone, {});
   addToHistory(phone, 'user', message);
+
+  // First-message welcome flow: intercept cold opens for new users
+  if (isFirstMessage(session)) {
+    try {
+      const welcomeResult = await handleWelcome(phone, session, trace);
+      trace.routing.pre_routed = true;
+      trace.routing.result = { intent: 'welcome', confidence: 1.0 };
+      trace.routing.latency_ms = 0;
+      trace.brain_tool = 'welcome';
+      trace.brain_provider = 'welcome';
+
+      await sendSMS(phone, welcomeResult.sms);
+      if (welcomeResult.picks?.length) await sendPickUrls(phone, welcomeResult.picks, welcomeResult.eventMap);
+      finalizeTrace(welcomeResult.sms, welcomeResult.intent);
+      return trace.id;
+    } catch (err) {
+      console.warn('Welcome flow failed, falling back to agent brain:', err.message);
+      // Fall through to normal agent brain flow
+    }
+  }
 
   try {
     // Call the brain
@@ -1132,4 +1223,4 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
   return trace.id;
 }
 
-module.exports = { checkMechanical, callAgentBrain, handleAgentBrainRequest, resolveDateRange, brainCompose, welcomeCompose, validatePicks };
+module.exports = { checkMechanical, callAgentBrain, handleAgentBrainRequest, resolveDateRange, brainCompose, welcomeCompose, handleWelcome, validatePicks };

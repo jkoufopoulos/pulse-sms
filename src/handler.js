@@ -7,7 +7,7 @@ const { handleHelp, handleConversational, handleDetails, handleMore } = require(
 const { sendRuntimeAlert } = require('./alerts');
 const { getEventById } = require('./events');
 const { lookupReferralCode, recordAttribution } = require('./referral');
-const { saveResponseFrame } = require('./pipeline');
+const { saveResponseFrame, sendPickUrls } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
 const { processedMessages, OPT_OUT_KEYWORDS, isOverBudget, trackAICost, getCostSummary, ipRateLimits, IP_RATE_LIMIT, IP_RATE_WINDOW, clearGuardIntervals } = require('./request-guard');
 
@@ -175,12 +175,27 @@ async function handleMessage(phone, message) {
  * All paths are terminal: sendSMS + finalizeTrace + return.
  */
 async function dispatchPreRouterIntent(route, ctx) {
-  const { phone, session, finalizeTrace } = ctx;
+  const { phone, session, trace, finalizeTrace } = ctx;
 
   if (route.intent === 'referral') {
     const referral = lookupReferralCode(route.referralCode);
     if (referral) {
       recordAttribution(phone, route.referralCode);
+      // Agent brain: use welcome flow instead of canned intro
+      if (process.env.PULSE_AGENT_BRAIN === 'true') {
+        const { handleWelcome } = require('./agent-brain');
+        try {
+          const welcomeResult = await handleWelcome(phone, session, trace);
+          trace.routing.result = { intent: 'welcome_referral', confidence: 1.0 };
+          await sendSMS(phone, welcomeResult.sms);
+          if (welcomeResult.picks?.length) await sendPickUrls(phone, welcomeResult.picks, welcomeResult.eventMap);
+          finalizeTrace(welcomeResult.sms, 'referral');
+          return;
+        } catch (err) {
+          console.warn('Welcome flow failed for referral, using canned intro:', err.message);
+          // Fall through to existing canned messages
+        }
+      }
       const referredEvent = getEventById(referral.eventId);
       updateProfile(phone, {
         neighborhood: referredEvent?.neighborhood || null,
@@ -196,6 +211,20 @@ async function dispatchPreRouterIntent(route, ctx) {
       await sendSMS(phone, msg2);
       finalizeTrace(msg1 + '\n' + msg2, 'referral');
       return;
+    }
+    // Agent brain: use welcome flow even for expired referrals
+    if (process.env.PULSE_AGENT_BRAIN === 'true') {
+      const { handleWelcome } = require('./agent-brain');
+      try {
+        const welcomeResult = await handleWelcome(phone, session, trace);
+        trace.routing.result = { intent: 'welcome_referral_expired', confidence: 1.0 };
+        await sendSMS(phone, welcomeResult.sms);
+        if (welcomeResult.picks?.length) await sendPickUrls(phone, welcomeResult.picks, welcomeResult.eventMap);
+        finalizeTrace(welcomeResult.sms, 'referral_expired');
+        return;
+      } catch (err) {
+        console.warn('Welcome flow failed for expired referral, using canned intro:', err.message);
+      }
     }
     const msg1 = "Hey! I'm Bestie — I dig through the best of what's happening in NYC daily that you'll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.";
     const msg2 = 'Text me a neighborhood like "Bushwick" or a vibe like "jazz tonight" to start exploring. I\'ll send picks — reply a number for details, "more" to keep going, or just tell me what you\'re looking for.';
