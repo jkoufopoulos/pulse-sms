@@ -226,7 +226,10 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
           // Fallback to brainCompose if continuation fails
           console.warn('More continuation failed, falling back to brainCompose:', err.message);
           trace.brain_error = (trace.brain_error || '') + ` more_continuation: ${err.message}`;
-          const composed = await brainCompose(moreResult.events, moreResult.neighborhood || 'NYC', moreResult.activeFilters || {}, trace, phone);
+          const composed = await brainCompose(moreResult.events, {
+            neighborhood: moreResult.neighborhood || 'NYC',
+            activeFilters: moreResult.activeFilters || {},
+          });
           recordAICost(trace, 'compose', composed._usage, composed._provider);
           trackAICost(phone, composed._usage, composed._provider);
           const validPicks = validatePicks(composed.picks, moreResult.events);
@@ -251,8 +254,12 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
           execResult = { sms: composed.sms_text, intent: 'more', picks: validPicks, eventMap };
         }
       } else {
-        // Anthropic fallback — use brainCompose
-        const composed = await brainCompose(moreResult.events, moreResult.neighborhood || 'NYC', moreResult.activeFilters || {}, trace, phone);
+        // Anthropic fallback — skip Gemini for compose since it already failed for routing
+        const composed = await brainCompose(moreResult.events, {
+          neighborhood: moreResult.neighborhood || 'NYC',
+          activeFilters: moreResult.activeFilters || {},
+          skipGemini: true,
+        });
         recordAICost(trace, 'compose', composed._usage, composed._provider);
         trackAICost(phone, composed._usage, composed._provider);
         const validPicks = validatePicks(composed.picks, moreResult.events);
@@ -322,10 +329,10 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
           execResult = { sms: smartTruncate(result.sms_text), intent: 'details' };
         }
       } else {
-        // Anthropic fallback — use composeDetails
+        // Anthropic fallback — skip Gemini for compose since it already failed for routing
         const { composeDetails } = require('./ai');
         const event = detailsResult.event;
-        const result = await composeDetails(event, detailsResult.pick?.why);
+        const result = await composeDetails(event, detailsResult.pick?.why, { skipGemini: true });
         recordAICost(trace, 'compose', result._usage, result._provider);
         trackAICost(phone, result._usage, result._provider);
         execResult = { sms: smartTruncate(result.sms_text), intent: 'details' };
@@ -402,8 +409,8 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
           execResult = await executeSearchEvents(brainResult.params, session, phone, trace);
         }
       } else {
-        // Anthropic fallback or no chat session — use brainCompose
-        execResult = await executeSearchEvents(brainResult.params, session, phone, trace);
+        // Anthropic fallback — skip Gemini for compose since it already failed for routing
+        execResult = await executeSearchEvents(brainResult.params, session, phone, trace, { skipGemini: true });
       }
     } else if (brainResult.tool === 'respond') {
       execResult = await executeRespond(brainResult.params, session, phone, trace);

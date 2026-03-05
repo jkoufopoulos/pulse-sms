@@ -600,8 +600,8 @@ async function brainCompose(events, options = {}) {
   const lastBatchNote = isLastBatch ? `\nLAST BATCH: These are the final picks. Do NOT say "Reply MORE". Instead end with: "${exhaustionMessage || 'That\'s everything I\'ve got!'}"` : '';
   const userPrompt = `Neighborhood: ${hoodLabel}${filterDesc ? `\nFilter: ${filterDesc}` : ''}\nMATCH count: ${matchCount}${sparseNote}${excludeNote}${suggestNote}${lastBatchNote}\n\nEVENTS (${events.length}):\n${eventListStr}`;
 
-  // Try Gemini Flash first
-  const genAI = getGeminiClient();
+  // Try Gemini Flash first (skip if caller knows Gemini is down)
+  const genAI = options.skipGemini ? null : getGeminiClient();
   if (genAI) {
     try {
       // Use flash-lite for compose — minimal thinking, much faster for simple generation
