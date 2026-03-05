@@ -462,7 +462,7 @@ curl http://localhost:3000/api/eval/audit | jq .summary
 
 ```bash
 # Regenerate from templates (won't overwrite if hand-curated set < 100 cases):
-npm run eval:gen
+node scripts/gen-synthetic.js
 
 # Output: data/fixtures/synthetic-cases.json
 ```

@@ -51,6 +51,17 @@
     margin-bottom: 28px;
   }
 
+  /* ── Section labels ── */
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #555;
+    margin-bottom: 12px;
+    margin-top: 8px;
+  }
+
   /* ── Card grid ── */
   .card-grid {
     display: grid;
@@ -245,11 +256,12 @@
   <h1><span>Pulse</span> Eval Guide</h1>
 </div>
 <p class="intro">
-  Pulse has seven evaluation layers, from free deterministic checks to LLM-judged conversation tests.
-  Start from the top &mdash; run the free checks first, fix anything they catch, then move down to the costlier layers.
-  Each card below shows the live pass rate (when available), what it costs, and how to run it.
+  Pulse has three eval layers: free deterministic checks that run automatically, a quality eval suite with an LLM judge,
+  and an optional A/B comparator for model swaps.
+  Start from the top &mdash; run the free checks first, fix anything they catch, then move to the quality suite.
 </p>
 
+<div class="section-label">Free &amp; Automatic</div>
 <div class="card-grid">
   <!-- Unit Tests -->
   <div class="eval-card">
@@ -260,7 +272,7 @@
       </div>
     </div>
     <div class="eval-card-desc">
-      Pure function correctness &mdash; formatters, geo math, filter logic, session helpers. No server needed.
+      Pure function correctness &mdash; formatters, geo math, filter logic, session helpers, eval functions. No server needed.
       Run these first after any code change.
     </div>
     <div class="eval-card-stat">
@@ -285,7 +297,7 @@
     </div>
     <div class="eval-card-desc">
       Checks that Claude-extracted events (from Skint, Nonsense NYC, etc.) have evidence in their source text.
-      Catches hallucinated venues, dates, and prices. Runs against the live event cache.
+      Catches hallucinated venues, dates, and prices. Runs automatically on every scrape.
     </div>
     <div class="eval-card-stat">
       <span class="stat-label">Pass rate</span>
@@ -325,17 +337,18 @@
     </div>
   </div>
 
-  <!-- Pipeline Evals -->
+  <!-- Code Evals -->
   <div class="eval-card">
     <div class="eval-card-header">
-      <div class="eval-card-title">Pipeline Evals</div>
+      <div class="eval-card-title">Code Evals</div>
       <div class="eval-card-badges">
         <span class="cost-badge free">Free</span>
       </div>
     </div>
     <div class="eval-card-desc">
-      24 deterministic checks on request traces &mdash; character limits, valid intents, neighborhoods,
-      filter accuracy, pick alignment, URLs, and more. Runs on stored traces with zero AI cost.
+      6 structural invariants checked on every request trace: character limit, non-empty response,
+      picked events exist, latency under 10s, valid URLs, and price transparency.
+      Run automatically &mdash; browse results in the trace viewer.
     </div>
     <div class="eval-card-stat">
       <span class="stat-label">Traces</span>
@@ -343,76 +356,24 @@
     </div>
     <div class="eval-card-actions">
       <a href="/eval" class="card-link primary">Trace viewer</a>
-      <div class="cli-cmd" onclick="copyCmd(this)" title="Click to copy">
-        <code>node scripts/run-evals.js</code>
-        <span class="copy-icon">copy</span>
-      </div>
     </div>
   </div>
+</div>
 
-  <!-- Scenario Evals -->
-  <div class="eval-card">
-    <div class="eval-card-header">
-      <div class="eval-card-title">Scenario Evals</div>
-      <div class="eval-card-badges">
-        <span class="cost-badge free">Free</span>
-      </div>
-    </div>
-    <div class="eval-card-desc">
-      293 multi-turn SMS conversations with 24 deterministic code evals per turn &mdash; verifies
-      filters, neighborhoods, pick accuracy, URLs, and data integrity. Free by default; add
-      <code>--judge</code> for LLM behavioral scoring (~$1.20). Requires a running server.
-    </div>
-    <div class="eval-card-stat">
-      <span class="stat-label">Latest</span>
-      <span class="stat-value loading" id="scenario-stat">loading...</span>
-    </div>
-    <div class="eval-card-actions">
-      <a href="/eval-report" class="card-link primary">Reports</a>
-      <div class="cli-cmd" onclick="copyCmd(this)" title="Click to copy">
-        <code>node scripts/run-scenario-evals.js --url http://localhost:3000</code>
-        <span class="copy-icon">copy</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Regression Evals -->
-  <div class="eval-card">
-    <div class="eval-card-header">
-      <div class="eval-card-title">Regression Evals</div>
-      <div class="eval-card-badges">
-        <span class="cost-badge paid">~$0.80</span>
-      </div>
-    </div>
-    <div class="eval-card-desc">
-      Behavioral regression tests organized by architecture principles (e.g. "code owns state",
-      "deterministic extraction first"). Each principle has targeted scenarios that validate
-      that specific system behaviors haven't regressed. Requires a running server.
-    </div>
-    <div class="eval-card-stat">
-      <span class="stat-label">Latest</span>
-      <span class="stat-value loading" id="regression-stat">loading...</span>
-    </div>
-    <div class="eval-card-actions">
-      <a href="/eval-report" class="card-link primary">Reports</a>
-      <div class="cli-cmd" onclick="copyCmd(this)" title="Click to copy">
-        <code>node scripts/run-regression-evals.js --url http://localhost:3000</code>
-        <span class="copy-icon">copy</span>
-      </div>
-    </div>
-  </div>
-
+<div class="section-label">LLM-Judged Quality</div>
+<div class="card-grid">
   <!-- Quality Evals -->
   <div class="eval-card">
     <div class="eval-card-header">
       <div class="eval-card-title">Quality Evals</div>
       <div class="eval-card-badges">
-        <span class="cost-badge paid">~$0.50</span>
+        <span class="cost-badge paid">~$0.02</span>
       </div>
     </div>
     <div class="eval-card-desc">
-      Rubric-based quality assessment of multi-turn conversations. An LLM judge scores editorial voice,
-      pick relevance, personality, and SMS formatting against a detailed rubric.
+      The primary eval suite. Replays 15 golden conversations through the live pipeline, then scores each
+      response on 6 dimensions: tone, curation, intent match, probing, inference, and coherence.
+      Uses Claude Haiku as judge. Run after prompt changes, model swaps, or editorial voice adjustments.
     </div>
     <div class="eval-card-stat">
       <span class="stat-label">Latest</span>
@@ -437,7 +398,7 @@
     </div>
     <div class="eval-card-desc">
       Head-to-head model comparison &mdash; runs the same prompts through two models and has an LLM judge
-      pick a winner. Use this when considering a model swap or prompt change. CLI only.
+      pick a winner. Use this when considering a model swap. CLI only.
     </div>
     <div class="eval-card-stat">
       <span class="stat-label">Status</span>
@@ -468,16 +429,16 @@
       <p>Open <a href="/test" style="color:#93c5fd">/test</a> and try a few neighborhoods. Confirm the change works manually before running eval suites.</p>
     </div>
     <div class="how-card">
-      <h3><span class="step-num">4</span>Run targeted regressions</h3>
-      <p>If your change affects a specific principle, run just that principle's tests: <code>--principle P1</code>.</p>
+      <h3><span class="step-num">4</span>Run quality evals</h3>
+      <p>Run <code>npm run eval:quality</code> to score all 15 golden conversations on 6 dimensions. Review results at <a href="/eval-quality" style="color:#93c5fd">/eval-quality</a>.</p>
     </div>
     <div class="how-card">
-      <h3><span class="step-num">5</span>Run the full eval suite</h3>
-      <p>Run scenario evals to validate end-to-end behavior. Review failures in the <a href="/eval-report" style="color:#93c5fd">Reports</a> dashboard.</p>
+      <h3><span class="step-num">5</span>Check extraction &amp; scrape audits</h3>
+      <p>Open <a href="/health" style="color:#93c5fd">/health</a> to check extraction pass rates and source coverage. These run on every scrape.</p>
     </div>
     <div class="how-card">
-      <h3><span class="step-num">6</span>Label scenarios</h3>
-      <p>In the Reports dashboard, review conversations and mark pass/fail. Use <kbd>j</kbd>/<kbd>k</kbd> to navigate, <kbd>p</kbd>/<kbd>f</kbd> to label quickly.</p>
+      <h3><span class="step-num">6</span>Review traces</h3>
+      <p>Open <a href="/eval" style="color:#93c5fd">/eval</a> to browse recent traces. Code evals (char limit, valid picks, etc.) run automatically on each trace.</p>
     </div>
   </div>
 </div>
@@ -556,56 +517,6 @@ async function loadStats() {
     document.getElementById('traces-stat').className = 'stat-value neutral';
   }
 
-  // Scenario evals — show code eval rate when no judge, judge rate otherwise
-  try {
-    var res = await fetch('/api/eval-reports?type=scenario');
-    if (res.ok) {
-      var reports = await res.json();
-      var el = document.getElementById('scenario-stat');
-      if (reports.length > 0) {
-        var latest = reports[0];
-        var ce = latest.code_evals;
-        var isNoJudge = (!latest.judge_cost || latest.judge_cost === 0) && latest.passed === 0;
-        if (isNoJudge && ce && ce.total > 0) {
-          var ceRate = Math.round(100 * ce.passed / ce.total);
-          el.textContent = ceRate + '% code evals (' + ce.passed + '/' + ce.total + ')';
-          el.className = 'stat-value ' + rateColor(ceRate);
-        } else {
-          var rate = latest.total > 0 ? Math.round(100 * latest.passed / latest.total) : 0;
-          el.textContent = rate + '% (' + latest.passed + '/' + latest.total + ')';
-          el.className = 'stat-value ' + rateColor(rate);
-        }
-      } else {
-        el.textContent = 'no reports';
-        el.className = 'stat-value neutral';
-      }
-    }
-  } catch (e) {
-    document.getElementById('scenario-stat').textContent = '--';
-    document.getElementById('scenario-stat').className = 'stat-value neutral';
-  }
-
-  // Regression evals
-  try {
-    var res = await fetch('/api/eval-reports?type=regression');
-    if (res.ok) {
-      var reports = await res.json();
-      var el = document.getElementById('regression-stat');
-      if (reports.length > 0) {
-        var latest = reports[0];
-        var rate = latest.total > 0 ? Math.round(100 * latest.passed / latest.total) : 0;
-        el.textContent = rate + '% (' + latest.passed + '/' + latest.total + ')';
-        el.className = 'stat-value ' + rateColor(rate);
-      } else {
-        el.textContent = 'no reports';
-        el.className = 'stat-value neutral';
-      }
-    }
-  } catch (e) {
-    document.getElementById('regression-stat').textContent = '--';
-    document.getElementById('regression-stat').className = 'stat-value neutral';
-  }
-
   // Quality evals
   try {
     var res = await fetch('/api/eval-reports?type=quality');
@@ -614,9 +525,14 @@ async function loadStats() {
       var el = document.getElementById('quality-stat');
       if (reports.length > 0) {
         var latest = reports[0];
-        var rate = latest.total > 0 ? Math.round(100 * latest.passed / latest.total) : 0;
-        el.textContent = rate + '% (' + latest.passed + '/' + latest.total + ')';
-        el.className = 'stat-value ' + rateColor(rate);
+        if (latest.avg_score) {
+          el.textContent = latest.avg_score.toFixed(1) + '/5';
+          el.className = 'stat-value ' + rateColor(latest.avg_score * 20);
+        } else {
+          var rate = latest.total > 0 ? Math.round(100 * latest.passed / latest.total) : 0;
+          el.textContent = rate + '% (' + latest.passed + '/' + latest.total + ')';
+          el.className = 'stat-value ' + rateColor(rate);
+        }
       } else {
         el.textContent = 'no reports';
         el.className = 'stat-value neutral';
