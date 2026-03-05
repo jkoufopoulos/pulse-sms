@@ -3,7 +3,7 @@ const path = require('path');
 const { SOURCES, SOURCE_TIERS, SOURCE_LABELS, MERGE_ORDER } = require('./source-registry');
 const { sourceHealth, saveHealthData, updateSourceHealth, updateScrapeStats, computeEventMix, getHealthStatus: _getHealthStatus } = require('./source-health');
 const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate } = require('./geo');
-const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues, lookupVenueSize } = require('./venues');
+const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues, lookupVenue, lookupVenueSize } = require('./venues');
 const { filterIncomplete, filterKidsEvents } = require('./curation');
 const { eventMatchesFilters, failsTimeGate } = require('./pipeline');
 const { computeCompleteness, backfillEvidence, backfillDateTimes } = require('./sources/shared');
@@ -451,7 +451,7 @@ async function refreshCache() {
       if (!d) return true; // keep undated events (perennials, venues)
       return d >= yesterday && d <= monthOut;
     });
-    const validEvents = filterKidsEvents(dateFiltered);
+    let validEvents = filterKidsEvents(dateFiltered);
     const staleCount = allEvents.length - dateFiltered.length;
     const kidsCount = dateFiltered.length - validEvents.length;
     if (staleCount > 0 || kidsCount > 0) {
@@ -464,6 +464,27 @@ async function refreshCache() {
       await batchGeocodeEvents(validEvents);
     } catch (err) {
       console.error('Geocoding failed, continuing with un-geocoded events:', err.message);
+    }
+
+    // Drop events with resolved venue coordinates outside NYC bounding box
+    // Events with NO coordinates are kept (might be unlisted NYC venues)
+    const NYC_BOUNDS = { latMin: 40.49, latMax: 40.92, lngMin: -74.27, lngMax: -73.68 };
+    const beforeGeoGate = validEvents.length;
+    const droppedBySource = {};
+    validEvents = validEvents.filter(e => {
+      const coords = lookupVenue(e.venue_name);
+      if (!coords) return true; // no coordinates — keep
+      const { lat, lng } = coords;
+      if (lat >= NYC_BOUNDS.latMin && lat <= NYC_BOUNDS.latMax &&
+          lng >= NYC_BOUNDS.lngMin && lng <= NYC_BOUNDS.lngMax) return true;
+      // Outside NYC — drop and track
+      droppedBySource[e.source_name || 'unknown'] = (droppedBySource[e.source_name || 'unknown'] || 0) + 1;
+      return false;
+    });
+    const geoDropped = beforeGeoGate - validEvents.length;
+    if (geoDropped > 0) {
+      const breakdown = Object.entries(droppedBySource).map(([s, n]) => `${s}:${n}`).join(', ');
+      console.log(`Geo gate: dropped ${geoDropped} out-of-NYC events (${breakdown})`);
     }
 
     // Persist learned venues to disk for next restart

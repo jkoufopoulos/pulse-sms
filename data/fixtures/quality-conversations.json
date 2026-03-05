@@ -1,70 +1,53 @@
 [
   {
-    "name": "new user: prepopulated signup",
+    "name": "cold open: neighborhood",
     "turns": [
-      { "user": "Hey, I'd like to START receiving messages about what's going on tonight." },
-      { "user": "2" },
-      { "user": "more" }
+      { "user": "bushwick" },
+      { "user": "tell me about the first one" },
+      { "user": "thanks" }
     ]
   },
   {
-    "name": "new user: just says hey",
-    "turns": [
-      { "user": "hey" },
-      { "user": "bushwick" }
-    ]
-  },
-  {
-    "name": "new user: neighborhood cold open",
-    "turns": [
-      { "user": "bushwick" }
-    ]
-  },
-  {
-    "name": "new user: specific request cold open",
+    "name": "specific request: genre + neighborhood",
     "turns": [
       { "user": "jazz in west village" }
     ]
   },
   {
-    "name": "returning: one word category",
+    "name": "vague vibe: weird tonight",
     "turns": [
-      { "user": "hey" },
-      { "user": "techno" }
-    ]
-  },
-  {
-    "name": "returning: vibe request",
-    "turns": [
-      { "user": "hey" },
       { "user": "anything weird tonight" }
     ]
   },
   {
-    "name": "returning: free filter",
+    "name": "ultra vague: vibes",
     "turns": [
-      { "user": "hey" },
-      { "user": "free stuff in greenpoint" }
+      { "user": "vibes" }
     ]
   },
   {
-    "name": "returning: group context",
+    "name": "progressive filtering",
     "turns": [
-      { "user": "hey" },
-      { "user": "4 of us looking for something fun in williamsburg tonight" },
-      { "user": "anything cheaper?" }
+      { "user": "free stuff in greenpoint" },
+      { "user": "how about comedy" },
+      { "user": "more" }
     ]
   },
   {
-    "name": "returning: browse then filter",
+    "name": "group context",
     "turns": [
-      { "user": "east village" },
-      { "user": "any comedy?" },
-      { "user": "2" }
+      { "user": "4 of us looking for something fun in williamsburg" }
     ]
   },
   {
-    "name": "returning: pivot mid-conversation",
+    "name": "challenge the picks",
+    "turns": [
+      { "user": "williamsburg" },
+      { "user": "those sound basic" }
+    ]
+  },
+  {
+    "name": "pivot mid-conversation",
     "turns": [
       { "user": "les" },
       { "user": "actually bushwick" },
@@ -72,16 +55,50 @@
     ]
   },
   {
-    "name": "returning: skeptic follow-up",
+    "name": "natural detail request",
     "turns": [
-      { "user": "williamsburg" },
-      { "user": "those sound basic" }
+      { "user": "east village" },
+      { "user": "any comedy?" },
+      { "user": "tell me about the first one" }
     ]
   },
   {
-    "name": "returning: minimal effort",
+    "name": "borough-level search",
     "turns": [
-      { "user": "vibes" }
+      { "user": "comedy tonight somewhere in brooklyn" }
+    ]
+  },
+  {
+    "name": "vibe + location inference",
+    "turns": [
+      { "user": "something chill near prospect park" }
+    ]
+  },
+  {
+    "name": "new user: just says hey",
+    "turns": [
+      { "user": "hey" }
+    ]
+  },
+  {
+    "name": "weekend planning: refine",
+    "turns": [
+      { "user": "what's good this weekend" },
+      { "user": "saturday night specifically" }
+    ]
+  },
+  {
+    "name": "exhaustion: trivia deep dive",
+    "turns": [
+      { "user": "trivia" },
+      { "user": "more" },
+      { "user": "more" }
+    ]
+  },
+  {
+    "name": "time-specific request",
+    "turns": [
+      { "user": "anything happening tomorrow afternoon" }
     ]
   }
 ]
