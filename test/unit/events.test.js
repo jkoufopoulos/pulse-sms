@@ -208,3 +208,28 @@ check('strips (21+)', normalizeEventName('Rock Night (21+)') === 'rock night');
 check('strips (Free)', normalizeEventName('Comedy Hour (Free)') === 'comedy hour');
 check('preserves set times', normalizeEventName('DJ Cool (8 PM set)').includes('8 pm set'));
 check('null returns empty', normalizeEventName(null) === '');
+
+// ---- scoreInterestingness ----
+const { scoreInterestingness } = require('../../src/events');
+
+console.log('\nscoreInterestingness:');
+
+check('discovery one-off intimate = 6', scoreInterestingness({
+  source_vibe: 'discovery', is_recurring: false, venue_size: 'intimate', interaction_format: null,
+}) === 6);
+
+check('mainstream recurring massive = -3', scoreInterestingness({
+  source_vibe: 'mainstream', is_recurring: true, venue_size: 'massive', interaction_format: null,
+}) === -3);
+
+check('niche recurring interactive = 3', scoreInterestingness({
+  source_vibe: 'niche', is_recurring: true, venue_size: null, interaction_format: 'interactive',
+}) === 3);
+
+check('platform one-off unknown venue = 2', scoreInterestingness({
+  source_vibe: 'platform', is_recurring: false, venue_size: null, interaction_format: null,
+}) === 2);
+
+check('no source_vibe = platform default', scoreInterestingness({
+  is_recurring: false, venue_size: 'medium',
+}) === 2);

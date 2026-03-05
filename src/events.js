@@ -123,6 +123,22 @@ function classifyInteractionFormat(event) {
 }
 
 /**
+ * Score an event for "interestingness" — how likely it is to impress a first-time user.
+ * Deterministic, $0. Used to rank citywide pools for first-message and "surprise me" queries.
+ * Score range: -3 (recurring mainstream at massive venue) to 6 (one-off discovery at intimate venue).
+ */
+const VIBE_SCORES = { discovery: 3, niche: 2, platform: 0, mainstream: -2 };
+const VENUE_SCORES = { intimate: 1, medium: 0, large: -1, massive: -1 };
+
+function scoreInterestingness(event) {
+  const vibeScore = VIBE_SCORES[event.source_vibe] ?? 0;
+  const rarityScore = !event.is_recurring ? 2
+    : (event.interaction_format === 'interactive' ? 1 : 0);
+  const venueScore = VENUE_SCORES[event.venue_size] ?? 0;
+  return vibeScore + rarityScore + venueScore;
+}
+
+/**
  * Source vibe signal — classifies source_name into discovery-factor tiers.
  * discovery: editorial picks, underground — the stuff your coolest friend knows about.
  * niche: focused, known but specific venues/orgs.
@@ -871,4 +887,4 @@ function scanCityWide(filters) {
     .map(([neighborhood, matchCount]) => ({ neighborhood, matchCount }));
 }
 
-module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, getEvents, getEventsForBorough, getEventsCitywide, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs, scanCityWide };
+module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, getEvents, getEventsForBorough, getEventsCitywide, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs, scanCityWide, scoreInterestingness };
