@@ -10,6 +10,7 @@ const { computeCompleteness, backfillEvidence, backfillDateTimes } = require('./
 const { runExtractionAudit } = require('./evals/extraction-audit');
 const { checkSourceCompleteness } = require('./evals/source-completeness');
 const { captureExtractionInput, getExtractionInputs, clearExtractionInputs } = require('./extraction-capture');
+const { checkBaseline } = require('./scrape-guard');
 
 /**
  * Stamp is_recurring + recurrence_label on events that match active recurring patterns.
@@ -391,30 +392,48 @@ async function refreshCache() {
         : { events: [], durationMs: 0, status: 'error', error: settled.reason?.message || 'unknown' };
     }
 
-    let sourcesOk = 0, sourcesFailed = 0, sourcesEmpty = 0;
+    let sourcesOk = 0, sourcesFailed = 0, sourcesEmpty = 0, sourcesQuarantined = 0;
     let totalRaw = 0;
 
     // Merge in priority order (highest weight first, then mergeRank)
     for (const label of MERGE_ORDER) {
-      const { events, durationMs, status, error } = fetchMap[label];
-      totalRaw += events.length;
+      const result = fetchMap[label];
+      totalRaw += result.events.length;
 
-      for (const e of events) {
+      // Record health BEFORE baseline check (so history accumulates)
+      updateSourceHealth(label, result);
+
+      if (result.status === 'error' || result.status === 'timeout') {
+        console.error(`${label} failed:`, result.error);
+        sourcesFailed++;
+        continue;
+      }
+
+      // Baseline gate: quarantine sources with suspicious output
+      if (result.status === 'ok') {
+        const verdict = checkBaseline(label, result.events);
+        if (verdict.quarantined) {
+          console.warn(`[SCRAPE-GUARD] Quarantined ${label}: ${verdict.reason}`);
+          result.status = 'quarantined';
+          result.quarantineReason = verdict.reason;
+          sourcesQuarantined++;
+          continue; // skip merge — cache retains yesterday's events for this source
+        }
+      }
+
+      for (const e of result.events) {
         if (!seen.has(e.id)) {
           seen.add(e.id);
           allEvents.push(e);
         }
       }
 
-      if (status === 'error' || status === 'timeout') {
-        console.error(`${label} failed:`, error);
-      }
+      if (result.status === 'ok') sourcesOk++;
+      else if (result.status === 'empty') sourcesEmpty++;
+    }
 
-      updateSourceHealth(label, { events, durationMs, status, error });
-
-      if (status === 'ok') sourcesOk++;
-      else if (status === 'empty') sourcesEmpty++;
-      else sourcesFailed++;
+    if (sourcesQuarantined > 0) {
+      console.warn(`[SCRAPE-GUARD] ${sourcesQuarantined} source(s) quarantined this scrape`);
     }
 
     // Filter out stale/far-future events and kids events at scrape time
@@ -506,6 +525,7 @@ async function refreshCache() {
       sourcesOk,
       sourcesFailed,
       sourcesEmpty,
+      sourcesQuarantined,
     });
 
     // Alert on sources that have been failing for 3+ consecutive scrapes
