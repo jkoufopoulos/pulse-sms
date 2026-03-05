@@ -6,11 +6,11 @@
  */
 
 const MODELS = {
-  brain:    process.env.PULSE_MODEL_BRAIN    || 'gemini-2.5-flash-lite',
-  compose:  process.env.PULSE_MODEL_COMPOSE  || 'gemini-2.5-flash-lite',
-  extract:  process.env.PULSE_MODEL_EXTRACT  || 'gemini-2.5-flash',
-  details:  process.env.PULSE_MODEL_DETAILS  || 'gemini-2.5-flash',
-  fallback: process.env.PULSE_MODEL_FALLBACK || 'claude-haiku-4-5-20251001',
+  brain:    process.env.PULSE_MODEL_BRAIN    || 'claude-haiku-4-5-20251001',
+  compose:  process.env.PULSE_MODEL_COMPOSE  || 'claude-haiku-4-5-20251001',
+  extract:  process.env.PULSE_MODEL_EXTRACT  || 'claude-haiku-4-5-20251001',
+  details:  process.env.PULSE_MODEL_DETAILS  || 'claude-haiku-4-5-20251001',
+  fallback: process.env.PULSE_MODEL_FALLBACK || 'gemini-2.5-flash-lite',
 };
 
 function getProvider(modelName) {
