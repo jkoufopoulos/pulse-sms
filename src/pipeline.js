@@ -1,6 +1,5 @@
 const { setResponseState } = require('./session');
 const { filterByTimeAfter, parseAsNycTime, getEventDate } = require('./geo');
-const { recordAICost } = require('./traces');
 const { VALID_CATEGORIES } = require('./evals/scrape-audit');
 
 /**
@@ -66,13 +65,11 @@ function saveResponseFrame(phone, { mode = 'fresh', picks = [], prevSession,
     eventMap,
     neighborhood,
     borough: borough || null,
-    dateRange: filters?.date_range || null,
     filters: filters || null,
     visitedHoods: visitedHoods
       ? visitedHoods
       : [...new Set([...(prevSession?.visitedHoods || []), neighborhood || 'citywide'])],
     pendingNearby: pending?.neighborhood || null,
-    pendingNearbyEvents: pending?.nearbyEvents || null,
     pendingFilters: pending?.filters || null,
     pendingMessage: pendingMessage || null,
     lastResponseHadPicks: lastResponseHadPicks ?? (picks.length > 0),
@@ -470,44 +467,6 @@ function normalizeFilterIntent(updates) {
 }
 
 /**
- * Execute a unified LLM query: call unifiedRespond with events and options,
- * return the parsed result. Thin wrapper that both the unified branch
- * and handleMore can call.
- *
- * Returns { type, sms_text, picks, clear_filters, _raw, _usage, _provider }
- */
-async function executeQuery(message, events, options = {}) {
-  // Late require to avoid circular dep (ai.js → prompts.js → ... → pipeline.js)
-  const { unifiedRespond } = require('./ai');
-
-  const result = await unifiedRespond(message, {
-    session: options.session,
-    events,
-    neighborhood: options.neighborhood,
-    nearbyHoods: options.nearbyHoods,
-    conversationHistory: options.conversationHistory,
-    currentTime: options.currentTime,
-    validNeighborhoods: options.validNeighborhoods,
-    activeFilters: options.activeFilters,
-    isSparse: options.isSparse,
-    isCitywide: options.isCitywide,
-    isBorough: options.isBorough,
-    borough: options.borough,
-    matchCount: options.matchCount,
-    hardCount: options.hardCount,
-    softCount: options.softCount,
-    excludeIds: options.excludeIds,
-    suggestedNeighborhood: options.suggestedNeighborhood,
-    userHoodAlias: options.userHoodAlias,
-    isLastBatch: options.isLastBatch,
-    exhaustionSuggestion: options.exhaustionSuggestion,
-    model: options.model,
-  });
-
-  return result;
-}
-
-/**
  * Send individual URLs for each picked event as separate SMS messages.
  * iMessage renders rich link previews for standalone URLs.
  * Gated by PULSE_LINK_PREVIEWS env var.
@@ -524,4 +483,4 @@ async function sendPickUrls(phone, picks, eventMap) {
   }
 }
 
-module.exports = { applyFilters, resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, describeFilters, buildZeroMatchResponse, mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, normalizeFilterIntent, failsTimeGate, executeQuery, sendPickUrls };
+module.exports = { applyFilters, resolveActiveFilters, buildEventMap, saveResponseFrame, buildExhaustionMessage, describeFilters, buildZeroMatchResponse, mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, normalizeFilterIntent, failsTimeGate, sendPickUrls };
