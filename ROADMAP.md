@@ -197,7 +197,7 @@ Collapsed tools from 3 to 2 (deleted `get_details`). `search_events` handles mor
 
 | Item | Risk | Status |
 |------|------|--------|
-| **agent-brain.js is 1683 lines** | Medium | Largest file. Consider splitting pool-building, execution helpers, and compose fallbacks into separate modules |
+| ~~agent-brain.js is 1683 lines~~ | ~~Medium~~ | ~~Split into agent-brain.js (~450), brain-llm.js (~726), brain-execute.js (~561).~~ **Done (2026-03-05)** |
 | ~~Dead exports in pipeline.js~~ | ~~Low~~ | ~~`applyFilters`, `resolveActiveFilters` removed from exports. `normalizeFilterIntent` kept (tested).~~ **Done (2026-03-05)** |
 | ~~Stale comments in code-evals.js~~ | ~~Low~~ | ~~Code evals trimmed from 24 to 6 invariant checks. Old eval infrastructure archived.~~ **Done (2026-03-05)** |
 | ~~Stale comments in traces.js, agent-brain.js~~ | ~~Low~~ | ~~Updated for Phase 4 architecture.~~ **Done (2026-03-05)** |
