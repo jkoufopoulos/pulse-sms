@@ -217,4 +217,70 @@ async function sendRuntimeAlert(alertType, details) {
   _runtimeCooldowns.set(alertType, Date.now());
 }
 
-module.exports = { sendHealthAlert, sendRuntimeAlert, _runtimeCooldowns, loadAlerts, getRecentAlerts };
+// --- Daily digest email ---
+const DIGEST_COOLDOWN_MS = 20 * 60 * 60 * 1000; // 20 hours — one per day
+let lastDigestSent = 0;
+
+async function sendDigestEmail(digest) {
+  if (Date.now() - lastDigestSent < DIGEST_COOLDOWN_MS) {
+    console.log('[DIGEST] Cooldown active — skipping email');
+    return;
+  }
+
+  const { formatDigestEmail } = require('./daily-digest');
+  const subject = `Pulse daily: ${digest.status} — ${digest.cache.total.toLocaleString()} events${digest.needs_attention.length > 0 ? `, ${digest.needs_attention.length} need attention` : ''}`;
+  const body = formatDigestEmail(digest);
+
+  const alertEntry = {
+    id: crypto.randomUUID(),
+    timestamp: new Date().toISOString(),
+    type: 'digest',
+    subject,
+    details: { digest_id: digest.id, status: digest.status },
+    emailSent: false,
+    emailError: null,
+  };
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    alertEntry.emailError = 'RESEND_API_KEY not set';
+    logAlert(alertEntry);
+    lastDigestSent = Date.now();
+    return;
+  }
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'Pulse Alerts <onboarding@resend.dev>',
+        to: ALERT_EMAIL,
+        subject,
+        text: body,
+      }),
+    });
+
+    if (res.ok) {
+      alertEntry.emailSent = true;
+      console.log(`[DIGEST] Email sent: ${subject}`);
+      try {
+        const { markDigestEmailed } = require('./db');
+        markDigestEmailed(digest.id);
+      } catch {}
+    } else {
+      const err = await res.text();
+      alertEntry.emailError = `${res.status} ${err}`;
+    }
+  } catch (err) {
+    alertEntry.emailError = err.message;
+  }
+
+  logAlert(alertEntry);
+  lastDigestSent = Date.now();
+}
+
+module.exports = { sendHealthAlert, sendRuntimeAlert, sendDigestEmail, _runtimeCooldowns, loadAlerts, getRecentAlerts };

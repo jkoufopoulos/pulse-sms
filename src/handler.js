@@ -4,7 +4,6 @@ const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('.
 const { startTrace, saveTrace, getLatestTraceForPhone, getTraceById, recordAICost } = require('./traces');
 const { getSession, setSession, clearSession, addToHistory, clearSessionInterval, acquireLock } = require('./session');
 const { handleHelp } = require('./intent-handlers');
-const { sendRuntimeAlert } = require('./alerts');
 const { getEventById } = require('./events');
 const { lookupReferralCode, recordAttribution } = require('./referral');
 const { saveResponseFrame, sendPickUrls } = require('./pipeline');
@@ -270,15 +269,6 @@ async function handleMessageAI(phone, message) {
       ].filter(Boolean).join(' | ');
       console.warn(`[SLOW] ${(trace.total_latency_ms / 1000).toFixed(1)}s | ${breakdown} | intent=${trace.output_intent} | msg="${trace.input_message.slice(0, 40)}"`);
 
-      sendRuntimeAlert('slow_response', {
-        total_ms: trace.total_latency_ms,
-        routing_ms: trace.routing.latency_ms,
-        compose_ms: trace.composition.latency_ms,
-        events_ms: trace.events.getEvents_ms,
-        intent: trace.output_intent,
-        phone_masked: trace.phone_masked,
-        message: trace.input_message,
-      });
     }
   }
 

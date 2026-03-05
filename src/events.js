@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { SOURCES, SOURCE_TIERS, SOURCE_LABELS, MERGE_ORDER } = require('./source-registry');
-const { sourceHealth, saveHealthData, updateSourceHealth, updateScrapeStats, alertOnFailingSources, computeEventMix, getHealthStatus: _getHealthStatus } = require('./source-health');
+const { sourceHealth, saveHealthData, updateSourceHealth, updateScrapeStats, computeEventMix, getHealthStatus: _getHealthStatus } = require('./source-health');
 const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate } = require('./geo');
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues, lookupVenueSize } = require('./venues');
 const { filterIncomplete, filterKidsEvents } = require('./curation');
@@ -533,8 +533,27 @@ async function refreshCache() {
       sourcesQuarantined,
     });
 
-    // Alert on sources that have been failing for 3+ consecutive scrapes
-    alertOnFailingSources();
+    // Generate daily digest and email if yellow/red
+    try {
+      const { generateDigest } = require('./daily-digest');
+      const digest = generateDigest(eventCache, {
+        totalDurationMs: scrapeEnd - scrapeStart,
+        sourcesOk,
+        sourcesFailed,
+      });
+      const db = require('./db');
+      db.saveDigest(digest.id, digest.status, digest);
+      console.log(`Daily digest: ${digest.status} — ${digest.summary}`);
+
+      if (digest.status !== 'green') {
+        const { sendDigestEmail } = require('./alerts');
+        sendDigestEmail(digest).catch(err =>
+          console.error('[DIGEST] Email failed:', err.message)
+        );
+      }
+    } catch (err) {
+      console.error('Daily digest generation failed:', err.message);
+    }
 
     // Post-scrape audit: completeness + extraction quality checks with alerting
     try {

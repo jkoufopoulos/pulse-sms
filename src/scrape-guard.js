@@ -2,8 +2,6 @@ const { sourceHealth } = require('./source-health');
 const { getNycDateString } = require('./geo');
 const { checkSourceCompleteness } = require('./evals/source-completeness');
 const { runExtractionAudit } = require('./evals/extraction-audit');
-const { sendRuntimeAlert } = require('./alerts');
-
 const MIN_HISTORY = 3;
 const COUNT_DRIFT_THRESHOLD = 0.4;
 const FIELD_DRIFT_THRESHOLD = 0.25;
@@ -146,10 +144,6 @@ function postScrapeAudit(fetchMap, events, extractionInputs) {
   if (alerts.length > 0) {
     const summary = alerts.map(a => a.message).join('\n');
     console.warn(`[SCRAPE-GUARD] Post-scrape audit found ${alerts.length} issue(s):\n${summary}`);
-    sendRuntimeAlert('scrape-audit-regression', {
-      issues: alerts.length,
-      details: summary,
-    }).catch(err => console.error('[SCRAPE-GUARD] Alert send failed:', err.message));
   }
 
   return { alerts, completeness, extraction };
