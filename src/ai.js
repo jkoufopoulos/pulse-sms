@@ -285,7 +285,7 @@ function fixJsonNewlines(text) {
  * Used when user asks for more info on a pick (e.g. "what is last resort").
  * Returns { sms_text }
  */
-async function composeDetails(event, pickReason, { bestieUrl } = {}) {
+async function composeDetails(event, pickReason, { pulseUrl } = {}) {
   const now = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   // Build a Google Maps URL as fallback
@@ -304,7 +304,7 @@ async function composeDetails(event, pickReason, { bestieUrl } = {}) {
     }
   }
   if (!bestUrl) bestUrl = mapsUrl;
-  if (bestieUrl) bestUrl = bestieUrl;
+  if (pulseUrl) bestUrl = pulseUrl;
 
   const eventData = {
     name: event.name,

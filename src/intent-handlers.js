@@ -35,7 +35,7 @@ function stripMoreReferences(text) {
 
 // --- Help ---
 async function handleHelp(ctx) {
-  const msg1 = "Hey! I'm Bestie — I dig through the best of what's happening in NYC daily that you'll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.";
+  const msg1 = "Hey! I'm Pulse — I dig through the best of what's happening in NYC daily that you'll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.";
   const msg2 = 'Text me a neighborhood like "Bushwick" or a vibe like "jazz tonight" to start exploring. I\'ll send picks — reply a number for details, "more" to keep going, or just tell me what you\'re looking for. The more you text, the better it gets.';
   saveResponseFrame(ctx.phone, {
     picks: ctx.session?.lastPicks || [],
@@ -128,17 +128,17 @@ async function handleDetails(ctx) {
       return;
     }
     if (event) {
-      // Generate referral code and Bestie URL for shareable details (when cards enabled)
-      let bestieUrl;
+      // Generate referral code and Pulse URL for shareable details (when cards enabled)
+      let pulseUrl;
       if (process.env.PULSE_CARD_ENABLED === 'true') {
         const refCode = generateReferralCode(ctx.phone, event.id);
         const domain = process.env.PULSE_CARD_DOMAIN || 'https://web-production-c8fdb.up.railway.app';
-        bestieUrl = `${domain}/e/${event.id}?ref=${refCode}`;
+        pulseUrl = `${domain}/e/${event.id}?ref=${refCode}`;
       }
 
       try {
         const composeStart = Date.now();
-        const result = await composeDetails(event, pick.why, { bestieUrl });
+        const result = await composeDetails(event, pick.why, { pulseUrl });
         ctx.trace.composition.latency_ms = Date.now() - composeStart;
         ctx.trace.composition.raw_response = result._raw || null;
         ctx.recordAICost?.(ctx.trace, 'details', result._usage, result._provider);
@@ -150,7 +150,7 @@ async function handleDetails(ctx) {
         return;
       } catch (err) {
         console.error('composeDetails error, falling back:', err.message);
-        const sms = formatEventDetails(event, { bestieUrl });
+        const sms = formatEventDetails(event, { pulseUrl });
         await sendSMS(ctx.phone, sms);
         ctx.finalizeTrace(sms, 'details');
         return;

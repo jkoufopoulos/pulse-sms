@@ -923,7 +923,7 @@ async function geocodeVenue(name, address) {
       countrycodes: 'us', viewbox: '-74.26,40.49,-73.70,40.92', bounded: '1',
     });
     const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
-      headers: { 'User-Agent': 'BestieSMS/1.0' },
+      headers: { 'User-Agent': 'PulseSMS/1.0' },
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;

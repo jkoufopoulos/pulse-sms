@@ -156,7 +156,7 @@ async function handleMessage(phone, message) {
     } catch (err) {
       console.error('AI flow error:', err.message);
       try {
-        await sendSMS(phone, "Bestie hit a snag — try again in a sec!");
+        await sendSMS(phone, "Pulse hit a snag — try again in a sec!");
       } catch (smsErr) {
         console.error(`[CRITICAL] Double failure for ${masked}: AI error="${err.message}", SMS error="${smsErr.message}" — user received nothing`);
       }
@@ -202,7 +202,7 @@ async function dispatchPreRouterIntent(route, ctx) {
         filters: referredEvent?.category ? { category: referredEvent.category } : {},
         responseType: 'referral',
       }).catch(err => console.error('profile update failed:', err.message));
-      const msg1 = "Hey! I'm Bestie — I dig through the best of what's happening in NYC daily that you'll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.";
+      const msg1 = "Hey! I'm Pulse — I dig through the best of what's happening in NYC daily that you'll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.";
       const msg2 = referredEvent?.neighborhood
         ? `Text me a vibe like "jazz tonight" or try "${referredEvent.neighborhood}" to start exploring. I'll send picks — reply a number for details, "more" to keep going, or just tell me what you're looking for.`
         : 'Text me a neighborhood like "Bushwick" or a vibe like "jazz tonight" to start exploring. I\'ll send picks — reply a number for details, "more" to keep going, or just tell me what you\'re looking for.';
@@ -226,7 +226,7 @@ async function dispatchPreRouterIntent(route, ctx) {
         console.warn('Welcome flow failed for expired referral, using canned intro:', err.message);
       }
     }
-    const msg1 = "Hey! I'm Bestie — I dig through the best of what's happening in NYC daily that you'll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.";
+    const msg1 = "Hey! I'm Pulse — I dig through the best of what's happening in NYC daily that you'll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness, and more across every neighborhood.";
     const msg2 = 'Text me a neighborhood like "Bushwick" or a vibe like "jazz tonight" to start exploring. I\'ll send picks — reply a number for details, "more" to keep going, or just tell me what you\'re looking for.';
     saveResponseFrame(phone, { picks: [], eventMap: {}, neighborhood: null, filters: null, offeredIds: [] });
     await sendSMS(phone, msg1);
