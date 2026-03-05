@@ -64,6 +64,17 @@ try {
 // Health update helpers — called by events.js during refresh
 // ============================================================
 
+function computeFieldCoverage(events) {
+  if (!events.length) return { name: 0, venue_name: 0, date_local: 0 };
+  const fields = ['name', 'venue_name', 'date_local'];
+  const coverage = {};
+  for (const field of fields) {
+    const filled = events.filter(e => e[field] != null).length;
+    coverage[field] = filled / events.length;
+  }
+  return coverage;
+}
+
 function updateSourceHealth(label, { events, durationMs, status, error }) {
   const health = sourceHealth[label];
   if (!health) return;
@@ -86,7 +97,8 @@ function updateSourceHealth(label, { events, durationMs, status, error }) {
   }
 
   // Push to history (capped at HISTORY_MAX)
-  health.history.push({ timestamp: now, count: events.length, durationMs, status });
+  const fieldCoverage = computeFieldCoverage(events);
+  health.history.push({ timestamp: now, count: events.length, durationMs, status, fieldCoverage });
   if (health.history.length > HISTORY_MAX) {
     health.history.shift();
   }
@@ -191,5 +203,6 @@ module.exports = {
   alertOnFailingSources,
   computeEventMix,
   getHealthStatus,
+  computeFieldCoverage,
   HEALTH_WARN_THRESHOLD,
 };
