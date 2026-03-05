@@ -37,7 +37,7 @@ Every code path that sends an SMS must end with the same atomic session save fun
 
 Every structured field in the LLM output is a surface for hallucination and drift. Fields the code already knows before calling the LLM should never be in the LLM's output schema.
 
-**Current:** The agent brain uses 3 tools (`search_events`, `get_details`, `respond`) with validated parameter schemas. Free-text SMS composition is separate via `brainCompose`.
+**Current:** The agent brain uses 3 tools (`search_events`, `get_details`, `respond`) with validated parameter schemas. For `search_events`, SMS composition happens in the same Gemini chat session via multi-turn tool calling. `brainCompose` kept only for `handleMore`.
 
 ### P6. Mechanical Shortcuts for $0 Operations, LLM for Everything Else
 
@@ -59,15 +59,17 @@ Validate structural contracts in the hot path (do `picks[].event_id` values exis
 
 ```
 message -> checkMechanical ($0 shortcuts: 1-5, more, help, greetings)
-  -> callAgentBrain (Gemini 2.5 Flash Lite tool calling)
-  -> tool execution (search_events / get_details / respond)
-  -> brainCompose (lightweight SMS composition)
+  -> callAgentBrain (Gemini 2.5 Flash Lite chat session + tool calling)
+  -> search_events: buildSearchPool → functionResponse → same session writes SMS
+  -> get_details / respond: unchanged
   -> atomic save (saveResponseFrame) -> SMS
 ```
 
-Fallback: Anthropic Haiku activates within the same agent loop on Gemini failure.
+Fallback chain: continuation failure → brainCompose, Gemini failure → Anthropic Haiku.
 
-**Key decision (2026-03-05):** Phase 1 complete. Deleted unified-flow.js, model-router.js, pre-router.js, and src/skills/ (~1,300 lines). The agent brain is the only code path. Tool call params are the system of record for state.
+**Key decisions:**
+- **(2026-03-05, Phase 1):** Deleted unified-flow.js, model-router.js, pre-router.js, src/skills/ (~1,300 lines). Agent brain is the only code path.
+- **(2026-03-05, Phase 2):** Single Gemini chat session for search_events. The model that understands intent writes the SMS via multi-turn tool calling. brainCompose kept for handleMore.
 
 ---
 
@@ -130,16 +132,9 @@ Fallback: Anthropic Haiku activates within the same agent loop on Gemini failure
 
 Deleted unified-flow.js, model-router.js, pre-router.js, src/skills/. One code path: `callAgentBrain` with Gemini -> Claude fallback. `checkMechanical` extracted to agent-brain.js.
 
-**Phase 2: Single-Turn Agent** -- Merge routing + compose into one generation
+**Phase 2: Single-Turn Agent** -- **Done (2026-03-05)**
 
-Merge `callAgentBrain` and `brainCompose` into a single agent turn. The agent calls `search_events`, sees results inline, and writes the SMS in the same generation.
-
-- `search_events` tool returns event pool as tool result; agent continues generating -> writes SMS directly
-- Delete `brainCompose` -- the agent IS the composer
-- `respond` tool simplified or removed -- agent writes conversational SMS directly
-- Pool serialization: ~50-100 tokens/event x 15 events = ~1500 tokens. Fits in context.
-- Cost: ~$0.0008/call (up from ~$0.0005). Worth it for coherence.
-- Eval: A/B eval -- single-turn vs two-call. Measure editorial quality, filter compliance, 480-char compliance.
+Merged routing + compose into a single Gemini chat session using multi-turn tool calling. The agent that understands user intent writes the SMS in the same generation via `functionResponse` continuation. `brainCompose` kept for `handleMore`. Fallback: `brainCompose` on continuation failure, Anthropic Haiku on Gemini failure. Code eval: 99.2% scenario, 98.4% regression.
 
 **Phase 3: Conversation History as State** -- Reduce session to accumulators
 
@@ -218,7 +213,7 @@ Feed the agent its own tool call history so it can derive context without explic
 
 | Period | Highlights |
 |--------|-----------|
-| Mar 5 | Phase 1: unified agent loop (deleted unified-flow, pre-router, model-router, skills). First-message welcome flow. Quality eval runner + browse page. |
+| Mar 5 | Phase 1: unified agent loop (deleted unified-flow, pre-router, model-router, skills). Phase 2: single-turn agent (Gemini multi-turn tool calling — same session routes + composes). First-message welcome flow. Quality eval runner + browse page. |
 | Mar 3 | Eval suite audit (34 new scenarios, 417 total). Community layer Phase 2 (editorial voice, source vibe, venue size, interaction format). Skint multi-day parsing. Description coverage for Luma/Songkick/DoNYC. |
 | Mar 2 | Agent brain (`agent-brain.js`) with 99.9% code eval. Cross-source recurrence detection (485 patterns). Gemini Flash fallback chain. Broad query support (citywide + date range). New sources: Tiny Cupboard, Brooklyn Comedy Collective, NYC Trivia League, BK Mag, Sofar Sounds. EventbriteComedy fix (0 -> 55 events). |
 | Mar 1 | Prompt audit (tool_use, tone reduction, shared sections). Structural filter drift fix (Step 2b). Degraded-mode fallback. Code eval accuracy overhaul (99.8%). Fragility audit (16 issues fixed). New sources: Luma, Screen Slate, Skint Ongoing. Dice multi-category. Scrape audit dashboards. Price coverage 27% -> 79%. Neighborhood resolution gap 171 -> 80. SQLite event store. 286 golden scenarios. |
