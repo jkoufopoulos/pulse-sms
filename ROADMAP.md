@@ -1,7 +1,7 @@
 # Pulse -- Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-05 (Phase 1 complete: agent brain is the sole path)
+> Last updated: 2026-03-05 (Phase 4 complete: 2 tools, natural prose, agent-native details/more)
 
 ---
 
@@ -37,15 +37,15 @@ Every code path that sends an SMS must end with the same atomic session save fun
 
 Every structured field in the LLM output is a surface for hallucination and drift. Fields the code already knows before calling the LLM should never be in the LLM's output schema.
 
-**Current:** The agent brain uses 3 tools (`search_events`, `get_details`, `respond`) with validated parameter schemas. For `search_events`, SMS composition happens in the same Gemini chat session via multi-turn tool calling. `brainCompose` kept only for `handleMore`.
+**Current:** The agent brain uses 2 tools (`search_events`, `respond`) with validated parameter schemas. `search_events` handles all event intents (search, refine, more, details) via the `intent` param. SMS composition happens in the same Gemini chat session via multi-turn tool calling. `brainCompose` kept as fallback only.
 
 ### P6. Mechanical Shortcuts for $0 Operations, LLM for Everything Else
 
 Use deterministic code only for operations that don't need language understanding and can be handled at $0. Everything else -- including compound filters, semantic intent, and ambiguous language -- goes to the agent brain's tool calling.
 
-**$0 mechanical (checkMechanical):** Bare numbers 1-5 (details), "more" (next batch), "help" (canned response), greetings/thanks/bye. These are pattern-matched and never hit the LLM.
+**$0 mechanical (checkMechanical):** "help"/"?" (canned response) and TCPA opt-out keywords. These are pattern-matched and never hit the LLM.
 
-**Agent brain handles natively:** "free comedy in bushwick", "later in the week", "how about something lowkey", "trivia or art stuff in greenpoint". The LLM expresses intent through structured tool params.
+**Agent brain handles natively:** Bare numbers ("2"), "more", greetings/thanks/bye, "free comedy in bushwick", "later in the week", "how about something lowkey", "trivia or art stuff in greenpoint". The LLM expresses intent through structured tool params.
 
 ### P7. Validate the Contract, Not the Content
 
@@ -195,8 +195,12 @@ Collapsed tools from 3 to 2 (deleted `get_details`). `search_events` handles mor
 
 ## Tech Debt
 
-| Item | Risk | Notes |
-|------|------|-------|
+| Item | Risk | Status |
+|------|------|--------|
+| **agent-brain.js is 1683 lines** | Medium | Largest file. Consider splitting pool-building, execution helpers, and compose fallbacks into separate modules |
+| ~~Dead exports in pipeline.js~~ | ~~Low~~ | ~~`applyFilters`, `resolveActiveFilters` removed from exports. `normalizeFilterIntent` kept (tested).~~ **Done (2026-03-05)** |
+| ~~Stale comments in code-evals.js~~ | ~~Low~~ | ~~Code evals trimmed from 24 to 6 invariant checks. Old eval infrastructure archived.~~ **Done (2026-03-05)** |
+| ~~Stale comments in traces.js, agent-brain.js~~ | ~~Low~~ | ~~Updated for Phase 4 architecture.~~ **Done (2026-03-05)** |
 | Price data gap (21% unknown) | Low | Structurally unavailable from some sources |
 | No horizontal scalability | Low | Single-process, in-memory sessions |
 | Preference learning not yet active | Low | Profiles captured but not injected into prompts -- Phase 5 |
@@ -207,7 +211,7 @@ Collapsed tools from 3 to 2 (deleted `get_details`). `search_events` handles mor
 
 | Period | Highlights |
 |--------|-----------|
-| Mar 5 | Phase 1: unified agent loop. Phase 2: single-turn agent. Phase 3: structured conversation history. Phase 4: agent-native details/more (natural prose, 3→2 tools, fuzzy pick matching). First-message welcome flow. Quality eval runner + browse page. Scrape guard (baseline gates + post-scrape audit). |
+| Mar 5 | Phase 1-4 complete. Codebase audit: dead exports removed (pipeline.js), stale pre-router comments cleaned (code-evals.js, traces.js, agent-brain.js), CLAUDE.md/AGENTS.md/ROADMAP.md synced to Phase 4 (2 tools, checkMechanical = help+TCPA only). Scrape guard (baseline gates + post-scrape audit). First-message welcome flow. Quality eval runner + browse page. |
 | Mar 3 | Eval suite audit (34 new scenarios, 417 total). Community layer Phase 2 (editorial voice, source vibe, venue size, interaction format). Skint multi-day parsing. Description coverage for Luma/Songkick/DoNYC. |
 | Mar 2 | Agent brain (`agent-brain.js`) with 99.9% code eval. Cross-source recurrence detection (485 patterns). Gemini Flash fallback chain. Broad query support (citywide + date range). New sources: Tiny Cupboard, Brooklyn Comedy Collective, NYC Trivia League, BK Mag, Sofar Sounds. EventbriteComedy fix (0 -> 55 events). |
 | Mar 1 | Prompt audit (tool_use, tone reduction, shared sections). Structural filter drift fix (Step 2b). Degraded-mode fallback. Code eval accuracy overhaul (99.8%). Fragility audit (16 issues fixed). New sources: Luma, Screen Slate, Skint Ongoing. Dice multi-category. Scrape audit dashboards. Price coverage 27% -> 79%. Neighborhood resolution gap 171 -> 80. SQLite event store. 286 golden scenarios. |

@@ -266,9 +266,10 @@
 
   <div id="filtersRow" class="filters hidden">
     <button class="filter-btn active" data-filter="all">All</button>
-    <button class="filter-btn" data-filter="voice">Voice &lt; 3</button>
-    <button class="filter-btn" data-filter="picks">Picks &lt; 3</button>
-    <button class="filter-btn" data-filter="density">Density &lt; 3</button>
+    <button class="filter-btn" data-filter="tone">Tone &lt; 3</button>
+    <button class="filter-btn" data-filter="curation">Curation &lt; 3</button>
+    <button class="filter-btn" data-filter="intent_match">Intent &lt; 3</button>
+    <button class="filter-btn" data-filter="coherence">Coherence &lt; 3</button>
   </div>
 
   <div id="convoList"></div>
@@ -363,9 +364,12 @@
     const s = currentReport.summary;
     const cards = [
       { label: 'Overall', value: s.avg_score },
-      { label: 'Voice', value: s.voice },
-      { label: 'Picks', value: s.picks },
-      { label: 'Density', value: s.density }
+      { label: 'Tone', value: s.tone },
+      { label: 'Curation', value: s.curation },
+      { label: 'Intent', value: s.intent_match },
+      { label: 'Probing', value: s.probing },
+      { label: 'Inference', value: s.inference },
+      { label: 'Coherence', value: s.coherence }
     ];
 
     const metaParts = [];
@@ -461,7 +465,7 @@
 
     convoList.innerHTML = convos.map((c, ci) => {
       const turnsHtml = (c.turns || []).map(t => {
-        const scoreBadges = t.scores ? Object.entries(t.scores).map(([k, v]) => {
+        const scoreBadges = t.scores ? Object.entries(t.scores).filter(([k, v]) => v != null).map(([k, v]) => {
           return '<span class="badge"><span style="color:#888">' + esc(k) + ':</span> <span class="' + scoreClass(v) + '">' + v + '</span></span>';
         }).join('') : '';
 

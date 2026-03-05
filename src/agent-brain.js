@@ -1646,7 +1646,7 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
           execResult = await executeSearchEvents(brainResult.params, session, phone, trace);
         }
       } else {
-        // Anthropic path or no chat — use legacy brainCompose
+        // Anthropic fallback or no chat session — use brainCompose
         execResult = await executeSearchEvents(brainResult.params, session, phone, trace);
       }
     } else if (brainResult.tool === 'respond') {

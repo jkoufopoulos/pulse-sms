@@ -12,7 +12,7 @@ npm install
 cp .env.example .env
 
 # 3. Start the server in test mode (required for all evals except unit tests)
-PULSE_TEST_MODE=true node src/server.js
+PULSE_TEST_MODE=true PULSE_NO_RATE_LIMIT=true node src/server.js
 ```
 
 The server must be running for pipeline evals, scenario evals, and A/B evals. Unit tests run standalone.
@@ -26,8 +26,8 @@ The server must be running for pipeline evals, scenario evals, and A/B evals. Un
 | Code didn't break | `npm test` | Free | ~2s |
 | Extraction fidelity (auto) | Runs every scrape automatically | Free | <1s |
 | Extraction fidelity (with LLM) | `POST /api/eval/audit` | ~$0.01 | ~10s |
-| Full pipeline regression | `npm run eval` | Free | ~3min |
-| Pipeline + LLM judges | `npm run eval:judges` | ~$0.50 | ~8min |
+| Full pipeline regression | `node scripts/run-evals.js` | Free | ~3min |
+| Pipeline + LLM judges | `node scripts/run-evals.js --judges` | ~$0.50 | ~8min |
 | Multi-turn conversations | `node scripts/run-scenario-evals.js` | ~$0.20 | ~5min |
 | Model A/B comparison | `node scripts/run-ab-eval.js` | ~$0.30 | ~5min |
 | Browse traces interactively | Open `/eval` in browser | Free | -- |
@@ -145,7 +145,7 @@ Key things to look for:
 ### Code evals only (free, fast)
 
 ```bash
-npm run eval
+node scripts/run-evals.js
 # or with explicit URL:
 node scripts/run-evals.js --url=http://localhost:3000
 ```
@@ -189,7 +189,7 @@ Plus expectation checks per case (expected intent, expected neighborhood, banned
 ### With LLM judges (~$0.50)
 
 ```bash
-npm run eval:judges
+node scripts/run-evals.js --judges
 ```
 
 Adds two Claude Sonnet judges per trace:
@@ -407,7 +407,7 @@ Here's the complete sequence for a thorough quality check — for example, after
 
 ```bash
 # Terminal 1: Start server
-PULSE_TEST_MODE=true node src/server.js
+PULSE_TEST_MODE=true PULSE_NO_RATE_LIMIT=true node src/server.js
 
 # Wait for initial scrape to complete (watch logs for "Cache refreshed: ...")
 # Also watch for "Extraction audit: X/Y events pass" in the logs
@@ -421,10 +421,10 @@ npm test
 curl http://localhost:3000/api/eval/audit | jq .summary
 
 # 3. Pipeline evals — code checks only (free, ~3 min)
-npm run eval
+node scripts/run-evals.js
 
 # 4. Pipeline evals — with LLM judges (~$0.50, ~8 min)
-npm run eval:judges
+node scripts/run-evals.js --judges
 
 # 5. Scenario evals — multi-turn behavioral checks (~$0.20, ~5 min)
 node scripts/run-scenario-evals.js
@@ -450,7 +450,7 @@ For smaller changes where you just need a sanity check:
 
 ```bash
 npm test
-npm run eval
+node scripts/run-evals.js
 curl http://localhost:3000/api/eval/audit | jq .summary
 ```
 
@@ -491,7 +491,7 @@ All reports are saved to `data/reports/`:
 
 | Pattern | Source | Contains |
 |---------|--------|----------|
-| `eval-{timestamp}.json` | `npm run eval` | Per-case pass/fail, failure breakdown, eval details |
+| `eval-{timestamp}.json` | `node scripts/run-evals.js` | Per-case pass/fail, failure breakdown, eval details |
 | `scenario-eval-{timestamp}.json` | `run-scenario-evals.js` | Per-scenario judge verdicts, actual conversations |
 | `ab-eval-{models}-{timestamp}.json` | `run-ab-eval.js` | Side-by-side responses, preference stats, cost |
 | `extraction-audit-{date}.json` | Every scrape + `POST /api/eval/audit` | Per-event check results, source stats |

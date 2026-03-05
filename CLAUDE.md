@@ -25,19 +25,19 @@ Pulse turns a simple text message into a curated night out. A user texts a neigh
 
 ## How Conversations Work
 
-Pulse routes every incoming message through `checkMechanical` (fast $0 shortcuts) then the agent brain (Gemini tool calling). Session state is derived from the agent's structured tool call parameters — never parsed from free-text output.
+Pulse routes every incoming message through `checkMechanical` (help + TCPA only, $0) then the agent brain (Gemini tool calling). Session state is derived from the agent's structured tool call parameters — never parsed from free-text output.
 
-**Agent brain (sole path, ~$0.0005/call)** — Gemini 2.5 Flash Lite with tool calling. `checkMechanical` handles $0 shortcuts (bare numbers 1-5, "more", "help", greetings/thanks/bye), then `callAgentBrain` invokes 3 tools (`search_events`, `get_details`, `respond`), followed by `brainCompose` for lightweight SMS composition. 2-3s typical latency. Tool call params (`search_events` args) are the system of record for filters and intent. Falls back to Anthropic Haiku on Gemini failure. 99.9% code eval pass rate.
+**Agent brain (sole path, ~$0.0005/call)** — Gemini 2.5 Flash Lite with tool calling. `checkMechanical` handles only "help"/"?" and TCPA opt-out at $0. Everything else goes to `callAgentBrain` which uses 2 tools: `search_events` (all event intents: search, refine, more, details) and `respond` (conversation). SMS composition happens in the same Gemini chat session via multi-turn tool calling. 2-3s typical latency. Tool call params (`search_events` args) are the system of record for filters and intent. Falls back to Anthropic Haiku on Gemini failure.
 
 A typical multi-turn conversation:
 ```
 User: "williamsburg"           → agent brain: search_events({neighborhood: "williamsburg"}) ($0.0005)
 User: "how about comedy"       → agent brain: search_events({neighborhood: "williamsburg", categories: ["comedy"]}) ($0.0005)
-User: "2"                      → checkMechanical: details on pick #2 ($0)
+User: "2"                      → agent brain: search_events({intent: "details", pick_reference: "2"}) ($0.0005)
 User: "try bushwick"           → agent brain: search_events({neighborhood: "bushwick", categories: ["comedy"]}) ($0.0005)
 User: "later tonight"          → agent brain: search_events({neighborhood: "bushwick", categories: ["comedy"], time_filter: "late_night"}) ($0.0005)
 User: "forget the comedy"      → agent brain: search_events({neighborhood: "bushwick"}) ($0.0005)
-User: "more"                   → checkMechanical: next batch of picks ($0)
+User: "more"                   → agent brain: search_events({intent: "more"}) ($0.0005)
 ```
 
 **Filter state flow:** The handler reads filter state from the agent brain's `search_events` tool call params (categories, time_filter, free_only, date_range). These are structured and validated — safe state sources. After the response, the handler saves `activeFilters` as `lastFilters` via `saveResponseFrame`.
@@ -57,37 +57,30 @@ Daily scrape (10am ET)              Incoming SMS
     19 scraper modules)              TCPA, dedup, budget)
         │                                │
         ├─► venues.js              checkMechanical ◄── session.js
-        │   (auto-learn             ($0 shortcuts:      (12 fields,
-        │    coords,                 1-5, more,          2hr TTL)
-        │    persist)                help, bye)
-        ▼                               │
-   events.js                 ┌──────────┼──────────┐
-   (cache, dedup,         matched     no match
-    source health)       (intent-     (85% of
-        │                handlers)    messages)
-        │                   │              │
-        │                 $0 AI            ▼
-        │                          callAgentBrain
-        │                          (Gemini 2.5 Flash Lite
-        │                           tool calling)
-        │                               │
-        │                     ┌─────────┼─────────┐
-        │                     ▼         ▼         ▼
-        │               search_events  get_    respond
-        │               (hood, cats,   details
-        └─►              time, date,
-                         free, intent)
-                              │
-                         brainCompose            ~$0.0005
-                         (SMS composition)
-                              │
-                         handler saves              $0
-                         activeFilters → lastFilters
-                         (from tool call params)
-                              │
-                         formatters.js (480-char)
-                              │
-                         twilio.js (send SMS)    ~$0.008
+        │   (auto-learn             (help + TCPA          (12 fields,
+        │    coords,                 only, $0)             2hr TTL)
+        │    persist)                    │
+        ▼                               ▼
+   events.js                    callAgentBrain
+   (cache, dedup,              (Gemini 2.5 Flash Lite
+    source health)              tool calling)
+        │                           │
+        │                    ┌──────┴──────┐
+        │                    ▼             ▼
+        │              search_events    respond
+        │              (search, refine, (greetings,
+        └─►             more, details)   thanks, bye)
+                             │
+                        same Gemini session     ~$0.0005
+                        writes natural prose SMS
+                             │
+                        handler saves              $0
+                        activeFilters → lastFilters
+                        (from tool call params)
+                             │
+                        formatters.js (480-char)
+                             │
+                        twilio.js (send SMS)    ~$0.008
 
 ```
 
@@ -97,7 +90,7 @@ Daily scrape (10am ET)              Incoming SMS
 |--------|------|
 | `handler.js` | Orchestrator: checkMechanical → agent brain → deterministic session save |
 | `request-guard.js` | TCPA opt-out, Twilio dedup, per-user AI budget ($0.10/day prod), IP rate limiting |
-| `agent-brain.js` | Sole LLM path: `checkMechanical` ($0), `callAgentBrain` (Gemini tool calling), `brainCompose`. Falls back to Claude Haiku on Gemini failure |
+| `agent-brain.js` | Sole LLM path: `checkMechanical` (help + TCPA only), `callAgentBrain` (Gemini tool calling, 2 tools: `search_events` + `respond`). Falls back to Claude Haiku on Gemini failure |
 | `pipeline.js` | `buildTaggedPool`, `eventMatchesFilters`, `saveResponseFrame` (atomic session writes) |
 | `ai.js` | `extractEvents` (scrape-time), `composeDetails` (event detail composition) |
 | `prompts.js` | System prompts: `BRAIN_SYSTEM`, `BRAIN_COMPOSE_SYSTEM`, `DETAILS_SYSTEM`, `EXTRACTION_PROMPT` |
@@ -105,7 +98,7 @@ Daily scrape (10am ET)              Incoming SMS
 | `events.js` | Daily event cache + disk persistence, cross-source dedup, quality gates, source vibe stamping |
 | `source-registry.js` | Single source of truth for all 22 source entries across 19 scraper modules (weights, tiers, fetch functions) |
 
-Other modules: `intent-handlers.js` (help/details/more/convo), `geo.js` + `neighborhoods.js` (36 NYC hoods), `venues.js` (auto-learning coords), `formatters.js` (480-char cap), `twilio.js`, `traces.js`, `alerts.js`, `preference-profile.js`, `referral.js`, `card.js`, `curation.js`, `source-health.js`, `db.js` (SQLite).
+Other modules: `intent-handlers.js` (help response), `geo.js` + `neighborhoods.js` (36 NYC hoods), `venues.js` (auto-learning coords), `formatters.js` (480-char cap), `twilio.js`, `traces.js`, `alerts.js`, `preference-profile.js`, `referral.js`, `card.js`, `curation.js`, `source-health.js`, `db.js` (SQLite).
 
 Sources: 22 entries across 19 scraper modules in `sources/` — see `source-registry.js` for the full list. Evals: 6 modules in `src/evals/`. Scripts: 13 runners in `scripts/`. UIs: 8 dashboards served by `server.js`.
 
@@ -113,7 +106,7 @@ Sources: 22 entries across 19 scraper modules in `sources/` — see `source-regi
 
 - **P1: Structured tool calls own state, free-text owns language** — Session state is derived from the agent brain's tool call params (`search_events` args), never parsed from free-text LLM output. Tool params are structured and validated — the sole source of truth for filters and intent.
 - **P4: One save path** — Every SMS-sending path must end with `saveResponseFrame`. No `setSession` terminal writes.
-- **P6: Mechanical shortcuts for $0 operations, LLM for everything else** — `checkMechanical` handles bare numbers, "more", "help" at $0. All semantic understanding (compounds, filters, intent) goes to the agent brain's tool calling.
+- **P6: Mechanical shortcuts for $0 operations, LLM for everything else** — `checkMechanical` handles "help"/"?" and TCPA opt-out at $0. Everything else (including bare numbers, "more", greetings) goes to the agent brain's tool calling.
 - **480-char SMS limit** — All responses capped at 480 chars.
 - **TCPA compliance** — STOP/UNSUBSCRIBE/CANCEL/QUIT silently dropped (no reply).
 - **Per-user daily AI budget** — $0.10/day prod, $10 test. `trackAICost` accumulates; `isOverBudget` blocks.
@@ -137,8 +130,7 @@ npm install
 npm start              # boots on PORT (default 3000)
 npm run dev            # dev server with file-watch reload
 npm test               # smoke tests (pure functions, no API calls)
-npm run eval           # code evals on stored traces (no API calls)
-npm run eval:judges    # code evals + LLM judge evals (costs API tokens)
+npm run eval:quality   # quality evals on 15 golden conversations (~$0.02, ~30s)
 ```
 
 **Railway:** Simulator at `https://web-production-c8fdb.up.railway.app/test`. Test endpoint: `POST /api/sms/test` with `Body` and optional `From`. Health dashboard: `GET /health`.

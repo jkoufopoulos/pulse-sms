@@ -7,9 +7,9 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node test/run-all.js && node test/eval.test.js",
-    "eval": "node scripts/run-evals.js",
-    "eval:judges": "node scripts/run-evals.js --judges",
-    "eval:gen": "node scripts/gen-synthetic.js",
+
+
+
     "eval:quality": "node scripts/run-quality-evals.js"
   },
   "engines": {

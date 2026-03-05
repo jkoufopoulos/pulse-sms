@@ -344,7 +344,7 @@
     <div class="eval-card-actions">
       <a href="/eval" class="card-link primary">Trace viewer</a>
       <div class="cli-cmd" onclick="copyCmd(this)" title="Click to copy">
-        <code>npm run eval</code>
+        <code>node scripts/run-evals.js</code>
         <span class="copy-icon">copy</span>
       </div>
     </div>
@@ -445,7 +445,7 @@
     </div>
     <div class="eval-card-actions">
       <div class="cli-cmd" onclick="copyCmd(this)" title="Click to copy">
-        <code>node scripts/run-ab-eval.js --a haiku --b sonnet</code>
+        <code>node scripts/run-ab-eval.js --model-a haiku --model-b sonnet</code>
         <span class="copy-icon">copy</span>
       </div>
     </div>
@@ -461,7 +461,7 @@
     </div>
     <div class="how-card">
       <h3><span class="step-num">2</span>Start the server</h3>
-      <p>Run <code>npm run dev</code> and wait for the event cache to load (~3 min on first boot, instant on restart).</p>
+      <p>Run <code>PULSE_TEST_MODE=true PULSE_NO_RATE_LIMIT=true node src/server.js</code> and wait for the event cache to load.</p>
     </div>
     <div class="how-card">
       <h3><span class="step-num">3</span>Smoke test in the simulator</h3>

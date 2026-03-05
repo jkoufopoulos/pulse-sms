@@ -3,7 +3,7 @@
  * Quality eval runner for Pulse SMS.
  *
  * Replays conversations from quality-conversations.json through the live pipeline,
- * then uses Claude Haiku as a judge to score each response on voice, picks, and density.
+ * then uses Claude Haiku as a judge to score each response on tone, curation, intent match, and more.
  *
  * Usage:
  *   node scripts/run-quality-evals.js                          # Run all
@@ -42,21 +42,34 @@ const client = new Anthropic();
 const JUDGE_SYSTEM = `You are evaluating an SMS nightlife recommendation bot called Pulse.
 Pulse is supposed to feel like texting a cool friend who always knows what's happening tonight -- not a search engine, not a customer service bot.
 
-Score each dimension 1-5:
+Score ONLY the dimensions that apply to this turn. Set inapplicable dimensions to null.
 
-- Voice (1-5): 5 = sounds like a friend who actually goes out, uses natural language, has personality, maybe a little opinionated. 3 = fine but generic, could be any bot. 1 = robotic, formal, "I'd be happy to help", bullet-point listing.
+DIMENSIONS (each 1-5):
 
-- Picks (1-5): 5 = recommendations feel genuinely curated and interesting, the kind of thing a knowledgeable local who goes out a lot would suggest. 3 = reasonable but obvious, stuff you'd find on the first page of Google. 1 = generic, irrelevant, or clearly just the first items from a database.
+- tone (ALWAYS score): 5 = sounds like a friend who actually goes out, uses natural language, has personality, opinionated. 3 = fine but generic, could be any bot. 1 = robotic, formal, "I'd be happy to help", bullet-point listing.
 
-- Density (1-5): 5 = every word earns its place, punchy, respects that this is SMS and the reader is on their phone. 3 = acceptable length but has some filler. 1 = padded with unnecessary preambles, verbose, wastes the reader's time.
+- curation (score ONLY when response contains event picks): 5 = recommendations feel genuinely curated, the kind of thing a knowledgeable local would suggest -- interesting, not obvious. 3 = reasonable but stuff you'd find on the first page of Google. 1 = generic, irrelevant, clearly just database results.
 
-IMPORTANT: If the response is a non-event message (greeting, help text, clarifying question, off-topic redirect), score Voice and Density only. Set Picks to null. These are valid responses that just don't contain event recommendations.
+- intent_match (score ONLY when user had a clear request): 5 = nailed exactly what the user wanted, picks/response perfectly aligned with their ask. 3 = partially relevant, some picks match but others don't. 1 = completely missed what the user was asking for.
+
+- probing (score ONLY when user intent is vague/ambiguous): 5 = asked a smart, specific follow-up that would genuinely help narrow down what the user wants. 3 = asked something generic like "what are you looking for?" 1 = didn't ask at all, just guessed badly or gave generic results.
+
+- inference (score ONLY when there's an opportunity to go beyond the literal request): 5 = connected dots brilliantly -- inferred context (group size, vibe, time constraints) and picked events that match the unstated need. 3 = reasonable interpretation but nothing creative. 1 = took request too literally, missed obvious context clues.
+
+- coherence (score ONLY on turn 2+ of a conversation): 5 = perfectly maintained context from previous turns, built on the conversation naturally. 3 = mostly coherent but forgot or ignored something from earlier. 1 = clearly lost context, contradicted previous turns, or started over.
 
 Respond in STRICT JSON (no markdown fencing):
-{"voice": N, "picks": N_or_null, "density": N, "note": "one sentence explaining the weakest score"}`;
+{"tone": N_or_null, "curation": N_or_null, "intent_match": N_or_null, "probing": N_or_null, "inference": N_or_null, "coherence": N_or_null, "note": "one sentence on the weakest score"}`;
 
-async function judgeResponse(userMessage, responseText) {
-  const prompt = `The user texted: "${userMessage}"\n\nPulse responded: "${responseText}"\n\nScore this response.`;
+async function judgeResponse(userMessage, responseText, { turnNumber, previousTurns } = {}) {
+  let context = '';
+  if (previousTurns?.length > 0) {
+    context = '\n\nPrevious turns in this conversation:\n' +
+      previousTurns.map(t => `User: "${t.user}"\nPulse: "${t.response}"`).join('\n\n') +
+      '\n\n---\nNow scoring this turn:\n';
+  }
+  const turnLabel = turnNumber > 1 ? ` (turn ${turnNumber} of conversation)` : ' (first message, no prior context)';
+  const prompt = `The user texted${turnLabel}: "${userMessage}"${context}\n\nPulse responded: "${responseText}"\n\nScore this response. Remember: only score dimensions that apply to this turn. Set others to null.`;
 
   const response = await client.messages.create({
     model: JUDGE_MODEL,
@@ -84,7 +97,7 @@ async function judgeResponse(userMessage, responseText) {
       try { return JSON.parse(text.slice(start, end + 1)); } catch {}
     }
   }
-  return { voice: null, picks: null, density: null, note: 'Judge returned unparseable response' };
+  return { tone: null, curation: null, intent_match: null, probing: null, inference: null, coherence: null, note: 'Judge returned unparseable response' };
 }
 
 function avgScore(turns) {
@@ -151,11 +164,21 @@ async function runConversation(conversation, phoneNumber) {
     // Judge this turn
     let scores, note;
     try {
-      const judgment = await judgeResponse(turn.user, responseText);
-      scores = { voice: judgment.voice, picks: judgment.picks, density: judgment.density };
+      const judgment = await judgeResponse(turn.user, responseText, {
+        turnNumber: turnResults.length + 1,
+        previousTurns: turnResults,
+      });
+      scores = {
+        tone: judgment.tone ?? null,
+        curation: judgment.curation ?? null,
+        intent_match: judgment.intent_match ?? null,
+        probing: judgment.probing ?? null,
+        inference: judgment.inference ?? null,
+        coherence: judgment.coherence ?? null,
+      };
       note = judgment.note || null;
     } catch (err) {
-      scores = { voice: null, picks: null, density: null };
+      scores = { tone: null, curation: null, intent_match: null, probing: null, inference: null, coherence: null };
       note = `Judge error: ${err.message}`;
     }
 
@@ -243,11 +266,11 @@ async function main() {
   const totalElapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
   // Build report
-  const voiceAvg = dimensionAvg(convResults, 'voice');
-  const picksAvg = dimensionAvg(convResults, 'picks');
-  const densityAvg = dimensionAvg(convResults, 'density');
-  const allScores = convResults.map(c => c.avg_score);
-  const overallAvg = allScores.length > 0 ? allScores.reduce((a, b) => a + b, 0) / allScores.length : 0;
+  const dims = ['tone', 'curation', 'intent_match', 'probing', 'inference', 'coherence'];
+  const dimAvgs = {};
+  for (const d of dims) dimAvgs[d] = dimensionAvg(convResults, d);
+  const scoredDims = dims.filter(d => dimAvgs[d] > 0);
+  const overallAvg = scoredDims.length > 0 ? scoredDims.reduce((s, d) => s + dimAvgs[d], 0) / scoredDims.length : 0;
 
   const report = {
     timestamp: new Date().toISOString(),
@@ -258,9 +281,12 @@ async function main() {
     summary: {
       conversations: conversations.length,
       avg_score: parseFloat(overallAvg.toFixed(1)),
-      voice: parseFloat(voiceAvg.toFixed(1)),
-      picks: parseFloat(picksAvg.toFixed(1)),
-      density: parseFloat(densityAvg.toFixed(1)),
+      tone: parseFloat(dimAvgs.tone.toFixed(1)),
+      curation: parseFloat(dimAvgs.curation.toFixed(1)),
+      intent_match: parseFloat(dimAvgs.intent_match.toFixed(1)),
+      probing: parseFloat(dimAvgs.probing.toFixed(1)),
+      inference: parseFloat(dimAvgs.inference.toFixed(1)),
+      coherence: parseFloat(dimAvgs.coherence.toFixed(1)),
     },
     conversations: convResults,
   };
@@ -273,8 +299,9 @@ async function main() {
     .join(', ');
 
   console.log(`\n${'='.repeat(60)}`);
-  console.log(`Quality eval: ${conversations.length} conversations, avg ${overallAvg.toFixed(1)}/5`);
-  console.log(`  Voice: ${voiceAvg.toFixed(1)}  Picks: ${picksAvg.toFixed(1)}  Density: ${densityAvg.toFixed(1)}`);
+  console.log(`Quality: ${overallAvg.toFixed(1)}/5.0 (${conversations.length} conversations)`);
+  console.log(`  Tone: ${dimAvgs.tone.toFixed(1)}  Curation: ${dimAvgs.curation.toFixed(1)}  Intent: ${dimAvgs.intent_match.toFixed(1)}`);
+  console.log(`  Probing: ${dimAvgs.probing.toFixed(1)}  Inference: ${dimAvgs.inference.toFixed(1)}  Coherence: ${dimAvgs.coherence.toFixed(1)}`);
   console.log(`  Worst: ${worst}`);
   console.log(`  Cost: $${judgeCostTotal.toFixed(4)}  Time: ${totalElapsed}s`);
   console.log(`  Browse: ${BASE}/eval-quality`);
