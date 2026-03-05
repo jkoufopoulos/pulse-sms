@@ -563,6 +563,88 @@ async function callAgentBrainAnthropic(message, session, phone, trace, brainStar
   };
 }
 
+/**
+ * Continue the Gemini chat session with search_events results.
+ * Sends functionResponse → model writes SMS in the same context.
+ * Returns { sms_text, picks, _raw, _usage, _provider }
+ */
+async function continueWithResults(chat, eventData, trace) {
+  const composeStart = Date.now();
+
+  try {
+    const result = await withTimeout(
+      chat.sendMessage([{
+        functionResponse: {
+          name: 'search_events',
+          response: eventData,
+        },
+      }]),
+      10_000, 'continueWithResults'
+    );
+
+    const response = result.response;
+    const text = response.text();
+    const usage = extractGeminiUsage(response);
+
+    trace.composition.latency_ms = Date.now() - composeStart;
+
+    const parsed = JSON.parse(stripCodeFences(text));
+    const sms = smartTruncate(parsed.sms_text);
+
+    return {
+      sms_text: sms,
+      picks: reconcilePicks(sms, parsed.picks || []),
+      _raw: text,
+      _usage: usage,
+      _provider: 'gemini',
+    };
+  } catch (err) {
+    console.warn('continueWithResults failed:', err.message);
+    throw err;
+  }
+}
+
+/**
+ * Serialize event pool into compact format for Gemini functionResponse.
+ */
+function serializePoolForContinuation(poolResult) {
+  const todayNyc = getNycDateString(0);
+  const tomorrowNyc = getNycDateString(1);
+  const { pool, hood: neighborhood, activeFilters, isSparse, matchCount,
+          nearbyHoods, suggestedHood, excludeIds, isCitywide, isBorough, borough } = poolResult;
+
+  const hoodLabel = isBorough ? `${borough} (borough-wide)` : isCitywide ? 'citywide' : neighborhood || 'NYC';
+  const filterDesc = activeFilters && Object.values(activeFilters).some(Boolean) ? describeFilters(activeFilters) : '';
+
+  const events = pool.map(e => {
+    const dayLabel = e.date_local === todayNyc ? 'TODAY' : e.date_local === tomorrowNyc ? 'TOMORROW' : e.date_local;
+    const tag = e.filter_match === 'hard' ? '[MATCH]' : e.filter_match === 'soft' ? '[SOFT]' : '';
+    const nearbyTag = (neighborhood && e.neighborhood && e.neighborhood !== neighborhood) ? '[NEARBY]' : '';
+    return {
+      id: e.id, name: (e.name || '').slice(0, 80), venue_name: e.venue_name,
+      neighborhood: e.neighborhood, day: dayLabel, start_time_local: e.start_time_local,
+      is_free: e.is_free, price_display: e.price_display, category: e.category,
+      short_detail: (e.short_detail || e.description_short || '').slice(0, 100),
+      recurring: e.is_recurring ? e.recurrence_label : undefined,
+      venue_size: e.venue_size || undefined,
+      interaction_format: e.interaction_format || undefined,
+      source_vibe: e.source_vibe || undefined,
+      tags: [tag, nearbyTag].filter(Boolean).join(' ') || undefined,
+    };
+  });
+
+  return {
+    neighborhood: hoodLabel,
+    filter: filterDesc || undefined,
+    match_count: matchCount,
+    sparse: isSparse || undefined,
+    nearby_hoods: isSparse ? nearbyHoods : undefined,
+    suggested_neighborhood: suggestedHood || undefined,
+    exclude_ids: excludeIds?.length > 0 ? excludeIds : undefined,
+    events,
+  };
+}
+
 // --- Lightweight compose for brain path ---
 // ~400 tokens system prompt vs ~2000+ for unified. No routing, no intent, just write the SMS.
 
