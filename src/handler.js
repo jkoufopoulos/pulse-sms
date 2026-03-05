@@ -3,7 +3,7 @@ const twilio = require('twilio');
 const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('./twilio');
 const { startTrace, saveTrace, getLatestTraceForPhone, getTraceById, recordAICost } = require('./traces');
 const { getSession, setSession, clearSession, addToHistory, clearSessionInterval, acquireLock } = require('./session');
-const { handleHelp, handleConversational, handleDetails, handleMore } = require('./intent-handlers');
+const { handleHelp } = require('./intent-handlers');
 const { sendRuntimeAlert } = require('./alerts');
 const { getEventById } = require('./events');
 const { lookupReferralCode, recordAttribution } = require('./referral');
@@ -171,7 +171,7 @@ async function handleMessage(phone, message) {
 // =======================================================
 
 /**
- * Dispatch mechanical shortcuts (referral, help, conversational, details, more).
+ * Dispatch mechanical shortcuts (referral, help).
  * All paths are terminal: sendSMS + finalizeTrace + return.
  */
 async function dispatchPreRouterIntent(route, ctx) {
@@ -236,20 +236,6 @@ async function dispatchPreRouterIntent(route, ctx) {
   }
 
   if (route.intent === 'help') return handleHelp(ctx);
-  if (route.intent === 'conversational') return handleConversational(ctx);
-  if (route.intent === 'details') return handleDetails(ctx);
-
-  if (route.intent === 'more') {
-    ctx.neighborhood = session?.lastNeighborhood || null;
-    try {
-      return await handleMore(ctx);
-    } catch (err) {
-      console.error('more handler error:', err.message);
-      const sms = "Couldn't load more picks right now — try again in a sec!";
-      await sendSMS(phone, sms);
-      finalizeTrace(sms, 'more');
-    }
-  }
 }
 
 async function handleMessageAI(phone, message) {
@@ -312,10 +298,6 @@ async function handleMessageAI(phone, message) {
 
     const route = { ...mechanical };
     const ctx = { phone, message, masked, session, trace, route, finalizeTrace, trackAICost: (usage, provider) => trackAICost(phone, usage, provider), recordAICost };
-
-    if (session?.pendingNearby) {
-      setSession(phone, { pendingNearby: null, pendingFilters: null, pendingMessage: null });
-    }
 
     await dispatchPreRouterIntent(route, ctx);
     return trace.id;
