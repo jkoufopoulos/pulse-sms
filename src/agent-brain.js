@@ -568,6 +568,36 @@ const BRAIN_COMPOSE_SCHEMA = {
   required: ['sms_text', 'picks'],
 };
 
+const WELCOME_COMPOSE_SYSTEM = `You are Bestie, an NYC nightlife and events SMS bot. Compose a WELCOME message for a brand-new user.
+
+FORMAT (MANDATORY):
+Line 1: "I'm Bestie \u2014 your plugged-in friend for NYC. Tell me what you're into tonight, just ask. Here's a few things on my radar:"
+Blank line
+Then 3 numbered picks with emoji category markers:
+1) [emoji] Event description \u2014 time, price
+2) [emoji] Event description \u2014 time, price
+3) [emoji] Event description \u2014 time, price
+Blank line
+Last line: "Any of those sound good? Or tell me a vibe, a neighborhood, whatever."
+
+EMOJI MAP:
+comedy/theater: \ud83c\udfad
+live_music/jazz/dj/nightlife: \ud83c\udfb5
+art: \ud83c\udfa8
+film: \ud83c\udfac
+community/trivia/food_drink: \ud83c\udf89
+other: \u2728
+
+RULES:
+- Pick exactly 3 events from the provided list. They are pre-ranked by interestingness \u2014 respect the ranking but you may reorder slightly for narrative flow.
+- Each pick MUST include: event name, venue name, neighborhood in parentheses, time, and price ("$20", "free", "cover").
+- Make each pick sound like a tip from a friend who just found out about it. Opinionated, vivid, concise.
+- Label TODAY events as "tonight", TOMORROW as "tomorrow".
+- Under 480 characters total. No URLs.
+- Do NOT change the intro line or the CTA line \u2014 use them exactly as specified above.
+
+Return JSON: { "sms_text": "the full SMS", "picks": [{"rank": 1, "event_id": "id", "why": "short reason"}] }`;
+
 /**
  * Strip markdown code fences from LLM JSON responses.
  */
@@ -714,6 +744,73 @@ async function brainCompose(events, options = {}) {
   const parsed = JSON.parse(stripCodeFences(raw));
   const sms = smartTruncate(parsed.sms_text);
   return { sms_text: sms, picks: reconcilePicks(sms, parsed.picks || []), _raw: raw, _usage: usage, _provider: 'anthropic' };
+}
+
+/**
+ * Compose a welcome message from interestingness-ranked events.
+ * Uses the same Gemini -> Anthropic fallback as brainCompose.
+ */
+async function welcomeCompose(events) {
+  const todayNyc = getNycDateString(0);
+  const eventLines = events.slice(0, 6).map((e, i) => {
+    const day = e.date_local === todayNyc ? 'TODAY' : 'TOMORROW';
+    const time = e.start_time_local
+      ? new Date(e.start_time_local).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })
+      : 'evening';
+    const price = e.is_free ? 'Free' : (e.price_display || 'check price');
+    const vibe = e.source_vibe ? `[${e.source_vibe}]` : '';
+    const venue = e.venue_size ? `[${e.venue_size}]` : '';
+    return `${i + 1}. [${day}] ${e.name} at ${e.venue_name || 'TBA'} (${e.neighborhood || 'NYC'}) \u2014 ${time}, ${price} | ${e.category} ${vibe} ${venue} | id:${e.id}`;
+  }).join('\n');
+
+  const userPrompt = `Pick 3 events for a welcome message. Events ranked by interestingness (best first):\n\n${eventLines}`;
+
+  // Try Gemini first
+  const client = getGeminiClient();
+  if (client) {
+    try {
+      const model = client.getGenerativeModel({
+        model: process.env.PULSE_MODEL_ROUTE_GEMINI || 'gemini-2.5-flash-lite',
+        systemInstruction: WELCOME_COMPOSE_SYSTEM,
+        safetySettings: GEMINI_SAFETY,
+        generationConfig: {
+          maxOutputTokens: 1024,
+          temperature: 0.7,
+          responseMimeType: 'application/json',
+          responseSchema: BRAIN_COMPOSE_SCHEMA,
+        },
+      });
+      const result = await withTimeout(
+        model.generateContent({ contents: [{ role: 'user', parts: [{ text: userPrompt }] }] }),
+        10_000, 'welcomeCompose'
+      );
+      const text = result.response.text();
+      const usage = {
+        input_tokens: result.response.usageMetadata?.promptTokenCount || 0,
+        output_tokens: result.response.usageMetadata?.candidatesTokenCount || 0,
+      };
+      const parsed = JSON.parse(stripCodeFences(text));
+      const sms = smartTruncate(parsed.sms_text);
+      return { sms_text: sms, picks: parsed.picks || [], _raw: text, _usage: usage, _provider: 'gemini' };
+    } catch (err) {
+      console.warn('welcomeCompose Gemini failed, falling back to Anthropic:', err.message);
+    }
+  }
+
+  // Anthropic fallback
+  const Anthropic = require('@anthropic-ai/sdk');
+  const anthropicClient = new Anthropic();
+  const response = await withTimeout(anthropicClient.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 512,
+    system: WELCOME_COMPOSE_SYSTEM + '\n\nReturn ONLY valid JSON, no other text.',
+    messages: [{ role: 'user', content: userPrompt }],
+  }, { timeout: 10000 }), 12000, 'welcomeCompose-anthropic');
+  const raw = response.content?.[0]?.text || '';
+  const usage = response.usage || {};
+  const parsed = JSON.parse(stripCodeFences(raw));
+  const sms = smartTruncate(parsed.sms_text);
+  return { sms_text: sms, picks: parsed.picks || [], _raw: raw, _usage: usage, _provider: 'anthropic' };
 }
 
 // --- Tool execution: search_events ---
@@ -1035,4 +1132,4 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
   return trace.id;
 }
 
-module.exports = { checkMechanical, callAgentBrain, handleAgentBrainRequest, resolveDateRange, brainCompose, validatePicks };
+module.exports = { checkMechanical, callAgentBrain, handleAgentBrainRequest, resolveDateRange, brainCompose, welcomeCompose, validatePicks };
