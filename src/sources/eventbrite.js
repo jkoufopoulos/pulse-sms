@@ -173,7 +173,7 @@ function parseEventbriteJsonLd(html) {
   return events;
 }
 
-async function fetchEventbritePage(url, label, categoryOverride) {
+async function fetchEventbritePage(url, label, categoryOverride, sourceName) {
   console.log(`Fetching Eventbrite ${label}...`);
   try {
     const res = await fetch(url, {
@@ -193,8 +193,12 @@ async function fetchEventbritePage(url, label, categoryOverride) {
       return [];
     }
 
-    if (categoryOverride) {
-      events = events.map(e => ({ ...e, category: categoryOverride }));
+    if (categoryOverride || sourceName) {
+      events = events.map(e => ({
+        ...e,
+        ...(categoryOverride && { category: categoryOverride }),
+        ...(sourceName && { source_name: sourceName }),
+      }));
     }
 
     console.log(`Eventbrite ${label}: ${events.length} events`);
@@ -215,7 +219,7 @@ async function fetchEventbriteComedy() {
   ];
 
   const results = await Promise.all(
-    pages.map(([label, url]) => fetchEventbritePage(url, label, 'comedy'))
+    pages.map(([label, url]) => fetchEventbritePage(url, label, 'comedy', 'EventbriteComedy'))
   );
 
   // Deduplicate by event ID (same event may appear in multiple search pages)
@@ -238,7 +242,8 @@ function fetchEventbriteArts() {
   return fetchEventbritePage(
     'https://www.eventbrite.com/d/ny--new-york/arts--this-week/',
     'Arts',
-    'art'
+    'art',
+    'EventbriteArts'
   );
 }
 
