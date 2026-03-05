@@ -1,5 +1,5 @@
 const { check } = require('../helpers');
-const { checkMechanical } = require('../../src/agent-brain');
+const { checkMechanical, executeMore } = require('../../src/agent-brain');
 
 const sessionWithPicks = {
   lastPicks: [{ id: 'e1', name: 'Test Event' }],
@@ -64,3 +64,62 @@ check('"??" → null', checkMechanical('??', emptySession) === null);
 // Regular messages → null (fall through to agent brain)
 check('"williamsburg" → null', checkMechanical('williamsburg', emptySession) === null);
 check('"comedy in bushwick" → null', checkMechanical('comedy in bushwick', emptySession) === null);
+
+// ---- executeMore ----
+console.log('\nexecuteMore:');
+
+// Returns noContext when no session
+check('null session → noContext', executeMore(null).noContext === true);
+check('empty session → noContext', executeMore({}).noContext === true);
+check('session without lastPicks → noContext', executeMore({ lastEvents: {} }).noContext === true);
+check('session without lastEvents → noContext', executeMore({ lastPicks: [] }).noContext === true);
+
+// Returns events excluding already shown
+const moreSession = {
+  lastPicks: [{ event_id: 'e1' }],
+  lastEvents: {
+    e1: { id: 'e1', name: 'Event 1', neighborhood: 'Bushwick' },
+    e2: { id: 'e2', name: 'Event 2', neighborhood: 'Bushwick' },
+    e3: { id: 'e3', name: 'Event 3', neighborhood: 'Bushwick' },
+  },
+  allOfferedIds: ['e1'],
+  allPicks: [{ event_id: 'e1' }],
+  lastNeighborhood: 'Bushwick',
+  lastFilters: {},
+};
+const moreResult = executeMore(moreSession);
+check('returns events from pool', moreResult.events.length > 0);
+check('excludes already shown e1', moreResult.events.every(e => e.id !== 'e1'));
+check('not exhausted', moreResult.exhausted === false);
+check('neighborhood set', moreResult.neighborhood === 'Bushwick');
+
+// Returns exhaustion when pool empty
+const exhaustedSession = {
+  lastPicks: [{ event_id: 'e1' }],
+  lastEvents: { e1: { id: 'e1', name: 'Event 1', neighborhood: 'Bushwick' } },
+  allOfferedIds: ['e1'],
+  allPicks: [{ event_id: 'e1' }],
+  lastNeighborhood: 'Bushwick',
+  lastFilters: {},
+  visitedHoods: ['Bushwick'],
+};
+const exhaustResult = executeMore(exhaustedSession);
+check('exhausted pool → events empty', exhaustResult.events.length === 0);
+check('exhausted pool → exhausted true', exhaustResult.exhausted === true);
+
+// Name dedup: excludes events with same name as shown events
+const nameDupSession = {
+  lastPicks: [{ event_id: 'e1' }],
+  lastEvents: {
+    e1: { id: 'e1', name: 'Jazz Night', neighborhood: 'Bushwick' },
+    e2: { id: 'e2', name: 'Jazz Night', neighborhood: 'Bushwick' },
+    e3: { id: 'e3', name: 'Comedy Show', neighborhood: 'Bushwick' },
+  },
+  allOfferedIds: ['e1'],
+  allPicks: [{ event_id: 'e1' }],
+  lastNeighborhood: 'Bushwick',
+  lastFilters: {},
+};
+const nameDupResult = executeMore(nameDupSession);
+check('name dedup excludes duplicate name', nameDupResult.events.every(e => e.name !== 'Jazz Night'));
+check('name dedup keeps unique event', nameDupResult.events.some(e => e.name === 'Comedy Show'));

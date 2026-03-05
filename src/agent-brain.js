@@ -15,10 +15,10 @@
 
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
 const { extractNeighborhood, NEIGHBORHOODS, BOROUGHS, detectBorough } = require('./neighborhoods');
-const { getAdjacentNeighborhoods } = require('./geo');
+const { getAdjacentNeighborhoods, filterByTimeAfter } = require('./geo');
 const { getEvents, getEventsForBorough, getEventsCitywide, getCacheStatus } = require('./events');
 const { filterKidsEvents } = require('./curation');
-const { buildTaggedPool, buildEventMap, saveResponseFrame, mergeFilters, buildZeroMatchResponse, describeFilters, sendPickUrls } = require('./pipeline');
+const { buildTaggedPool, buildEventMap, saveResponseFrame, mergeFilters, buildZeroMatchResponse, describeFilters, sendPickUrls, buildExhaustionMessage } = require('./pipeline');
 const { sendSMS, maskPhone } = require('./twilio');
 const { startTrace, saveTrace, recordAICost } = require('./traces');
 const { getSession, setSession, addToHistory } = require('./session');
@@ -577,6 +577,73 @@ function serializePoolForContinuation(poolResult) {
     suggested_neighborhood: suggestedHood || undefined,
     exclude_ids: excludeIds?.length > 0 ? excludeIds : undefined,
     events,
+  };
+}
+
+/**
+ * Pure function: compute "more" pool from session state.
+ * No side effects — no SMS sending, no session saves.
+ */
+function executeMore(session) {
+  if (!session || !session.lastPicks || !session.lastEvents) {
+    return { noContext: true };
+  }
+
+  const allOfferedIds = new Set(session.allOfferedIds || []);
+  const allPickIds = new Set((session.allPicks || session.lastPicks || []).map(p => p.event_id));
+  const allShownIds = new Set([...allOfferedIds, ...allPickIds]);
+  const hood = session.lastNeighborhood;
+  const activeFilters = session.lastFilters || {};
+
+  // Filter out already-shown events
+  const allRemaining = Object.values(session.lastEvents).filter(e => !allShownIds.has(e.id));
+
+  // Filter by neighborhood/borough/citywide
+  const boroughHoods = session.lastBorough ? new Set(BOROUGHS[session.lastBorough] || []) : null;
+  const inHoodRemaining = hood
+    ? allRemaining.filter(e => e.neighborhood === hood)
+    : boroughHoods
+      ? allRemaining.filter(e => boroughHoods.has(e.neighborhood))
+      : allRemaining;
+
+  // Hard time gate: exclude events before time_after
+  const timeGated = activeFilters.time_after
+    ? filterByTimeAfter(inHoodRemaining, activeFilters.time_after)
+    : inHoodRemaining;
+
+  // Name dedup: exclude events whose name matches any previously shown event
+  const offeredNames = new Set(
+    [...allShownIds].map(id => session.lastEvents[id]?.name?.toLowerCase()).filter(Boolean)
+  );
+  const nameDeduped = timeGated.filter(e => !offeredNames.has(e.name?.toLowerCase()));
+  const dedupedPool = nameDeduped.length > 0 ? nameDeduped : timeGated;
+
+  // Adjacent hood suggestions
+  const adjacentHoods = hood ? getAdjacentNeighborhoods(hood, 3) : [];
+  const suggestions = adjacentHoods.filter(h => !(session.visitedHoods || []).includes(h));
+
+  if (dedupedPool.length === 0) {
+    return {
+      events: [],
+      exhausted: true,
+      suggestions,
+      neighborhood: hood,
+      allShownIds: [...allShownIds],
+    };
+  }
+
+  const batch = dedupedPool.slice(0, 8);
+  const isLastBatch = dedupedPool.length <= 8;
+
+  return {
+    events: batch,
+    exhausted: false,
+    isLastBatch,
+    suggestions,
+    neighborhood: hood,
+    allShownIds: [...allShownIds],
+    borough: session.lastBorough,
+    activeFilters,
   };
 }
 
@@ -1249,7 +1316,162 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
     // Execute the tool
     let execResult;
 
-    if (brainResult.tool === 'search_events') {
+    if (brainResult.tool === 'search_events' && brainResult.params.intent === 'more') {
+      // --- More intent: pull next batch from session pool ---
+      const moreResult = executeMore(session);
+
+      if (moreResult.noContext) {
+        execResult = {
+          sms: "Tell me what you're in the mood for — comedy, live music, something weird? Or drop a neighborhood.",
+          intent: 'conversational',
+        };
+      } else if (moreResult.exhausted) {
+        const exhaust = buildExhaustionMessage(moreResult.neighborhood, {
+          adjacentHoods: moreResult.neighborhood ? getAdjacentNeighborhoods(moreResult.neighborhood, 4) : [],
+          visitedHoods: session?.visitedHoods || [moreResult.neighborhood].filter(Boolean),
+          filters: moreResult.activeFilters || {},
+          borough: session?.lastBorough,
+        });
+        saveResponseFrame(phone, {
+          mode: 'more',
+          picks: [],
+          prevSession: session,
+          eventMap: session?.lastEvents || {},
+          neighborhood: moreResult.neighborhood,
+          filters: moreResult.activeFilters || {},
+          offeredIds: [],
+          pending: exhaust.suggestedHood ? { neighborhood: exhaust.suggestedHood, filters: moreResult.activeFilters || {} } : null,
+        });
+        addToHistory(phone, 'tool_result', '', {
+          match_count: 0,
+          neighborhood: moreResult.neighborhood || 'unknown',
+          exhausted: true,
+        });
+        execResult = { sms: exhaust.message, intent: 'more' };
+      } else if (brainResult.chat) {
+        // Single-turn: continue same Gemini session with more events
+        try {
+          const todayNyc = getNycDateString(0);
+          const tomorrowNyc = getNycDateString(1);
+          const eventData = {
+            neighborhood: moreResult.neighborhood || 'NYC',
+            match_count: moreResult.events.length,
+            is_last_batch: moreResult.isLastBatch || false,
+            suggestions: moreResult.suggestions,
+            events: moreResult.events.map(e => ({
+              id: e.id, name: (e.name || '').slice(0, 80), venue_name: e.venue_name,
+              neighborhood: e.neighborhood,
+              day: e.date_local === todayNyc ? 'TODAY' : e.date_local === tomorrowNyc ? 'TOMORROW' : e.date_local,
+              start_time_local: e.start_time_local,
+              is_free: e.is_free, price_display: e.price_display, category: e.category,
+              short_detail: (e.short_detail || e.description_short || '').slice(0, 100),
+              recurring: e.is_recurring ? e.recurrence_label : undefined,
+              venue_size: e.venue_size || undefined,
+              source_vibe: e.source_vibe || undefined,
+            })),
+          };
+
+          const composeResult = await continueWithResults(brainResult.chat, eventData, trace);
+          recordAICost(trace, 'compose', composeResult._usage, composeResult._provider);
+          trackAICost(phone, composeResult._usage, composeResult._provider);
+          trace.composition.raw_response = composeResult._raw || null;
+          trace.composition.neighborhood_used = moreResult.neighborhood;
+
+          // Validate picks against the more batch
+          const validPicks = validatePicks(composeResult.picks, moreResult.events);
+          const eventMap = buildEventMap(moreResult.events);
+
+          trace.composition.picks = validPicks.map(p => {
+            const evt = eventMap[p.event_id];
+            return { ...p, date_local: evt?.date_local || null, event_name: evt?.name || null,
+              venue_name: evt?.venue_name || null, neighborhood: evt?.neighborhood || null,
+              category: evt?.category || null, is_free: evt?.is_free ?? null,
+              price_display: evt?.price_display || null, start_time_local: evt?.start_time_local || null,
+              source_vibe: evt?.source_vibe || null };
+          });
+
+          saveResponseFrame(phone, {
+            mode: 'more',
+            picks: validPicks,
+            prevSession: session,
+            eventMap: session?.lastEvents || eventMap,
+            neighborhood: moreResult.neighborhood,
+            filters: moreResult.activeFilters || {},
+            offeredIds: moreResult.events.map(e => e.id),
+            pending: (moreResult.isLastBatch && moreResult.suggestions?.length) ? { neighborhood: moreResult.suggestions[0], filters: moreResult.activeFilters || {} } : null,
+          });
+
+          addToHistory(phone, 'tool_result', '', {
+            picks: validPicks.slice(0, 3).map(p => {
+              const evt = eventMap[p.event_id];
+              return { name: evt?.name, category: evt?.category, neighborhood: evt?.neighborhood };
+            }),
+            match_count: moreResult.events.length,
+            neighborhood: moreResult.neighborhood || 'unknown',
+          });
+
+          execResult = {
+            sms: composeResult.sms_text,
+            intent: 'more',
+            picks: validPicks,
+            activeFilters: moreResult.activeFilters,
+            eventMap,
+          };
+        } catch (err) {
+          // Fallback to brainCompose if continuation fails
+          console.warn('More continuation failed, falling back to brainCompose:', err.message);
+          trace.brain_error = (trace.brain_error || '') + ` more_continuation: ${err.message}`;
+          const composed = await brainCompose(moreResult.events, moreResult.neighborhood || 'NYC', moreResult.activeFilters || {}, trace, phone);
+          recordAICost(trace, 'compose', composed._usage, composed._provider);
+          trackAICost(phone, composed._usage, composed._provider);
+          const validPicks = validatePicks(composed.picks, moreResult.events);
+          const eventMap = buildEventMap(moreResult.events);
+          saveResponseFrame(phone, {
+            mode: 'more',
+            picks: validPicks,
+            prevSession: session,
+            eventMap: session?.lastEvents || eventMap,
+            neighborhood: moreResult.neighborhood,
+            filters: moreResult.activeFilters || {},
+            offeredIds: moreResult.events.map(e => e.id),
+          });
+          addToHistory(phone, 'tool_result', '', {
+            picks: validPicks.slice(0, 3).map(p => {
+              const evt = eventMap[p.event_id];
+              return { name: evt?.name, category: evt?.category, neighborhood: evt?.neighborhood };
+            }),
+            match_count: moreResult.events.length,
+            neighborhood: moreResult.neighborhood || 'unknown',
+          });
+          execResult = { sms: composed.sms_text, intent: 'more', picks: validPicks, eventMap };
+        }
+      } else {
+        // Anthropic fallback — use brainCompose
+        const composed = await brainCompose(moreResult.events, moreResult.neighborhood || 'NYC', moreResult.activeFilters || {}, trace, phone);
+        recordAICost(trace, 'compose', composed._usage, composed._provider);
+        trackAICost(phone, composed._usage, composed._provider);
+        const validPicks = validatePicks(composed.picks, moreResult.events);
+        const eventMap = buildEventMap(moreResult.events);
+        saveResponseFrame(phone, {
+          mode: 'more',
+          picks: validPicks,
+          prevSession: session,
+          eventMap: session?.lastEvents || eventMap,
+          neighborhood: moreResult.neighborhood,
+          filters: moreResult.activeFilters || {},
+          offeredIds: moreResult.events.map(e => e.id),
+        });
+        addToHistory(phone, 'tool_result', '', {
+          picks: validPicks.slice(0, 3).map(p => {
+            const evt = eventMap[p.event_id];
+            return { name: evt?.name, category: evt?.category, neighborhood: evt?.neighborhood };
+          }),
+          match_count: moreResult.events.length,
+          neighborhood: moreResult.neighborhood || 'unknown',
+        });
+        execResult = { sms: composed.sms_text, intent: 'more', picks: validPicks, eventMap };
+      }
+    } else if (brainResult.tool === 'search_events') {
       const poolResult = await buildSearchPool(brainResult.params, session, phone, trace);
 
       if (poolResult.zeroMatch) {
@@ -1355,4 +1577,4 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
   return trace.id;
 }
 
-module.exports = { checkMechanical, callAgentBrain, handleAgentBrainRequest, resolveDateRange, brainCompose, welcomeCompose, handleWelcome, validatePicks, buildSearchPool };
+module.exports = { checkMechanical, callAgentBrain, handleAgentBrainRequest, resolveDateRange, brainCompose, welcomeCompose, handleWelcome, validatePicks, buildSearchPool, executeMore };
