@@ -1,0 +1,68 @@
+[
+  {
+    "name": "cold neighborhood open",
+    "turns": [
+      { "user": "bushwick" }
+    ]
+  },
+  {
+    "name": "category with neighborhood",
+    "turns": [
+      { "user": "jazz in west village" }
+    ]
+  },
+  {
+    "name": "vibe request",
+    "turns": [
+      { "user": "anything weird tonight" }
+    ]
+  },
+  {
+    "name": "one word category",
+    "turns": [
+      { "user": "techno" }
+    ]
+  },
+  {
+    "name": "free filter",
+    "turns": [
+      { "user": "free stuff in greenpoint" }
+    ]
+  },
+  {
+    "name": "group context",
+    "turns": [
+      { "user": "4 of us looking for something fun in williamsburg tonight" },
+      { "user": "anything cheaper?" }
+    ]
+  },
+  {
+    "name": "multi-turn browse and filter",
+    "turns": [
+      { "user": "east village" },
+      { "user": "any comedy?" },
+      { "user": "2" }
+    ]
+  },
+  {
+    "name": "pivot mid-conversation",
+    "turns": [
+      { "user": "les" },
+      { "user": "actually bushwick" },
+      { "user": "techno stuff" }
+    ]
+  },
+  {
+    "name": "skeptic follow-up",
+    "turns": [
+      { "user": "williamsburg" },
+      { "user": "those sound basic" }
+    ]
+  },
+  {
+    "name": "minimal effort",
+    "turns": [
+      { "user": "vibes" }
+    ]
+  }
+]
