@@ -647,6 +647,65 @@ function executeMore(session) {
   };
 }
 
+/**
+ * Execute "details" intent: match pick_reference against lastPicks.
+ * Pure function — no SMS sending, no session saves.
+ * Returns: { found, event, pick, pickIndex } or { noPicks } or { stalePicks } or { found: false }
+ */
+function executeDetails(pickReference, session) {
+  if (!session?.lastPicks?.length || !session?.lastEvents) {
+    return { noPicks: true, found: false };
+  }
+
+  // Guard: if last response didn't have picks, user is referencing stale list
+  if (session.lastResponseHadPicks === false) {
+    return { stalePicks: true, found: false, neighborhood: session.lastNeighborhood };
+  }
+
+  const picks = session.lastPicks;
+  const events = session.lastEvents;
+  const ref = (pickReference || '').toString().trim().toLowerCase();
+
+  // 1. Try numeric match
+  const num = parseInt(ref, 10);
+  if (!isNaN(num) && num >= 1 && num <= picks.length) {
+    const pick = picks[num - 1];
+    const event = events[pick.event_id];
+    if (event) return { found: true, event, pick, pickIndex: num };
+  }
+
+  // 2. Try event name match (substring)
+  for (let i = 0; i < picks.length; i++) {
+    const event = events[picks[i].event_id];
+    if (event?.name && event.name.toLowerCase().includes(ref)) {
+      return { found: true, event, pick: picks[i], pickIndex: i + 1 };
+    }
+  }
+
+  // 3. Try venue name match (substring)
+  for (let i = 0; i < picks.length; i++) {
+    const event = events[picks[i].event_id];
+    if (event?.venue_name && event.venue_name.toLowerCase().includes(ref)) {
+      return { found: true, event, pick: picks[i], pickIndex: i + 1 };
+    }
+  }
+
+  // 4. Try category match ("the comedy one")
+  const categoryWords = ['comedy', 'jazz', 'music', 'trivia', 'film', 'theater', 'art', 'dance', 'dj', 'nightlife'];
+  for (const word of categoryWords) {
+    if (ref.includes(word)) {
+      for (let i = 0; i < picks.length; i++) {
+        const event = events[picks[i].event_id];
+        if (event?.category?.toLowerCase().includes(word)) {
+          return { found: true, event, pick: picks[i], pickIndex: i + 1 };
+        }
+      }
+    }
+  }
+
+  return { found: false };
+}
+
 // --- Lightweight compose for brain path ---
 // ~400 tokens system prompt vs ~2000+ for unified. No routing, no intent, just write the SMS.
 
@@ -1471,6 +1530,60 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
         });
         execResult = { sms: composed.sms_text, intent: 'more', picks: validPicks, eventMap };
       }
+    } else if (brainResult.tool === 'search_events' && brainResult.params.intent === 'details') {
+      // --- Details intent: match pick_reference against session lastPicks ---
+      const detailsResult = executeDetails(brainResult.params.pick_reference, session);
+
+      if (detailsResult.noPicks) {
+        execResult = { sms: "I don't have any picks loaded — tell me what you're looking for!", intent: 'details' };
+      } else if (detailsResult.stalePicks) {
+        const hood = detailsResult.neighborhood;
+        const sms = hood
+          ? `I don't have a pick list up right now — ask for more ${hood} picks, or tell me what you're looking for!`
+          : "I don't have a pick list up right now — tell me what you're looking for!";
+        execResult = { sms, intent: 'details' };
+      } else if (!detailsResult.found) {
+        execResult = { sms: "I'm not sure which event you mean — can you be more specific?", intent: 'details' };
+      } else if (brainResult.chat) {
+        // Continue Gemini session with event details
+        const event = detailsResult.event;
+        const eventData = {
+          intent: 'details',
+          event: {
+            id: event.id, name: event.name, venue_name: event.venue_name,
+            neighborhood: event.neighborhood, category: event.category,
+            start_time_local: event.start_time_local, date_local: event.date_local,
+            is_free: event.is_free, price_display: event.price_display,
+            description: event.description_short || event.short_detail || '',
+            ticket_url: event.ticket_url || event.source_url || null,
+            venue_address: event.venue_address || null,
+            why: detailsResult.pick?.why || '',
+          },
+        };
+
+        try {
+          const composeResult = await continueWithResults(brainResult.chat, eventData, trace);
+          recordAICost(trace, 'compose', composeResult._usage, composeResult._provider);
+          trackAICost(phone, composeResult._usage, composeResult._provider);
+          trace.composition.raw_response = composeResult._raw || null;
+          execResult = { sms: smartTruncate(composeResult.sms_text), intent: 'details' };
+        } catch (err) {
+          console.warn('Details continuation failed, falling back to composeDetails:', err.message);
+          const { composeDetails } = require('./ai');
+          const result = await composeDetails(event, detailsResult.pick?.why);
+          recordAICost(trace, 'compose', result._usage, result._provider);
+          trackAICost(phone, result._usage, result._provider);
+          execResult = { sms: smartTruncate(result.sms_text), intent: 'details' };
+        }
+      } else {
+        // Anthropic fallback — use composeDetails
+        const { composeDetails } = require('./ai');
+        const event = detailsResult.event;
+        const result = await composeDetails(event, detailsResult.pick?.why);
+        recordAICost(trace, 'compose', result._usage, result._provider);
+        trackAICost(phone, result._usage, result._provider);
+        execResult = { sms: smartTruncate(result.sms_text), intent: 'details' };
+      }
     } else if (brainResult.tool === 'search_events') {
       const poolResult = await buildSearchPool(brainResult.params, session, phone, trace);
 
@@ -1577,4 +1690,4 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
   return trace.id;
 }
 
-module.exports = { checkMechanical, callAgentBrain, handleAgentBrainRequest, resolveDateRange, brainCompose, welcomeCompose, handleWelcome, validatePicks, buildSearchPool, executeMore };
+module.exports = { checkMechanical, callAgentBrain, handleAgentBrainRequest, resolveDateRange, brainCompose, welcomeCompose, handleWelcome, validatePicks, buildSearchPool, executeMore, executeDetails };

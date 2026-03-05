@@ -1,5 +1,5 @@
 const { check } = require('../helpers');
-const { checkMechanical, executeMore } = require('../../src/agent-brain');
+const { checkMechanical, executeMore, executeDetails } = require('../../src/agent-brain');
 
 const sessionWithPicks = {
   lastPicks: [{ id: 'e1', name: 'Test Event' }],
@@ -123,3 +123,53 @@ const nameDupSession = {
 const nameDupResult = executeMore(nameDupSession);
 check('name dedup excludes duplicate name', nameDupResult.events.every(e => e.name !== 'Jazz Night'));
 check('name dedup keeps unique event', nameDupResult.events.some(e => e.name === 'Comedy Show'));
+
+// ---- executeDetails ----
+console.log('\nexecuteDetails:');
+
+const detailsSession = {
+  lastPicks: [
+    { event_id: 'e1', why: 'great jazz' },
+    { event_id: 'e2', why: 'funny comedy' },
+  ],
+  lastEvents: {
+    e1: { id: 'e1', name: 'Jazz Night', venue_name: 'Blue Note', neighborhood: 'West Village',
+      category: 'live_music', start_time_local: '21:30', price_display: '$20', is_free: false },
+    e2: { id: 'e2', name: 'Open Mic Comedy', venue_name: 'Tiny Cupboard', neighborhood: 'Bushwick',
+      category: 'comedy', start_time_local: '20:00', price_display: 'free', is_free: true },
+  },
+  lastResponseHadPicks: true,
+};
+
+// Matches by number
+const detNum = executeDetails('2', detailsSession);
+check('details: matches by number', detNum.found === true && detNum.event.id === 'e2' && detNum.pickIndex === 2);
+
+// Matches by event name
+const detName = executeDetails('jazz', detailsSession);
+check('details: matches by event name', detName.found === true && detName.event.id === 'e1');
+
+// Matches by venue name
+const detVenue = executeDetails('tiny cupboard', detailsSession);
+check('details: matches by venue name', detVenue.found === true && detVenue.event.id === 'e2');
+
+// Matches by category keyword
+const detCat = executeDetails('the comedy one', detailsSession);
+check('details: matches by category keyword', detCat.found === true && detCat.event.id === 'e2');
+
+// Returns not found when no match
+const detNoMatch = executeDetails('the karaoke show', detailsSession);
+check('details: returns not found when no match', detNoMatch.found === false && !detNoMatch.noPicks && !detNoMatch.stalePicks);
+
+// Returns noPicks when no session picks
+const detNoPicks = executeDetails('2', { lastPicks: [] });
+check('details: returns noPicks when no session picks', detNoPicks.noPicks === true);
+
+// Returns noPicks when null session
+const detNull = executeDetails('2', null);
+check('details: returns noPicks when null session', detNull.noPicks === true);
+
+// Returns stalePicks when lastResponseHadPicks is false
+const staleSession = { ...detailsSession, lastResponseHadPicks: false, lastNeighborhood: 'Bushwick' };
+const detStale = executeDetails('2', staleSession);
+check('details: returns stalePicks when lastResponseHadPicks is false', detStale.stalePicks === true && detStale.neighborhood === 'Bushwick');
