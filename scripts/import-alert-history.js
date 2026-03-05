@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// One-off script: import historical Bestie alert emails from Gmail into data/alerts.jsonl
+// One-off script: import historical Pulse alert emails from Gmail into data/alerts.jsonl
 // Usage: node scripts/import-alert-history.js
 // Requires GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN env vars
 
@@ -27,12 +27,12 @@ function stripHtml(html) {
 }
 
 function parseType(subject) {
-  // Health alerts: "Bestie: 3 sources failing", "Bestie: 1 source failing"
+  // Health alerts: "Bestie: 3 sources failing", "Pulse: 1 source failing" (legacy used "Bestie")
   if (/source.?\s*failing/i.test(subject)) {
     return { type: 'health', alertType: undefined };
   }
-  // Runtime alerts: "Bestie: slow_response", "Bestie: error_rate", etc.
-  const match = subject.match(/^Bestie:\s*(.+)$/i);
+  // Runtime alerts: "Pulse: slow_response", "Bestie: error_rate" (legacy used "Bestie")
+  const match = subject.match(/^(?:Bestie|Pulse):\s*(.+)$/i);
   const alertType = match ? match[1].trim() : 'unknown';
   return { type: 'runtime', alertType };
 }
@@ -62,9 +62,9 @@ function isDuplicate(entry, existing) {
 }
 
 async function main() {
-  console.log('Fetching Bestie alert emails from Gmail...');
+  console.log('Fetching Pulse alert emails from Gmail...');
 
-  const emails = await fetchEmails('from:onboarding@resend.dev subject:Bestie newer_than:90d', 100);
+  const emails = await fetchEmails('from:onboarding@resend.dev subject:(Bestie OR Pulse) newer_than:90d', 100);
 
   if (emails.length === 0) {
     console.log('No alert emails found. Check Gmail credentials and search query.');

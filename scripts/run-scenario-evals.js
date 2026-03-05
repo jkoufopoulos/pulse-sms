@@ -56,7 +56,7 @@ const PRICING = {
 let judgeCostTotal = 0;
 let budgetExceeded = false;
 
-const JUDGE_SYSTEM = `You are a QA judge for Bestie, an SMS bot that recommends NYC events.
+const JUDGE_SYSTEM = `You are a QA judge for Pulse, an SMS bot that recommends NYC events.
 
 You will be given:
 1. A test scenario with expected behavior and failure modes
@@ -70,11 +70,11 @@ GRADING RULES:
 - A response can use different words/events and still PASS if the behavior matches.
 - Only FAIL if the actual response clearly violates expected behavior or triggers a listed failure mode.
 - Sign-offs: A warm sign-off (1-2 sentences) that includes future engagement prompts ("Hit me up anytime!", "Text me when you're heading out!") is ACCEPTABLE and SHOULD PASS. Only FAIL sign-offs that are excessively long (3+ sentences), ignore the user's exit intent, or are robotically formal. Brief sign-offs ("enjoy!") and warm sign-offs ("Have fun tonight! Hit me up anytime.") are BOTH acceptable.
-- Nearby expansion: When a neighborhood has few or no matching events, Bestie is DESIGNED to transparently expand to nearby neighborhoods ("not much in LES, but nearby East Village has..."). This is CORRECT behavior, not a failure. Only FAIL if the system silently serves wrong-neighborhood events without acknowledging the expansion.
+- Nearby expansion: When a neighborhood has few or no matching events, Pulse is DESIGNED to transparently expand to nearby neighborhoods ("not much in LES, but nearby East Village has..."). This is CORRECT behavior, not a failure. Only FAIL if the system silently serves wrong-neighborhood events without acknowledging the expansion.
 - Thin coverage: If the requested neighborhood genuinely has zero events for the given filter (or zero events at all), an honest "not much here" response with alternatives is CORRECT behavior. Do not fail a scenario just because no events exist — judge the system's HANDLING of the empty state. This applies even when the user explicitly requests a neighborhood ("actually dumbo") — if there's nothing there, a transparent "not much in DUMBO, but Fort Greene is next door" with a nudge is PREFERRED over delivering zero results. It saves the user an extra message round-trip.
-- MORE numbering: Bestie restarts pick numbering at 1 after MORE (new batch = new numbers). Sequential numbering (4-6 continuing from 1-3) is NOT expected. Do not fail for restarting numbering.
-- Nudge accepts: When Bestie asks "want me to check [nearby neighborhood]?" or "want picks from there?", user responses like "sounds good thx", "sure", "yeah", "ok", "bet", "cool", "down", "yes please" are ACCEPTING the offer — NOT exit intent or sign-offs. Judge these in conversational context. "sounds good thx" after a question is agreement, not goodbye.
-- Nudge acknowledgments: After a user accepts a nearby nudge, Bestie may send a brief acknowledgment ("Got it! Checking Red Hook for you — give me a sec") before delivering picks in a follow-up message. This is CORRECT behavior. Do not fail for an acknowledgment-only response when it follows a nudge accept — the eval may not capture the follow-up SMS with actual picks.
+- MORE numbering: Pulse restarts pick numbering at 1 after MORE (new batch = new numbers). Sequential numbering (4-6 continuing from 1-3) is NOT expected. Do not fail for restarting numbering.
+- Nudge accepts: When Pulse asks "want me to check [nearby neighborhood]?" or "want picks from there?", user responses like "sounds good thx", "sure", "yeah", "ok", "bet", "cool", "down", "yes please" are ACCEPTING the offer — NOT exit intent or sign-offs. Judge these in conversational context. "sounds good thx" after a question is agreement, not goodbye.
+- Nudge acknowledgments: After a user accepts a nearby nudge, Pulse may send a brief acknowledgment ("Got it! Checking Red Hook for you — give me a sec") before delivering picks in a follow-up message. This is CORRECT behavior. Do not fail for an acknowledgment-only response when it follows a nudge accept — the eval may not capture the follow-up SMS with actual picks.
 
 For each user turn, grade pass/fail and explain briefly.
 Then give an overall scenario verdict.
@@ -146,24 +146,24 @@ Grade each user turn's response and give an overall verdict.`;
 }
 
 /**
- * Check deterministic assertions on bestie turns.
+ * Check deterministic assertions on pulse turns.
  * Returns { passed, allAsserted, results[] }.
- * - allAsserted: true if every bestie turn has an assertion (can skip judge)
+ * - allAsserted: true if every pulse turn has an assertion (can skip judge)
  * - results: per-turn assertion details for reporting
  */
 function checkAssertions(scenario, actualConversation) {
-  const expectedBestieTurns = scenario.turns.filter(t => t.sender === 'bestie');
-  const actualBestieTurns = actualConversation.filter(t => t.sender === 'bestie');
+  const expectedPulseTurns = scenario.turns.filter(t => t.sender === 'pulse');
+  const actualPulseTurns = actualConversation.filter(t => t.sender === 'pulse');
   const results = [];
   let allPassed = true;
   let assertedCount = 0;
 
-  for (let i = 0; i < expectedBestieTurns.length; i++) {
-    const expected = expectedBestieTurns[i];
+  for (let i = 0; i < expectedPulseTurns.length; i++) {
+    const expected = expectedPulseTurns[i];
     if (!expected.assert) continue;
 
     assertedCount++;
-    const actual = actualBestieTurns[i];
+    const actual = actualPulseTurns[i];
     if (!actual) {
       results.push({ turn: i + 1, assert_type: expected.assert, expected: expected.message, actual: null, passed: false });
       allPassed = false;
@@ -183,7 +183,7 @@ function checkAssertions(scenario, actualConversation) {
     if (!passed) allPassed = false;
   }
 
-  const allAsserted = assertedCount > 0 && assertedCount === expectedBestieTurns.length;
+  const allAsserted = assertedCount > 0 && assertedCount === expectedPulseTurns.length;
   return { passed: assertedCount === 0 ? null : allPassed, allAsserted, results };
 }
 
@@ -213,12 +213,12 @@ async function runScenario(scenario, phoneNumber) {
       data = await res.json().catch(() => ({ error: `HTTP ${res.status} (non-JSON response)` }));
     } catch (err) {
       const msg = err.name === 'TimeoutError' ? 'fetch timeout (28s)' : err.message;
-      actualConversation.push({ sender: 'bestie', message: `[ERROR: ${msg}]` });
+      actualConversation.push({ sender: 'pulse', message: `[ERROR: ${msg}]` });
       continue;
     }
 
     if (!res.ok) {
-      actualConversation.push({ sender: 'bestie', message: `[ERROR: ${data.error || res.status}]` });
+      actualConversation.push({ sender: 'pulse', message: `[ERROR: ${data.error || res.status}]` });
       continue;
     }
 
@@ -227,11 +227,11 @@ async function runScenario(scenario, phoneNumber) {
     const trace = data.trace || null;
     const messages = data.messages || [];
     for (const msg of messages) {
-      actualConversation.push({ sender: 'bestie', message: msg.body, trace_summary: traceSummary, trace });
+      actualConversation.push({ sender: 'pulse', message: msg.body, trace_summary: traceSummary, trace });
     }
 
     if (messages.length === 0) {
-      actualConversation.push({ sender: 'bestie', message: '[NO RESPONSE]' });
+      actualConversation.push({ sender: 'pulse', message: '[NO RESPONSE]' });
     }
 
     // Small delay between turns for session to settle
@@ -312,11 +312,11 @@ async function main() {
       const actualConversation = await runScenario(scenario, phoneNumber);
       const assertions = checkAssertions(scenario, actualConversation);
 
-      // Run code evals on every bestie turn that has a trace
+      // Run code evals on every pulse turn that has a trace
       const codeEvalFailures = [];
       let codeEvalTotal = 0;
       for (const turn of actualConversation) {
-        if (turn.sender === 'bestie' && turn.trace) {
+        if (turn.sender === 'pulse' && turn.trace) {
           const results = runCodeEvals(turn.trace);
           codeEvalTotal += results.length;
           for (const r of results) {

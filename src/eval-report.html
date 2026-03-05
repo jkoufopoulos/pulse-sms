@@ -1485,7 +1485,7 @@ function renderRegressionReport() {
       s.conversation.forEach(function(turn) {
         var bubbleClass = turn.sender === 'user' ? 'user' : 'bestie';
         if (turn.message) html += '<div class="chat-bubble ' + bubbleClass + '">' + escHtml(turn.message) + '</div>';
-        if (turn.sender === 'bestie' && turn.trace_summary) {
+        if (turn.sender === 'pulse' && turn.trace_summary) {
           html += renderTraceSummary(turn.trace_summary, turn.trace_debug);
         }
       });
@@ -2215,7 +2215,7 @@ function renderScenarioCard(s, sortIdx) {
         }
         var bubbleClass = msg.sender === 'user' ? 'user' : 'bestie';
         html += '<div class="chat-bubble ' + bubbleClass + '">' + escHtml(msg.message) + '</div>';
-        if (msg.sender === 'bestie' && msg.trace_summary) {
+        if (msg.sender === 'pulse' && msg.trace_summary) {
           html += renderTraceSummary(msg.trace_summary, msg.trace_debug);
         }
       });
