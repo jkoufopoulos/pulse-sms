@@ -90,9 +90,11 @@ Daily scrape (10am ET)              Incoming SMS
 |--------|------|
 | `handler.js` | Orchestrator: checkMechanical → agent brain → deterministic session save |
 | `request-guard.js` | TCPA opt-out, Twilio dedup, per-user AI budget ($0.10/day prod), IP rate limiting |
-| `agent-brain.js` | Sole LLM path: `checkMechanical` (help + TCPA only), `callAgentBrain` (Gemini tool calling, 2 tools: `search_events` + `respond`). Falls back to Claude Haiku on Gemini failure |
+| `model-config.js` | Single source of truth for all LLM model choices. 5 roles (brain, compose, extract, details, fallback), env var overrides, provider auto-detection from model name prefix |
+| `llm.js` | Provider-agnostic LLM interface: `generate()`, `callWithTools()`, `continueChat()`. Routes to Gemini or Anthropic based on model name. Neutral tool format with automatic conversion |
+| `agent-brain.js` | Sole LLM path: `checkMechanical` (help + TCPA only), `callAgentBrain` (tool calling via llm.js, 2 tools: `search_events` + `respond`). Falls back to `MODELS.fallback` on primary failure |
 | `pipeline.js` | `buildTaggedPool`, `eventMatchesFilters`, `saveResponseFrame` (atomic session writes) |
-| `ai.js` | `extractEvents` (scrape-time), `composeDetails` (event detail composition) |
+| `ai.js` | `extractEvents` (scrape-time), `composeDetails` (event detail composition). Uses `llm.generate()` |
 | `prompts.js` | System prompts: `BRAIN_SYSTEM`, `BRAIN_COMPOSE_SYSTEM`, `DETAILS_SYSTEM`, `EXTRACTION_PROMPT` |
 | `session.js` | Per-phone session store, 2hr TTL, 12 fields |
 | `events.js` | Daily event cache + disk persistence, cross-source dedup, quality gates, source vibe stamping |
@@ -120,7 +122,7 @@ Required: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `ANT
 
 Optional: `PORT` (default 3000), `PULSE_TEST_MODE=true` (enables simulator), `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`/`GMAIL_REFRESH_TOKEN` (newsletter scrapers), `RESEND_API_KEY`/`ALERT_EMAIL` (email alerts), `PULSE_NO_RATE_LIMIT=true`, `PULSE_CARD_ENABLED=true` (enables branded card pages; default off, uses direct source URLs), `PULSE_CARD_DOMAIN`, `PULSE_LINK_PREVIEWS=true` (sends each pick's URL as a separate SMS for iMessage link previews).
 
-Model overrides: `PULSE_MODEL_COMPOSE`, `PULSE_MODEL_EXTRACT`.
+Model config (all optional, defaults in `src/model-config.js`): `PULSE_MODEL_BRAIN` (agent brain, default `gemini-2.5-flash-lite`), `PULSE_MODEL_COMPOSE` (SMS composition, default `gemini-2.5-flash-lite`), `PULSE_MODEL_EXTRACT` (event extraction, default `gemini-2.5-flash`), `PULSE_MODEL_DETAILS` (detail composition, default `gemini-2.5-flash`), `PULSE_MODEL_FALLBACK` (fallback for all roles, default `claude-haiku-4-5-20251001`). Provider auto-detected from model name prefix (`gemini-*` → Gemini, `claude-*` → Anthropic).
 
 ## Running
 
