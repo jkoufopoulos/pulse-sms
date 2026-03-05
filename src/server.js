@@ -135,12 +135,18 @@ app.get('/eval-report', (req, res) => {
   res.sendFile(require('path').join(__dirname, 'eval-report.html'));
 });
 
+app.get('/eval-quality', (req, res) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
+  res.sendFile(require('path').join(__dirname, 'eval-quality.html'));
+});
+
 // Eval report API — list available reports and serve report data
 const REPORT_PREFIXES = {
   'scenario-eval-': 'scenario',
   'regression-eval-': 'regression',
   'extraction-audit-': 'extraction',
   'scrape-audit-': 'scrape',
+  'quality-eval-': 'quality',
 };
 function getReportType(filename) {
   for (const [prefix, type] of Object.entries(REPORT_PREFIXES)) {
@@ -180,6 +186,9 @@ app.get('/api/eval-reports', (req, res) => {
       }
       if (type === 'scrape') {
         return { ...base, total: data.summary?.total, passed: data.summary?.passed, pass_rate: data.summary?.passRate, sources_below: data.summary?.sourcesBelow };
+      }
+      if (type === 'quality') {
+        return { ...base, ...data.summary, judge_model: data.judge_model, judge_cost: data.judge_cost, elapsed_seconds: data.elapsed_seconds, base_url: data.base_url };
       }
       return base;
     } catch { return null; }
