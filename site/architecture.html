@@ -786,11 +786,19 @@
       color: var(--text-muted);
     }
 
-    /* ── PLACEHOLDER SECTIONS ── */
-    .placeholder-text {
-      font-family: var(--font-mono);
-      font-size: 0.85rem;
-      color: var(--text-muted);
+    /* ── SCROLL FADE-IN ── */
+    section .container {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    section.visible .container {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    #hero .container {
+      opacity: 1;
+      transform: translateY(0);
     }
 
     /* ── RESPONSIVE ── */
@@ -853,8 +861,15 @@
         padding: 0 16px;
       }
       .phone {
+        max-width: 100%;
         min-height: 480px;
         padding: 40px 12px 24px;
+      }
+      .section-title {
+        font-size: 1.25rem;
+      }
+      .section-subtitle {
+        font-size: 0.85rem;
       }
     }
   </style>
@@ -1375,7 +1390,7 @@ OUTPUT:
 </section>
 
 <!-- ══════════════════════════════════════════════════════ -->
-<!-- SECTION 4: PIPELINE (placeholder)                     -->
+<!-- SECTION 4: DATA PIPELINE                              -->
 <!-- ══════════════════════════════════════════════════════ -->
 <section id="pipeline">
   <div class="container">
@@ -1390,7 +1405,7 @@ OUTPUT:
       <div class="pipe-arrow">&darr;</div>
       <div class="pipe-node">19 scrapers (parallel)<div class="pipe-node-dim">4 use LLM extraction, 15 parse structured APIs</div></div>
       <div class="pipe-arrow">&darr;</div>
-      <div class="pipe-node">scrape-guard.js<div class="pipe-node-dim">4 checks: confidence &ge; 0.4, completeness &ge; 0.4, not needs_review, has name</div></div>
+      <div class="pipe-node">scrape-guard.js<div class="pipe-node-dim">4 checks: count, coverage, date, dupes</div></div>
       <div class="pipe-arrow">&darr;</div>
       <div class="pipe-fork">
         <div class="pipe-fork-branch">
@@ -1452,7 +1467,7 @@ OUTPUT:
 </section>
 
 <!-- ══════════════════════════════════════════════════════ -->
-<!-- SECTION 5: SESSIONS (placeholder)                     -->
+<!-- SECTION 5: SESSION ISOLATION                           -->
 <!-- ══════════════════════════════════════════════════════ -->
 <section id="sessions">
   <div class="container">
@@ -1508,7 +1523,7 @@ OUTPUT:
 </section>
 
 <!-- ══════════════════════════════════════════════════════ -->
-<!-- SECTION 6: COST MODEL (placeholder)                   -->
+<!-- SECTION 6: COST ANATOMY                               -->
 <!-- ══════════════════════════════════════════════════════ -->
 <section id="cost">
   <div class="container">
@@ -1648,6 +1663,17 @@ OUTPUT:
     });
   }, { threshold: 0.3 });
   observer.observe(heroSection);
+
+  // ── SCROLL FADE-IN ──
+  const allSections = document.querySelectorAll('section');
+  const sectionObs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.1 });
+  allSections.forEach(s => sectionObs.observe(s));
 
   // ── JUMP NAV ACTIVE STATE ──
   const jumpLinks = document.querySelectorAll('.jump-nav a');
