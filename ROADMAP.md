@@ -166,7 +166,7 @@ Added structured conversation history: tool calls (name + params), tool results 
 - Comedy source -- Dedicated scraper for Comedy Cellar, UCB, Caveat
 - Gallery/art source -- Gallery listing aggregator
 - Happy hour detection -- Surface as filterable category
-- Self-healing scraper pipeline -- Auto-detect failures, retry, alert on structural breakage
+- Self-healing scraper pipeline -- **Done (2026-03-05).** `scrape-guard.js`: baseline gates (count drift, field coverage drift, date sanity, duplicate spike) quarantine broken sources at scrape time. Post-scrape audit wires `checkSourceCompleteness` + `runExtractionAudit` to alerting. Yesterday's cached events serve as automatic fallback.
 - Web discovery crawlers -- Targeted searches for niche events beyond whitelisted sources
 
 ### Infrastructure + Product
@@ -207,7 +207,7 @@ Added structured conversation history: tool calls (name + params), tool results 
 
 | Period | Highlights |
 |--------|-----------|
-| Mar 5 | Phase 1: unified agent loop. Phase 2: single-turn agent (Gemini multi-turn tool calling). Phase 3: structured conversation history (tool calls, params, picks in history). First-message welcome flow. Quality eval runner + browse page. |
+| Mar 5 | Phase 1: unified agent loop. Phase 2: single-turn agent (Gemini multi-turn tool calling). Phase 3: structured conversation history (tool calls, params, picks in history). First-message welcome flow. Quality eval runner + browse page. Scrape guard (baseline gates + post-scrape audit). |
 | Mar 3 | Eval suite audit (34 new scenarios, 417 total). Community layer Phase 2 (editorial voice, source vibe, venue size, interaction format). Skint multi-day parsing. Description coverage for Luma/Songkick/DoNYC. |
 | Mar 2 | Agent brain (`agent-brain.js`) with 99.9% code eval. Cross-source recurrence detection (485 patterns). Gemini Flash fallback chain. Broad query support (citywide + date range). New sources: Tiny Cupboard, Brooklyn Comedy Collective, NYC Trivia League, BK Mag, Sofar Sounds. EventbriteComedy fix (0 -> 55 events). |
 | Mar 1 | Prompt audit (tool_use, tone reduction, shared sections). Structural filter drift fix (Step 2b). Degraded-mode fallback. Code eval accuracy overhaul (99.8%). Fragility audit (16 issues fixed). New sources: Luma, Screen Slate, Skint Ongoing. Dice multi-category. Scrape audit dashboards. Price coverage 27% -> 79%. Neighborhood resolution gap 171 -> 80. SQLite event store. 286 golden scenarios. |
