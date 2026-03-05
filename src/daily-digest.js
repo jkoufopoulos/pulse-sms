@@ -5,12 +5,13 @@ const { getRecentAlerts } = require('./alerts');
 
 /**
  * Determine digest status from metrics.
- * Green: all ok. Yellow: 1-3 issues. Red: >3 issues or user-facing errors.
+ * Green: all ok. Yellow: 1-2 issues. Red: >5 issues or user-facing errors.
+ * With 22 sources, 1-2 having a rough day is normal variation.
  */
 function computeDigestStatus({ sourcesBelow, cacheDrop, userFacingErrors, latencyP95 }) {
   if (userFacingErrors > 0) return 'red';
   if (cacheDrop > 40) return 'red';
-  if (sourcesBelow.length > 3) return 'red';
+  if (sourcesBelow.length > 5) return 'red';
   if (sourcesBelow.length > 0) return 'yellow';
   if (cacheDrop > 20) return 'yellow';
   if (latencyP95 > 5000) return 'yellow';
@@ -31,7 +32,13 @@ function buildNeedsAttention(sourceData, dayName) {
     const belowAvg = s.avg7d > 5 && s.count < s.avg7d * 0.4;
 
     if (belowThreshold || belowAvg) {
-      if (!isOnSchedule) {
+      if (s.isQuarantined) {
+        items.push({
+          source: s.name,
+          issue: `quarantined: ${s.quarantineReason || 'unknown'}`,
+          severity: 'info',
+        });
+      } else if (!isOnSchedule) {
         items.push({
           source: s.name,
           issue: `0 events (off-schedule, expected ${s.schedule.days.join('/')})`,
@@ -82,11 +89,14 @@ function generateDigest(eventCache, scrapeStats) {
       ? okHistory.reduce((sum, h) => sum + h.count, 0) / okHistory.length
       : 0;
     const expectations = SOURCE_EXPECTATIONS[label] || { minExpected: 0, schedule: null };
+    const isQuarantined = health?.lastStatus === 'quarantined';
     return {
       name: label,
       count: sourceCounts[label.toLowerCase()] || 0,
       avg7d,
       status: (sourceCounts[label.toLowerCase()] || 0) >= expectations.minExpected * 0.4 ? 'ok' : 'warn',
+      isQuarantined,
+      quarantineReason: isQuarantined ? health?.lastQuarantineReason : null,
       ...expectations,
     };
   });
