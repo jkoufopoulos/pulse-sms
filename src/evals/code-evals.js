@@ -215,8 +215,8 @@ const evals = {
   },
 
   /**
-   * Pick count: numbered items in SMS should match picks.length.
-   * Skip for non-event intents, single-pick (natural prose), and details.
+   * Pick count: each pick's event name should appear in the SMS.
+   * Skip for non-event intents and details.
    */
   pick_count_accuracy(trace) {
     const picks = trace.composition.picks || [];
@@ -225,18 +225,17 @@ const evals = {
     if (!['events', 'more'].includes(intent) || picks.length === 0) {
       return { name: 'pick_count_accuracy', pass: true, detail: 'not applicable' };
     }
-    // Single-pick responses use natural prose (singlePick skill), no numbered list
-    if (picks.length === 1) {
-      return { name: 'pick_count_accuracy', pass: true, detail: 'single pick (prose)' };
+    // Check that each pick's event name appears in the SMS (first 20 chars of name for fuzzy)
+    let mentioned = 0;
+    for (const p of picks) {
+      const name = (p.event_name || '').toLowerCase();
+      if (name && sms.toLowerCase().includes(name.slice(0, 20))) mentioned++;
     }
-    // Count numbered items (e.g. "1)", "2)", "3)" or "1.", "2.", "3.")
-    const numbered = sms.match(/^\d[.)]/gm) || [];
-    const smsCount = numbered.length;
-    const match = smsCount === picks.length;
+    const match = mentioned === picks.length;
     return {
       name: 'pick_count_accuracy',
       pass: match,
-      detail: match ? `${picks.length} picks, ${smsCount} numbered` : `${picks.length} picks but ${smsCount} numbered in SMS`,
+      detail: match ? `${picks.length} picks, ${mentioned} mentioned in SMS` : `${picks.length} picks but only ${mentioned} mentioned in SMS`,
     };
   },
 

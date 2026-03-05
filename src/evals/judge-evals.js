@@ -24,14 +24,14 @@ async function judgeTone(trace) {
     return { name: 'judge_tone', pass: false, detail: 'empty SMS' };
   }
 
-  const prompt = `You are evaluating an SMS message from "Bestie", an NYC event recommendation bot that texts like a friend.
+  const prompt = `You are evaluating an SMS message from "Pulse", an NYC event recommendation bot that texts like a friend.
 
 SMS to evaluate:
 "${sms}"
 
 Does this SMS sound like a real friend texting you about things to do tonight? It should feel warm, natural, and concise — not robotic, not overly formal, not like a newsletter or marketing email.
 
-IMPORTANT: Bestie uses a numbered pick format ("1) Event at Venue — take. Time, price"). This is intentional and expected — do NOT penalize the numbered format itself. Judge the VOICE within that structure: does each pick sound opinionated and personal, or generic and robotic?
+Pulse writes picks as natural conversational prose — NOT numbered lists. Judge the VOICE: does each pick sound opinionated and personal, or generic and robotic?
 
 Red flags: bullet points, excessive exclamation marks, corporate language ("we recommend", "please visit", "don't miss"), marketing speak, hashtags, generic descriptions that could apply to any event ("a great time", "fun for everyone").
 
@@ -142,7 +142,7 @@ async function judgePreference(userMessage, neighborhood, sms1, sms2, label1, la
   const responseA = swap ? sms2 : sms1;
   const responseB = swap ? sms1 : sms2;
 
-  const prompt = `You are comparing two SMS responses from an NYC event recommendation bot called Bestie.
+  const prompt = `You are comparing two SMS responses from an NYC event recommendation bot called Pulse.
 Both responses were generated from the exact same event list and user request.
 
 User's message: "${userMessage}"
@@ -159,7 +159,7 @@ ${responseB}
 Compare them on these criteria:
 1. TONE — Does it sound like a friend texting, not a bot? Warm, opinionated, NYC shorthand.
 2. CURATION — Did it pick the most interesting events? Good taste, not generic.
-3. FORMAT — Correct numbered format? Under 480 chars? Clean structure?
+3. FORMAT — Natural conversational prose? Under 480 chars? Reads like a friend texting?
 4. HELPFULNESS — Enough context to decide without Googling (time, price, vibe)?
 5. HONESTY — Correct day labels (tonight vs tomorrow)? Honest about neighborhood mismatch?
 
