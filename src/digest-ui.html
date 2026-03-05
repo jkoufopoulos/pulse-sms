@@ -206,9 +206,11 @@
 
   /* Nav */
   .bestie-nav {
-    display: flex; align-items: center; gap: 4px;
-    background: #111; border-radius: 6px; padding: 4px 8px;
-    margin-bottom: 20px; overflow-x: auto; white-space: nowrap;
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; height: 36px;
+    background: #111; border-bottom: 1px solid #222;
+    padding: 0 16px; font-size: 13px;
+    margin: -24px -24px 24px -24px;
   }
   .bestie-nav-link {
     color: #888; text-decoration: none; padding: 0 12px;
