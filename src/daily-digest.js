@@ -33,6 +33,7 @@ function buildNeedsAttention(sourceData, dayName) {
 
     if (belowThreshold || belowAvg) {
       if (s.isQuarantined) {
+        // Quarantine is the safety mechanism working — informational, not a warn
         items.push({
           source: s.name,
           issue: `quarantined: ${s.quarantineReason || 'unknown'}`,

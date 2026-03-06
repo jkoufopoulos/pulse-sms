@@ -4,7 +4,7 @@
 
 const { extractNeighborhood, BOROUGHS, detectBorough } = require('./neighborhoods');
 const { getAdjacentNeighborhoods, getNycDateString, filterByTimeAfter } = require('./geo');
-const { getEvents, getEventsForBorough, getEventsCitywide, getCacheStatus } = require('./events');
+const { getEvents, getEventsForBorough, getEventsCitywide, getCacheStatus, scoreInterestingness } = require('./events');
 const { filterKidsEvents } = require('./curation');
 const { buildTaggedPool, buildEventMap, saveResponseFrame, mergeFilters, buildZeroMatchResponse, describeFilters } = require('./pipeline');
 const { recordAICost } = require('./traces');
@@ -343,6 +343,7 @@ async function buildSearchPool(params, session, phone, trace) {
     is_free: e.is_free, price_display: e.price_display, source_name: e.source_name,
     filter_match: e.filter_match, ticket_url: e.ticket_url || null,
     source_vibe: e.source_vibe || null,
+    interestingness: scoreInterestingness(e),
   }));
   trace.events.pool_meta = { matchCount, hardCount, softCount, isSparse };
 

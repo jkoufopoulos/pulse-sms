@@ -7,32 +7,34 @@
  * This file re-exports from both modules so existing require('./agent-brain') calls work unchanged.
  */
 
-const { extractNeighborhood, NEIGHBORHOODS, detectBorough } = require('./neighborhoods');
-const { getAdjacentNeighborhoods } = require('./geo');
+const { extractNeighborhood, detectBorough } = require('./neighborhoods');
+const { getAdjacentNeighborhoods, getNycDateString } = require('./geo');
+const { buildEventMap, saveResponseFrame, buildExhaustionMessage, sendPickUrls } = require('./pipeline');
 const { sendSMS, maskPhone } = require('./twilio');
-const { startTrace, saveTrace, recordAICost } = require('./traces');
+const { recordAICost } = require('./traces');
 const { getSession, setSession, addToHistory } = require('./session');
 const { trackAICost, OPT_OUT_KEYWORDS } = require('./request-guard');
 const { handleHelp } = require('./intent-handlers');
-const { saveResponseFrame, buildEventMap, buildExhaustionMessage, describeFilters } = require('./pipeline');
+const { updateProfile } = require('./preference-profile');
 const { smartTruncate } = require('./formatters');
 const { sendRuntimeAlert } = require('./alerts');
-const { updateProfile } = require('./preference-profile');
-const { getNycDateString } = require('./geo');
 
 // Split modules
 const {
   callAgentBrain, continueWithResults, serializePoolForContinuation,
   brainCompose, welcomeCompose, buildBrainSystemPrompt,
-  BRAIN_COMPOSE_SYSTEM, BRAIN_COMPOSE_SCHEMA,
-  WELCOME_COMPOSE_SYSTEM, stripCodeFences, reconcilePicks, BRAIN_TOOLS,
+  getGeminiClient, GEMINI_SAFETY, BRAIN_TOOLS,
+  callAgentBrainAnthropic, extractGeminiUsage, withTimeout,
+  stripCodeFences, reconcilePicks,
+  BRAIN_COMPOSE_SYSTEM, BRAIN_COMPOSE_SCHEMA, WELCOME_COMPOSE_SYSTEM,
 } = require('./brain-llm');
 const {
   executeSearchEvents, executeRespond, handleWelcome,
-  executeMore, executeDetails, buildSearchPool, resolveDateRange, validatePicks,
+  executeMore, executeDetails, buildSearchPool,
+  resolveDateRange, validatePicks,
 } = require('./brain-execute');
 
-// --- Mechanical shortcuts ($0) ---
+// --- Mechanical pre-check ---
 
 function checkMechanical(message, session) {
   const lower = message.toLowerCase().trim();
@@ -78,7 +80,7 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
       trace.brain_provider = 'welcome';
 
       await sendSMS(phone, welcomeResult.sms);
-      // One message is enough before the user has asked for anything
+      if (welcomeResult.picks?.length) await sendPickUrls(phone, welcomeResult.picks, welcomeResult.eventMap);
       finalizeTrace(welcomeResult.sms, welcomeResult.intent);
       return trace.id;
     } catch (err) {
@@ -225,10 +227,7 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
           // Fallback to brainCompose if continuation fails
           console.warn('More continuation failed, falling back to brainCompose:', err.message);
           trace.brain_error = (trace.brain_error || '') + ` more_continuation: ${err.message}`;
-          const composed = await brainCompose(moreResult.events, {
-            neighborhood: moreResult.neighborhood || 'NYC',
-            activeFilters: moreResult.activeFilters || {},
-          });
+          const composed = await brainCompose(moreResult.events, moreResult.neighborhood || 'NYC', moreResult.activeFilters || {}, trace, phone);
           recordAICost(trace, 'compose', composed._usage, composed._provider);
           trackAICost(phone, composed._usage, composed._provider);
           const validPicks = validatePicks(composed.picks, moreResult.events);
@@ -253,11 +252,8 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
           execResult = { sms: composed.sms_text, intent: 'more', picks: validPicks, eventMap };
         }
       } else {
-        // Anthropic fallback — skip Gemini for compose since it already failed for routing
-        const composed = await brainCompose(moreResult.events, {
-          neighborhood: moreResult.neighborhood || 'NYC',
-          activeFilters: moreResult.activeFilters || {},
-        });
+        // Anthropic fallback — use brainCompose
+        const composed = await brainCompose(moreResult.events, moreResult.neighborhood || 'NYC', moreResult.activeFilters || {}, trace, phone);
         recordAICost(trace, 'compose', composed._usage, composed._provider);
         trackAICost(phone, composed._usage, composed._provider);
         const validPicks = validatePicks(composed.picks, moreResult.events);
@@ -327,7 +323,7 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
           execResult = { sms: smartTruncate(result.sms_text), intent: 'details' };
         }
       } else {
-        // Anthropic fallback — skip Gemini for compose since it already failed for routing
+        // Anthropic fallback — use composeDetails
         const { composeDetails } = require('./ai');
         const event = detailsResult.event;
         const result = await composeDetails(event, detailsResult.pick?.why);
@@ -407,7 +403,7 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
           execResult = await executeSearchEvents(brainResult.params, session, phone, trace);
         }
       } else {
-        // Anthropic fallback — skip Gemini for compose since it already failed for routing
+        // Anthropic fallback or no chat session — use brainCompose
         execResult = await executeSearchEvents(brainResult.params, session, phone, trace);
       }
     } else if (brainResult.tool === 'respond') {
@@ -419,6 +415,7 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
 
     // Send SMS and finalize
     await sendSMS(phone, execResult.sms);
+    if (execResult.picks) await sendPickUrls(phone, execResult.picks, execResult.eventMap);
     finalizeTrace(execResult.sms, execResult.intent);
 
   } catch (err) {
