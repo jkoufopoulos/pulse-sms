@@ -6,7 +6,7 @@ const { getSession, setSession, clearSession, addToHistory, clearSessionInterval
 const { handleHelp } = require('./intent-handlers');
 const { getEventById } = require('./events');
 const { lookupReferralCode, recordAttribution } = require('./referral');
-const { saveResponseFrame, sendPickUrls } = require('./pipeline');
+const { saveResponseFrame } = require('./pipeline');
 const { updateProfile } = require('./preference-profile');
 const { processedMessages, OPT_OUT_KEYWORDS, isOverBudget, trackAICost, getCostSummary, ipRateLimits, IP_RATE_LIMIT, IP_RATE_WINDOW, clearGuardIntervals } = require('./request-guard');
 const { WELCOME_INTRO, WELCOME_INSTRUCTIONS } = require('./messages');

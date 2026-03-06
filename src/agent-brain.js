@@ -14,7 +14,7 @@ const { startTrace, saveTrace, recordAICost } = require('./traces');
 const { getSession, setSession, addToHistory } = require('./session');
 const { trackAICost, OPT_OUT_KEYWORDS } = require('./request-guard');
 const { handleHelp } = require('./intent-handlers');
-const { saveResponseFrame, buildEventMap, buildExhaustionMessage, describeFilters, sendPickUrls } = require('./pipeline');
+const { saveResponseFrame, buildEventMap, buildExhaustionMessage, describeFilters } = require('./pipeline');
 const { smartTruncate } = require('./formatters');
 const { sendRuntimeAlert } = require('./alerts');
 const { updateProfile } = require('./preference-profile');
@@ -78,7 +78,7 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
       trace.brain_provider = 'welcome';
 
       await sendSMS(phone, welcomeResult.sms);
-      // No sendPickUrls on welcome — one message is enough before the user has asked for anything
+      // One message is enough before the user has asked for anything
       finalizeTrace(welcomeResult.sms, welcomeResult.intent);
       return trace.id;
     } catch (err) {
@@ -419,7 +419,6 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
 
     // Send SMS and finalize
     await sendSMS(phone, execResult.sms);
-    if (execResult.picks) await sendPickUrls(phone, execResult.picks, execResult.eventMap);
     finalizeTrace(execResult.sms, execResult.intent);
 
   } catch (err) {

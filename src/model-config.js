@@ -6,11 +6,11 @@
  */
 
 const MODELS = {
-  brain:    process.env.PULSE_MODEL_BRAIN    || 'claude-haiku-4-5-20251001',
-  compose:  process.env.PULSE_MODEL_COMPOSE  || 'claude-haiku-4-5-20251001',
-  extract:  process.env.PULSE_MODEL_EXTRACT  || 'claude-haiku-4-5-20251001',
-  details:  process.env.PULSE_MODEL_DETAILS  || 'claude-haiku-4-5-20251001',
-  fallback: process.env.PULSE_MODEL_FALLBACK || 'gemini-2.5-flash-lite',
+  brain:    process.env.PULSE_MODEL_BRAIN    || 'gemini-2.5-flash-lite',   // tool calling — Gemini routes better
+  compose:  process.env.PULSE_MODEL_COMPOSE  || 'gemini-2.5-flash-lite',   // SMS composition — same session as brain
+  extract:  process.env.PULSE_MODEL_EXTRACT  || 'claude-haiku-4-5-20251001', // event extraction — Claude excels at structured XML
+  details:  process.env.PULSE_MODEL_DETAILS  || 'gemini-2.5-flash',         // detail composition — simple task
+  fallback: process.env.PULSE_MODEL_FALLBACK || 'claude-haiku-4-5-20251001', // fallback for any role
 };
 
 function getProvider(modelName) {

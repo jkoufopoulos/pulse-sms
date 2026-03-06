@@ -14,11 +14,11 @@ delete require.cache[require.resolve('../../src/model-config')];
 const { MODELS, getProvider } = require('../../src/model-config');
 
 // Defaults — verify they match what's in model-config.js
-check('brain defaults to claude-haiku-4-5-20251001', MODELS.brain === 'claude-haiku-4-5-20251001');
-check('compose defaults to claude-haiku-4-5-20251001', MODELS.compose === 'claude-haiku-4-5-20251001');
+check('brain defaults to gemini-2.5-flash-lite', MODELS.brain === 'gemini-2.5-flash-lite');
+check('compose defaults to gemini-2.5-flash-lite', MODELS.compose === 'gemini-2.5-flash-lite');
 check('extract defaults to claude-haiku-4-5-20251001', MODELS.extract === 'claude-haiku-4-5-20251001');
-check('details defaults to claude-haiku-4-5-20251001', MODELS.details === 'claude-haiku-4-5-20251001');
-check('fallback defaults to gemini-2.5-flash-lite', MODELS.fallback === 'gemini-2.5-flash-lite');
+check('details defaults to gemini-2.5-flash', MODELS.details === 'gemini-2.5-flash');
+check('fallback defaults to claude-haiku-4-5-20251001', MODELS.fallback === 'claude-haiku-4-5-20251001');
 
 // Provider detection
 check('gemini-2.5-flash → gemini', getProvider('gemini-2.5-flash') === 'gemini');

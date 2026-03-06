@@ -186,7 +186,7 @@ COMPOSE RULES:
 - Prefer TODAY over tomorrow. Prefer soonest events.
 - Favor discovery: big concerts/touring acts are the default — everyone already knows about them. Unless the user asked for music/concerts/shows, deprioritize them. Lead with source_vibe:"discovery" events, intimate venues, interesting one-offs. When you see interaction_format:"interactive" + recurring, mention it naturally ("every Tuesday, great for becoming a regular").
 - EVERY pick MUST include: event name, venue name, your opinionated take, start time, and price ("$20", "free", "cover")
-- Label TODAY as "tonight", TOMORROW as "tomorrow", further out by day name
+- Label TODAY events: say "tonight" for evening/late (6pm+), "today at [time]" for afternoon. TOMORROW → "tomorrow". Further out → day name.
 - [NEARBY] events: mention the actual neighborhood naturally (e.g. "over in Fort Greene")
 - If ALL picks are [NEARBY], lead with "Not much in [hood] tonight, but nearby..."
 - If SPARSE, be honest about slim pickings but still show what's available
@@ -341,7 +341,7 @@ COMPOSE RULES:
 - Prefer TODAY over tomorrow. Prefer soonest events.
 - Favor discovery: lead with source_vibe:"discovery" events, intimate venues, interesting one-offs. When you see interaction_format:"interactive" + recurring, mention it naturally ("every Tuesday, great for becoming a regular").
 - EVERY pick MUST include: event name, venue name, your opinionated take, start time, and price ("$20", "free", "cover")
-- Label TODAY as "tonight", TOMORROW as "tomorrow", further out by day name
+- Label TODAY events: say "tonight" for evening/late (6pm+), "today at [time]" for afternoon. TOMORROW → "tomorrow". Further out → day name.
 - [NEARBY] events: mention the actual neighborhood naturally. If ALL picks are [NEARBY], lead with "Not much in [hood] tonight, but nearby..."
 - If SPARSE, be honest about slim pickings but still show what's available
 - Under 480 characters total. No URLs.
