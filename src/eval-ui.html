@@ -701,6 +701,12 @@
     <div id="td-picks"></div>
   </div>
 
+  <!-- Pick reasoning -->
+  <div id="td-reasoning-section" style="display:none">
+    <h4>Pick Reasoning</h4>
+    <p id="td-reasoning" style="color:#ccc; font-style:italic; white-space:pre-wrap;"></p>
+  </div>
+
   <!-- Not picked events -->
   <div class="trace-section" id="td-not-picked-section" style="display:none;">
     <h4>Sent but Not Picked</h4>
@@ -1465,19 +1471,21 @@ function showTraceDetail(t) {
     if (sentPool.length > 0) {
       // Rich table view: join picks with sent_pool data
       picksEl.innerHTML = `<table class="pool-table">
-        <thead><tr><th>#</th><th>Name</th><th>Venue</th><th>Time</th><th>Category</th><th>Why</th></tr></thead>
+        <thead><tr><th>#</th><th>Name</th><th>Venue</th><th>Time</th><th>Category</th><th>Score</th><th>Why</th></tr></thead>
         <tbody>${picks.map(p => {
           const poolEvt = sentPool.find(e => e.id === p.event_id);
           const name = p.event_name || poolEvt?.name || p.event_id;
           const venue = p.venue_name || poolEvt?.venue_name || '';
           const time = p.start_time_local || poolEvt?.start_time_local || '';
           const cat = p.category || poolEvt?.category || '';
+          const score = poolEvt?.interestingness != null ? poolEvt.interestingness : '';
           return `<tr>
             <td><span class="pick-rank">${p.rank || '?'}</span></td>
             <td>${esc(name)}</td>
             <td>${esc(venue)}</td>
             <td>${esc(time)}</td>
             <td>${esc(cat)}</td>
+            <td>${score}</td>
             <td><span class="pick-why">${esc(p.why || '')}</span></td>
           </tr>`;
         }).join('')}</tbody>
@@ -1496,23 +1504,39 @@ function showTraceDetail(t) {
     picksSection.style.display = 'none';
   }
 
+  // Reasoning
+  const reasoningEl = document.getElementById('td-reasoning');
+  const reasoningSection = document.getElementById('td-reasoning-section');
+  const reasoning = t.composition?.reasoning;
+  if (reasoning) {
+    reasoningSection.style.display = 'block';
+    reasoningEl.textContent = reasoning;
+  } else {
+    reasoningSection.style.display = 'none';
+  }
+
   // Not-picked table
   if (sentPool.length > 0) {
     const pickedIds = new Set(picks.map(p => p.event_id));
-    const notPicked = sentPool.filter(e => !pickedIds.has(e.id));
+    const notPicked = sentPool.filter(e => !pickedIds.has(e.id))
+      .sort((a, b) => (b.interestingness ?? -99) - (a.interestingness ?? -99));
     if (notPicked.length > 0) {
       notPickedSection.style.display = 'block';
       notPickedEl.innerHTML = `<table class="pool-table">
-        <thead><tr><th>Name</th><th>Venue</th><th>Time</th><th>Category</th><th>Match</th></tr></thead>
+        <thead><tr><th>Name</th><th>Venue</th><th>Time</th><th>Category</th><th>Vibe</th><th>Score</th><th>Match</th></tr></thead>
         <tbody>${notPicked.map(e => {
           let matchHtml = '';
           if (e.filter_match === 'hard') matchHtml = '<span class="match-badge match-hard">[MATCH]</span>';
           else if (e.filter_match === 'soft') matchHtml = '<span class="match-badge match-soft">[SOFT]</span>';
+          const vibe = e.source_vibe || '';
+          const score = e.interestingness != null ? e.interestingness : '';
           return `<tr>
             <td>${esc(e.name || e.id)}</td>
             <td>${esc(e.venue_name || '')}</td>
             <td>${esc(e.start_time_local || '')}</td>
             <td>${esc(e.category || '')}</td>
+            <td>${esc(vibe)}</td>
+            <td>${score}</td>
             <td>${matchHtml}</td>
           </tr>`;
         }).join('')}</tbody>
