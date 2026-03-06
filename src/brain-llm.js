@@ -196,7 +196,7 @@ COMPOSE RULES:
 - For DETAILS responses: write a rich, opinionated detail message including venue, time, price, description, and URL. Under 480 chars.
 - For MORE responses with is_last_batch=true: mention these are the last picks and suggest trying a different neighborhood if suggestions are provided. Do NOT say "reply MORE".
 
-Return JSON: { "sms_text": "the full SMS", "picks": [{"rank": 1, "event_id": "id from the event", "why": "short reason"}] }
+Return JSON: { "reasoning": "2-3 sentences on why you chose these picks over the others in the pool. What made the winners stand out? What did you skip and why?", "sms_text": "the full SMS", "picks": [{"rank": 1, "event_id": "id from the event", "why": "short reason"}] }
 The picks array MUST reference events mentioned in sms_text.`;
 }
 
@@ -347,12 +347,13 @@ COMPOSE RULES:
 - Under 480 characters total. No URLs.
 - Voice: friend texting. Opinionated, concise, warm.
 
-Return JSON: { "sms_text": "the full SMS", "picks": [{"rank": 1, "event_id": "id from the event", "why": "short reason"}] }
+Return JSON: { "reasoning": "2-3 sentences on why you chose these picks over the others in the pool. What made the winners stand out? What did you skip and why?", "sms_text": "the full SMS", "picks": [{"rank": 1, "event_id": "id from the event", "why": "short reason"}] }
 The picks array MUST reference events mentioned in sms_text.`;
 
 const BRAIN_COMPOSE_SCHEMA = {
   type: 'object',
   properties: {
+    reasoning: { type: 'string' },
     sms_text: { type: 'string' },
     picks: { type: 'array', items: {
       type: 'object',
@@ -364,7 +365,7 @@ const BRAIN_COMPOSE_SCHEMA = {
       required: ['rank', 'event_id', 'why'],
     }},
   },
-  required: ['sms_text', 'picks'],
+  required: ['reasoning', 'sms_text', 'picks'],
 };
 
 const WELCOME_COMPOSE_SYSTEM = `You are Pulse, an NYC nightlife and events SMS bot. Compose a WELCOME message for a brand-new user.
@@ -395,7 +396,7 @@ RULES:
 - Under 480 characters total. No URLs.
 - Do NOT change the intro line or the CTA line \u2014 use them exactly as specified above.
 
-Return JSON: { "sms_text": "the full SMS", "picks": [{"rank": 1, "event_id": "id", "why": "short reason"}] }`;
+Return JSON: { "reasoning": "2-3 sentences on why you chose these 3 over the others. What made the winners stand out? What did you skip and why?", "sms_text": "the full SMS", "picks": [{"rank": 1, "event_id": "id", "why": "short reason"}] }`;
 
 /**
  * Strip markdown code fences from LLM JSON responses.
