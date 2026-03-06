@@ -279,7 +279,7 @@ function eventMatchesFilters(event, filters) {
 function buildTaggedPool(events, activeFilters, { citywide = false } = {}) {
   const hasFilters = activeFilters && Object.values(activeFilters).some(Boolean);
   if (!hasFilters) {
-    let pool = events.slice(0, 15);
+    let pool = events.slice(0, 40);
     // For citywide pools, apply neighborhood diversity even without filters
     if (citywide) {
       const diversePool = [];
@@ -288,7 +288,7 @@ function buildTaggedPool(events, activeFilters, { citywide = false } = {}) {
         const hood = e.neighborhood || 'unknown';
         hoodCounts[hood] = (hoodCounts[hood] || 0) + 1;
         if (hoodCounts[hood] <= 3) diversePool.push(e);
-        if (diversePool.length >= 15) break;
+        if (diversePool.length >= 40) break;
       }
       pool = diversePool;
     }
@@ -337,8 +337,8 @@ function buildTaggedPool(events, activeFilters, { citywide = false } = {}) {
     return result;
   };
 
-  const hardSlice = applyDiversity(hard, 10);
-  const softSlice = applyDiversity(soft, Math.max(0, 10 - hardSlice.length));
+  const hardSlice = applyDiversity(hard, 20);
+  const softSlice = applyDiversity(soft, Math.max(0, 20 - hardSlice.length));
   const pool = [...hardSlice, ...softSlice];
 
   const totalMatched = hard.length + soft.length;

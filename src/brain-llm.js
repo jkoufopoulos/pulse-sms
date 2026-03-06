@@ -92,6 +92,12 @@ function buildBrainSystemPrompt(session) {
       session.pendingNearby
         ? `Pending suggestion: "${session.pendingNearby}" (user was asked if they want picks there)`
         : null,
+      session.allPicks?.length
+        ? `User's prior pick categories: ${[...new Set(session.allPicks.map(p => {
+          const evt = session.lastEvents?.[p.event_id];
+          return evt?.category;
+        }).filter(Boolean))].join(', ')}`
+        : null,
     ].filter(Boolean).join('\n')
     : 'No prior session.';
 

@@ -153,9 +153,9 @@ function makeEvents(n, overrides = {}) {
   }));
 }
 
-// No filters → 15 events, all filter_match=false, matchCount=0
+// No filters → 20 events (input size, under cap of 40), all filter_match=false, matchCount=0
 const noFilterResult = buildTaggedPool(makeEvents(20), {});
-check('no filters: pool size 15', noFilterResult.pool.length === 15);
+check('no filters: pool size 20', noFilterResult.pool.length === 20);
 check('no filters: matchCount 0', noFilterResult.matchCount === 0);
 check('no filters: hardCount 0', noFilterResult.hardCount === 0);
 check('no filters: softCount 0', noFilterResult.softCount === 0);
@@ -164,7 +164,7 @@ check('no filters: all filter_match false', noFilterResult.pool.every(e => e.fil
 
 // Null filters → same as empty
 const nullFilterResult = buildTaggedPool(makeEvents(20), null);
-check('null filters: pool size 15', nullFilterResult.pool.length === 15);
+check('null filters: pool size 20', nullFilterResult.pool.length === 20);
 check('null filters: matchCount 0', nullFilterResult.matchCount === 0);
 
 // Hard match: exact category (no subcategory) → filter_match='hard'
@@ -199,12 +199,12 @@ check('zero matches: matchCount 0', zeroResult.matchCount === 0);
 check('zero matches: isSparse false', zeroResult.isSparse === false);
 check('zero matches: pool size 0 (no matches, no padding)', zeroResult.pool.length === 0);
 
-// Hard matched > 10 → cap at 10 hard
-const manyMatched = makeEvents(14, { category: 'comedy' });
+// Hard matched > 20 → cap at 20 hard
+const manyMatched = makeEvents(25, { category: 'comedy' });
 const manyResult = buildTaggedPool([...manyMatched, ...makeEvents(6, { category: 'nightlife' })], { category: 'comedy' });
-check('many matches: matchCount 14', manyResult.matchCount === 14);
-check('many matches: hardCount 14', manyResult.hardCount === 14);
-check('many matches: pool size 10 (hard cap, no padding)', manyResult.pool.length === 10);
+check('many matches: matchCount 25', manyResult.matchCount === 25);
+check('many matches: hardCount 25', manyResult.hardCount === 25);
+check('many matches: pool size 20 (hard cap, no padding)', manyResult.pool.length === 20);
 check('many matches: all hard', manyResult.pool.every(e => e.filter_match === 'hard'));
 check('many matches: no unmatched in pool', manyResult.pool.every(e => e.filter_match !== false));
 
