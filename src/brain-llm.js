@@ -278,6 +278,7 @@ async function continueWithResults(chat, eventData, trace) {
     return {
       sms_text: sms,
       picks: reconcilePicks(sms, parsed.picks || []),
+      reasoning: parsed.reasoning || null,
       _raw: result.text,
       _usage: result.usage,
       _provider: result.provider,
@@ -462,7 +463,7 @@ async function brainCompose(events, options = {}) {
     });
     const parsed = JSON.parse(stripCodeFences(result.text));
     const sms = smartTruncate(parsed.sms_text);
-    return { sms_text: sms, picks: reconcilePicks(sms, parsed.picks || []), _raw: result.text, _usage: result.usage, _provider: result.provider };
+    return { sms_text: sms, picks: reconcilePicks(sms, parsed.picks || []), reasoning: parsed.reasoning || null, _raw: result.text, _usage: result.usage, _provider: result.provider };
   } catch (err) {
     console.warn(`brainCompose ${MODELS.compose} failed, falling back to ${MODELS.fallback}: ${err.message}`);
     const result = await llmGenerate(MODELS.fallback, BRAIN_COMPOSE_SYSTEM, userPrompt, {
@@ -470,7 +471,7 @@ async function brainCompose(events, options = {}) {
     });
     const parsed = JSON.parse(stripCodeFences(result.text));
     const sms = smartTruncate(parsed.sms_text);
-    return { sms_text: sms, picks: reconcilePicks(sms, parsed.picks || []), _raw: result.text, _usage: result.usage, _provider: result.provider };
+    return { sms_text: sms, picks: reconcilePicks(sms, parsed.picks || []), reasoning: parsed.reasoning || null, _raw: result.text, _usage: result.usage, _provider: result.provider };
   }
 }
 
@@ -499,7 +500,7 @@ async function welcomeCompose(events) {
     });
     const parsed = JSON.parse(stripCodeFences(result.text));
     const sms = smartTruncate(parsed.sms_text);
-    return { sms_text: sms, picks: parsed.picks || [], _raw: result.text, _usage: result.usage, _provider: result.provider };
+    return { sms_text: sms, picks: parsed.picks || [], reasoning: parsed.reasoning || null, _raw: result.text, _usage: result.usage, _provider: result.provider };
   } catch (err) {
     console.warn(`welcomeCompose ${MODELS.compose} failed, falling back to ${MODELS.fallback}: ${err.message}`);
     const result = await llmGenerate(MODELS.fallback, WELCOME_COMPOSE_SYSTEM, userPrompt, {
@@ -507,7 +508,7 @@ async function welcomeCompose(events) {
     });
     const parsed = JSON.parse(stripCodeFences(result.text));
     const sms = smartTruncate(parsed.sms_text);
-    return { sms_text: sms, picks: parsed.picks || [], _raw: result.text, _usage: result.usage, _provider: result.provider };
+    return { sms_text: sms, picks: parsed.picks || [], reasoning: parsed.reasoning || null, _raw: result.text, _usage: result.usage, _provider: result.provider };
   }
 }
 

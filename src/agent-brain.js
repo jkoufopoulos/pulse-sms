@@ -181,6 +181,7 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
           recordAICost(trace, 'compose', composeResult._usage, composeResult._provider);
           trackAICost(phone, composeResult._usage, composeResult._provider);
           trace.composition.raw_response = composeResult._raw || null;
+          trace.composition.reasoning = composeResult.reasoning || null;
           trace.composition.neighborhood_used = moreResult.neighborhood;
 
           // Validate picks against the more batch
@@ -230,6 +231,7 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
           const composed = await brainCompose(moreResult.events, moreResult.neighborhood || 'NYC', moreResult.activeFilters || {}, trace, phone);
           recordAICost(trace, 'compose', composed._usage, composed._provider);
           trackAICost(phone, composed._usage, composed._provider);
+          trace.composition.reasoning = composed.reasoning || null;
           const validPicks = validatePicks(composed.picks, moreResult.events);
           const eventMap = buildEventMap(moreResult.events);
           saveResponseFrame(phone, {
@@ -256,6 +258,7 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
         const composed = await brainCompose(moreResult.events, moreResult.neighborhood || 'NYC', moreResult.activeFilters || {}, trace, phone);
         recordAICost(trace, 'compose', composed._usage, composed._provider);
         trackAICost(phone, composed._usage, composed._provider);
+        trace.composition.reasoning = composed.reasoning || null;
         const validPicks = validatePicks(composed.picks, moreResult.events);
         const eventMap = buildEventMap(moreResult.events);
         saveResponseFrame(phone, {
@@ -313,6 +316,7 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
           recordAICost(trace, 'compose', composeResult._usage, composeResult._provider);
           trackAICost(phone, composeResult._usage, composeResult._provider);
           trace.composition.raw_response = composeResult._raw || null;
+          trace.composition.reasoning = composeResult.reasoning || null;
           execResult = { sms: smartTruncate(composeResult.sms_text), intent: 'details' };
         } catch (err) {
           console.warn('Details continuation failed, falling back to composeDetails:', err.message);
@@ -349,6 +353,7 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
           recordAICost(trace, 'compose', composeResult._usage, composeResult._provider);
           trackAICost(phone, composeResult._usage, composeResult._provider);
           trace.composition.raw_response = composeResult._raw || null;
+          trace.composition.reasoning = composeResult.reasoning || null;
           trace.composition.active_filters = poolResult.activeFilters;
           trace.composition.neighborhood_used = poolResult.hood;
 

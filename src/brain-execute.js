@@ -419,6 +419,7 @@ async function executeSearchEvents(params, session, phone, trace, _options = {})
   });
   trace.composition.latency_ms = Date.now() - composeStart;
   trace.composition.raw_response = result._raw || null;
+  trace.composition.reasoning = result.reasoning || null;
   trace.composition.active_filters = poolResult.activeFilters;
   trace.composition.neighborhood_used = poolResult.hood;
 
@@ -523,6 +524,7 @@ async function handleWelcome(phone, session, trace) {
   const result = await welcomeCompose(topEvents);
   trace.composition.latency_ms = Date.now() - composeStart;
   trace.composition.raw_response = result._raw || null;
+  trace.composition.reasoning = result.reasoning || null;
   trace.composition.active_filters = {};
   trace.composition.neighborhood_used = 'citywide';
 
