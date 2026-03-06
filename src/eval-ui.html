@@ -695,6 +695,12 @@
     <div class="filter-chips" id="td-filter-chips"></div>
   </div>
 
+  <!-- Pool funnel / exclusions -->
+  <div id="td-exclusions-section" style="display:none">
+    <h4>Pool Funnel</h4>
+    <p id="td-exclusions" style="color:#ccc;"></p>
+  </div>
+
   <!-- Picked events -->
   <div class="trace-section" id="td-picks-section">
     <h4>Picked by Claude</h4>
@@ -1456,6 +1462,20 @@ function showTraceDetail(t) {
     ).join('');
   } else {
     filtersSection.style.display = 'none';
+  }
+
+  // Exclusions / Pool Funnel
+  const exclusions = ev.exclusions;
+  const exclusionEl = document.getElementById('td-exclusions');
+  const exclusionSection = document.getElementById('td-exclusions-section');
+  if (exclusions && exclusions.excluded_count > 0) {
+    exclusionSection.style.display = 'block';
+    const reasons = Object.entries(exclusions.by_reason || {})
+      .map(([reason, count]) => reason.replace(/_/g, ' ') + ': ' + count)
+      .join(', ');
+    exclusionEl.textContent = exclusions.total_candidates + ' candidates \u2192 ' + exclusions.sent_to_llm + ' sent to LLM (' + exclusions.excluded_count + ' excluded: ' + reasons + ')';
+  } else {
+    exclusionSection.style.display = 'none';
   }
 
   // Picks + Pool tables
