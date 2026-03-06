@@ -6,7 +6,7 @@ const { extractNeighborhood, BOROUGHS, detectBorough } = require('./neighborhood
 const { getAdjacentNeighborhoods, getNycDateString, filterByTimeAfter } = require('./geo');
 const { getEvents, getEventsForBorough, getEventsCitywide, getCacheStatus, scoreInterestingness } = require('./events');
 const { filterKidsEvents } = require('./curation');
-const { buildTaggedPool, buildEventMap, saveResponseFrame, mergeFilters, buildZeroMatchResponse, describeFilters } = require('./pipeline');
+const { buildTaggedPool, buildEventMap, saveResponseFrame, mergeFilters, buildZeroMatchResponse, describeFilters, failsTimeGate, eventMatchesFilters } = require('./pipeline');
 const { recordAICost } = require('./traces');
 const { setSession } = require('./session');
 const { trackAICost } = require('./request-guard');
@@ -346,6 +346,29 @@ async function buildSearchPool(params, session, phone, trace) {
     interestingness: scoreInterestingness(e),
   }));
   trace.events.pool_meta = { matchCount, hardCount, softCount, isSparse };
+
+  // Track why events were excluded from the pool
+  const poolIds = new Set(events.map(e => e.id));
+  const exclusions = {
+    total_candidates: curated.length,
+    sent_to_llm: events.length,
+    excluded_count: curated.length - events.length,
+    by_reason: {},
+  };
+
+  if (activeFilters.time_after) {
+    const timeExcluded = curated.filter(e => !poolIds.has(e.id) && failsTimeGate(e, activeFilters.time_after));
+    if (timeExcluded.length > 0) exclusions.by_reason.time_gate = timeExcluded.length;
+  }
+  if (activeFilters.category || (activeFilters.categories && activeFilters.categories.length > 0)) {
+    const catMissed = curated.filter(e => !poolIds.has(e.id) && eventMatchesFilters(e, activeFilters) === false);
+    if (catMissed.length > 0) exclusions.by_reason.category_mismatch = catMissed.length;
+  }
+  const accountedFor = Object.values(exclusions.by_reason).reduce((a, b) => a + b, 0);
+  const poolCap = exclusions.excluded_count - accountedFor;
+  if (poolCap > 0) exclusions.by_reason.pool_cap = poolCap;
+
+  trace.events.exclusions = exclusions;
 
   // 6. Zero match → deterministic response
   const nearbyHoods = hood ? getAdjacentNeighborhoods(hood, 3) : [];
