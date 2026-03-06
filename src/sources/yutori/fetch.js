@@ -7,7 +7,7 @@ const { captureExtractionInput } = require('../../extraction-capture');
 const { isEventEmail, isTriviaEmail } = require('./email-filter');
 const { preprocessYutoriHtml } = require('./html-preprocess');
 const { parseTriviaEvents } = require('./trivia-parser');
-const { parseNonTriviaEvents } = require('./general-parser');
+const { parseNonTriviaEvents, resolveDayOfWeekDate } = require('./general-parser');
 const {
   YUTORI_DIR, PROCESSED_DIR, CACHE_FILE,
   loadCachedEvents, saveCachedEvents,
@@ -209,6 +209,8 @@ async function fetchYutoriEvents({ reprocess = false } = {}) {
             if (!hasTime && !hasVenue && !hasUrl) return false;
             return true;
           });
+          // Fix day-of-week mismatches (e.g. "Trivia Thursdays" assigned to Friday)
+          contentFiltered.forEach(resolveDayOfWeekDate);
           const dropped = raw.length - contentFiltered.length;
           if (dropped > 0) {
             console.log(`Yutori: LLM extracted ${raw.length} from ${file}, ${contentFiltered.length} passed gates (${dropped} dropped)`);
