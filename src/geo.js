@@ -243,7 +243,7 @@ function parseAsNycTime(dtString) {
  */
 function filterUpcomingEvents(events, { refTimeMs } = {}) {
   const now = refTimeMs || Date.now();
-  const twoHoursAgo = now - 2 * 60 * 60 * 1000;
+  const fourHoursAgo = now - 4 * 60 * 60 * 1000;
   const todayNyc = getNycDateString(0, now);
 
   return events.filter(e => {
@@ -255,12 +255,13 @@ function filterUpcomingEvents(events, { refTimeMs } = {}) {
       } catch {}
     }
 
-    // Check start_time — events within last 2 hours or in future are live regardless of date
+    // Check start_time — events within last 4 hours or in future are live regardless of date
+    // 4 hours because NYC nightlife events often run late
     if (e.start_time_local && /T\d{2}:/.test(e.start_time_local)) {
       try {
         const eventMs = parseAsNycTime(e.start_time_local);
         if (!isNaN(eventMs)) {
-          if (eventMs > twoHoursAgo) return true;
+          if (eventMs > fourHoursAgo) return true;
           return false; // has specific time and it's too old
         }
       } catch {}

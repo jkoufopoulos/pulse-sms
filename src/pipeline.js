@@ -412,61 +412,6 @@ function normalizeFilters(filters) {
 }
 
 /**
- * Normalize LLM filter_intent.updates into a format suitable for mergeFilters.
- * Validates keys against known filter fields, maps subcategories → categories.
- * Returns an object with explicit-key semantics (present keys override, absent fall back).
- */
-function normalizeFilterIntent(updates) {
-  if (!updates || typeof updates !== 'object') return {};
-  const result = {};
-
-  // Category: normalize subcategories (jazz → live_music + subcategory)
-  if ('category' in updates) {
-    if (updates.category === null || updates.category === '') {
-      result.category = null;
-      result.subcategory = null;
-    } else {
-      const key = String(updates.category).toLowerCase().trim();
-      const canonical = CATEGORY_NORMALIZE[key] || key;
-      result.category = canonical;
-      if (CATEGORY_NORMALIZE[key] && key !== canonical) {
-        result.subcategory = key;
-      } else {
-        result.subcategory = null;
-      }
-      // Reject unknown categories (P1: only valid categories reach session state)
-      if (!VALID_CATEGORIES.has(result.category)) {
-        console.warn(`normalizeFilterIntent: rejected invalid category "${result.category}"`);
-        delete result.category;
-        delete result.subcategory;
-      }
-    }
-  }
-
-  // Free: coerce to boolean
-  if ('free_only' in updates) {
-    result.free_only = updates.free_only === null ? false : Boolean(updates.free_only);
-  }
-
-  // Time: validate HH:MM format
-  if ('time_after' in updates) {
-    if (updates.time_after === null) {
-      result.time_after = null;
-    } else {
-      const ta = String(updates.time_after).trim();
-      result.time_after = /^\d{2}:\d{2}$/.test(ta) ? ta : null;
-    }
-  }
-
-  // Vibe: passthrough
-  if ('vibe' in updates) {
-    result.vibe = updates.vibe || null;
-  }
-
-  return result;
-}
-
-/**
  * Send individual URLs for each picked event as separate SMS messages.
  * iMessage renders rich link previews for standalone URLs.
  * Gated by PULSE_LINK_PREVIEWS env var.
@@ -483,4 +428,4 @@ async function sendPickUrls(phone, picks, eventMap) {
   }
 }
 
-module.exports = { buildEventMap, saveResponseFrame, buildExhaustionMessage, describeFilters, buildZeroMatchResponse, mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, normalizeFilterIntent, failsTimeGate, sendPickUrls };
+module.exports = { buildEventMap, saveResponseFrame, buildExhaustionMessage, describeFilters, buildZeroMatchResponse, mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, failsTimeGate, sendPickUrls };
