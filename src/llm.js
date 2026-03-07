@@ -1,10 +1,11 @@
 /**
  * llm.js — Provider-agnostic LLM interface.
  *
- * Three main functions:
+ * Four main functions:
  *   generate()      — Single-turn text/JSON generation
  *   callWithTools() — Single-turn tool calling
  *   continueChat()  — Multi-turn continuation (send tool result back)
+ *   runAgentLoop()  — Multi-turn agent loop (tool calling + execution + repeat)
  *
  * Callers pass tools in neutral format (lowercase JSON Schema types).
  * This module converts to provider-specific formats automatically.
@@ -375,11 +376,140 @@ async function continueChat(chatSession, toolName, toolResult, options = {}) {
   throw new Error(`Unknown chat session type: ${chatSession._type}`);
 }
 
+/**
+ * Run a multi-turn agent loop: LLM calls tools, we execute them,
+ * feed results back, repeat until LLM responds with text or max iterations.
+ *
+ * @param {string} model - Model name
+ * @param {string} systemPrompt - System instruction
+ * @param {string} message - User message
+ * @param {Array} tools - Neutral-format tool definitions
+ * @param {Function} executeTool - async (toolName, params) => resultObject
+ * @param {object} options - { maxIterations, timeout }
+ * @returns {{ text: string, toolCalls: Array<{name, params, result}>, totalUsage: object, provider: string }}
+ */
+async function runAgentLoop(model, systemPrompt, message, tools, executeTool, options = {}) {
+  const { maxIterations = 3, timeout = 15000 } = options;
+  const provider = getProvider(model);
+  const loopStart = Date.now();
+  const toolCalls = [];
+  let totalUsage = { input_tokens: 0, output_tokens: 0 };
+
+  function addUsage(usage) {
+    if (!usage) return;
+    totalUsage.input_tokens += usage.input_tokens || 0;
+    totalUsage.output_tokens += usage.output_tokens || 0;
+  }
+
+  function remainingTimeout() {
+    const elapsed = Date.now() - loopStart;
+    const remaining = timeout - elapsed;
+    if (remaining <= 0) throw new Error('Agent loop timed out');
+    return remaining;
+  }
+
+  if (provider === 'gemini') {
+    const genAI = getGeminiClient();
+    if (!genAI) throw new Error('GEMINI_API_KEY not set');
+
+    const geminiModel = genAI.getGenerativeModel({
+      model,
+      systemInstruction: systemPrompt,
+      safetySettings: GEMINI_SAFETY,
+      tools: toGeminiTools(tools),
+      generationConfig: { maxOutputTokens: 1024, temperature: 0 },
+    });
+
+    const chat = geminiModel.startChat();
+
+    // First turn: send user message
+    let result = await withTimeout(chat.sendMessage(message), remainingTimeout(), `agentLoop(${model})`);
+    let response = result.response;
+    addUsage(extractGeminiUsage(response));
+
+    for (let i = 0; i < maxIterations; i++) {
+      const candidate = response.candidates?.[0];
+      const parts = candidate?.content?.parts || [];
+      const fnCall = parts.find(p => p.functionCall);
+
+      if (!fnCall?.functionCall) {
+        // No tool call — LLM is done, return text
+        const textPart = parts.find(p => p.text);
+        return { text: textPart?.text || '', toolCalls, totalUsage, provider };
+      }
+
+      // Execute the tool
+      const toolName = fnCall.functionCall.name;
+      const toolParams = fnCall.functionCall.args || {};
+      const toolResult = await executeTool(toolName, toolParams);
+      toolCalls.push({ name: toolName, params: toolParams, result: toolResult });
+
+      // Send result back
+      result = await withTimeout(
+        chat.sendMessage([{ functionResponse: { name: toolName, response: toolResult } }]),
+        remainingTimeout(), `agentLoop(${model}) turn ${i + 2}`
+      );
+      response = result.response;
+      addUsage(extractGeminiUsage(response));
+    }
+
+    // Hit max iterations — extract whatever text we have
+    const finalParts = response.candidates?.[0]?.content?.parts || [];
+    const finalText = finalParts.find(p => p.text);
+    return { text: finalText?.text || '', toolCalls, totalUsage, provider };
+  }
+
+  if (provider === 'anthropic') {
+    const client = getAnthropicClient();
+    const messages = [{ role: 'user', content: message }];
+
+    for (let i = 0; i <= maxIterations; i++) {
+      const response = await withTimeout(
+        client.messages.create({
+          model,
+          max_tokens: 1024,
+          system: systemPrompt,
+          tools: toAnthropicTools(tools),
+          messages,
+        }, { timeout: remainingTimeout() }),
+        remainingTimeout() + 2000, `agentLoop(${model}) turn ${i + 1}`
+      );
+
+      addUsage(response.usage);
+
+      const toolBlock = response.content.find(b => b.type === 'tool_use');
+
+      if (!toolBlock) {
+        // No tool call — return text
+        const textBlock = response.content.find(b => b.type === 'text');
+        return { text: textBlock?.text || '', toolCalls, totalUsage, provider };
+      }
+
+      // Execute the tool
+      const toolResult = await executeTool(toolBlock.name, toolBlock.input || {});
+      toolCalls.push({ name: toolBlock.name, params: toolBlock.input || {}, result: toolResult });
+
+      // Append assistant response + tool result for next turn
+      messages.push({ role: 'assistant', content: response.content });
+      messages.push({
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: toolBlock.id, content: JSON.stringify(toolResult) }],
+      });
+    }
+
+    // Hit max iterations
+    return { text: '', toolCalls, totalUsage, provider };
+  }
+
+  throw new Error(`Unsupported provider: ${provider}`);
+}
+
 module.exports = {
   // Main functions
   generate,
   callWithTools,
   continueChat,
+  runAgentLoop,
 
   // Tool format converters
   toGeminiTools,
