@@ -530,6 +530,14 @@
 
 <div class="summary-row" id="cost-row" style="display:none"></div>
 
+<div id="latency-section" style="display:none">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <h2 style="font-size:16px;font-weight:600;color:#aaa">Response Latency <span style="font-size:11px;font-weight:400;color:#666">-- SMS response time percentiles</span></h2>
+  </div>
+  <div class="summary-row" id="latency-row"></div>
+  <div id="latency-outliers"></div>
+</div>
+
 <div class="event-mix-summary" id="event-mix-summary" style="display:none">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
     <h2 style="font-size:16px;font-weight:600;color:#aaa">Event Mix</h2>
@@ -984,6 +992,78 @@ async function refreshCosts() {
   }
 }
 
+function renderLatency(data) {
+  const section = $('latency-section');
+  if (!data) { section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  const recent = data.recent;
+  const today = data.today;
+  const src = today.count > 0 ? today : recent;
+  const label = today.count > 0 ? 'today' : 'recent';
+
+  function latencyColor(ms) {
+    if (ms <= 3000) return '';
+    if (ms <= 5000) return 'style="color:#fbbf24"';
+    return 'style="color:#f87171"';
+  }
+
+  const cards = [
+    { label: `P50 (${label})`, value: fmtDuration(src.p50), sub: `brain: ${fmtDuration(src.brain_p50)}`, color: latencyColor(src.p50) },
+    { label: `P95 (${label})`, value: fmtDuration(src.p95), sub: `brain: ${fmtDuration(src.brain_p95)}`, color: latencyColor(src.p95) },
+    { label: `Max (${label})`, value: fmtDuration(src.max), sub: `${src.count} traces`, color: latencyColor(src.max) },
+    { label: 'Avg', value: fmtDuration(src.avg), sub: src.outliers.length > 0 ? src.outliers.length + ' outlier' + (src.outliers.length > 1 ? 's' : '') : 'no outliers', color: '' },
+  ];
+
+  $('latency-row').innerHTML = cards.map(c => `
+    <div class="summary-card">
+      <div class="label">${c.label}</div>
+      <div class="value" ${c.color}>${c.value}</div>
+      <div class="sub">${c.sub}</div>
+    </div>
+  `).join('');
+
+  // Outlier table
+  const outliers = src.outliers;
+  if (outliers.length === 0) {
+    $('latency-outliers').innerHTML = '';
+    return;
+  }
+
+  const rows = outliers.map(o => {
+    const time = o.timestamp ? new Date(o.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' }) : '--';
+    return `<tr>
+      <td style="color:#888;white-space:nowrap">${time}</td>
+      <td style="color:#f87171;font-weight:600">${fmtDuration(o.total_ms)}</td>
+      <td>${fmtDuration(o.brain_ms)}</td>
+      <td>${o.intent || '--'}</td>
+      <td style="color:#888;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(o.message || '')}</td>
+    </tr>`;
+  }).join('');
+
+  $('latency-outliers').innerHTML = `
+    <div class="alert-table-wrap" style="margin-top:12px">
+      <table class="alert-table">
+        <thead><tr><th>Time</th><th>Total</th><th>Brain</th><th>Intent</th><th>Message</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function refreshLatency() {
+  try {
+    const res = await fetch('/api/health/latency');
+    if (res.ok) {
+      renderLatency(await res.json());
+    } else {
+      renderLatency(null);
+    }
+  } catch {
+    renderLatency(null);
+  }
+}
+
 async function refresh() {
   try {
     const res = await fetch('/health?json=1');
@@ -1064,11 +1144,13 @@ async function refreshAlerts() {
 
 refresh();
 refreshCosts();
+refreshLatency();
 refreshAudit();
 refreshScrapeAudit();
 refreshAlerts();
 setInterval(refresh, 60000);
 setInterval(refreshCosts, 60000);
+setInterval(refreshLatency, 60000);
 setInterval(refreshAudit, 60000);
 setInterval(refreshScrapeAudit, 60000);
 setInterval(refreshAlerts, 60000);
