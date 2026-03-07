@@ -4,7 +4,7 @@ console.log('\nmodel-config:');
 
 // Save and clear env vars for clean test
 const savedEnv = {};
-['PULSE_MODEL_BRAIN', 'PULSE_MODEL_COMPOSE', 'PULSE_MODEL_EXTRACT', 'PULSE_MODEL_DETAILS', 'PULSE_MODEL_FALLBACK'].forEach(k => {
+['PULSE_MODEL_BRAIN', 'PULSE_MODEL_EXTRACT', 'PULSE_MODEL_DETAILS', 'PULSE_MODEL_FALLBACK'].forEach(k => {
   savedEnv[k] = process.env[k];
   delete process.env[k];
 });
@@ -15,7 +15,6 @@ const { MODELS, getProvider } = require('../../src/model-config');
 
 // Defaults — verify they match what's in model-config.js
 check('brain defaults to gemini-2.5-flash-lite', MODELS.brain === 'gemini-2.5-flash-lite');
-check('compose defaults to gemini-2.5-flash-lite', MODELS.compose === 'gemini-2.5-flash-lite');
 check('extract defaults to claude-haiku-4-5-20251001', MODELS.extract === 'claude-haiku-4-5-20251001');
 check('details defaults to gemini-2.5-flash', MODELS.details === 'gemini-2.5-flash');
 check('fallback defaults to claude-haiku-4-5-20251001', MODELS.fallback === 'claude-haiku-4-5-20251001');
