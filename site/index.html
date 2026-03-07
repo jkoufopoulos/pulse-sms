@@ -959,23 +959,23 @@
     await wait(1400);
 
     // User texts a neighborhood
-    addBubble('east village', 'sms-sent');
+    addBubble('bushwick', 'sms-sent');
 
     await wait(600);
     showTyping();
     await wait(2000);
     hideTyping();
 
-    // Pulse response — natural prose (matches current agent behavior)
+    // Pulse response — natural prose, discovery-focused picks
     addRawBubble(
-      'Smalls has a killer jazz set tonight at 7:30 \u2014 intimate basement room, $20 cover. Eastville is doing stand-up at 8 ($12), and there\u2019s a free DJ set at Nublu starting at 10. Any of those sound good?',
+      'Okay so tonight in Bushwick \u2014 there\u2019s a one-night-only noise pop showcase at Market Hotel, $12, doors at 9. Tiny Cupboard has free improv at 8 (it\u2019s a literal cupboard, fits like 20 people). And Elsewhere is doing a deep house thing across both rooms starting at 11, $15.',
       'sms-recv'
     );
 
     await wait(1400);
 
     // User asks for details on a pick
-    addBubble('the jazz one', 'sms-sent');
+    addBubble('the cupboard one', 'sms-sent');
 
     await wait(600);
     showTyping();
@@ -984,7 +984,7 @@
 
     // Detail response — natural prose
     addRawBubble(
-      'Smalls Jazz Club \u2014 183 W 10th St, 7:30pm. Legendary basement club with two sets nightly, BYOB-friendly. $20 cover. One of those places that makes you feel like you found something special. smallslive.com',
+      'Tiny Cupboard \u2014 252 Wyckoff Ave, 8pm. It\u2019s literally a tiny storefront turned comedy venue, maybe 20 seats. Free improv show tonight, no cover, just show up. One of those Bushwick things you have to see to believe.',
       'sms-recv'
     );
 
