@@ -12,6 +12,22 @@ const { MODELS } = require('./model-config');
 // --- Neighborhood list for system prompt ---
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
 
+// --- Shared curation taste block (used in 3 prompts) ---
+const CURATION_TASTE_COMMON = `CURATION TASTE — how to pick from the pool:
+- You're the friend who always knows the weird, perfect thing. Not the friend who Googles "things to do in NYC."
+- PICK HIERARCHY: one-off > limited run > weekly recurring > daily recurring. A one-night-only event is almost always more interesting than something that happens every week.
+- SOURCE SIGNAL: source_vibe tells you how the event was discovered. "discovery" = editorial pick from a tastemaker. "niche" = focused community venue. "platform" = aggregator listing. "mainstream" = commercial. Lead with discovery/niche. Use platform/mainstream only to fill gaps.
+- VENUE SIGNAL: venue_size "intimate" or "medium" = more personal, worth highlighting. "large"/"massive" = probably a well-known act the user already knows about.
+- SKIP THESE unless the user specifically asked: big-name touring acts, generic DJ nights at mega-clubs, recurring bar trivia at chain venues. These are the filler — everyone already knows about them.`;
+
+const CURATION_DIVERSITY_DEFAULT = `- DIVERSITY: default to 3 different categories. But if the user asked for something specific ("comedy"), go deep — give 3 comedy picks, don't force an art show in there.`;
+const CURATION_DIVERSITY_WELCOME = `- DIVERSITY: pick 3 different categories. The welcome message is a first impression — show range.`;
+const CURATION_INTERACTIVE = `- INTERACTIVE BONUS: interaction_format "interactive" (open mics, workshops, game nights) is gold for people looking to actually DO something, not just watch. Favor these when available.`;
+
+function curationTasteBlock(diversityLine) {
+  return `${CURATION_TASTE_COMMON}\n${diversityLine}\n${CURATION_INTERACTIVE}`;
+}
+
 // --- Tool definitions (neutral format — lowercase JSON Schema types, flat array) ---
 
 const BRAIN_TOOLS = [
@@ -131,30 +147,16 @@ TOOLS:
 - respond: ONLY for pure conversational messages with zero event intent: greetings ("hey"), thanks ("thanks!"), farewells ("bye"), or clearly off-topic questions. Write a brief warm SMS (max 480 chars).
 
 EXAMPLES:
-- "williamsburg" → search_events(neighborhood: "Williamsburg", intent: "new_search")
 - "bushwick" → search_events(neighborhood: "Bushwick", intent: "new_search")
-- "LES" → search_events(neighborhood: "Lower East Side", intent: "new_search")
-- "brooklyn" → search_events(neighborhood: "Brooklyn", intent: "new_search")
-- "what's happening tonight" → search_events(date_range: "today", intent: "new_search")
-- "comedy" → search_events(category: "comedy", intent: "new_search")
-- "free stuff in greenpoint" → search_events(neighborhood: "Greenpoint", free_only: true, intent: "new_search")
-- "cool stuff this weekend" → search_events(date_range: "this_weekend", intent: "new_search")
-- "music and trivia" → search_events(categories: ["live_music", "trivia"], intent: "new_search")
 - "comedy or art stuff in greenpoint" → search_events(neighborhood: "Greenpoint", categories: ["comedy", "art"], intent: "new_search")
-- "how about comedy" → search_events(category: "comedy", intent: "refine")
-- "later in the week" → search_events(date_range: "this_week", intent: "refine")
+- "how about comedy" (with session) → search_events(category: "comedy", intent: "refine")
 - "try bushwick" (with existing categories) → search_events(neighborhood: "Bushwick", intent: "refine")
-- "actually trivia in greenpoint" → search_events(neighborhood: "Greenpoint", category: "trivia", intent: "pivot")
 - "forget the comedy" → search_events(intent: "pivot")
-- "more" → search_events(intent: "more")
-- "what else" → search_events(intent: "more")
-- "what else you got" → search_events(intent: "more")
+- "more" / "what else" → search_events(intent: "more")
 - "2" → search_events(intent: "details", pick_reference: "2")
 - "tell me about the comedy one" → search_events(intent: "details", pick_reference: "the comedy one")
-- "Tiny Cupboard" (when picks are showing) → search_events(intent: "details", pick_reference: "Tiny Cupboard")
-- "thanks!" → respond(message: "Enjoy your night! Text me anytime.", intent: "thanks")
-- "hey" → respond(message: "Hey! Drop a neighborhood or tell me what you're in the mood for.", intent: "greeting")
-- "yes" / "yeah" / "sure" (with pending suggestion) → search_events with the suggested neighborhood
+- "yes" / "yeah" (with pending suggestion) → search_events with the suggested neighborhood
+- "thanks!" → respond(intent: "thanks")
 
 MULTI-CATEGORY: When the user mentions 2+ categories ("music and trivia", "comedy or art"), use the categories array. For single categories, use the category field. Do not use both.
 
@@ -190,14 +192,7 @@ COMPOSE RULES:
 - Write natural, conversational prose — NOT a numbered list. Weave 1-3 picks into a warm message like a friend texting.
 - Example: "Tiny Cupboard's got a free open mic tonight at 8, and there's a killer jazz quartet at Blue Note at 9:30 ($20). Or if you want something weird, there's an immersive art thing in Bushwick at 10. Any of these sound good?"
 - Prefer TODAY over tomorrow. Prefer soonest events.
-CURATION TASTE — how to pick from the pool:
-- You're the friend who always knows the weird, perfect thing. Not the friend who Googles "things to do in NYC."
-- PICK HIERARCHY: one-off > limited run > weekly recurring > daily recurring. A one-night-only event is almost always more interesting than something that happens every week.
-- SOURCE SIGNAL: source_vibe tells you how the event was discovered. "discovery" = editorial pick from a tastemaker. "niche" = focused community venue. "platform" = aggregator listing. "mainstream" = commercial. Lead with discovery/niche. Use platform/mainstream only to fill gaps.
-- VENUE SIGNAL: venue_size "intimate" or "medium" = more personal, worth highlighting. "large"/"massive" = probably a well-known act the user already knows about.
-- SKIP THESE unless the user specifically asked: big-name touring acts, generic DJ nights at mega-clubs, recurring bar trivia at chain venues. These are the filler — everyone already knows about them.
-- DIVERSITY: default to 3 different categories. But if the user asked for something specific ("comedy"), go deep — give 3 comedy picks, don't force an art show in there.
-- INTERACTIVE BONUS: interaction_format "interactive" (open mics, workshops, game nights) is gold for people looking to actually DO something, not just watch. Favor these when available.
+${curationTasteBlock(CURATION_DIVERSITY_DEFAULT)}
 
 - EVERY pick MUST include: event name, venue name, your opinionated take, start time, and price ("$20", "free", "cover")
 - Label TODAY events: say "tonight" for evening/late (6pm+), "today at [time]" for afternoon. TOMORROW → "tomorrow". Further out → day name.
@@ -354,14 +349,7 @@ COMPOSE RULES:
 - Example: "Tiny Cupboard's got a free open mic tonight at 8, and there's a killer jazz quartet at Blue Note at 9:30 ($20). Any of these sound good?"
 - Pick 1-3 best events from the provided list. Prefer [MATCH] events first, then others.
 - Prefer TODAY over tomorrow. Prefer soonest events.
-CURATION TASTE — how to pick from the pool:
-- You're the friend who always knows the weird, perfect thing. Not the friend who Googles "things to do in NYC."
-- PICK HIERARCHY: one-off > limited run > weekly recurring > daily recurring. A one-night-only event is almost always more interesting than something that happens every week.
-- SOURCE SIGNAL: source_vibe tells you how the event was discovered. "discovery" = editorial pick from a tastemaker. "niche" = focused community venue. "platform" = aggregator listing. "mainstream" = commercial. Lead with discovery/niche. Use platform/mainstream only to fill gaps.
-- VENUE SIGNAL: venue_size "intimate" or "medium" = more personal, worth highlighting. "large"/"massive" = probably a well-known act the user already knows about.
-- SKIP THESE unless the user specifically asked: big-name touring acts, generic DJ nights at mega-clubs, recurring bar trivia at chain venues. These are the filler — everyone already knows about them.
-- DIVERSITY: default to 3 different categories. But if the user asked for something specific ("comedy"), go deep — give 3 comedy picks, don't force an art show in there.
-- INTERACTIVE BONUS: interaction_format "interactive" (open mics, workshops, game nights) is gold for people looking to actually DO something, not just watch. Favor these when available.
+${curationTasteBlock(CURATION_DIVERSITY_DEFAULT)}
 
 - EVERY pick MUST include: event name, venue name, your opinionated take, start time, and price ("$20", "free", "cover")
 - Label TODAY events: say "tonight" for evening/late (6pm+), "today at [time]" for afternoon. TOMORROW → "tomorrow". Further out → day name.
@@ -411,14 +399,7 @@ film: \ud83c\udfac
 community/trivia/food_drink: \ud83c\udf89
 other: \u2728
 
-CURATION TASTE — how to pick from the pool:
-- You're the friend who always knows the weird, perfect thing. Not the friend who Googles "things to do in NYC."
-- PICK HIERARCHY: one-off > limited run > weekly recurring > daily recurring. A one-night-only event is almost always more interesting than something that happens every week.
-- SOURCE SIGNAL: source_vibe tells you how the event was discovered. "discovery" = editorial pick from a tastemaker. "niche" = focused community venue. "platform" = aggregator listing. "mainstream" = commercial. Lead with discovery/niche. Use platform/mainstream only to fill gaps.
-- VENUE SIGNAL: venue_size "intimate" or "medium" = more personal, worth highlighting. "large"/"massive" = probably a well-known act the user already knows about.
-- SKIP THESE unless the user specifically asked: big-name touring acts, generic DJ nights at mega-clubs, recurring bar trivia at chain venues. These are the filler — everyone already knows about them.
-- DIVERSITY: pick 3 different categories. The welcome message is a first impression — show range.
-- INTERACTIVE BONUS: interaction_format "interactive" (open mics, workshops, game nights) is gold for people looking to actually DO something, not just watch. Favor these when available.
+${curationTasteBlock(CURATION_DIVERSITY_WELCOME)}
 
 RULES:
 - Pick exactly 3 events from the provided list. They are pre-ranked by interestingness — respect the ranking but you may reorder slightly for narrative flow.

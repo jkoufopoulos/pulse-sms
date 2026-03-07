@@ -201,9 +201,45 @@ Collapsed tools from 3 to 2 (deleted `get_details`). `search_events` handles mor
 | ~~Dead exports in pipeline.js~~ | ~~Low~~ | ~~`applyFilters`, `resolveActiveFilters` removed from exports. `normalizeFilterIntent` kept (tested).~~ **Done (2026-03-05)** |
 | ~~Stale comments in code-evals.js~~ | ~~Low~~ | ~~Code evals trimmed from 24 to 6 invariant checks. Old eval infrastructure archived.~~ **Done (2026-03-05)** |
 | ~~Stale comments in traces.js, agent-brain.js~~ | ~~Low~~ | ~~Updated for Phase 4 architecture.~~ **Done (2026-03-05)** |
+| Prompt hygiene (see below) | Medium | Audit completed 2026-03-07. 6 action items identified. |
 | Price data gap (21% unknown) | Low | Structurally unavailable from some sources |
 | No horizontal scalability | Low | Single-process, in-memory sessions |
 | Preference learning not yet active | Low | Profiles captured but not injected into prompts -- Phase 5 |
+
+### Prompt Hygiene Audit (2026-03-07)
+
+Comprehensive review of all prompts in `prompts.js` and `brain-llm.js`. The prompts are not too long by absolute standards (~1500-1800 tokens each), but have structural issues that affect reliability.
+
+**Findings:**
+
+1. **Dual-role prompt (routing + composition):** `buildBrainSystemPrompt` asks Gemini Flash Lite to both route (classify intent, call tools) and compose (write natural SMS) in one system prompt. These are different cognitive tasks -- routing is classification (high reliability), composition is generation (lower reliability). Compose rules (~50% of the prompt) are invisible during routing and only activate after the tool result comes back.
+
+2. **Curation taste duplicated 3x:** The curation taste block (pick hierarchy, source signal, venue signal, skip rules, diversity, interactive bonus) is copy-pasted across `buildBrainSystemPrompt`, `BRAIN_COMPOSE_SYSTEM`, and `WELCOME_COMPOSE_SYSTEM`. Maintenance risk: tuning curation requires updating 3 prompts.
+
+3. **`UNIFIED_SYSTEM` possibly dead code:** Exported from `prompts.js` but may not be used in the hot path. Contains `SHARED_UNDERSTANDING` with complex filter_intent logic. If dead, it's 145 lines of misleading code. If live, it contradicts `buildBrainSystemPrompt` (numbered lists vs prose).
+
+4. **Excessive routing examples:** `buildBrainSystemPrompt` has 24 routing examples (lines 134-157). Research suggests 3-5 well-chosen examples are optimal for tool calling. Beyond that, diminishing returns and increased input tokens on every call.
+
+5. **Non-deterministic instructions for deterministic constraints:** Several rules are unreliable as prompt instructions:
+   - "Under 480 characters" -- LLMs can't count chars. `smartTruncate` backstops this (good).
+   - "EVERY pick MUST include price" -- ~80-90% compliance. Fails when source data lacks price.
+   - "Do NOT say 'Reply MORE' when is_last_batch" -- Negative instructions ~70-80% reliable.
+   - filter_intent classification (6 action types with edge cases) -- Most drift-prone area.
+
+6. **Numbered lists vs prose contradiction:** `UNIFIED_SYSTEM` says "Use numbered format." `buildBrainSystemPrompt` says "NOT a numbered list." Currently separated by code path but confusing for maintenance.
+
+**Action items (ordered by impact):**
+
+| # | Action | Risk | Effort | Rationale |
+|---|--------|------|--------|-----------|
+| 1 | Verify `UNIFIED_SYSTEM` usage; delete if dead | None | Small | Dead code removal, no behavior change |
+| 2 | Trim routing examples to 5-8 | Low | Small | Fewer input tokens, keep ambiguous edge cases only |
+| 3 | Extract curation taste into shared constant | None | Small | Single source of truth, like `SHARED_UNDERSTANDING` |
+| 4 | Separate routing prompt from compose prompt | Medium | Medium | Inject compose rules via `functionResponse` context instead of front-loading. Reduces routing prompt by ~50%. Risk: changes the flow that's currently working at 99.2% eval. Run evals before/after. |
+| 5 | Move filter_intent to deterministic code | Medium | Medium | Derive from tool params (intent="pivot" -> clear filters). Aligns with P1. Risk: edge cases in "nvm"/"forget it" disambiguation. |
+| 6 | Add deterministic post-processing for price/day labels | Low | Small | Like `smartTruncate` but for other constraints. Backstop, not replacement. |
+
+**Risk assessment:** Items 1-3 are safe refactors with no behavior change. Items 4-5 change the LLM interaction pattern and should be gated behind eval runs (before/after comparison on the 417-scenario golden dataset). Item 6 is additive safety net.
 
 ---
 
