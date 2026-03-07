@@ -9,7 +9,6 @@ const { loadProfiles } = require('./preference-profile');
 const { loadReferrals, clearReferralInterval } = require('./referral');
 const { loadSessions, flushSessions, clearSessionInterval } = require('./session');
 const { loadAlerts, getRecentAlerts } = require('./alerts');
-const { renderEventCard, renderStaleCard } = require('./card');
 
 // Validate required env vars — exit if critical ones are missing
 const required = ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER', 'ANTHROPIC_API_KEY', 'TAVILY_API_KEY'];
@@ -346,25 +345,14 @@ app.get('/api/digests', (req, res) => {
   }
 });
 
-// Event card page — shareable Pulse URLs with OG meta tags
+// Event short-link — redirects to source URL
 app.get('/e/:eventId', (req, res) => {
-  const pulsePhone = process.env.TWILIO_PHONE_NUMBER || '+16467226926';
-  const domain = process.env.PULSE_CARD_DOMAIN || `${req.protocol}://${req.get('host')}`;
-  const formattedPhone = pulsePhone.replace(/\D/g, '').replace(/^1(\d{3})(\d{3})(\d{4})$/, '($1) $2-$3');
   const event = getEventById(req.params.eventId);
-  if (process.env.PULSE_CARD_ENABLED !== 'true') {
-    if (event) {
-      const directUrl = event.ticket_url || event.source_url;
-      if (directUrl) return res.redirect(302, directUrl);
-    }
-    return res.send(renderStaleCard(formattedPhone, pulsePhone));
-  }
   if (event) {
-    const refCode = req.query.ref || null;
-    res.send(renderEventCard(event, formattedPhone, pulsePhone, domain, refCode));
-  } else {
-    res.send(renderStaleCard(formattedPhone, pulsePhone));
+    const directUrl = event.ticket_url || event.source_url;
+    if (directUrl) return res.redirect(302, directUrl);
   }
+  res.status(404).send('Event not found');
 });
 
 // --- Read-only dashboards & APIs (always available) ---

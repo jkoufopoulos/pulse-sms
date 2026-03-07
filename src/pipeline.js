@@ -414,10 +414,8 @@ function normalizeFilters(filters) {
 /**
  * Send individual URLs for each picked event as separate SMS messages.
  * iMessage renders rich link previews for standalone URLs.
- * Gated by PULSE_LINK_PREVIEWS env var.
  */
 async function sendPickUrls(phone, picks, eventMap) {
-  if (process.env.PULSE_LINK_PREVIEWS !== 'true') return;
   if (!picks || picks.length === 0) return;
   const { sendSMS } = require('./twilio');
   for (const pick of picks) {

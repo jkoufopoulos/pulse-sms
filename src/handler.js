@@ -4,12 +4,9 @@ const { sendSMS, maskPhone, enableTestCapture, disableTestCapture } = require('.
 const { startTrace, saveTrace, getLatestTraceForPhone, getTraceById, recordAICost } = require('./traces');
 const { getSession, setSession, clearSession, addToHistory, clearSessionInterval, acquireLock } = require('./session');
 const { handleHelp } = require('./intent-handlers');
-const { getEventById } = require('./events');
 const { lookupReferralCode, recordAttribution } = require('./referral');
-const { saveResponseFrame } = require('./pipeline');
-const { updateProfile } = require('./preference-profile');
 const { processedMessages, OPT_OUT_KEYWORDS, isOverBudget, trackAICost, getCostSummary, ipRateLimits, IP_RATE_LIMIT, IP_RATE_WINDOW, clearGuardIntervals } = require('./request-guard');
-const { WELCOME_INTRO, WELCOME_INSTRUCTIONS } = require('./messages');
+
 
 const router = express.Router();
 
@@ -181,55 +178,19 @@ async function dispatchPreRouterIntent(route, ctx) {
     const referral = lookupReferralCode(route.referralCode);
     if (referral) {
       recordAttribution(phone, route.referralCode);
-      // Agent brain: use welcome flow instead of canned intro
-      if (process.env.PULSE_AGENT_BRAIN === 'true') {
-        const { handleWelcome } = require('./agent-brain');
-        try {
-          const welcomeResult = await handleWelcome(phone, session, trace);
-          trace.routing.result = { intent: 'welcome_referral', confidence: 1.0 };
-          await sendSMS(phone, welcomeResult.sms);
-          finalizeTrace(welcomeResult.sms, 'referral');
-          return;
-        } catch (err) {
-          console.warn('Welcome flow failed for referral, using canned intro:', err.message);
-          // Fall through to existing canned messages
-        }
-      }
-      const referredEvent = getEventById(referral.eventId);
-      updateProfile(phone, {
-        neighborhood: referredEvent?.neighborhood || null,
-        filters: referredEvent?.category ? { category: referredEvent.category } : {},
-        responseType: 'referral',
-      }).catch(err => console.error('profile update failed:', err.message));
-      const msg1 = WELCOME_INTRO;
-      const msg2 = referredEvent?.neighborhood
-        ? `Text me a vibe like "jazz tonight" or try "${referredEvent.neighborhood}" to start exploring. I'll send picks — reply a number for details, "more" to keep going, or just tell me what you're looking for.`
-        : WELCOME_INSTRUCTIONS;
-      saveResponseFrame(phone, { picks: [], eventMap: {}, neighborhood: null, filters: null, offeredIds: [] });
-      await sendSMS(phone, msg1);
-      await sendSMS(phone, msg2);
-      finalizeTrace(msg1 + '\n' + msg2, 'referral');
+      const { handleWelcome } = require('./agent-brain');
+      const welcomeResult = await handleWelcome(phone, session, trace);
+      trace.routing.result = { intent: 'welcome_referral', confidence: 1.0 };
+      await sendSMS(phone, welcomeResult.sms);
+      finalizeTrace(welcomeResult.sms, 'referral');
       return;
     }
-    // Agent brain: use welcome flow even for expired referrals
-    if (process.env.PULSE_AGENT_BRAIN === 'true') {
-      const { handleWelcome } = require('./agent-brain');
-      try {
-        const welcomeResult = await handleWelcome(phone, session, trace);
-        trace.routing.result = { intent: 'welcome_referral_expired', confidence: 1.0 };
-        await sendSMS(phone, welcomeResult.sms);
-        finalizeTrace(welcomeResult.sms, 'referral_expired');
-        return;
-      } catch (err) {
-        console.warn('Welcome flow failed for expired referral, using canned intro:', err.message);
-      }
-    }
-    const msg1 = WELCOME_INTRO;
-    const msg2 = WELCOME_INSTRUCTIONS;
-    saveResponseFrame(phone, { picks: [], eventMap: {}, neighborhood: null, filters: null, offeredIds: [] });
-    await sendSMS(phone, msg1);
-    await sendSMS(phone, msg2);
-    finalizeTrace(msg1 + '\n' + msg2, 'referral_expired');
+    // Expired referral — still welcome the user
+    const { handleWelcome } = require('./agent-brain');
+    const welcomeResult = await handleWelcome(phone, session, trace);
+    trace.routing.result = { intent: 'welcome_referral_expired', confidence: 1.0 };
+    await sendSMS(phone, welcomeResult.sms);
+    finalizeTrace(welcomeResult.sms, 'referral_expired');
     return;
   }
 
