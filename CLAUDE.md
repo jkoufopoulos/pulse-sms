@@ -27,7 +27,7 @@ Pulse turns a simple text message into a curated night out. A user texts a neigh
 
 Pulse routes every incoming message through `checkMechanical` (help + TCPA only, $0) then the agent brain (Gemini tool calling). Session state is derived from the agent's structured tool call parameters — never parsed from free-text output.
 
-**Agent brain (sole path, ~$0.0005/call)** — Gemini 2.5 Flash Lite with tool calling. `checkMechanical` handles only "help"/"?" and TCPA opt-out at $0. Everything else goes to `callAgentBrain` which uses 2 tools: `search_events` (all event intents: search, refine, more, details) and `respond` (conversation). SMS composition happens in the same Gemini chat session via multi-turn tool calling. 2-3s typical latency. Tool call params (`search_events` args) are the system of record for filters and intent. Falls back to Anthropic Haiku on Gemini failure.
+**Agent loop (sole path, ~$0.001/call)** — True agent loop via `runAgentLoop` in `llm.js`. `checkMechanical` handles only "help"/"?" and TCPA opt-out at $0. Everything else goes through `handleAgentRequest` in `agent-loop.js`, which runs a multi-turn tool calling loop (max 3 iterations): model calls a tool → code executes it → result fed back → model decides next action or writes SMS. 2 tools: `search_events` (all event intents) and `respond` (conversation). The model writes the SMS as plain text when it's ready. Falls back to Anthropic Haiku on Gemini failure. 2-5s typical latency.
 
 A typical multi-turn conversation:
 ```
@@ -61,9 +61,9 @@ Daily scrape (10am ET)              Incoming SMS
         │    coords,                 only, $0)             2hr TTL)
         │    persist)                    │
         ▼                               ▼
-   events.js                    callAgentBrain
-   (cache, dedup,              (Gemini 2.5 Flash Lite
-    source health)              tool calling)
+   events.js                    runAgentLoop
+   (cache, dedup,              (llm.js, multi-turn
+    source health)              tool calling loop)
         │                           │
         │                    ┌──────┴──────┐
         │                    ▼             ▼
@@ -71,11 +71,10 @@ Daily scrape (10am ET)              Incoming SMS
         │              (search, refine, (greetings,
         └─►             more, details)   thanks, bye)
                              │
-                        same Gemini session     ~$0.0005
-                        writes natural prose SMS
+                        agent loop (max 3 turns)   ~$0.001
+                        model writes plain text SMS
                              │
-                        handler saves              $0
-                        activeFilters → lastFilters
+                        saveSessionFromToolCalls    $0
                         (from tool call params)
                              │
                         formatters.js (480-char)
@@ -88,14 +87,17 @@ Daily scrape (10am ET)              Incoming SMS
 
 | Module | Role |
 |--------|------|
-| `handler.js` | Orchestrator: checkMechanical → agent brain → deterministic session save |
+| `handler.js` | Orchestrator: checkMechanical → agent loop → session save |
+| `agent-loop.js` | True agent loop: `handleAgentRequest` (orchestrator), `executeTool` (callback for tool execution), `saveSessionFromToolCalls` (post-loop session save) |
 | `request-guard.js` | TCPA opt-out, Twilio dedup, per-user AI budget ($0.10/day prod), IP rate limiting |
-| `model-config.js` | Single source of truth for all LLM model choices. 5 roles (brain, compose, extract, details, fallback), env var overrides, provider auto-detection from model name prefix |
-| `llm.js` | Provider-agnostic LLM interface: `generate()`, `callWithTools()`, `continueChat()`. Routes to Gemini or Anthropic based on model name. Neutral tool format with automatic conversion |
-| `agent-brain.js` | Sole LLM path: `checkMechanical` (help + TCPA only), `callAgentBrain` (tool calling via llm.js, 2 tools: `search_events` + `respond`). Falls back to `MODELS.fallback` on primary failure |
+| `model-config.js` | Single source of truth for LLM model choices. 3 roles (brain, extract, fallback), env var overrides, provider auto-detection from model name prefix |
+| `llm.js` | Provider-agnostic LLM interface: `generate()`, `callWithTools()`, `continueChat()`, `runAgentLoop()`. Routes to Gemini or Anthropic based on model name |
+| `agent-brain.js` | Mechanical pre-check only: `checkMechanical` (help + TCPA). Re-exports `executeMore`/`executeDetails` for tests |
+| `brain-llm.js` | Tool definitions (`BRAIN_TOOLS`), system prompt (`buildBrainSystemPrompt`), event serialization (`serializePoolForContinuation`) |
+| `brain-execute.js` | Pure tool implementations: `buildSearchPool`, `executeMore`, `executeDetails`, `validatePicks` |
 | `pipeline.js` | `buildTaggedPool`, `eventMatchesFilters`, `saveResponseFrame` (atomic session writes) |
 | `ai.js` | `extractEvents` (scrape-time), `composeDetails` (event detail composition). Uses `llm.generate()` |
-| `prompts.js` | System prompts: `BRAIN_SYSTEM`, `BRAIN_COMPOSE_SYSTEM`, `DETAILS_SYSTEM`, `EXTRACTION_PROMPT` |
+| `prompts.js` | System prompts: `DETAILS_SYSTEM`, `EXTRACTION_PROMPT` |
 | `session.js` | Per-phone session store, 2hr TTL, 12 fields |
 | `events.js` | Daily event cache + disk persistence, cross-source dedup, quality gates, source vibe stamping |
 | `source-registry.js` | Single source of truth for all 22 source entries across 19 scraper modules (weights, tiers, fetch functions) |
@@ -122,7 +124,7 @@ Required: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `ANT
 
 Optional: `PORT` (default 3000), `PULSE_TEST_MODE=true` (enables simulator), `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`/`GMAIL_REFRESH_TOKEN` (newsletter scrapers), `RESEND_API_KEY`/`ALERT_EMAIL` (email alerts), `PULSE_NO_RATE_LIMIT=true`.
 
-Model config (all optional, defaults in `src/model-config.js`): `PULSE_MODEL_BRAIN` (agent brain, default `gemini-2.5-flash-lite`), `PULSE_MODEL_COMPOSE` (SMS composition, default `gemini-2.5-flash-lite`), `PULSE_MODEL_EXTRACT` (event extraction, default `gemini-2.5-flash`), `PULSE_MODEL_DETAILS` (detail composition, default `gemini-2.5-flash`), `PULSE_MODEL_FALLBACK` (fallback for all roles, default `claude-haiku-4-5-20251001`). Provider auto-detected from model name prefix (`gemini-*` → Gemini, `claude-*` → Anthropic).
+Model config (all optional, defaults in `src/model-config.js`): `PULSE_MODEL_BRAIN` (agent loop, default `gemini-2.5-flash-lite`), `PULSE_MODEL_EXTRACT` (event extraction, default `claude-haiku-4-5-20251001`), `PULSE_MODEL_DETAILS` (detail composition, default `gemini-2.5-flash`), `PULSE_MODEL_FALLBACK` (fallback for all roles, default `claude-haiku-4-5-20251001`). Provider auto-detected from model name prefix (`gemini-*` → Gemini, `claude-*` → Anthropic).
 
 ## Running
 
