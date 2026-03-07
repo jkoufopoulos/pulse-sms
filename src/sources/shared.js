@@ -167,8 +167,11 @@ function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
     time_window: e.time_window || null,
     is_free: e.is_free === true,
     price_display: e.price_display || null,
-    category: e.category === 'music' ? 'live_music' : (e.category || 'other'),
-    subcategory: e.subcategory || null,
+    category: e.category === 'music' ? 'live_music'
+      : e.category === 'film' ? 'art'
+      : (e.category || 'other'),
+    subcategory: e.category === 'film' ? 'film'
+      : (e.subcategory || null),
     extraction_confidence: e.extraction_confidence ?? e.confidence ?? null,
     completeness: computeCompleteness({
       name: e.name,
