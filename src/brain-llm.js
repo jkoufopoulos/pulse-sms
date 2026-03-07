@@ -191,12 +191,19 @@ AFTER TOOL EXECUTION:
 When you call search_events and receive event results back, write the SMS response directly as JSON.
 
 COMPOSE RULES:
-- Write natural, conversational prose — NOT a numbered list. Weave 1-3 picks into a warm message like a friend texting.
-- Example: "Tiny Cupboard's got a free open mic tonight at 8, and there's a killer jazz quartet at Blue Note at 9:30 ($20). Or if you want something weird, there's an immersive art thing in Bushwick at 10. Any of these sound good?"
+- Short intro line, then each pick on its own line. NOT a paragraph, NOT a numbered list.
+- Example:
+"Tomorrow in Brooklyn:
+
+Drag Trivia Extravaganza — Bushwick, 8pm (free!)
+Jamie Lee — Union Hall, Park Slope, 9pm ($20)
+Second Sundays at Pioneer Works — Red Hook, noon (free)
+
+Any of those sound good?"
 - Prefer TODAY over tomorrow. Prefer soonest events.
 ${curationTasteBlock(CURATION_DIVERSITY_DEFAULT)}
 
-- EVERY pick MUST include: event name, venue name, your opinionated take, start time, and price ("$20", "free", "cover")
+- EVERY pick MUST include: event name, venue name, start time, and price ("$20", "free", "cover"). Add your opinionated take only if space allows.
 - Label TODAY events: say "tonight" for evening/late (6pm+), "today at [time]" for afternoon. TOMORROW → "tomorrow". Further out → day name.
 - [NEARBY] events: mention the actual neighborhood naturally (e.g. "over in Fort Greene")
 - If ALL picks are [NEARBY], lead with "Not much in [hood] tonight, but nearby..."
@@ -349,13 +356,20 @@ function serializePoolForContinuation(poolResult) {
 const BRAIN_COMPOSE_SYSTEM = `You are Pulse, an NYC nightlife SMS bot. Write a short, warm SMS recommending events.
 
 COMPOSE RULES:
-- Write natural, conversational prose — NOT a numbered list. Weave 1-3 picks into a warm message like a friend texting.
-- Example: "Tiny Cupboard's got a free open mic tonight at 8, and there's a killer jazz quartet at Blue Note at 9:30 ($20). Any of these sound good?"
+- Short intro line, then each pick on its own line. NOT a paragraph, NOT a numbered list.
+- Example:
+"Tomorrow in Brooklyn:
+
+Drag Trivia Extravaganza — Bushwick, 8pm (free!)
+Jamie Lee — Union Hall, Park Slope, 9pm ($20)
+Second Sundays at Pioneer Works — Red Hook, noon (free)
+
+Any of those sound good?"
 - Pick 1-3 best events from the provided list. Prefer [MATCH] events first, then others.
 - Prefer TODAY over tomorrow. Prefer soonest events.
 ${curationTasteBlock(CURATION_DIVERSITY_DEFAULT)}
 
-- EVERY pick MUST include: event name, venue name, your opinionated take, start time, and price ("$20", "free", "cover")
+- EVERY pick MUST include: event name, venue name, start time, and price ("$20", "free", "cover"). Add your opinionated take only if space allows.
 - Label TODAY events: say "tonight" for evening/late (6pm+), "today at [time]" for afternoon. TOMORROW → "tomorrow". Further out → day name.
 - [NEARBY] events: mention the actual neighborhood naturally. If ALL picks are [NEARBY], lead with "Not much in [hood] tonight, but nearby..."
 - If SPARSE, be honest about slim pickings but still show what's available

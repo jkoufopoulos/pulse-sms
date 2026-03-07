@@ -76,7 +76,6 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
       trace.brain_provider = 'welcome';
 
       await sendSMS(phone, welcomeResult.sms);
-      if (welcomeResult.picks?.length) await sendPickUrls(phone, welcomeResult.picks, welcomeResult.eventMap);
       finalizeTrace(welcomeResult.sms, welcomeResult.intent);
       return trace.id;
     } catch (err) {
@@ -431,7 +430,7 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
 
     // Send SMS and finalize
     await sendSMS(phone, execResult.sms);
-    if (execResult.picks) await sendPickUrls(phone, execResult.picks, execResult.eventMap);
+    if (execResult.intent === 'details' && execResult.picks) await sendPickUrls(phone, execResult.picks, execResult.eventMap);
     finalizeTrace(execResult.sms, execResult.intent);
 
   } catch (err) {
