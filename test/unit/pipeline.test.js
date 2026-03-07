@@ -199,12 +199,12 @@ check('zero matches: matchCount 0', zeroResult.matchCount === 0);
 check('zero matches: isSparse false', zeroResult.isSparse === false);
 check('zero matches: pool size 0 (no matches, no padding)', zeroResult.pool.length === 0);
 
-// Hard matched > 20 → cap at 20 hard
-const manyMatched = makeEvents(25, { category: 'comedy' });
+// Hard matched > 50 → cap at 50 hard
+const manyMatched = makeEvents(60, { category: 'comedy' });
 const manyResult = buildTaggedPool([...manyMatched, ...makeEvents(6, { category: 'nightlife' })], { category: 'comedy' });
-check('many matches: matchCount 25', manyResult.matchCount === 25);
-check('many matches: hardCount 25', manyResult.hardCount === 25);
-check('many matches: pool size 20 (hard cap, no padding)', manyResult.pool.length === 20);
+check('many matches: matchCount 60', manyResult.matchCount === 60);
+check('many matches: hardCount 60', manyResult.hardCount === 60);
+check('many matches: pool size 50 (hard cap, no padding)', manyResult.pool.length === 50);
 check('many matches: all hard', manyResult.pool.every(e => e.filter_match === 'hard'));
 check('many matches: no unmatched in pool', manyResult.pool.every(e => e.filter_match !== false));
 

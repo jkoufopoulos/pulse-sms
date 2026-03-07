@@ -804,7 +804,7 @@ async function getEvents(neighborhood, { dateRange } = {}) {
   });
 
   console.log(`${filtered.length} events near ${neighborhood} (range ${rangeStart}..${rangeEnd}, cache: ${eventCache.length})`);
-  return filtered.slice(0, 20);
+  return filtered.slice(0, 100);
 }
 
 /**
@@ -904,7 +904,7 @@ async function getEventsCitywide({ dateRange, filters } = {}) {
   const sorted = filterAwareSort(dateFiltered, filters, sortFn);
 
   console.log(`Citywide: ${sorted.length} events (range ${rangeStart}..${rangeEnd}, cache: ${eventCache.length})`);
-  return sorted.slice(0, 30);
+  return sorted.slice(0, 100);
 }
 
 // ============================================================
