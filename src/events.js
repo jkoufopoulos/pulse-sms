@@ -260,6 +260,10 @@ function stampSourceVibe(events) {
     const tier = SOURCE_VIBE[e.source_name];
     if (tier) {
       e.source_vibe = tier;
+      // Discovery sources are inherently editorial — every event is a curated pick
+      if (tier === 'discovery' && !e.editorial_signal) {
+        e.editorial_signal = true;
+      }
       stamped++;
     }
   }
