@@ -86,18 +86,28 @@ function checkBaseline(label, events) {
     }
   }
 
-  // 4. Duplicate spike
+  // 4. Duplicate spike — but allow legitimate multi-show venues (same name, different times)
   const nameCounts = {};
+  const nameTimeCounts = {};
   for (const e of events) {
     const name = (e.name || '').toLowerCase().trim();
-    if (name) nameCounts[name] = (nameCounts[name] || 0) + 1;
+    if (!name) continue;
+    nameCounts[name] = (nameCounts[name] || 0) + 1;
+    const timeKey = `${name}|${(e.start_time_local || '').slice(0, 16)}`;
+    nameTimeCounts[timeKey] = (nameTimeCounts[timeKey] || 0) + 1;
   }
   const maxDupes = Math.max(0, ...Object.values(nameCounts));
   if (events.length > 5 && maxDupes / events.length > DUPLICATE_THRESHOLD) {
-    return {
-      quarantined: true,
-      reason: `duplicate spike: "${Object.entries(nameCounts).find(([_, c]) => c === maxDupes)?.[0]}" appears ${maxDupes}/${events.length} times`,
-    };
+    const dupeName = Object.entries(nameCounts).find(([_, c]) => c === maxDupes)?.[0];
+    // Count distinct date+time slots for the duplicated name
+    const distinctSlots = Object.keys(nameTimeCounts).filter(k => k.startsWith(dupeName + '|')).length;
+    // If 70%+ of occurrences have unique time slots, it's a multi-show venue
+    if (distinctSlots < maxDupes * 0.7) {
+      return {
+        quarantined: true,
+        reason: `duplicate spike: "${dupeName}" appears ${maxDupes}/${events.length} times`,
+      };
+    }
   }
 
   return { quarantined: false, reason: null };

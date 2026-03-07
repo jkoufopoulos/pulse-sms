@@ -104,8 +104,39 @@ const veryLowEvents = Array.from({ length: 5 }, (_, i) => ({ name: `Event ${i}`,
 const veryLowResult = checkBaseline('TestVolatile', veryLowEvents);
 check('volatile source: quarantined when truly low (5 < median*0.4=17)', veryLowResult.quarantined === true);
 
+// --- Duplicate spike: legitimate multi-show venue ---
+console.log('\nduplicate spike — multi-show:');
+sh['TestMultiShow'] = { ...mkEntry(), history: buildHistory(25, 5) };
+const multiShowEvents = [];
+for (let d = 7; d <= 13; d++) {
+  for (const time of ['19:00', '20:30', '22:15']) {
+    multiShowEvents.push({
+      name: 'Best of Brooklyn Stand-Up Comedy',
+      venue_name: 'The Tiny Cupboard',
+      date_local: `2026-03-${String(d).padStart(2, '0')}`,
+      start_time_local: `2026-03-${String(d).padStart(2, '0')}T${time}:00`,
+    });
+  }
+}
+multiShowEvents.push({ name: 'Trivia Night', venue_name: 'The Tiny Cupboard', date_local: '2026-03-07', start_time_local: '2026-03-07T18:00:00' });
+multiShowEvents.push({ name: 'Open Mic', venue_name: 'The Tiny Cupboard', date_local: '2026-03-08', start_time_local: '2026-03-08T17:00:00' });
+const multiShowResult = checkBaseline('TestMultiShow', multiShowEvents);
+check('multi-show venue: NOT quarantined (distinct times)', multiShowResult.quarantined === false);
+
+// True duplication: same name AND same time (extraction error)
+sh['TestTrueDupes'] = { ...mkEntry(), history: buildHistory(20, 5) };
+const trueDupeEvents = [];
+for (let i = 0; i < 15; i++) {
+  trueDupeEvents.push({ name: 'Broken Event', venue_name: 'V', date_local: '2026-03-07', start_time_local: '2026-03-07T20:00:00' });
+}
+for (let i = 0; i < 5; i++) {
+  trueDupeEvents.push({ name: `Other ${i}`, venue_name: 'V', date_local: '2026-03-07', start_time_local: '2026-03-07T19:00:00' });
+}
+const trueDupeResult = checkBaseline('TestTrueDupes', trueDupeEvents);
+check('true duplication: quarantined (same name+time)', trueDupeResult.quarantined === true);
+
 // Clean up
-for (const k of ['TestGuard', 'TestFieldDrift', 'TestDupes', 'TestDates', 'TestNewSource', 'TestVolatile']) {
+for (const k of ['TestGuard', 'TestFieldDrift', 'TestDupes', 'TestDates', 'TestNewSource', 'TestVolatile', 'TestMultiShow', 'TestTrueDupes']) {
   delete sh[k];
 }
 
