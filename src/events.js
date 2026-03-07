@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { SOURCES, SOURCE_TIERS, SOURCE_LABELS, MERGE_ORDER } = require('./source-registry');
+const { SOURCES, SOURCE_TIERS, SOURCE_LABELS, SOURCE_DB_NAMES, MERGE_ORDER } = require('./source-registry');
 const { sourceHealth, saveHealthData, updateSourceHealth, updateScrapeStats, computeEventMix, getHealthStatus: _getHealthStatus } = require('./source-health');
 const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate, parseAsNycTime } = require('./geo');
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues, lookupVenue, lookupVenueSize } = require('./venues');
@@ -316,7 +316,7 @@ try {
   const { getEventsInRange, generateOccurrences, importFromJsonCache, pruneInactiveSources } = require('./db');
   // Auto-import JSON cache on first boot with SQLite
   importFromJsonCache(CACHE_FILE);
-  pruneInactiveSources(SOURCE_LABELS);
+  pruneInactiveSources(SOURCE_DB_NAMES);
   const today = getNycDateString(0);
   const weekOut = getNycDateString(7);
   const dbEvents = getEventsInRange(today, weekOut);
@@ -527,7 +527,7 @@ async function refreshCache() {
       const db = require('./db');
       db.upsertEvents(validEvents);
       db.pruneOldEvents(getNycDateString(-30));
-      db.pruneInactiveSources(SOURCE_LABELS);
+      db.pruneInactiveSources(SOURCE_DB_NAMES);
       // Detect recurring patterns from historical data
       try {
         db.detectRecurringPatterns();

@@ -68,7 +68,7 @@ const SOURCE_EXPECTATIONS = {
 };
 
 // Sources that use LLM extraction (not structured parsers) — skip these
-const EXTRACTED_SOURCES = new Set(['Skint', 'NonsenseNYC', 'Yutori', 'Tavily']);
+const EXTRACTED_SOURCES = new Set(['Skint', 'SkintOngoing', 'ScreenSlate', 'NonsenseNYC', 'Yutori', 'Tavily']);
 
 /**
  * Check field completeness for a single event.

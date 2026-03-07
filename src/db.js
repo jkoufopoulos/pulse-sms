@@ -282,7 +282,7 @@ function deleteEventsBySource(sourceNames) {
 function pruneInactiveSources(activeLabels) {
   const d = getDb();
   const allSources = d.prepare('SELECT DISTINCT source_name FROM events').all().map(r => r.source_name);
-  const activeSet = new Set([...activeLabels, ...activeLabels.map(l => l.toLowerCase())]);
+  const activeSet = new Set(activeLabels);
   const inactive = allSources.filter(s => !activeSet.has(s));
   if (inactive.length === 0) return 0;
   const ph = inactive.map(() => '?').join(', ');

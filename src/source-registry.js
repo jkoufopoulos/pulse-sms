@@ -34,8 +34,8 @@ const SOURCE_TIERS = {
 // ============================================================
 
 const SOURCES = [
-  { label: 'Skint',            fetch: fetchSkintEvents,         weight: 0.9,  mergeRank: 0, endpoint: 'https://theskint.com', minExpected: 5 },
-  { label: 'SkintOngoing',     fetch: fetchSkintOngoingEvents,  weight: 0.9,  mergeRank: 1, endpoint: 'https://theskint.com/ongoing-events/', minExpected: 10 },
+  { label: 'Skint',            fetch: fetchSkintEvents,         weight: 0.9,  mergeRank: 0, endpoint: 'https://theskint.com', minExpected: 5, dbName: 'theskint' },
+  { label: 'SkintOngoing',     fetch: fetchSkintOngoingEvents,  weight: 0.9,  mergeRank: 1, endpoint: 'https://theskint.com/ongoing-events/', minExpected: 10, dbName: 'theskint' },
   { label: 'NonsenseNYC',      fetch: fetchNonsenseNYC,         weight: 0.9,  mergeRank: 1, endpoint: 'https://nonsensenyc.com', minExpected: 10 },
   { label: 'RA',               fetch: fetchRAEvents,            weight: 0.85, mergeRank: 0, endpoint: 'https://ra.co', minExpected: 50 },
   // OhMyRockness removed — 80% loss to dedup/quality gates, only 3 unique events surviving.
@@ -46,7 +46,7 @@ const SOURCES = [
   // SmallsLIVE removed — single-venue jazz, low volume. Scraper preserved at sources/smallslive.js.
   { label: 'Yutori',            fetch: fetchYutoriEvents,        weight: 0.8,  mergeRank: 4, endpoint: null, minExpected: 20 },
   { label: 'ScreenSlate',      fetch: fetchScreenSlateEvents,   weight: 0.9,  mergeRank: 2, endpoint: null, minExpected: 5 },
-  { label: 'NYCParks',         fetch: fetchNYCParksEvents,      weight: 0.75, mergeRank: 0, endpoint: 'https://www.nycgovparks.org/events', minExpected: 15 },
+  { label: 'NYCParks',         fetch: fetchNYCParksEvents,      weight: 0.75, mergeRank: 0, endpoint: 'https://www.nycgovparks.org/events', minExpected: 15, dbName: 'nyc_parks' },
   { label: 'DoNYC',            fetch: fetchDoNYCEvents,         weight: 0.75, mergeRank: 1, endpoint: 'https://donyc.com/events/today', minExpected: 100 },
   { label: 'Songkick',         fetch: fetchSongkickEvents,      weight: 0.75, mergeRank: 2, endpoint: 'https://www.songkick.com/metro-areas/7644-us-new-york/today', minExpected: 20 },
   // Ticketmaster removed — 826 events, 70% Broadway/tourist. Birdland/Blue Note covered by Dice/Songkick.
@@ -80,6 +80,8 @@ validateSources(SOURCES);
 
 // Derived — no manual sync needed
 const SOURCE_LABELS = SOURCES.map(s => s.label);
+// All source_name values that appear in the DB (label, lowercase label, and explicit dbName)
+const SOURCE_DB_NAMES = [...new Set(SOURCES.flatMap(s => [s.label, s.label.toLowerCase(), ...(s.dbName ? [s.dbName] : [])]))];
 
 const ENDPOINT_URLS = Object.fromEntries(
   SOURCES.filter(s => s.endpoint).map(s => [s.label, s.endpoint])
@@ -93,4 +95,4 @@ const SOURCE_EXPECTATIONS = Object.fromEntries(
   SOURCES.map(s => [s.label, { minExpected: s.minExpected || 0, schedule: s.schedule || null }])
 );
 
-module.exports = { SOURCES, SOURCE_TIERS, SOURCE_LABELS, ENDPOINT_URLS, MERGE_ORDER, SOURCE_EXPECTATIONS, validateSources };
+module.exports = { SOURCES, SOURCE_TIERS, SOURCE_LABELS, SOURCE_DB_NAMES, ENDPOINT_URLS, MERGE_ORDER, SOURCE_EXPECTATIONS, validateSources };
