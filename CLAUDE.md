@@ -137,4 +137,6 @@ npm test               # smoke tests (pure functions, no API calls)
 npm run eval:quality   # quality evals on 15 golden conversations (~$0.02, ~30s)
 ```
 
-**Railway:** Simulator at `https://web-production-c8fdb.up.railway.app/test`. Test endpoint: `POST /api/sms/test` with `Body` and optional `From`. Health dashboard: `GET /health`.
+**Railway:** Simulator at `https://web-production-c8fdb.up.railway.app/test`. Test endpoint: `POST /api/sms/test` with `Body` and optional `From`. Health dashboard: `GET /health`. Deploy: `railway up` (async build, ~2-3 min).
+
+**GitHub Pages:** Public site at `https://jkoufopoulos.github.io/pulse-sms/` — landing page, architecture explorer, evals page. Source files live in `site/`. Deployed via `gh-pages` branch. To update: edit files in `site/` on `main`, then sync to `gh-pages` branch and push. Railway's `/architecture` redirects here.

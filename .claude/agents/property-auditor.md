@@ -32,6 +32,15 @@ You audit and update all Pulse SMS public-facing properties to ensure they are a
 - `src/evals-landing.html` — Eval guide
 - `src/digest-ui.html` — Digests
 
+### GitHub Pages (gh-pages branch → jkoufopoulos.github.io/pulse-sms/)
+- Landing page, architecture explorer, evals page
+- Source files live in `site/` on `main`. Deployed via `gh-pages` branch.
+- After updating `site/` files, must sync to `gh-pages`: checkout `gh-pages`, copy `site/*` to root, commit, push.
+
+### GitHub Repo
+- Repo description and homepage URL (check via `gh repo view --json description,homepageUrl`)
+- `README.md` — architecture overview, setup instructions, links
+
 ### Config Files
 - `package.json` — description, homepage, repository
 - `.env.example` — model references, env var docs
@@ -101,3 +110,6 @@ If the user asks you to **fix** issues (not just audit), make the edits directly
 - `src/neighborhoods.js` is the source of truth for neighborhood counts
 - The agent brain uses Gemini with Claude Haiku fallback (not Claude-first)
 - Demo conversations should reflect natural prose, not numbered list format
+- `site/` files deploy to GitHub Pages via `gh-pages` branch — changes to `site/` on main are NOT live until synced to `gh-pages`
+- GitHub repo description and homepage are set via `gh repo edit` — check these too
+- Railway's `/architecture` redirects to GitHub Pages
