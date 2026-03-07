@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bestie — Architecture</title>
+  <title>Pulse — Architecture</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -14,6 +14,7 @@
       --bg: #08070d;
       --bg-card: rgba(255,255,255,0.03);
       --bg-card-hover: rgba(255,255,255,0.05);
+      --border: rgba(255,255,255,0.06);
       --text: #ede9e3;
       --text-dim: #7a756d;
       --text-muted: #4a463f;
@@ -42,1159 +43,1579 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* NAV */
-    nav {
+    /* ── NAV ── */
+    .main-nav {
       position: sticky;
       top: 0;
       z-index: 100;
       backdrop-filter: blur(24px) saturate(1.4);
       -webkit-backdrop-filter: blur(24px) saturate(1.4);
       background: rgba(8,7,13,0.8);
-      border-bottom: 1px solid rgba(255,255,255,0.04);
+      border-bottom: 1px solid var(--border);
     }
-    .nav-inner {
+    .main-nav-inner {
       max-width: var(--max-w);
       margin: 0 auto;
-      padding: 18px 28px;
+      padding: 16px 24px;
       display: flex;
       align-items: center;
       gap: 16px;
     }
     .nav-logo {
       font-family: var(--font-display);
-      font-size: 1.5rem;
       font-weight: 800;
+      font-size: 1.25rem;
       color: var(--coral);
       text-decoration: none;
-      letter-spacing: -0.02em;
     }
     .nav-sep {
+      width: 1px;
+      height: 20px;
+      background: var(--text-muted);
+    }
+    .nav-breadcrumb {
+      font-family: var(--font-body);
+      font-size: 0.9rem;
+      color: var(--text-dim);
+    }
+
+    /* ── SECTION JUMP NAV ── */
+    .jump-nav {
+      position: sticky;
+      top: 57px;
+      z-index: 99;
+      backdrop-filter: blur(24px) saturate(1.4);
+      -webkit-backdrop-filter: blur(24px) saturate(1.4);
+      background: rgba(8,7,13,0.85);
+      border-bottom: 1px solid var(--border);
+    }
+    .jump-nav-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 10px 24px;
+      display: flex;
+      gap: 24px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .jump-nav-inner::-webkit-scrollbar { display: none; }
+    .jump-nav a {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
       color: var(--text-muted);
-      font-size: 1.2rem;
-      font-weight: 300;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: color 0.2s;
+      letter-spacing: 0.03em;
     }
-    .nav-page {
-      font-family: var(--font-display);
-      font-size: 0.88rem;
-      font-weight: 700;
-      color: var(--text-dim);
-      letter-spacing: -0.01em;
-    }
-
-    /* LAYOUT */
-    .container { max-width: var(--max-w); margin: 0 auto; padding: 0 28px; }
-
-    .page-header {
-      padding: 72px 0 48px;
-    }
-    .page-header h1 {
-      font-family: var(--font-display);
-      font-size: clamp(2rem, 4vw, 2.8rem);
-      font-weight: 800;
-      line-height: 1.1;
-      letter-spacing: -0.035em;
-      margin-bottom: 12px;
-    }
-    .page-header h1 em { font-style: normal; color: var(--coral); }
-    .page-header .subtitle {
-      color: var(--text-dim);
-      font-size: 1.05rem;
-      max-width: 600px;
-      line-height: 1.65;
+    .jump-nav a:hover,
+    .jump-nav a.active {
+      color: var(--coral);
     }
 
-    /* SECTIONS */
+    /* ── SECTIONS ── */
+    .container {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 24px;
+    }
     section {
-      padding: 56px 0;
-      border-top: 1px solid rgba(255,255,255,0.04);
+      padding: 80px 0;
+    }
+    section + section {
+      border-top: 1px solid var(--border);
     }
     .section-label {
-      font-family: var(--font-display);
-      text-transform: uppercase;
+      font-family: var(--font-mono);
       font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 0.18em;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
       color: var(--coral);
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
     .section-title {
       font-family: var(--font-display);
-      font-size: clamp(1.4rem, 3vw, 1.8rem);
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      line-height: 1.15;
-      margin-bottom: 20px;
+      font-weight: 700;
+      font-size: 2rem;
+      line-height: 1.2;
+      color: var(--text);
+      margin-bottom: 32px;
     }
-    .section-body {
+    .section-subtitle {
+      font-size: 1.05rem;
       color: var(--text-dim);
-      font-size: 0.92rem;
-      line-height: 1.75;
-      max-width: 700px;
+      margin-bottom: 48px;
+      max-width: 600px;
     }
-    .section-body p + p { margin-top: 12px; }
-    .section-body strong { color: var(--text); font-weight: 600; }
 
-    /* CARDS */
+    /* ── CARDS ── */
     .card {
       background: var(--bg-card);
-      border: 1px solid rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 24px;
-      margin-top: 20px;
+      padding: 28px;
     }
-    .card h3 {
-      font-family: var(--font-display);
-      font-size: 0.95rem;
-      font-weight: 700;
-      margin-bottom: 8px;
-      letter-spacing: -0.01em;
-    }
-    .card p {
-      color: var(--text-dim);
-      font-size: 0.88rem;
-      line-height: 1.65;
-    }
-    .card-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-top: 20px;
+    .card-sm {
+      border-radius: var(--radius-sm);
+      padding: 20px;
     }
 
-    /* FLOW DIAGRAMS */
-    .flow {
-      margin-top: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-      align-items: center;
+    /* ── HERO: PHONE + ANNOTATIONS ── */
+    .hero-layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 40px;
+      align-items: start;
     }
-    .flow-node {
-      padding: 14px 24px;
-      border-radius: var(--radius-sm);
-      font-family: var(--font-mono);
-      font-size: 0.82rem;
-      text-align: center;
-      max-width: 360px;
-      width: 100%;
+
+    /* Phone mockup */
+    .phone {
+      width: 320px;
+      min-height: 560px;
+      background: #111018;
+      border: 2px solid rgba(255,255,255,0.08);
+      border-radius: 40px;
+      padding: 48px 16px 32px;
       position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
     }
-    .flow-node .label {
-      font-family: var(--font-body);
-      font-size: 0.75rem;
-      color: var(--text-dim);
-      margin-top: 4px;
-      font-style: italic;
-    }
-    .flow-arrow {
-      width: 1px;
-      height: 20px;
-      background: rgba(255,255,255,0.12);
-      position: relative;
-    }
-    .flow-arrow::after {
+    .phone::before {
       content: '';
       position: absolute;
-      bottom: 0;
-      left: -3px;
-      border-left: 4px solid transparent;
-      border-right: 4px solid transparent;
-      border-top: 5px solid rgba(255,255,255,0.12);
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80px;
+      height: 6px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 3px;
     }
-    .flow-split {
-      display: flex;
-      gap: 12px;
-      align-items: flex-start;
-      width: 100%;
-      max-width: 460px;
-    }
-    .flow-split .flow-node { flex: 1; }
-
-    .node-coral { background: var(--coral-dim); border: 1px solid rgba(255,107,66,0.2); color: var(--coral); }
-    .node-blue { background: rgba(88,166,255,0.08); border: 1px solid rgba(88,166,255,0.15); color: var(--blue); }
-    .node-green { background: rgba(63,185,80,0.08); border: 1px solid rgba(63,185,80,0.15); color: var(--green); }
-    .node-purple { background: rgba(210,168,255,0.08); border: 1px solid rgba(210,168,255,0.15); color: var(--purple); }
-    .node-yellow { background: rgba(240,136,62,0.08); border: 1px solid rgba(240,136,62,0.15); color: var(--yellow); }
-    .node-dim { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); color: var(--text-dim); }
-
-    /* TABLES */
-    .table-wrap {
-      margin-top: 20px;
-      overflow-x: auto;
-      border-radius: var(--radius);
-      border: 1px solid rgba(255,255,255,0.04);
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.84rem;
-    }
-    thead th {
-      text-align: left;
-      font-family: var(--font-display);
-      font-weight: 700;
-      font-size: 0.75rem;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--text-dim);
-      padding: 12px 16px;
-      background: rgba(255,255,255,0.02);
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-    }
-    tbody td {
-      padding: 10px 16px;
-      border-bottom: 1px solid rgba(255,255,255,0.03);
-      color: var(--text-dim);
-      vertical-align: top;
-    }
-    tbody tr:last-child td { border-bottom: none; }
-    tbody tr:hover { background: rgba(255,255,255,0.02); }
-    .source-name { color: var(--text); font-weight: 600; }
-    .weight-high { color: var(--green); }
-    .weight-mid { color: var(--blue); }
-    .weight-low { color: var(--yellow); }
-
-    /* CODE BLOCKS */
-    .code-block {
-      background: rgba(0,0,0,0.3);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: var(--radius-sm);
-      padding: 16px 20px;
-      font-family: var(--font-mono);
-      font-size: 0.8rem;
-      line-height: 1.7;
-      color: var(--text-dim);
-      overflow-x: auto;
-      margin-top: 16px;
-      white-space: pre;
-    }
-    .code-block .hl { color: var(--coral); }
-    .code-block .hl-blue { color: var(--blue); }
-    .code-block .hl-green { color: var(--green); }
-    .code-block .hl-dim { color: var(--text-muted); }
-
-    /* INLINE MONO */
-    code {
-      font-family: var(--font-mono);
-      font-size: 0.85em;
-      background: rgba(255,255,255,0.05);
-      padding: 2px 6px;
-      border-radius: 4px;
-      color: var(--coral);
-    }
-
-    /* STAT PILLS */
-    .stats {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-top: 16px;
-    }
-    .stat {
-      padding: 8px 16px;
-      border-radius: 100px;
-      font-size: 0.78rem;
-      font-weight: 600;
-      border: 1px solid rgba(255,255,255,0.06);
-      color: var(--text-dim);
-    }
-    .stat em { font-style: normal; color: var(--coral); }
-
-    /* EXAMPLES */
-    .example {
-      background: var(--bg-card);
-      border: 1px solid rgba(255,255,255,0.04);
-      border-radius: var(--radius-sm);
-      padding: 16px 20px;
-      margin-top: 12px;
-    }
-    .example-turn {
-      display: flex;
-      gap: 12px;
-      align-items: baseline;
-      font-size: 0.85rem;
-      padding: 4px 0;
-    }
-    .example-turn + .example-turn { border-top: 1px solid rgba(255,255,255,0.03); padding-top: 8px; margin-top: 4px; }
-    .turn-user {
-      font-weight: 700;
-      color: var(--coral);
-      flex-shrink: 0;
-      min-width: 36px;
-    }
-    .turn-system {
-      font-weight: 700;
-      color: var(--blue);
-      flex-shrink: 0;
-      min-width: 36px;
-    }
-    .turn-msg { color: var(--text); }
-    .turn-route {
-      color: var(--text-muted);
-      font-size: 0.78rem;
-      font-style: italic;
-      margin-left: auto;
-      flex-shrink: 0;
-    }
-
-    /* LAYER LIST */
-    .layer-list {
-      list-style: none;
-      margin-top: 16px;
+    .phone-messages {
       display: flex;
       flex-direction: column;
-      gap: 8px;
-    }
-    .layer-list li {
-      display: flex;
       gap: 12px;
-      align-items: flex-start;
-      font-size: 0.88rem;
-      color: var(--text-dim);
+      min-height: 100%;
     }
-    .layer-num {
-      font-family: var(--font-display);
-      font-weight: 800;
-      font-size: 0.85rem;
-      color: var(--coral);
-      min-width: 20px;
-      flex-shrink: 0;
+    .msg {
+      max-width: 85%;
+      padding: 10px 14px;
+      border-radius: 16px;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      opacity: 0;
+      transform: translateY(12px);
     }
-    .layer-list li strong { color: var(--text); font-weight: 600; }
+    .msg.visible {
+      animation: fadeSlideIn 0.4s ease forwards;
+    }
+    .msg-user {
+      align-self: flex-end;
+      background: var(--coral);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+      font-weight: 500;
+    }
+    .msg-pulse {
+      align-self: flex-start;
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      border-bottom-left-radius: 4px;
+    }
 
-    /* FOOTER */
-    footer {
-      border-top: 1px solid rgba(255,255,255,0.04);
-      padding: 40px 0;
-      margin-top: 40px;
+    @keyframes fadeSlideIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
-    .footer-inner {
-      max-width: var(--max-w);
-      margin: 0 auto;
-      padding: 0 28px;
+
+    /* Annotations sidebar */
+    .annotations {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
+      flex-direction: column;
+      gap: 12px;
+      padding-top: 48px;
     }
-    .footer-brand {
-      font-family: var(--font-display);
-      font-size: 1rem;
-      font-weight: 800;
-      color: var(--coral);
-    }
-    .footer-note {
-      font-size: 0.8rem;
+    .annotation {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      line-height: 1.6;
       color: var(--text-muted);
-    }
-
-    /* COLLAPSIBLE DETAILS */
-    details {
       background: var(--bg-card);
-      border: 1px solid rgba(255,255,255,0.04);
-      border-radius: var(--radius);
-      margin-top: 12px;
-      overflow: hidden;
-      transition: border-color 0.2s;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      white-space: pre-wrap;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      min-height: 60px;
     }
-    details[open] {
-      border-color: rgba(255,255,255,0.08);
+    .annotation.visible {
+      opacity: 1;
+      transform: translateY(0);
     }
-    details summary {
-      padding: 18px 24px;
+    .annotation .ann-highlight {
+      color: var(--coral);
+    }
+    .annotation .ann-dim {
+      color: var(--text-muted);
+    }
+    .annotation .ann-cost {
+      color: var(--green);
+    }
+
+    .replay-btn {
+      margin-top: 20px;
+      padding: 8px 20px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
       cursor: pointer;
+      transition: color 0.2s, border-color 0.2s;
+      align-self: flex-start;
+    }
+    .replay-btn:hover {
+      color: var(--coral);
+      border-color: var(--coral);
+    }
+
+    /* ── FLOW TIMELINE ── */
+    .timeline {
+      position: relative;
+      padding-left: 40px;
+    }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 11px;
+      top: 8px;
+      bottom: 8px;
+      width: 2px;
+      background: var(--border);
+    }
+    .timeline-step {
+      position: relative;
+      margin-bottom: 24px;
+    }
+    .timeline-step:last-child {
+      margin-bottom: 0;
+    }
+    .timeline-dot {
+      position: absolute;
+      left: -40px;
+      top: 20px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--bg);
+      border: 2px solid var(--text-muted);
       display: flex;
       align-items: center;
-      gap: 12px;
-      list-style: none;
-      font-family: var(--font-display);
-      font-size: 0.95rem;
-      font-weight: 700;
-      letter-spacing: -0.01em;
-      user-select: none;
-      transition: background 0.15s;
+      justify-content: center;
     }
-    details summary:hover { background: var(--bg-card-hover); }
-    details summary::-webkit-details-marker { display: none; }
-    details summary::before {
+    .timeline-dot::after {
       content: '';
-      display: inline-block;
-      width: 0;
-      height: 0;
-      border-left: 5px solid var(--text-muted);
-      border-top: 4px solid transparent;
-      border-bottom: 4px solid transparent;
-      flex-shrink: 0;
-      transition: transform 0.2s;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
     }
-    details[open] summary::before {
-      transform: rotate(90deg);
+    .timeline-step.paid .timeline-dot {
+      border-color: var(--coral);
     }
-    details summary .step-label {
+    .timeline-step.paid .timeline-dot::after {
+      background: var(--coral);
+    }
+    .timeline-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 20px 24px;
+      border-left: 3px solid transparent;
+    }
+    .timeline-step.paid .timeline-card {
+      border-left-color: var(--coral);
+    }
+    .timeline-card-header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+    }
+    .timeline-module {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text);
+    }
+    .timeline-meta {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      display: flex;
+      gap: 12px;
+    }
+    .timeline-step.paid .timeline-meta .cost {
       color: var(--coral);
-      font-size: 0.78rem;
-      font-weight: 700;
-      letter-spacing: 0.04em;
     }
-    details summary .step-preview {
+    .timeline-desc {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+    .timeline-card details {
+      margin-top: 12px;
+    }
+    .timeline-card summary {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
       color: var(--text-muted);
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .timeline-card summary:hover {
+      color: var(--coral);
+    }
+
+    /* ── BRAIN: 3-COL GRID ── */
+    .brain-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 20px;
+    }
+    .brain-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+    .brain-panel-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 20px;
+      color: var(--text);
+    }
+
+    /* File tree */
+    .file-tree {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      line-height: 2;
+      color: var(--text-dim);
+    }
+    .file-tree .root {
+      color: var(--coral);
+      font-weight: 500;
+    }
+    .file-tree .child {
+      padding-left: 20px;
+      position: relative;
+    }
+    .file-tree .child::before {
+      content: '';
+      position: absolute;
+      left: 4px;
+      top: 0;
+      bottom: 50%;
+      width: 1px;
+      border-left: 1px solid var(--text-muted);
+    }
+    .file-tree .child::after {
+      content: '';
+      position: absolute;
+      left: 4px;
+      top: 50%;
+      width: 10px;
+      border-top: 1px solid var(--text-muted);
+    }
+    .file-tree .file-note {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+    }
+    .file-tree .lines {
+      color: var(--text-muted);
+      font-size: 0.68rem;
+    }
+
+    /* Tool schemas */
+    .tool-schema {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.8;
+      color: var(--text-dim);
+    }
+    .tool-schema .tool-name {
+      color: var(--blue);
+      font-weight: 500;
+      font-size: 0.8rem;
+      margin-bottom: 4px;
+    }
+    .tool-schema .prop-key {
+      color: var(--text-dim);
+    }
+    .tool-schema .prop-type {
+      color: var(--text-muted);
+    }
+    .tool-schema .prop-highlight {
+      color: var(--coral);
+      font-weight: 500;
+    }
+    .tool-schema .prop-enum {
+      color: var(--purple);
+      font-size: 0.66rem;
+    }
+    .tool-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 16px 0;
+    }
+
+    /* P1 callout */
+    .callout-p1 {
+      margin-top: 20px;
+      padding: 14px 16px;
+      border: 1px solid var(--coral);
+      border-radius: var(--radius-sm);
+      background: var(--coral-dim);
+      font-size: 0.78rem;
+      line-height: 1.6;
+      color: var(--text-dim);
+    }
+    .callout-p1 strong {
+      color: var(--coral);
+      font-weight: 600;
+    }
+
+    /* Fallback chain */
+    .fallback-chain {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.8;
+      color: var(--text-dim);
+    }
+    .fallback-chain .chain-label {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 0.78rem;
+      color: var(--text);
+      margin-bottom: 8px;
+      margin-top: 20px;
+    }
+    .fallback-chain .chain-label:first-child {
+      margin-top: 0;
+    }
+    .fallback-chain .chain-primary {
+      color: var(--green);
+      font-weight: 500;
+    }
+    .fallback-chain .chain-fallback {
+      color: var(--text-muted);
+    }
+    .fallback-chain .chain-arrow {
+      color: var(--text-muted);
+      padding-left: 8px;
+      font-size: 0.68rem;
+    }
+
+    /* ── PROMPT BLOCKS ── */
+    .prompt-block { margin: 16px 0; }
+    .prompt-block summary {
+      font-family: var(--font-mono);
       font-size: 0.82rem;
-      font-weight: 400;
-      font-family: var(--font-body);
-      margin-left: auto;
+      color: var(--coral);
+      cursor: pointer;
+      padding: 12px 16px;
+      background: rgba(255,255,255,0.02);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      list-style: none;
+    }
+    .prompt-block summary::-webkit-details-marker { display: none; }
+    .prompt-block summary::before { content: '+ '; }
+    .prompt-block[open] summary::before { content: '- '; }
+    .prompt-block pre {
+      margin-top: 8px;
+      padding: 16px;
+      background: rgba(255,255,255,0.02);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.6;
+      color: var(--text-dim);
+      overflow-x: auto;
+      white-space: pre-wrap;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    /* ── PIPELINE ── */
+    .pipe-flow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      margin-bottom: 48px;
+    }
+    .pipe-node {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 24px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text);
+      text-align: center;
+      min-width: 280px;
+      max-width: 420px;
+    }
+    .pipe-node-dim {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+    .pipe-arrow {
+      font-size: 1.2rem;
+      color: var(--text-muted);
+      line-height: 1;
+      padding: 4px 0;
+    }
+    .pipe-fork {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+      justify-content: center;
+    }
+    .pipe-fork-branch {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+    .pipe-node-pass {
+      border-color: var(--green);
+      color: var(--green);
+    }
+    .pipe-node-quarantine {
+      border-color: var(--coral);
+      color: var(--coral);
+    }
+    .source-pills-section { margin-top: 48px; }
+    .tier-legend {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .tier-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+    }
+    .tier-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
       flex-shrink: 0;
     }
-    details .detail-body {
-      padding: 0 24px 20px;
+    .source-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 20px;
     }
-    details .detail-body p {
-      color: var(--text-dim);
-      font-size: 0.88rem;
-      line-height: 1.65;
+    .source-pill {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      padding: 6px 12px;
+      border-radius: 20px;
+      white-space: nowrap;
     }
-    details .detail-body p + p { margin-top: 8px; }
-    details .detail-body strong { color: var(--text); font-weight: 600; }
-    details .detail-body ul {
-      padding-left: 20px;
-      color: var(--text-dim);
-      font-size: 0.88rem;
-      line-height: 1.8;
-      margin-top: 8px;
-    }
+    .pill-discovery { background: var(--coral-dim); color: var(--coral); }
+    .pill-niche { background: rgba(210,168,255,0.12); color: var(--purple); }
+    .pill-platform { background: rgba(88,166,255,0.12); color: var(--blue); }
+    .pill-mainstream { background: rgba(255,255,255,0.04); color: var(--text-muted); }
 
-    /* Skill-specific: condition tag */
-    .skill-condition {
-      color: var(--text-muted);
-      font-weight: 400;
+    /* ── SESSIONS ── */
+    .session-iso {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      margin-bottom: 48px;
+    }
+    .session-bubble {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+    .session-phone {
+      font-family: var(--font-mono);
       font-size: 0.82rem;
-      font-family: var(--font-body);
+      color: var(--coral);
+      margin-bottom: 16px;
+    }
+    .session-fields {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 2;
+      color: var(--text-dim);
+    }
+    .session-fields .sf-key { color: var(--text-muted); }
+    .session-fields .sf-val { color: var(--text); }
+    .session-wall {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0 16px;
+      min-width: 60px;
+    }
+    .session-wall-line {
+      width: 2px;
+      flex: 1;
+      background: var(--coral);
+      opacity: 0.3;
+    }
+    .session-wall-label {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      color: var(--coral);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      writing-mode: vertical-lr;
+      text-orientation: mixed;
+      padding: 12px 0;
+      white-space: nowrap;
+    }
+    .session-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .session-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 20px;
+    }
+    .session-card-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .session-card-desc {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      line-height: 1.6;
     }
 
-    /* RESPONSIVE */
-    @media (max-width: 680px) {
-      .card-grid { grid-template-columns: 1fr; }
-      .flow-split { flex-direction: column; align-items: center; }
-      .page-header { padding: 56px 0 36px; }
-      section { padding: 40px 0; }
-      .turn-route { display: none; }
-      .footer-inner { flex-direction: column; gap: 8px; text-align: center; }
+    /* ── COST ── */
+    .cost-bars { margin-bottom: 32px; }
+    .cost-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+    .cost-bar-label {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text);
+      min-width: 80px;
+      text-align: right;
+    }
+    .cost-bar {
+      height: 32px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+    }
+    .cost-bar-ai {
+      background: rgba(88,166,255,0.15);
+      color: var(--blue);
+      border: 1px solid rgba(88,166,255,0.3);
+    }
+    .cost-bar-sms {
+      background: var(--coral-dim);
+      color: var(--coral);
+      border: 1px solid rgba(255,107,66,0.3);
+    }
+    .cost-total {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--text);
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+    .cost-insight {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+    .cost-budget {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text-dim);
+    }
+    .page-footer {
+      text-align: center;
+      padding: 40px 24px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    /* ── SCROLL FADE-IN ── */
+    section .container {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    section.visible .container {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    #hero .container {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      .hero-layout {
+        grid-template-columns: 1fr;
+        gap: 32px;
+      }
+      .phone {
+        width: 100%;
+        max-width: 360px;
+        margin: 0 auto;
+      }
+      .annotations {
+        padding-top: 0;
+      }
+      .brain-grid {
+        grid-template-columns: 1fr;
+      }
+      .section-title {
+        font-size: 1.5rem;
+      }
+      section {
+        padding: 56px 0;
+      }
+      .session-iso {
+        flex-direction: column;
+      }
+      .session-wall {
+        flex-direction: row;
+        writing-mode: horizontal-tb;
+        padding: 12px 0;
+        min-width: auto;
+      }
+      .session-wall-line {
+        width: auto;
+        height: 2px;
+        flex: 1;
+      }
+      .session-wall-label {
+        writing-mode: horizontal-tb;
+        padding: 0 12px;
+      }
+      .session-cards {
+        grid-template-columns: 1fr;
+      }
+      .pipe-fork {
+        flex-direction: column;
+        align-items: center;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .main-nav-inner,
+      .jump-nav-inner {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+      .container {
+        padding: 0 16px;
+      }
+      .phone {
+        max-width: 100%;
+        min-height: 480px;
+        padding: 40px 12px 24px;
+      }
+      .section-title {
+        font-size: 1.25rem;
+      }
+      .section-subtitle {
+        font-size: 0.85rem;
+      }
     }
   </style>
 </head>
 <body>
 
-<nav>
-  <div class="nav-inner">
-    <a href="index.html" class="nav-logo">Bestie</a>
-    <span class="nav-sep">/</span>
-    <span class="nav-page">Architecture</span>
+<!-- ── MAIN NAV ── -->
+<nav class="main-nav">
+  <div class="main-nav-inner">
+    <a href="/" class="nav-logo">Pulse</a>
+    <div class="nav-sep"></div>
+    <span class="nav-breadcrumb">Architecture</span>
   </div>
 </nav>
 
-<!-- Header -->
-<header class="page-header">
-  <div class="container">
-    <h1>How Bestie <em>works</em></h1>
-    <p class="subtitle">A text message comes in. 18 scrapers, a unified AI layer, a tagged event pool, and a 480-character limit later, a recommendation goes out.</p>
+<!-- ── SECTION JUMP NAV ── -->
+<nav class="jump-nav">
+  <div class="jump-nav-inner">
+    <a href="#hero">Live Demo</a>
+    <a href="#flow">Request Flow</a>
+    <a href="#brain">Agent Loop</a>
+    <a href="#pipeline">Pipeline</a>
+    <a href="#sessions">Sessions</a>
+    <a href="#cost">Cost Model</a>
   </div>
-</header>
+</nav>
 
-<!-- 1. System Overview -->
-<section id="overview">
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- SECTION 1: HERO + LIVE CONVERSATION                   -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="hero">
   <div class="container">
-    <p class="section-label">Overview</p>
-    <h2 class="section-title">Text in, picks out</h2>
-    <div class="section-body">
-      <p>Bestie is an SMS-based AI assistant that recommends NYC nightlife and events. A user texts a neighborhood name and gets back curated picks within seconds. The entire experience happens in a single SMS thread &mdash; no app, no account, no links until asked.</p>
-      <p>Behind the scenes, Bestie scrapes <strong>18 event sources</strong> every morning, deduplicates and caches them in memory, then uses a lightweight <strong>pre-router</strong> for mechanical shortcuts and a <strong>unified AI call</strong> (Claude Haiku) for everything semantic &mdash; understanding intent, picking events from a tagged pool, and writing the SMS in a single pass.</p>
-    </div>
+    <div class="section-label">01 / Live Demo</div>
+    <h2 class="section-title">A Real Conversation, Annotated</h2>
+    <p class="section-subtitle">Every SMS to Pulse passes through the same pipeline. Watch a real multi-turn session unfold, and see exactly what happens at each step.</p>
 
-    <div class="stats">
-      <span class="stat"><em>18</em> event sources</span>
-      <span class="stat"><em>36</em> neighborhoods</span>
-      <span class="stat"><em>480</em> char SMS cap</span>
-      <span class="stat"><em>~15%</em> pre-routed (zero AI)</span>
-      <span class="stat"><em>2hr</em> session TTL</span>
+    <div class="hero-layout">
+      <!-- Phone mockup -->
+      <div class="phone" id="phone">
+        <div class="phone-messages" id="phoneMessages"></div>
+      </div>
+
+      <!-- Annotations -->
+      <div class="annotations" id="annotations">
+        <div id="annotationSlots"></div>
+        <button class="replay-btn" id="replayBtn" style="display:none;">Replay conversation</button>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- 2. End-to-End Walkthrough -->
-<section id="walkthrough">
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- SECTION 2: REQUEST FLOW TIMELINE                      -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="flow">
   <div class="container">
-    <p class="section-label">Walkthrough</p>
-    <h2 class="section-title">What happens when you text "williamsburg"</h2>
-    <div class="section-body">
-      <p>Let's trace a single message through the entire system. A user with no session history texts <strong>"williamsburg"</strong> at 7:14 PM on a Friday.</p>
-    </div>
+    <div class="section-label">02 / Request Flow</div>
+    <h2 class="section-title">From SMS to Response in 8 Steps</h2>
+    <p class="section-subtitle">Every message traverses the same pipeline. Only two steps cost money.</p>
 
-    <details open style="margin-top: 24px;">
-      <summary><span class="step-label">Step 1</span> Guard rails <span class="step-preview">&lt;1ms, $0</span></summary>
-      <div class="detail-body">
-        <p><code>handler.js</code> receives the Twilio webhook. Three checks run before any processing:</p>
-        <ul>
-          <li><strong>TCPA check</strong> &mdash; Is this "STOP", "UNSUBSCRIBE", "CANCEL", or "QUIT"? If yes, drop silently (no reply). Twilio manages the opt-out list; we just make sure no response leaks.</li>
-          <li><strong>Dedup</strong> &mdash; Has this MessageSid been seen in the last 5 minutes? Twilio retries on timeout, so this prevents double-processing.</li>
-          <li><strong>Budget</strong> &mdash; Has this phone number spent over $0.10 in AI costs today? If so, send a friendly limit message and stop. Pricing is provider-aware (Haiku input: $1/M tokens, Gemini: $0.10/M).</li>
-        </ul>
-        <p>"williamsburg" passes all three. Cost so far: <strong style="color: var(--green);">$0.00</strong>. Latency: <strong style="color: var(--green);">&lt;1ms</strong>.</p>
-      </div>
-    </details>
+    <div class="timeline">
 
-    <details>
-      <summary><span class="step-label">Step 2</span> Routing &mdash; pre-router miss, unified LLM <span class="step-preview">~400ms, ~$0.001</span></summary>
-      <div class="detail-body">
-        <p><code>pre-router.js</code> checks the message against mechanical shortcuts: help, numbers 1-5, "more", greetings, thanks, bye, impatient follow-ups, and event name matches from session picks. "williamsburg" doesn't match any of these &mdash; it's a semantic request that needs real understanding.</p>
-        <p>The message falls through to the <strong>unified LLM</strong> path. Before calling the LLM, the handler resolves the neighborhood from the message, fetches events, builds a tagged pool, and assembles the full context. The LLM handles intent understanding, event selection, and SMS composition in a single call.</p>
-        <p>The pre-router only handles ~15% of messages &mdash; purely mechanical patterns where no AI is needed. Everything semantic (neighborhoods, categories, vibes, compound queries, off-topic deflection) goes through the unified LLM for better understanding.</p>
-      </div>
-    </details>
-
-    <details>
-      <summary><span class="step-label">Step 3</span> Filter resolution &amp; tagged pool <span class="step-preview">deterministic, $0</span></summary>
-      <div class="detail-body">
-        <p>Before calling the LLM, the handler builds the event context deterministically:</p>
-        <ul>
-          <li><strong>Neighborhood extraction</strong> &mdash; <code>extractNeighborhood("williamsburg")</code> resolves the alias to "Williamsburg" from the 36-neighborhood map, including aliases and landmarks.</li>
-          <li><strong>Filter resolution</strong> &mdash; <code>mergeFilters(session.lastFilters, incoming)</code> compounds active filters. For a first message, filters are empty. On follow-ups like "how about comedy", the category filter is merged with any existing filters.</li>
-          <li><strong>Tagged pool</strong> &mdash; <code>buildTaggedPool(events, activeFilters)</code> tags each event with <code>filter_match: true/false</code>. Matched events come first (up to 10), padded to 15 with unmatched events. The LLM sees <code>[MATCH]</code> tags on matching events but gets the full pool.</li>
-        </ul>
-        <p style="margin-top: 12px;">This is the key architectural decision: <strong>the handler owns all filter state</strong>. The LLM never manages filters &mdash; it just sees a tagged pool and composes from it. Filters persist deterministically across neighborhood switches, nudge accepts, and conversational responses.</p>
-      </div>
-    </details>
-
-    <details>
-      <summary><span class="step-label">Step 4</span> Event fetching &amp; curation <span class="step-preview">14 &rarr; 15 tagged events</span></summary>
-      <div class="detail-body">
-        <p><code>getEvents("Williamsburg")</code> queries the in-memory cache. The cache was built at 10am from 18 scrapers. Events are already deduped and sorted by proximity to Williamsburg's center coordinates.</p>
-        <p>Say it returns 14 events. Before entering the tagged pool, <code>curation.js</code> runs deterministic quality filters:</p>
-        <ul>
-          <li><strong>filterKidsEvents</strong> &mdash; Drops NYC Parks events that match children's patterns ("storytime", "toddler", "ages 3-5"). Without this, Claude would occasionally recommend a toddler puppet show alongside a DJ set.</li>
-          <li><strong>filterIncomplete</strong> &mdash; Drops events below a completeness threshold (missing name, venue, or time). Prevents Claude from recommending "TBA at TBD".</li>
-          <li><strong>validatePerennialActivity</strong> &mdash; Perennial picks (always-good bars/venues) are only included if they have a specific activity tonight (trivia, live jazz, DJ). Removes generic "nice bar" suggestions that don't answer "what's happening tonight?"</li>
-        </ul>
-        <p>After curation: 12 events remain. Plus 2 perennial picks with tonight activities. <code>buildTaggedPool()</code> tags each event as <code>[MATCH]</code> or unmatched based on active filters, then sends up to 15 to the unified LLM (matched first, padded with unmatched). For this filterless first message, all events are unmatched &mdash; the LLM picks freely.</p>
-      </div>
-    </details>
-
-    <details>
-      <summary><span class="step-label">Step 5</span> Prompt assembly <span class="step-preview">5 of 12 skills ON</span></summary>
-      <div class="detail-body">
-        <p><code>buildUnifiedPrompt()</code> assembles the system prompt from the <code>UNIFIED_SYSTEM</code> base plus conditional skill modules. The user prompt includes the tagged event pool (with <code>[MATCH]</code> tags), any active filter context (<code>ACTIVE_FILTER</code>, <code>MATCH_COUNT</code>, <code>SPARSE</code>), conversation history, and the user's message. For this first-message-to-Williamsburg request:</p>
-        <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
-          <div style="display: flex; gap: 8px; align-items: baseline;">
-            <span style="color: var(--green); font-size: 0.82rem; font-weight: 700; min-width: 18px;">ON</span>
-            <span style="color: var(--text); font-weight: 600; font-size: 0.88rem;">core</span>
-            <span style="color: var(--text-dim); font-size: 0.82rem;">&mdash; always included. Persona, format, 480-char limit.</span>
+      <!-- Step 1 -->
+      <div class="timeline-step">
+        <div class="timeline-dot"></div>
+        <div class="timeline-card">
+          <div class="timeline-card-header">
+            <span class="timeline-module">request-guard.js</span>
+            <div class="timeline-meta"><span class="cost">$0</span> <span>&lt;1ms</span></div>
           </div>
-          <div style="display: flex; gap: 8px; align-items: baseline;">
-            <span style="color: var(--green); font-size: 0.82rem; font-weight: 700; min-width: 18px;">ON</span>
-            <span style="color: var(--text); font-weight: 600; font-size: 0.88rem;">sourceTiers</span>
-            <span style="color: var(--text-dim); font-size: 0.82rem;">&mdash; always included. Tells Claude to prefer Skint/Nonsense picks over Eventbrite.</span>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: baseline;">
-            <span style="color: var(--green); font-size: 0.82rem; font-weight: 700; min-width: 18px;">ON</span>
-            <span style="color: var(--text); font-weight: 600; font-size: 0.88rem;">tonightPriority</span>
-            <span style="color: var(--text-dim); font-size: 0.82rem;">&mdash; at least one event is today. Tells Claude: a decent tonight event beats a great tomorrow event.</span>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: baseline;">
-            <span style="color: var(--green); font-size: 0.82rem; font-weight: 700; min-width: 18px;">ON</span>
-            <span style="color: var(--text); font-weight: 600; font-size: 0.88rem;">perennialFraming</span>
-            <span style="color: var(--text-dim); font-size: 0.82rem;">&mdash; batch includes perennial picks. Tells Claude: lead with the activity, not the venue name.</span>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: baseline;">
-            <span style="color: var(--green); font-size: 0.82rem; font-weight: 700; min-width: 18px;">ON</span>
-            <span style="color: var(--text); font-weight: 600; font-size: 0.88rem;">nearbySuggestion</span>
-            <span style="color: var(--text-dim); font-size: 0.82rem;">&mdash; nearby hoods provided. Claude can suggest Greenpoint/Bushwick if picks are thin.</span>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: baseline;">
-            <span style="color: var(--text-muted); font-size: 0.82rem; font-weight: 700; min-width: 18px;">off</span>
-            <span style="color: var(--text-muted); font-weight: 600; font-size: 0.88rem;">neighborhoodMismatch</span>
-            <span style="color: var(--text-muted); font-size: 0.82rem;">&mdash; events ARE in Williamsburg, so no mismatch disclaimer needed.</span>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: baseline;">
-            <span style="color: var(--text-muted); font-size: 0.82rem; font-weight: 700; min-width: 18px;">off</span>
-            <span style="color: var(--text-muted); font-weight: 600; font-size: 0.88rem;">freeEmphasis / activityAdherence / conversationAwareness</span>
-            <span style="color: var(--text-muted); font-size: 0.82rem;">&mdash; no filters, no activity keyword, no history.</span>
-          </div>
-        </div>
-        <p style="margin-top: 12px;">The assembled prompt is ~800 tokens. Without the skills system, the prompt would always include every instruction (~1,400 tokens), wasting context on irrelevant rules and sometimes confusing Claude. For example, including "ACTIVITY ADHERENCE" when the user didn't ask for a specific activity caused Claude to over-filter and return fewer picks.</p>
-      </div>
-    </details>
-
-    <details>
-      <summary><span class="step-label">Step 6</span> Unified LLM call <span class="step-preview">~800ms, ~$0.001</span></summary>
-      <div class="detail-body">
-        <p><code>unifiedRespond()</code> sends the assembled system prompt (base + skills), the tagged event pool, filter context, conversation history, and the user's message to <strong>Claude Haiku</strong> in a single call. Claude understands the intent, picks 2-3 events from the pool, and writes the SMS text &mdash; all in one pass.</p>
-        <p>Claude returns structured JSON:</p>
-        <div class="code-block" style="margin-top: 8px;">{
-  "type": "event_picks",
-  "sms_text": "Tonight in Williamsburg:\n\n1) DJ set at Good Room — always goes off on Fridays. 10pm, $15\n\n2) Indie at Baby's All Right — solid lineup tonight. 8pm, $18\n\n3) Free comedy at Muchmore's — underground standup, BYOB vibes. 9pm\n\nReply 1-3 for details or MORE for extra picks",
-  "picks": [
-    { "rank": 1, "event_id": "dice-good-room-0221", "why": "reliable Friday DJ night" },
-    { "rank": 2, "event_id": "bv-babys-0221", "why": "strong indie lineup" },
-    { "rank": 3, "event_id": "skint-muchmores-0221", "why": "free comedy, unique" }
-  ],
-  "clear_filters": false
-}</div>
-        <p>The output contract is minimal: <code>type</code>, <code>sms_text</code>, <code>picks</code>, and <code>clear_filters</code>. All other state (neighborhood, filters, pending context) is derived deterministically by the handler &mdash; the LLM never reports state, only text and event selections.</p>
-        <p>Cost: ~$0.001 (Haiku, single call). Latency: ~800ms. This is cheaper than the old two-call flow (route + compose) because everything happens in one pass.</p>
-      </div>
-    </details>
-
-    <details>
-      <summary><span class="step-label">Step 7</span> Send, save &amp; persist filters <span class="step-preview">289 of 480 chars</span></summary>
-      <div class="detail-body">
-        <p>The SMS text (289 characters, under the 480-char cap) is sent via Twilio. The handler saves the session atomically via <code>saveResponseFrame()</code> &mdash; picks, event map, neighborhood, and <strong>active filters</strong>. Filters are persisted deterministically by the handler, not from the LLM's output. A JSONL trace captures the full request for evals.</p>
-        <p>Now when the user texts <strong>"2"</strong>, the pre-router matches it as <code>intent: "details"</code>, looks up pick #2 (Baby's All Right) from <code>session.lastPicks</code>, and sends the full event details with a link. No AI call needed ($0).</p>
-        <p>When they text <strong>"how about comedy"</strong>, it falls through to the unified LLM. The handler merges <code>{ category: "comedy" }</code> with any existing filters, builds a new tagged pool with comedy events marked <code>[MATCH]</code>, and the LLM composes picks that prefer the matches (~$0.001).</p>
-      </div>
-    </details>
-
-    <div class="card">
-      <h3>Total cost &amp; timing</h3>
-      <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 4px;">
-        <div>
-          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">~$0.001</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">AI cost (1 unified Haiku call)</div>
-        </div>
-        <div>
-          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">~1.2s</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">total latency</div>
-        </div>
-        <div>
-          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">1</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">AI call (unified)</div>
-        </div>
-        <div>
-          <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--coral);">289</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">chars (of 480 max)</div>
+          <p class="timeline-desc">TCPA opt-out, Twilio dedup, per-user AI budget ($0.10/day)</p>
         </div>
       </div>
+
+      <!-- Step 2 -->
+      <div class="timeline-step">
+        <div class="timeline-dot"></div>
+        <div class="timeline-card">
+          <div class="timeline-card-header">
+            <span class="timeline-module">handler.js</span>
+            <div class="timeline-meta"><span class="cost">$0</span> <span>&lt;1ms</span></div>
+          </div>
+          <p class="timeline-desc">Orchestrator: routes to checkMechanical, then handleAgentRequest</p>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="timeline-step">
+        <div class="timeline-dot"></div>
+        <div class="timeline-card">
+          <div class="timeline-card-header">
+            <span class="timeline-module">checkMechanical</span>
+            <div class="timeline-meta"><span class="cost">$0</span> <span>&lt;1ms</span></div>
+          </div>
+          <p class="timeline-desc">Pattern match for help + TCPA keywords only. ~99% pass-through.</p>
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="timeline-step">
+        <div class="timeline-dot"></div>
+        <div class="timeline-card">
+          <div class="timeline-card-header">
+            <span class="timeline-module">agent-loop.js</span>
+            <div class="timeline-meta"><span class="cost">$0</span> <span>&lt;1ms</span></div>
+          </div>
+          <p class="timeline-desc">handleAgentRequest: orchestrates runAgentLoop, executeTool callback, saveSessionFromToolCalls</p>
+        </div>
+      </div>
+
+      <!-- Step 5 (PAID) -->
+      <div class="timeline-step paid">
+        <div class="timeline-dot"></div>
+        <div class="timeline-card">
+          <div class="timeline-card-header">
+            <span class="timeline-module">llm.js <span style="font-size:0.68rem;color:var(--text-muted)">(runAgentLoop)</span></span>
+            <div class="timeline-meta"><span class="cost">~$0.001</span> <span>2-5s</span></div>
+          </div>
+          <p class="timeline-desc">Multi-turn tool calling loop (max 3 iterations). Model calls <code>search_events</code> or <code>respond</code>, gets results, decides next action or writes plain text SMS.</p>
+          <details>
+            <summary>View system prompt &#8595;</summary>
+            <p style="padding:12px 0 0; font-size:0.78rem; color:var(--text-dim);"><a href="#prompts" style="color:var(--coral); text-decoration:none;">See full prompts below &#8595;</a></p>
+          </details>
+        </div>
+      </div>
+
+      <!-- Step 6 -->
+      <div class="timeline-step">
+        <div class="timeline-dot"></div>
+        <div class="timeline-card">
+          <div class="timeline-card-header">
+            <span class="timeline-module">brain-execute.js</span>
+            <div class="timeline-meta"><span class="cost">$0</span> <span>&lt;50ms</span></div>
+          </div>
+          <p class="timeline-desc">Executes search_events: builds event pool, applies filters, resolves dates. Result fed back into agent loop.</p>
+        </div>
+      </div>
+
+      <!-- Step 7 -->
+      <div class="timeline-step">
+        <div class="timeline-dot"></div>
+        <div class="timeline-card">
+          <div class="timeline-card-header">
+            <span class="timeline-module">saveSessionFromToolCalls + saveResponseFrame</span>
+            <div class="timeline-meta"><span class="cost">$0</span> <span>&lt;1ms</span></div>
+          </div>
+          <p class="timeline-desc">Atomic session write. Tool call params become session state (P1). One save path (P4).</p>
+        </div>
+      </div>
+
+      <!-- Step 8 (PAID) -->
+      <div class="timeline-step paid">
+        <div class="timeline-dot"></div>
+        <div class="timeline-card">
+          <div class="timeline-card-header">
+            <span class="timeline-module">twilio.js</span>
+            <div class="timeline-meta"><span class="cost">$0.008</span></div>
+          </div>
+          <p class="timeline-desc">SMS delivered to user's phone</p>
+        </div>
+      </div>
+
     </div>
   </div>
 </section>
 
-<!-- 3. Data Pipeline -->
-<section id="data-pipeline">
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- SECTION 3: AGENT LOOP DEEP DIVE                       -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="brain">
   <div class="container">
-    <p class="section-label">Data Pipeline</p>
-    <h2 class="section-title">Daily scrape, in-memory cache</h2>
-    <div class="section-body">
-      <p>Every morning at 10am ET, Bestie runs all 18 scrapers in parallel. Each scraper extracts structured event data from its source &mdash; parsing HTML, hitting APIs, or using Claude to extract from newsletters. Events are deduped across sources (hashed by name + venue + date), ranked by source trust weight, and cached in memory. No scraping happens in the hot request path.</p>
+    <div class="section-label">03 / Agent Loop</div>
+    <h2 class="section-title">Two Tools, One Agent Loop</h2>
+    <p class="section-subtitle">The agent loop is a multi-turn tool calling loop (max 3 iterations). The model calls tools, gets results, and writes plain text SMS when ready. No regex. No intent classifiers.</p>
+
+    <div class="brain-grid">
+
+      <!-- Panel 1: File Split -->
+      <div class="brain-panel">
+        <div class="brain-panel-title">5-File Split</div>
+        <div class="file-tree">
+          <div class="root">agent-brain.js</div>
+          <div style="padding-left:8px; color:var(--text-muted); font-size:0.68rem;">checkMechanical only <span class="lines">~21 lines</span></div>
+          <div class="child">agent-loop.js</div>
+          <div style="padding-left:28px; color:var(--text-muted); font-size:0.68rem;">orchestrator <span class="lines">~300 lines</span></div>
+          <div class="child">llm.js</div>
+          <div style="padding-left:28px; color:var(--text-muted); font-size:0.68rem;">runAgentLoop + LLM interface</div>
+          <div class="child">brain-llm.js</div>
+          <div style="padding-left:28px; color:var(--text-muted); font-size:0.68rem;">tool definitions + system prompt <span class="lines">~238 lines</span></div>
+          <div class="child">brain-execute.js</div>
+          <div style="padding-left:28px; color:var(--text-muted); font-size:0.68rem;">pool building + filters <span class="lines">~424 lines</span></div>
+        </div>
+        <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border); font-family:var(--font-mono); font-size:0.68rem; color:var(--text-muted); line-height:1.7;">
+          No circular deps.<br>
+          agent-loop.js is the orchestrator.<br>
+          llm.js runs the multi-turn loop.
+        </div>
+      </div>
+
+      <!-- Panel 2: Tool Schemas -->
+      <div class="brain-panel">
+        <div class="brain-panel-title">2 Tools</div>
+        <div class="tool-schema">
+          <div class="tool-name">search_events</div>
+          <div>&nbsp;&nbsp;<span class="prop-key">neighborhood</span> <span class="prop-type">string</span></div>
+          <div>&nbsp;&nbsp;<span class="prop-key">category</span> <span class="prop-type">enum</span></div>
+          <div style="padding-left:16px;"><span class="prop-enum">comedy, jazz, live_music, dj, trivia, film, theater, art, dance, community, food_drink, spoken_word, classical, nightlife</span></div>
+          <div>&nbsp;&nbsp;<span class="prop-key">categories</span> <span class="prop-type">array</span></div>
+          <div>&nbsp;&nbsp;<span class="prop-key">free_only</span> <span class="prop-type">boolean</span></div>
+          <div>&nbsp;&nbsp;<span class="prop-key">time_after</span> <span class="prop-type">string</span> <span class="prop-enum">HH:MM</span></div>
+          <div>&nbsp;&nbsp;<span class="prop-key">date_range</span> <span class="prop-type">enum</span></div>
+          <div style="padding-left:16px;"><span class="prop-enum">today, tomorrow, this_weekend, this_week, next_week</span></div>
+          <div>&nbsp;&nbsp;<span class="prop-highlight">intent</span> <span class="prop-type">enum</span></div>
+          <div style="padding-left:16px;"><span class="prop-enum">new_search, refine, pivot, more, details</span></div>
+          <div>&nbsp;&nbsp;<span class="prop-key">pick_reference</span> <span class="prop-type">string</span></div>
+
+          <hr class="tool-divider">
+
+          <div class="tool-name">respond</div>
+          <div>&nbsp;&nbsp;<span class="prop-key">message</span> <span class="prop-type">string</span> <span class="prop-enum">max 480 chars</span></div>
+          <div>&nbsp;&nbsp;<span class="prop-key">intent</span> <span class="prop-type">enum</span></div>
+          <div style="padding-left:16px;"><span class="prop-enum">greeting, thanks, farewell, off_topic, clarify, acknowledge</span></div>
+        </div>
+
+        <div class="callout-p1">
+          <strong>P1:</strong> Tool call params ARE the state. Filters, intent, and neighborhood come from structured tool calls — never parsed from free text.
+        </div>
+      </div>
+
+      <!-- Panel 3: Fallback Chain -->
+      <div class="brain-panel">
+        <div class="brain-panel-title">Fallback Chain</div>
+        <div class="fallback-chain">
+          <div class="chain-label">Agent Loop</div>
+          <div><span class="chain-primary">Gemini 2.5 Flash Lite</span></div>
+          <div style="padding-left:8px; font-size:0.66rem; color:var(--text-muted);">(tool calling + SMS composition in one loop)</div>
+          <div class="chain-arrow">&#8595; failure</div>
+          <div><span class="chain-fallback">Claude Haiku 4.5</span></div>
+          <div style="padding-left:8px; font-size:0.66rem; color:var(--text-muted);">(same agent loop, different provider)</div>
+        </div>
+      </div>
+
     </div>
 
-    <div class="flow">
-      <div class="flow-node node-yellow">10am ET &mdash; daily cron trigger</div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-blue">
-        sources/ &mdash; 18 scrapers in parallel
-        <div class="label">Skint, RA, Dice, Eventbrite, Songkick, BrooklynVegan, NYC Parks, Nonsense NYC, Oh My Rockness, DoNYC, BAM, SmallsLIVE, NYPL, Ticketmaster, Yutori, Tavily</div>
-      </div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-green">
-        venues.js &mdash; auto-learn coordinates
-        <div class="label">Sources with lat/lng teach the shared venue map</div>
-      </div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-purple">
-        events.js &mdash; dedup, rank, cache
-        <div class="label">Cross-source dedup by name+venue+date. Higher-trust source wins.</div>
-      </div>
+    <!-- System Prompts -->
+    <div id="prompts" style="margin-top: 56px;">
+      <h3 style="font-family:var(--font-display); font-weight:700; font-size:1.3rem; margin-bottom:24px; color:var(--text);">System Prompts</h3>
+
+      <details class="prompt-block">
+        <summary>BRAIN_SYSTEM &mdash; Agent loop system prompt (dynamic, session-aware)</summary>
+        <pre>You are the routing brain for Pulse, an NYC nightlife SMS bot.
+Your job: understand what the user wants, call the right tool, and &mdash; when you receive event results back &mdash; write a warm, opinionated SMS with picks directly as plain text.
+
+CRITICAL RULE: When a user mentions ANY neighborhood name, borough name, or NYC location &mdash; ALWAYS call search_events. A bare neighborhood name like "williamsburg" or "LES" means "show me events there." This is the most common message type.
+
+TOOLS:
+- search_events: User wants events OR wants to interact with previously shown events. Call this for: neighborhoods, categories, time filters, "more" / "what else", detail requests (numbers, event names, "tell me about..."), and anything event-related. When in doubt, prefer search_events over respond.
+- respond: ONLY for pure conversational messages with zero event intent: greetings ("hey"), thanks ("thanks!"), farewells ("bye"), or clearly off-topic questions. Write a brief warm SMS (max 480 chars).
+
+EXAMPLES:
+- "williamsburg" &rarr; search_events(neighborhood: "Williamsburg", intent: "new_search")
+- "bushwick" &rarr; search_events(neighborhood: "Bushwick", intent: "new_search")
+- "LES" &rarr; search_events(neighborhood: "Lower East Side", intent: "new_search")
+- "brooklyn" &rarr; search_events(neighborhood: "Brooklyn", intent: "new_search")
+- "what's happening tonight" &rarr; search_events(date_range: "today", intent: "new_search")
+- "comedy" &rarr; search_events(category: "comedy", intent: "new_search")
+- "free stuff in greenpoint" &rarr; search_events(neighborhood: "Greenpoint", free_only: true, intent: "new_search")
+- "cool stuff this weekend" &rarr; search_events(date_range: "this_weekend", intent: "new_search")
+- "music and trivia" &rarr; search_events(categories: ["live_music", "trivia"], intent: "new_search")
+- "how about comedy" &rarr; search_events(category: "comedy", intent: "refine")
+- "later in the week" &rarr; search_events(date_range: "this_week", intent: "refine")
+- "try bushwick" (with existing categories) &rarr; search_events(neighborhood: "Bushwick", intent: "refine")
+- "actually trivia in greenpoint" &rarr; search_events(neighborhood: "Greenpoint", category: "trivia", intent: "pivot")
+- "forget the comedy" &rarr; search_events(intent: "pivot")
+- "more" &rarr; search_events(intent: "more")
+- "what else" &rarr; search_events(intent: "more")
+- "2" &rarr; search_events(intent: "details", pick_reference: "2")
+- "tell me about the comedy one" &rarr; search_events(intent: "details", pick_reference: "the comedy one")
+- "thanks!" &rarr; respond(message: "Enjoy your night! Text me anytime.", intent: "thanks")
+- "hey" &rarr; respond(message: "Hey! Drop a neighborhood or tell me what you're in the mood for.", intent: "greeting")
+- "yes" / "yeah" / "sure" (with pending suggestion) &rarr; search_events with the suggested neighborhood
+
+MULTI-CATEGORY: When the user mentions 2+ categories ("music and trivia", "comedy or art"), use the categories array. For single categories, use the category field. Do not use both.
+
+INTENT RULES for search_events:
+- "new_search": First message with no prior session context, or user explicitly starting over
+- "refine": Adding/changing a filter while keeping others. Includes neighborhood switches.
+- "pivot": Explicitly changing what they're looking for ("forget the comedy", "actually trivia instead")
+- "more": User wants more picks from the same search ("more", "what else", "next")
+- "details": User is asking about a specific event from the last batch. Set pick_reference to however they referenced it.
+- When switching neighborhoods, prefer "refine" so categories/time filters persist
+- When switching categories/topics, prefer "pivot" so stale filters are cleared
+
+NEIGHBORHOOD RESOLUTION:
+- Valid neighborhoods: Williamsburg, Bushwick, Greenpoint, ... and 72 more (75 total across five boroughs).
+- Common aliases: LES = Lower East Side, UES = Upper East Side, etc.
+- Borough names (Brooklyn, Queens, Manhattan, Bronx, Staten Island) &rarr; pass as neighborhood
+
+DATE RANGE:
+- "tonight" / "today" &rarr; "today"
+- "tomorrow" &rarr; "tomorrow"
+- "this weekend" &rarr; "this_weekend"
+- "this week" &rarr; "this_week"
+- "next week" &rarr; "next_week"
+
+SESSION CONTEXT:
+${sessionContext}${historyBlock}
+
+AFTER TOOL EXECUTION:
+When you call search_events and receive event results back, write the SMS response directly as plain text.
+
+COMPOSE RULES:
+- Write natural, conversational prose &mdash; NOT a numbered list.
+- Prefer TODAY over tomorrow. Prefer soonest events.
+- Favor discovery: lead with source_vibe:"discovery" events, intimate venues, interesting one-offs.
+- EVERY pick MUST include: event name, venue name, your opinionated take, start time, and price
+- Under 480 characters total. No URLs.
+- Voice: friend texting. Opinionated, concise, warm.</pre>
+      </details>
+
+      <details class="prompt-block">
+        <summary>DETAILS_SYSTEM &mdash; Event detail composition</summary>
+        <pre>&lt;role&gt;
+You are Pulse: an NYC "plugged-in friend" texting about a spot you recommended. Write like a real person &mdash; warm, opinionated, concise. Never robotic.
+&lt;/role&gt;
+
+&lt;content_priority&gt;
+Include details in this order. If you're running long, cut from the bottom:
+1. Vibe / what makes it worth going (lead with this)
+2. Time (tonight at 9, doors at 10, etc.)
+3. Price or "free"
+4. URL (always include if provided)
+5. Address (only if space remains)
+&lt;/content_priority&gt;
+
+&lt;constraints&gt;
+CHARACTER LIMIT: 480 characters. This will be sent as SMS.
+Return only plain text. No JSON, no quotes, no preamble. Just the message itself.
+Do not use list format or bullet points. Write one natural paragraph like a text from a friend.
+Do not include Yelp URLs of any kind.
+&lt;/constraints&gt;
+
+&lt;examples&gt;
+INPUT:
+Event: Jazz Night at Smalls Jazz Club, West Village, tonight 9:30pm, $20 cover
+URL: https://smallslive.com/events/tonight
+
+OUTPUT:
+Smalls is one of those legendary jazz spots &mdash; tiny basement, incredible players, always a good crowd. Tonight at 9:30, $20 cover but worth every penny. https://smallslive.com/events/tonight
+(178 chars)
+&lt;/examples&gt;</pre>
+      </details>
+
+      <details class="prompt-block">
+        <summary>EXTRACTION_PROMPT &mdash; Scrape-time event extraction (used by 4 sources)</summary>
+        <pre>&lt;role&gt;
+You are an Event Extractor for Pulse (NYC). Convert messy source text into normalized event records.
+&lt;/role&gt;
+
+&lt;rules&gt;
+VENUES vs EVENTS
+- If a venue hosts a specific event, extract the EVENT with the venue as venue_name.
+- Source text may include bars, restaurants, game spots, pool halls, arcades, or other venues.
+
+SOURCE URLs
+- Raw text may contain [Source: URL] markers before each item.
+- Always prefer per-item [Source: URL] over the top-level source_url input.
+
+TRUTH + SAFETY
+- Extract only what is explicitly present in the source text.
+- Do not guess venues, neighborhoods, prices, or descriptions.
+- If a field is missing, set it null.
+
+DATE RESOLUTION
+- The retrieval timestamp (retrieved_at_nyc) tells you today's date and day of week.
+- If the text contains explicit date headers, use that exact date for events in that section.
+- "today"/"tonight" &rarr; use retrieved_at_nyc date.
+- Always set date_local to the resolved YYYY-MM-DD. If you cannot resolve the date, set date_local null.
+
+EXTRACTION CONFIDENCE SCALE
+- 0.9+: name + date/time + location clearly present
+- 0.7&ndash;0.85: name + (date OR time window) + partial location
+- 0.4&ndash;0.65: name is clear but time/location ambiguous
+- &lt; 0.4: too ambiguous; set needs_review to true
+
+RECURRENCE DETECTION
+- If the source text describes a recurring event ("every Tuesday", "weekly"),
+  set is_recurring to true and extract recurrence_day and recurrence_time.
+
+DEDUPE HINT
+- If multiple items describe the same event, output them separately; downstream will dedupe.
+&lt;/rules&gt;
+
+&lt;output_format&gt;
+Return STRICT JSON with an array of events:
+{
+  "events": [
+    {
+      "source_name": "string",
+      "source_url": "string or null",
+      "name": "string",
+      "description_short": "1-2 sentence description",
+      "venue_name": "string or null",
+      "neighborhood": "string or null",
+      "category": "art|nightlife|live_music|comedy|community|food_drink|theater|other",
+      "start_time_local": "ISO datetime or null",
+      "date_local": "YYYY-MM-DD or null",
+      "is_free": "boolean or null",
+      "price_display": "string or null",
+      "extraction_confidence": 0.0,
+      "needs_review": false,
+      "is_recurring": "boolean",
+      "recurrence_day": "monday|...|sunday or null",
+      "recurrence_time": "HH:MM (24hr) or null"
+    }
+  ]
+}
+&lt;/output_format&gt;
+
+&lt;examples&gt;
+INPUT (Skint-style newsletter):
+source_name: theskint
+raw_text: "FREE: DJ Honeypot at Mood Ring (Bushwick) tonight 10pm-2am. $5 suggested donation."
+
+OUTPUT:
+{
+  "events": [{
+    "source_name": "theskint",
+    "name": "DJ Honeypot",
+    "venue_name": "Mood Ring",
+    "neighborhood": "Bushwick",
+    "category": "nightlife",
+    "date_local": "2026-02-15",
+    "is_free": true,
+    "price_display": "$5 suggested donation",
+    "extraction_confidence": 0.9
+  }]
+}
+&lt;/examples&gt;</pre>
+      </details>
     </div>
+
   </div>
 </section>
 
-<!-- 3. Message Flow -->
-<section id="message-flow">
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- SECTION 4: DATA PIPELINE                              -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="pipeline">
   <div class="container">
-    <p class="section-label">Message Flow</p>
-    <h2 class="section-title">Two paths, seven layers</h2>
-    <div class="section-body">
-      <p>Each message takes one of two paths. ~15% are <strong>mechanical shortcuts</strong> (help, numbers, "more", greetings) handled instantly by the pre-router with zero AI cost. The other ~85% go through the <strong>unified LLM path</strong> where a single Claude Haiku call handles intent, event selection, and SMS composition. Not every layer runs on every request &mdash; "details" only needs the session, "more" reuses the existing pool.</p>
+    <div class="section-label">04 / Pipeline</div>
+    <h2 class="section-title">22 Sources, One Cache</h2>
+    <p class="section-subtitle">Every day at 10am ET, 19 scrapers run in parallel. Events pass through quality gates, get geocoded, and land in a single JSON cache.</p>
+
+    <div class="pipe-flow">
+      <div class="pipe-node">10am ET cron trigger</div>
+      <div class="pipe-arrow">&darr;</div>
+      <div class="pipe-node">source-registry.js<div class="pipe-node-dim">22 entries across 19 modules</div></div>
+      <div class="pipe-arrow">&darr;</div>
+      <div class="pipe-node">19 scrapers (parallel)<div class="pipe-node-dim">4 use LLM extraction, 15 parse structured APIs</div></div>
+      <div class="pipe-arrow">&darr;</div>
+      <div class="pipe-node">scrape-guard.js<div class="pipe-node-dim">4 checks: count, coverage, date, dupes</div></div>
+      <div class="pipe-arrow">&darr;</div>
+      <div class="pipe-fork">
+        <div class="pipe-fork-branch">
+          <div class="pipe-node pipe-node-pass">Pass</div>
+          <div class="pipe-arrow" style="color:var(--green);">&darr;</div>
+        </div>
+        <div class="pipe-fork-branch">
+          <div class="pipe-node pipe-node-quarantine">Quarantine</div>
+          <div style="font-family:var(--font-mono); font-size:0.68rem; color:var(--text-muted); padding-top:8px;">logged, not served</div>
+        </div>
+      </div>
+      <div class="pipe-node">merge + cross-source dedup<div class="pipe-node-dim">ID = hash(name + venue + date). Higher-weight source wins.</div></div>
+      <div class="pipe-arrow">&darr;</div>
+      <div class="pipe-node">geocode + source vibe stamp<div class="pipe-node-dim">venues.js auto-learns coords. events.js stamps SOURCE_VIBE tier.</div></div>
+      <div class="pipe-arrow">&darr;</div>
+      <div class="pipe-node" style="border-color:var(--coral);">data/events-cache.json<div class="pipe-node-dim">isCacheFresh() skips re-scrape if &lt;20hr old</div></div>
     </div>
 
-    <div class="flow">
-      <div class="flow-node node-coral">
-        <strong>1. Incoming SMS</strong>
-        <div class="label">Twilio webhook delivers the message to handler.js</div>
-      </div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-dim">
-        <strong>2. Guard rails</strong>
-        <div class="label">TCPA opt-out &rarr; dedup (5min MessageSid cache) &rarr; $0.10/day AI budget</div>
-      </div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-blue">
-        <strong>3. Pre-router</strong>
-        <div class="label">Mechanical shortcuts (~15%): help, numbers 1-5, "more", greetings, event name match. $0.</div>
-      </div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-green">
-        <strong>4. Filter resolution &amp; tagged pool</strong>
-        <div class="label">mergeFilters() &rarr; getEvents() &rarr; curation &rarr; buildTaggedPool() with [MATCH] tags. $0.</div>
-      </div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-yellow">
-        <strong>5. Prompt assembly</strong>
-        <div class="label">UNIFIED_SYSTEM base + conditional skill modules + ACTIVE_FILTER/SPARSE context</div>
-      </div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-purple">
-        <strong>6. Unified LLM call</strong>
-        <div class="label">Claude Haiku: intent + event selection + SMS text in one pass. ~$0.001.</div>
-      </div>
-      <div class="flow-arrow"></div>
-      <div class="flow-node node-coral">
-        <strong>7. Send, save &amp; persist filters</strong>
-        <div class="label">SMS via Twilio &rarr; saveResponseFrame() (picks, filters, neighborhood) &rarr; JSONL trace</div>
-      </div>
-    </div>
-  </div>
-</section>
+    <div class="source-pills-section">
+      <h3 style="font-family:var(--font-display); font-weight:700; font-size:1.1rem; margin-bottom:16px; color:var(--text);">Source Coverage</h3>
 
-<!-- 4. Routing & Filters -->
-<section id="routing">
-  <div class="container">
-    <p class="section-label">Routing</p>
-    <h2 class="section-title">Pre-router + unified LLM</h2>
-    <div class="section-body">
-      <p>The <strong>pre-router</strong> handles only mechanical shortcuts &mdash; patterns that need zero semantic understanding. Everything else goes through a <strong>single unified Claude Haiku call</strong> that handles intent, event selection, and SMS composition in one pass. Filter state is owned entirely by the handler, not the LLM.</p>
-    </div>
+      <div class="tier-legend">
+        <div class="tier-legend-item"><div class="tier-dot" style="background:var(--coral);"></div><span style="color:var(--coral);">Discovery</span></div>
+        <div class="tier-legend-item"><div class="tier-dot" style="background:var(--purple);"></div><span style="color:var(--purple);">Niche</span></div>
+        <div class="tier-legend-item"><div class="tier-dot" style="background:var(--blue);"></div><span style="color:var(--blue);">Platform</span></div>
+        <div class="tier-legend-item"><div class="tier-dot" style="background:var(--text-muted);"></div><span style="color:var(--text-muted);">Mainstream</span></div>
+      </div>
 
-    <div class="card-grid">
-      <div class="card">
-        <h3>Pre-router (~15%, $0)</h3>
-        <p>Mechanical shortcuts only: help, numbers 1-5 for details, "more" for next batch, greetings/thanks/bye, event name match from session, impatient follow-ups ("hello??"), and explicit filter clearing ("forget the comedy").</p>
+      <div class="source-pills">
+        <span class="source-pill pill-discovery">Skint (0.9)</span>
+        <span class="source-pill pill-discovery">SkintOngoing (0.9)</span>
+        <span class="source-pill pill-discovery">NonsenseNYC (0.9)</span>
+        <span class="source-pill pill-discovery">Yutori (0.8)</span>
+        <span class="source-pill pill-discovery">ScreenSlate (0.9)</span>
+        <span class="source-pill pill-discovery">BKMag (0.9)</span>
+        <span class="source-pill pill-niche">RA (0.85)</span>
+        <span class="source-pill pill-niche">Dice (0.8)</span>
+        <span class="source-pill pill-niche">BrooklynVegan (0.8)</span>
+        <span class="source-pill pill-niche">BAM (0.8)</span>
+        <span class="source-pill pill-niche">Luma (0.9)</span>
+        <span class="source-pill pill-niche">SofarSounds (0.8)</span>
+        <span class="source-pill pill-platform">DoNYC (0.75)</span>
+        <span class="source-pill pill-platform">Songkick (0.75)</span>
+        <span class="source-pill pill-platform">NYCParks (0.75)</span>
+        <span class="source-pill pill-platform">TinyCupboard (0.75)</span>
+        <span class="source-pill pill-platform">BrooklynCC (0.75)</span>
+        <span class="source-pill pill-platform">NYCTrivia (0.75)</span>
+        <span class="source-pill pill-mainstream">Eventbrite (0.7)</span>
+        <span class="source-pill pill-mainstream">EventbriteComedy (0.7)</span>
+        <span class="source-pill pill-mainstream">EventbriteArts (0.7)</span>
+        <span class="source-pill pill-mainstream">NYPL (0.7)</span>
       </div>
-      <div class="card">
-        <h3>Unified LLM (~85%, ~$0.001)</h3>
-        <p>Everything semantic: neighborhoods, categories, vibes, time, free events, compound queries ("free jazz in williamsburg tonight"), nudge accepts, borough handling, off-topic deflection. Single Claude Haiku call with a tagged event pool.</p>
-      </div>
-    </div>
 
-    <div class="example" style="margin-top: 20px;">
-      <div class="example-turn">
-        <span class="turn-user">User</span>
-        <span class="turn-msg">"williamsburg"</span>
-        <span class="turn-route">unified LLM &rarr; ~$0.001</span>
+      <div style="font-family:var(--font-mono); font-size:0.72rem; color:var(--text-dim); padding:12px 16px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm);">
+        4 sources use LLM extraction (Skint, NonsenseNYC, Yutori, ScreenSlate) &mdash; see <a href="#prompts" style="color:var(--coral); text-decoration:none;">EXTRACTION_PROMPT</a> above
       </div>
-      <div class="example-turn">
-        <span class="turn-user">User</span>
-        <span class="turn-msg">"how about comedy"</span>
-        <span class="turn-route">unified LLM + [MATCH] tags &rarr; ~$0.001</span>
-      </div>
-      <div class="example-turn">
-        <span class="turn-user">User</span>
-        <span class="turn-msg">"2"</span>
-        <span class="turn-route">pre-router &rarr; details &rarr; $0</span>
-      </div>
-      <div class="example-turn">
-        <span class="turn-user">User</span>
-        <span class="turn-msg">"more"</span>
-        <span class="turn-route">pre-router &rarr; more &rarr; ~$0.001</span>
-      </div>
-      <div class="example-turn">
-        <span class="turn-user">User</span>
-        <span class="turn-msg">"any more free comedy stuff"</span>
-        <span class="turn-route">unified LLM + compound filters &rarr; ~$0.001</span>
-      </div>
-      <div class="example-turn">
-        <span class="turn-user">User</span>
-        <span class="turn-msg">"forget the comedy"</span>
-        <span class="turn-route">pre-router &rarr; clear_filters &rarr; ~$0.001</span>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top: 20px;">
-      <h3>Tagged event pool &amp; deterministic filter state</h3>
-      <p>When a user applies filters (category, time, vibe, free), the handler compounds them deterministically via <code>mergeFilters()</code> and builds a tagged pool via <code>buildTaggedPool()</code>. Each event is tagged <code>[MATCH]</code> or unmatched. The LLM sees the full pool but prefers <code>[MATCH]</code> events. When matches are sparse (&lt;3), the LLM gets a <code>SPARSE</code> flag and honestly acknowledges limited options instead of silently omitting the filter.</p>
-      <p style="margin-top: 8px;">Filters persist across neighborhood switches, nudge accepts, and conversational responses. The LLM never manages filter state &mdash; it only composes from what the handler provides.</p>
     </div>
   </div>
 </section>
 
-<!-- 5. Source Registry -->
-<section id="sources">
-  <div class="container">
-    <p class="section-label">Sources</p>
-    <h2 class="section-title">18 event sources, ranked by trust</h2>
-    <div class="section-body">
-      <p>Events are deduplicated across sources using a hash of name + venue + date. When the same event appears in multiple sources, the version from the higher-trust source wins. Sources with geo data (lat/lng) also teach venue coordinates to the shared venue map.</p>
-    </div>
-
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Source</th>
-            <th>Weight</th>
-            <th>Method</th>
-            <th>Specialty</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="source-name">Skint</td>
-            <td class="weight-high">0.9</td>
-            <td>HTML &rarr; Claude extraction</td>
-            <td>Free &amp; cheap NYC events</td>
-          </tr>
-          <tr>
-            <td class="source-name">Nonsense NYC</td>
-            <td class="weight-high">0.9</td>
-            <td>Gmail newsletter &rarr; Claude</td>
-            <td>Underground, weird, one-of-a-kind</td>
-          </tr>
-          <tr>
-            <td class="source-name">Resident Advisor</td>
-            <td class="weight-high">0.85</td>
-            <td>GraphQL API</td>
-            <td>Electronic music &amp; club nights</td>
-          </tr>
-          <tr>
-            <td class="source-name">Oh My Rockness</td>
-            <td class="weight-high">0.85</td>
-            <td>HTML &rarr; Claude extraction</td>
-            <td>Indie &amp; live music</td>
-          </tr>
-          <tr>
-            <td class="source-name">Dice</td>
-            <td class="weight-mid">0.8</td>
-            <td>__NEXT_DATA__ JSON</td>
-            <td>Music &amp; nightlife</td>
-          </tr>
-          <tr>
-            <td class="source-name">BrooklynVegan</td>
-            <td class="weight-mid">0.8</td>
-            <td>DoStuff JSON feed</td>
-            <td>Indie shows, punk, rock</td>
-          </tr>
-          <tr>
-            <td class="source-name">BAM</td>
-            <td class="weight-mid">0.8</td>
-            <td>JSON API</td>
-            <td>Film, theater, music, dance</td>
-          </tr>
-          <tr>
-            <td class="source-name">SmallsLIVE</td>
-            <td class="weight-mid">0.8</td>
-            <td>AJAX HTML</td>
-            <td>Jazz at Smalls + Mezzrow</td>
-          </tr>
-          <tr>
-            <td class="source-name">Yutori</td>
-            <td class="weight-mid">0.8</td>
-            <td>Gmail API &rarr; Claude</td>
-            <td>Agent briefings, curated picks</td>
-          </tr>
-          <tr>
-            <td class="source-name">NYC Parks</td>
-            <td class="weight-mid">0.75</td>
-            <td>Schema.org markup</td>
-            <td>Outdoor events, free programming</td>
-          </tr>
-          <tr>
-            <td class="source-name">DoNYC</td>
-            <td class="weight-mid">0.75</td>
-            <td>Cheerio HTML scraping</td>
-            <td>Music, comedy, theater</td>
-          </tr>
-          <tr>
-            <td class="source-name">Songkick</td>
-            <td class="weight-mid">0.75</td>
-            <td>JSON-LD</td>
-            <td>Concerts &amp; live music</td>
-          </tr>
-          <tr>
-            <td class="source-name">Ticketmaster</td>
-            <td class="weight-mid">0.75</td>
-            <td>Discovery API</td>
-            <td>Indie filter: venue blocklist + $100 cap</td>
-          </tr>
-          <tr>
-            <td class="source-name">Eventbrite</td>
-            <td class="weight-low">0.7</td>
-            <td>JSON-LD + __SERVER_DATA__</td>
-            <td>Community events, workshops</td>
-          </tr>
-          <tr>
-            <td class="source-name">NYPL</td>
-            <td class="weight-low">0.7</td>
-            <td>Eventbrite organizer pages</td>
-            <td>Free library events</td>
-          </tr>
-          <tr>
-            <td class="source-name">Tavily</td>
-            <td class="weight-low">0.6</td>
-            <td>Web search</td>
-            <td>Fallback only (not in hot path)</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
-
-<!-- 6. Session & Conversation -->
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- SECTION 5: SESSION ISOLATION                           -->
+<!-- ══════════════════════════════════════════════════════ -->
 <section id="sessions">
   <div class="container">
-    <p class="section-label">Sessions</p>
-    <h2 class="section-title">Multi-turn conversation state</h2>
-    <div class="section-body">
-      <p>Each phone number gets a session that persists for <strong>2 hours</strong>. The session tracks what the user has been shown, what filters they've applied, and what neighborhoods they've visited. This lets follow-up messages like "how about comedy" or "later tonight" modify the active context rather than starting over.</p>
+    <div class="section-label">05 / Sessions</div>
+    <h2 class="section-title">Per-Phone Isolation</h2>
+    <p class="section-subtitle">Every phone number gets its own session. No shared state, no cross-talk, no leakage.</p>
+
+    <div class="session-iso">
+      <div class="session-bubble">
+        <div class="session-phone">+1 (917) ***-**42</div>
+        <div class="session-fields">
+          <div><span class="sf-key">neighborhood:</span> <span class="sf-val">Bushwick</span></div>
+          <div><span class="sf-key">picks:</span> <span class="sf-val">3 shown</span></div>
+          <div><span class="sf-key">filters:</span> <span class="sf-val">comedy</span></div>
+          <div><span class="sf-key">history:</span> <span class="sf-val">4 turns</span></div>
+        </div>
+      </div>
+      <div class="session-wall">
+        <div class="session-wall-line"></div>
+        <div class="session-wall-label">no shared state</div>
+        <div class="session-wall-line"></div>
+      </div>
+      <div class="session-bubble">
+        <div class="session-phone">+1 (347) ***-**87</div>
+        <div class="session-fields">
+          <div><span class="sf-key">neighborhood:</span> <span class="sf-val">LES</span></div>
+          <div><span class="sf-key">picks:</span> <span class="sf-val">2 shown</span></div>
+          <div><span class="sf-key">filters:</span> <span class="sf-val">free + jazz</span></div>
+          <div><span class="sf-key">history:</span> <span class="sf-val">6 turns</span></div>
+        </div>
+      </div>
     </div>
 
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Field</th>
-            <th>Type</th>
-            <th>Purpose</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="source-name">lastPicks</td>
-            <td>array</td>
-            <td>Most recent picks returned by compose</td>
-          </tr>
-          <tr>
-            <td class="source-name">lastEvents</td>
-            <td>object</td>
-            <td>Map of event objects offered in the last batch (for details lookup)</td>
-          </tr>
-          <tr>
-            <td class="source-name">lastNeighborhood</td>
-            <td>string</td>
-            <td>Neighborhood from the last events response</td>
-          </tr>
-          <tr>
-            <td class="source-name">lastFilters</td>
-            <td>object</td>
-            <td>Active filters: category, vibe, time_after, free_only</td>
-          </tr>
-          <tr>
-            <td class="source-name">conversationHistory</td>
-            <td>array</td>
-            <td>Last 6 turns (300 chars each) &mdash; sent to router and compose</td>
-          </tr>
-          <tr>
-            <td class="source-name">allPicks</td>
-            <td>array</td>
-            <td>Cumulative picks across all "more" batches</td>
-          </tr>
-          <tr>
-            <td class="source-name">allOfferedIds</td>
-            <td>array</td>
-            <td>All event IDs ever shown &mdash; excluded on "more" to avoid repeats</td>
-          </tr>
-          <tr>
-            <td class="source-name">visitedHoods</td>
-            <td>array</td>
-            <td>Neighborhoods visited this session (dedup travel nudges)</td>
-          </tr>
-          <tr>
-            <td class="source-name">pendingNearby</td>
-            <td>string</td>
-            <td>Neighborhood stored during a travel nudge ("would you travel to X?")</td>
-          </tr>
-          <tr>
-            <td class="source-name">pendingNearbyEvents</td>
-            <td>object</td>
-            <td>Pre-loaded events for the nudge neighborhood</td>
-          </tr>
-          <tr>
-            <td class="source-name">pendingFilters</td>
-            <td>object</td>
-            <td>Saved filters when asking user for a neighborhood</td>
-          </tr>
-          <tr>
-            <td class="source-name">pendingMessage</td>
-            <td>string</td>
-            <td>Original message stored with pending filters</td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="session-cards">
+      <div class="session-card">
+        <div class="session-card-title">Keyed by phone #</div>
+        <div class="session-card-desc">In-memory Map uses From phone as key. Every read/write scoped to one user.</div>
+      </div>
+      <div class="session-card">
+        <div class="session-card-title">Per-phone mutex</div>
+        <div class="session-card-desc">acquireLock(phone) serializes concurrent SMS from the same number.</div>
+      </div>
+      <div class="session-card">
+        <div class="session-card-title">SHA-256 on disk</div>
+        <div class="session-card-desc">Phone numbers hashed before writing to sessions.json. Raw numbers never touch disk.</div>
+      </div>
+      <div class="session-card">
+        <div class="session-card-title">2hr TTL + cleanup</div>
+        <div class="session-card-desc">Sessions auto-expire. Garbage collected every 10 minutes.</div>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- 7. Prompt Architecture -->
-<section id="prompts">
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- SECTION 6: COST ANATOMY                               -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section id="cost">
   <div class="container">
-    <p class="section-label">Prompts</p>
-    <h2 class="section-title">Unified prompt + composable skills</h2>
-    <div class="section-body">
-      <p>The unified LLM call uses a base system prompt (<code>UNIFIED_SYSTEM</code>) that handles intent understanding, event selection, and SMS composition. On top of this, <strong>12 conditional skill modules</strong> are appended based on request context. The user prompt includes the tagged event pool with <code>[MATCH]</code> tags, filter context (<code>ACTIVE_FILTER</code>, <code>MATCH_COUNT</code>, <code>SPARSE</code>), and conversation history.</p>
-      <p><strong>Why conditional skills?</strong> When Claude sees "ACTIVITY ADHERENCE: if none match, say honestly you don't have that tonight" on a request where the user didn't ask for an activity, it sometimes over-filters and returns fewer picks. Including "NEIGHBORHOOD MISMATCH: acknowledge this upfront" when events ARE in the right neighborhood caused Claude to add unnecessary disclaimers. Each skill solves a specific failure mode, and only fires when that failure mode is possible.</p>
+    <div class="section-label">06 / Cost Model</div>
+    <h2 class="section-title">Cost Per Message</h2>
+    <p class="section-subtitle">Two paid steps per message. The split is lopsided.</p>
+
+    <div class="cost-bars">
+      <div class="cost-bar-row">
+        <div class="cost-bar-label">~$0.001</div>
+        <div class="cost-bar cost-bar-ai" style="width: 11%;">AI</div>
+        <span style="font-family:var(--font-mono); font-size:0.68rem; color:var(--text-dim);">runAgentLoop (Gemini 2.5 Flash Lite)</span>
+      </div>
+      <div class="cost-bar-row">
+        <div class="cost-bar-label">$0.008</div>
+        <div class="cost-bar cost-bar-sms" style="width: 89%;">SMS delivery</div>
+        <span style="font-family:var(--font-mono); font-size:0.68rem; color:var(--text-dim);">Twilio</span>
+      </div>
     </div>
 
-    <details open style="margin-top: 24px;">
-      <summary style="color: var(--coral);">core <span class="skill-condition">&mdash; always on. Persona, format, 480-char limit.</span></summary>
-      <div class="detail-body">
-        <p>Defines who Claude is and how to write. This is the only skill that's always included.</p>
-        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">You are Bestie: an NYC "plugged-in friend" who curates the best upcoming events. You text like a real person — warm, opinionated, concise. Never robotic.
+    <div class="cost-total">Total: ~$0.009 per message</div>
 
-PICK PRIORITY ORDER:
-1. Tonight first: if an event's day is "TODAY", prefer it over tomorrow events.
-2. Source tier: among tonight options, prefer unstructured and primary over secondary.
-3. Neighborhood match: strongly prefer events in the user's requested neighborhood.
-4. Curation taste: prefer gallery openings, DJ nights at small venues, indie concerts, comedy shows, themed pop-ups, and unique one-off events. Avoid corporate events, hotel bars, tourist traps, and chain venues.
+    <div class="cost-insight">The dumb pipe costs 8x more than the AI.</div>
 
-VOICE: you're a friend texting picks. Light NYC shorthand OK.
-Each numbered pick should feel opinionated — "always a vibe", "goes off late", "legendary basement spot".
-CHARACTER LIMIT: 480 characters total for sms_text.</div>
-      </div>
-    </details>
-
-    <details>
-      <summary>sourceTiers <span class="skill-condition">&mdash; always on. Editorial trust hierarchy.</span></summary>
-      <div class="detail-body">
-        <p><strong>Problem it solves:</strong> Without this, Claude treats all events equally. An Eventbrite "networking mixer" looks the same as a Nonsense NYC underground art party. This skill teaches Claude our editorial hierarchy.</p>
-        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">SOURCE TIERS — use source_tier to break ties between similar events:
-- "unstructured" (Skint, Nonsense NYC, Oh My Rockness, Yutori): curated editorial picks — trust these, they've been hand-selected.
-- "primary" (RA, Dice, BrooklynVegan, BAM, SmallsLIVE): structured high-quality listings.
-- "secondary" (NYC Parks, DoNYC, Songkick, Ticketmaster, Eventbrite, NYPL, Tavily): broader aggregators.</div>
-      </div>
-    </details>
-
-    <details>
-      <summary>tonightPriority <span class="skill-condition">&mdash; when today events exist in batch</span></summary>
-      <div class="detail-body">
-        <p><strong>Problem it solves:</strong> Claude naturally prefers the "best" event regardless of date. A great concert tomorrow looks better than a decent DJ set tonight. But the user texted now &mdash; they probably want something tonight.</p>
-        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">TONIGHT PRIORITY: A decent tonight event beats a great tomorrow event — the user is asking what's happening now.</div>
-      </div>
-    </details>
-
-    <details>
-      <summary>neighborhoodMismatch <span class="skill-condition">&mdash; when NO events match the requested hood</span></summary>
-      <div class="detail-body">
-        <p><strong>Problem it solves:</strong> When the user asks for the Upper West Side but all events are in Hell's Kitchen, Claude would silently show the Hell's Kitchen events. The user assumes they're in UWS. This skill forces Claude to acknowledge the mismatch upfront.</p>
-        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">NEIGHBORHOOD MISMATCH: NONE of the events are in the requested neighborhood. You MUST acknowledge this upfront — e.g. "Not much tonight on the UWS, but nearby in Hell's Kitchen:"</div>
-      </div>
-    </details>
-
-    <details>
-      <summary>perennialFraming <span class="skill-condition">&mdash; when batch includes perennial picks</span></summary>
-      <div class="detail-body">
-        <p><strong>Problem it solves:</strong> Perennials are always-good venues (bars with trivia, jazz clubs). Without framing, Claude writes "Black Rabbit is a solid bar" instead of "Black Rabbit has great trivia tonight at 8." It also needs to know when to lean on perennials (thin scrape nights) vs. skip them (plenty of events).</p>
-        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">PERENNIAL PICKS: Items with source_name "perennial" are bars/venues always worth visiting.
-- Lead with the activity: "Black Rabbit has great trivia tonight at 8" not "Black Rabbit is a solid bar."
-- THIN EVENTS (1-3 scraped events): Lead with the event, then add a perennial.
-- RICH EVENTS (4+ scraped events): Perennials are optional. Skip or mention one only if it has something specific and great happening.
-- Frame as personal recs — "always a good time" — never "if nothing else works."</div>
-      </div>
-    </details>
-
-    <details>
-      <summary>activityAdherence <span class="skill-condition">&mdash; when user asks for trivia, karaoke, jazz, etc.</span></summary>
-      <div class="detail-body">
-        <p><strong>Problem it solves:</strong> When someone texts "trivia in fort greene" and there's no trivia, Claude would recommend random events as alternatives. This is misleading &mdash; the user specifically wants trivia. This skill tells Claude to be honest about the miss rather than silently substituting.</p>
-        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">ACTIVITY ADHERENCE: The user asked for a specific type of activity. If NONE of the events match, do NOT recommend unrelated events. Instead, say honestly you don't have that tonight.
-DAY-SPECIFIC CLAIMS: NEVER say an event happens on a particular day (e.g. "trivia on Thursdays") unless you can verify from the event data that today IS that day.</div>
-      </div>
-    </details>
-
-    <details>
-      <summary>conversationAwareness <span class="skill-condition">&mdash; when session has conversation history</span></summary>
-      <div class="detail-body">
-        <p><strong>Problem it solves:</strong> Two specific bugs: (1) User asks for "tomorrow" events but Claude defaults to tonight-first priority &mdash; this skill overrides that. (2) Claude recommends events it already showed in earlier turns. (Filter persistence is now handled deterministically by the handler via <code>mergeFilters()</code>, not the LLM.)</p>
-        <div class="code-block" style="font-size: 0.76rem; line-height: 1.6; white-space: pre-wrap;">CONVERSATION AWARENESS:
-- TEMPORAL INTENT: If user asks about "tomorrow", prefer TOMORROW events. Override the "tonight first" rule.
-- REPEAT AVOIDANCE: Do not recommend events already mentioned in conversation history.</div>
-      </div>
-    </details>
-
-    <details>
-      <summary style="color: var(--text-dim);">5 more conditional skills <span class="skill-condition">&mdash; lastBatch, freeEmphasis, pendingIntent, venueFraming, nearbySuggestion</span></summary>
-      <div class="detail-body">
-        <p><strong>lastBatch</strong> &mdash; Fires on the final "more" batch. Removes the "Reply MORE for extra picks" CTA since there are no more picks. Appends a nearby neighborhood suggestion.</p>
-        <p><strong>freeEmphasis</strong> &mdash; Fires when user asked for free events. Tells Claude to list free events even if they seem niche &mdash; the user specifically wants free.</p>
-        <p><strong>pendingIntent</strong> &mdash; Fires when restoring a deferred request. User said "free comedy" with no neighborhood, then sent "bushwick" &mdash; this skill passes the original request so Claude knows the full intent.</p>
-        <p><strong>venueFraming</strong> &mdash; Fires when Tavily search results include permanent venues. Tells Claude to frame them as "solid spots to check out" rather than events with specific times.</p>
-        <p><strong>nearbySuggestion</strong> &mdash; Fires when nearby neighborhoods are provided. Tells Claude to suggest travel when picks are thin: "Slim pickings in Fort Greene &mdash; Park Slope is right nearby, want picks from there?"</p>
-      </div>
-    </details>
+    <div class="cost-budget">Daily per-user AI budget: $0.10 &mdash; enforced by request-guard.js</div>
   </div>
 </section>
 
-<!-- 8. Quality & Eval -->
-<section id="eval">
-  <div class="container">
-    <p class="section-label">Quality</p>
-    <h2 class="section-title">5-layer eval system</h2>
-    <div class="section-body">
-      <p>Quality is measured offline against stored request traces. The eval system runs in layers, from fast deterministic checks to expensive LLM judges. Each layer catches different failure modes.</p>
-    </div>
+<footer class="page-footer">Built by Justin Koufopoulos &middot; March 2026</footer>
 
-    <ul class="layer-list">
-      <li>
-        <span class="layer-num">1</span>
-        <span><strong>Unit tests</strong> &mdash; Pure function tests (formatters, geo, neighborhoods). Fast, no API calls. Run on every push.</span>
-      </li>
-      <li>
-        <span class="layer-num">2</span>
-        <span><strong>Code evals</strong> &mdash; 9 deterministic trace checks: 480-char limit, valid intent, valid neighborhood, picked events exist, no truncated URLs. Free and instant. (<code>evals/code-evals.js</code>)</span>
-      </li>
-      <li>
-        <span class="layer-num">3</span>
-        <span><strong>Extraction audit</strong> &mdash; Tier 1: verify Claude-extracted evidence quotes appear verbatim in source text. Tier 2: optional LLM judge for semantic accuracy. (<code>evals/extraction-audit.js</code>)</span>
-      </li>
-      <li>
-        <span class="layer-num">4</span>
-        <span><strong>Pipeline evals</strong> &mdash; Multi-turn scenario tests with expected outcomes. Trace assertions check intent, neighborhood, event presence, and banned phrases. (<code>scripts/run-scenario-evals.js</code>)</span>
-      </li>
-      <li>
-        <span class="layer-num">5</span>
-        <span><strong>LLM judges + A/B</strong> &mdash; Tone judge ("sounds like a friend, not a bot?"), relevance judge, and model-vs-model preference tests. Expensive, run on demand. (<code>evals/judge-evals.js</code>, <code>scripts/run-ab-eval.js</code>)</span>
-      </li>
-    </ul>
+<script>
+(function() {
+  // ── CONVERSATION DATA ──
+  const CONVO = [
+    {
+      role: 'user',
+      text: 'bushwick',
+      annotation: 'checkMechanical: miss\nhandleAgentRequest \u2192 search_events(\n  neighborhood: "Bushwick",\n  intent: "new_search"\n)\n47 events in pool, 3 picks composed\ncost: ~$0.001 | latency: 2.1s'
+    },
+    {
+      role: 'pulse',
+      text: "Tiny Cupboard\u2019s got a free open mic tonight at 8, and there\u2019s a killer DJ set at Elsewhere at 10 ($15). Or something chill \u2014 Bushwick Comedy has stand-up at 9, free. Any of these sound good?",
+      annotation: 'runAgentLoop \u2192 plain text SMS\nsaveSessionFromToolCalls \u2192 session updated\ntwilio.js \u2192 SMS out ($0.008)'
+    },
+    {
+      role: 'user',
+      text: '2',
+      annotation: 'handleAgentRequest \u2192 search_events(\n  intent: "details",\n  pick_reference: "2"\n)\nFuzzy match \u2192 Elsewhere DJ set\ncost: ~$0.001'
+    },
+    {
+      role: 'pulse',
+      text: "Elsewhere is that massive warehouse venue \u2014 tonight\u2019s a deep house night with DJ Honeypot. Doors at 10, gets going around 11. $15 at the door. https://elsewhere.zone/tonight",
+      annotation: 'runAgentLoop \u2192 detail SMS\n480 chars | includes URL'
+    },
+    {
+      role: 'user',
+      text: 'how about comedy',
+      annotation: 'handleAgentRequest \u2192 search_events(\n  neighborhood: "Bushwick",\n  category: "comedy",\n  intent: "refine"\n)\nFilters persist from session (P1)'
+    },
+    {
+      role: 'pulse',
+      text: "Bushwick Comedy\u2019s got free stand-up at 9 tonight \u2014 always a good crowd. And Tiny Cupboard has improv at 10 ($5). Want details on either?",
+      annotation: 'Refined: comedy + Bushwick\n2 picks composed\ncost: ~$0.001'
+    },
+  ];
 
-    <div class="code-block"><span class="hl-dim"># Run the eval layers</span>
-$ npm run eval              <span class="hl-dim"># Layer 2: code evals on stored traces</span>
-$ npm run eval:judges       <span class="hl-dim"># Layers 2+5: code evals + LLM judges</span>
-$ node scripts/run-scenario-evals.js   <span class="hl-dim"># Layer 4: multi-turn scenarios</span>
-$ node scripts/run-ab-eval.js          <span class="hl-dim"># Layer 5: A/B comparison</span></div>
-  </div>
-</section>
+  const phoneMessages = document.getElementById('phoneMessages');
+  const annotationSlots = document.getElementById('annotationSlots');
+  const replayBtn = document.getElementById('replayBtn');
+  let playing = false;
+  let timeouts = [];
 
-<!-- 9. Observability -->
-<section id="observability">
-  <div class="container">
-    <p class="section-label">Observability</p>
-    <h2 class="section-title">Traces, alerts, dashboards</h2>
-    <div class="section-body">
-      <p>Every request writes a structured trace. Health monitoring catches scrape failures and slow responses. Three dashboards provide real-time visibility.</p>
-    </div>
+  function reset() {
+    timeouts.forEach(t => clearTimeout(t));
+    timeouts = [];
+    phoneMessages.innerHTML = '';
+    annotationSlots.innerHTML = '';
+    replayBtn.style.display = 'none';
+    playing = false;
+  }
 
-    <div class="card-grid">
-      <div class="card">
-        <h3>Request traces</h3>
-        <p>Per-request JSONL records capture intent, neighborhood, picked events, AI costs, timing, and the full SMS response. Daily rotation with 4-file max. A 200-entry ring buffer powers the eval UI.</p>
-      </div>
-      <div class="card">
-        <h3>Email alerts</h3>
-        <p>Health alerts fire on scrape failures (6hr cooldown). Runtime alerts fire on slow responses or errors (30min per-type cooldown). Sent via Resend. No-op if API key is unset.</p>
-      </div>
-      <div class="card">
-        <h3>Health dashboard</h3>
-        <p>Per-source timing, success/failure status, history sparklines, extraction quality metrics. Available at <code>/health</code>.</p>
-      </div>
-      <div class="card">
-        <h3>Cost tracking</h3>
-        <p>Per-user daily budget of $0.10. Provider-aware pricing (Haiku vs Gemini). Budget resets daily on NYC timezone. Friendly message when exceeded.</p>
-      </div>
-    </div>
-  </div>
-</section>
+  function play() {
+    if (playing) return;
+    reset();
+    playing = true;
 
-<footer>
-  <div class="footer-inner">
-    <span class="footer-brand">Bestie</span>
-    <span class="footer-note">Built in Brooklyn</span>
-  </div>
-</footer>
+    // Pre-create DOM elements
+    const msgEls = [];
+    const annEls = [];
+    CONVO.forEach((item, i) => {
+      const msgEl = document.createElement('div');
+      msgEl.className = 'msg ' + (item.role === 'user' ? 'msg-user' : 'msg-pulse');
+      msgEl.textContent = item.text;
+      phoneMessages.appendChild(msgEl);
+      msgEls.push(msgEl);
+
+      const annEl = document.createElement('div');
+      annEl.className = 'annotation';
+      annEl.textContent = item.annotation;
+      annotationSlots.appendChild(annEl);
+      annEls.push(annEl);
+    });
+
+    // Staggered reveal
+    CONVO.forEach((_, i) => {
+      const t = setTimeout(() => {
+        msgEls[i].classList.add('visible');
+        annEls[i].classList.add('visible');
+        // Scroll phone to bottom
+        phoneMessages.scrollTop = phoneMessages.scrollHeight;
+        // Show replay after last
+        if (i === CONVO.length - 1) {
+          setTimeout(() => {
+            replayBtn.style.display = 'inline-block';
+            playing = false;
+          }, 600);
+        }
+      }, 1500 * (i + 1));
+      timeouts.push(t);
+    });
+  }
+
+  replayBtn.addEventListener('click', () => {
+    reset();
+    setTimeout(play, 100);
+  });
+
+  // IntersectionObserver: auto-play when hero is visible
+  const heroSection = document.getElementById('hero');
+  let hasPlayed = false;
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting && !hasPlayed) {
+        hasPlayed = true;
+        play();
+      }
+    });
+  }, { threshold: 0.3 });
+  observer.observe(heroSection);
+
+  // ── SCROLL FADE-IN ──
+  const allSections = document.querySelectorAll('section');
+  const sectionObs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.1 });
+  allSections.forEach(s => sectionObs.observe(s));
+
+  // ── JUMP NAV ACTIVE STATE ──
+  const jumpLinks = document.querySelectorAll('.jump-nav a');
+  const sections = document.querySelectorAll('section[id]');
+  const jumpObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        jumpLinks.forEach(l => l.classList.remove('active'));
+        const match = document.querySelector('.jump-nav a[href="#' + entry.target.id + '"]');
+        if (match) match.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => jumpObserver.observe(s));
+})();
+</script>
 
 </body>
 </html>

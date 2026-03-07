@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bestie — NYC Events, One Text Away</title>
-  <meta name="description" content="Tell me what you're in the mood for — jazz, comedy, this weekend — and I'll find it across NYC. No app needed. Bestie is your SMS guide to NYC nightlife, music, and more.">
+  <title>Pulse — NYC Events, One Text Away</title>
+  <meta name="description" content="The best of what's happening in NYC that you'll never find on Google or Instagram alone. Comedy, DJ sets, trivia, indie film, art, late-night weirdness. No app — just text Pulse.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
@@ -713,7 +713,7 @@
 <!-- Nav -->
 <nav>
   <div class="nav-inner">
-    <a href="#" class="nav-logo">Bestie</a>
+    <a href="#" class="nav-logo">Pulse</a>
     <div class="nav-links">
       <a href="#how-it-works">How It Works</a>
       <a href="#faq">FAQ</a>
@@ -745,7 +745,7 @@
     <div class="hero-text">
       <div class="hero-proof">
         <span><span class="dot"></span> Live now</span>
-        <span>36 neighborhoods</span>
+        <span>75 neighborhoods</span>
         <span>Free to use</span>
       </div>
       <h1>NYC events.<br><em>One text away.</em></h1>
@@ -761,7 +761,7 @@
         <div class="phone-screen">
           <div class="phone-dynamic-island"></div>
           <div class="phone-contact">
-            <div class="name">Bestie</div>
+            <div class="name">Pulse</div>
             <div class="number">(646) 722-6926</div>
           </div>
           <div class="sms-thread" id="sms-thread">
@@ -803,7 +803,7 @@
       </div>
       <div class="basics-item">
         <h3>Every source, one thread</h3>
-        <p>Resident Advisor, Dice, Nonsense NYC, Eventbrite, Songkick, NYC Parks, and a dozen more &mdash; scraped every morning so you don't have to check them yourself.</p>
+        <p>Resident Advisor, Dice, Nonsense NYC, Luma, BK Mag, Eventbrite, and 16 more &mdash; scraped every morning so you don't have to check them yourself.</p>
       </div>
       <div class="basics-item">
         <h3>Nothing to install</h3>
@@ -811,8 +811,8 @@
       </div>
       <div class="basics-item wide">
         <div class="basics-item-text">
-          <h3>36 neighborhoods across the city</h3>
-          <p>Manhattan, Brooklyn, and Queens. From warehouse shows in Bushwick to jazz on the Upper West Side.</p>
+          <h3>75 neighborhoods across five boroughs</h3>
+          <p>Manhattan, Brooklyn, Queens, the Bronx, and Staten Island. From warehouse shows in Bushwick to jazz on the Upper West Side.</p>
         </div>
         <div class="hood-tags">
           <span class="hood-tag">East Village</span>
@@ -827,6 +827,9 @@
           <span class="hood-tag">SoHo</span>
           <span class="hood-tag">Bed-Stuy</span>
           <span class="hood-tag">Prospect Heights</span>
+          <span class="hood-tag">Jackson Heights</span>
+          <span class="hood-tag">Flushing</span>
+          <span class="hood-tag">Fordham</span>
         </div>
       </div>
     </div>
@@ -845,7 +848,7 @@
     <div class="faq-grid">
       <div class="faq-item">
         <h3>Is this free?</h3>
-        <p>Yes. Bestie is free to use. Standard text message rates from your carrier apply, but we don't charge anything.</p>
+        <p>Yes. Pulse is free to use. Standard text message rates from your carrier apply, but we don't charge anything.</p>
       </div>
       <div class="faq-item">
         <h3>Will you spam me?</h3>
@@ -868,7 +871,7 @@
     <p class="subtitle">Text any NYC neighborhood to get started</p>
     <a href="sms:+16467226926" class="cta-phone">(646) 722-6926</a>
     <div class="opt-in-disclosure">
-      By texting this number, you agree to receive event recommendation text messages from Bestie. Message frequency varies based on your requests. Message and data rates may apply. Reply <strong>STOP</strong> at any time to opt out. Reply <strong>HELP</strong> for support. <a href="privacy.html">Privacy Policy</a> &middot; <a href="terms.html">Terms of Service</a>
+      By texting this number, you agree to receive event recommendation text messages from Pulse. Message frequency varies based on your requests. Message and data rates may apply. Reply <strong>STOP</strong> at any time to opt out. Reply <strong>HELP</strong> for support. <a href="privacy.html">Privacy Policy</a> &middot; <a href="terms.html">Terms of Service</a>
     </div>
   </div>
 </section>
@@ -877,7 +880,7 @@
 <footer>
   <div class="footer-inner">
     <div class="footer-left">
-      <span class="footer-brand">Bestie</span>
+      <span class="footer-brand">Pulse</span>
       <span class="footer-tagline">Built by <a href="https://github.com/jkoufopoulos" style="color:var(--text-dim);text-decoration:none;">Justin</a> in Brooklyn</span>
     </div>
     <div class="footer-links">
@@ -944,15 +947,18 @@
     // Timestamp
     addEl('div', 'sms-time', 'Today, 6:42 PM');
 
-    // Welcome message from Pulse
+    // Welcome message — agent writes natural prose
     showTyping();
     await wait(1200);
     hideTyping();
-    addRawBubble("Hey! Text me a neighborhood and I'll find you something good tonight.", 'sms-recv');
+    addRawBubble(
+      'Hey! I\u2019m Pulse \u2014 your plugged-in friend for NYC nightlife. What neighborhood are you thinking tonight? Or just tell me a vibe \u2014 comedy, live music, something weird \u2014 and I\u2019ll find you something good.',
+      'sms-recv'
+    );
 
     await wait(1400);
 
-    // User sends "east village"
+    // User texts a neighborhood
     addBubble('east village', 'sms-sent');
 
     await wait(600);
@@ -960,32 +966,25 @@
     await wait(2000);
     hideTyping();
 
-    // Pulse response
+    // Pulse response — natural prose (matches current agent behavior)
     addRawBubble(
-      'Tonight in East Village:<br><br>' +
-      '1. Jazz at Smalls &mdash; 7:30pm, $20<br>' +
-      '2. Stand-up at Eastville &mdash; 8pm, $12<br>' +
-      '3. DJ set at Nublu &mdash; 10pm, free<br><br>' +
-      'Reply # for details, "more" for extras',
+      'Smalls has a killer jazz set tonight at 7:30 \u2014 intimate basement room, $20 cover. Eastville is doing stand-up at 8 ($12), and there\u2019s a free DJ set at Nublu starting at 10. Any of those sound good?',
       'sms-recv'
     );
 
     await wait(1400);
 
-    // User asks for details
-    addBubble('1', 'sms-sent');
+    // User asks for details on a pick
+    addBubble('the jazz one', 'sms-sent');
 
     await wait(600);
     showTyping();
     await wait(1800);
     hideTyping();
 
-    // Detail response
+    // Detail response — natural prose
     addRawBubble(
-      'Jazz at Smalls<br>' +
-      '7:30pm &mdash; 183 W 10th St<br>' +
-      'Late-night jazz in a legendary basement club. Two sets nightly, BYOB-friendly. $20 cover.<br>' +
-      'smallslive.com',
+      'Smalls Jazz Club \u2014 183 W 10th St, 7:30pm. Legendary basement club with two sets nightly, BYOB-friendly. $20 cover. One of those places that makes you feel like you found something special. smallslive.com',
       'sms-recv'
     );
 
