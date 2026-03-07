@@ -106,14 +106,15 @@ const tier1Checks = {
     const ev = event.evidence || {};
     const fields = [ev.name_quote, ev.time_quote, ev.location_quote, ev.price_quote];
     const present = fields.filter(f => f && f.trim()).length;
-    const highConfidence = confidence > 0.8;
-    const allEvidence = present === 4;
+    // Confidence should be proportional to evidence: max reasonable confidence ≈ 0.25 per field
+    const maxReasonable = present * 0.25;
+    const overconfident = confidence > maxReasonable + 0.15; // 0.15 tolerance
 
-    if (highConfidence && !allEvidence) {
+    if (overconfident) {
       return {
         name: 'confidence_calibrated',
         pass: false,
-        detail: `confidence ${confidence} but only ${present}/4 evidence fields — overconfident`,
+        detail: `confidence ${confidence} but only ${present}/4 evidence fields — overconfident (max reasonable: ${maxReasonable.toFixed(2)})`,
       };
     }
     return {
@@ -128,6 +129,10 @@ const tier1Checks = {
     if (!dateLocal) return { name: 'date_not_past', pass: true, detail: 'no date (skipped)' };
 
     const today = getNycDateString(0);
+    // Multi-day events: if series_end is today or future, the event is still active
+    if (dateLocal < today && event.series_end && event.series_end >= today) {
+      return { name: 'date_not_past', pass: true, detail: `ongoing: ${dateLocal}..${event.series_end} (still active)` };
+    }
     const isPast = dateLocal < today;
     return {
       name: 'date_not_past',

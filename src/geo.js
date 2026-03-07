@@ -80,6 +80,23 @@ function getEventDate(event) {
 }
 
 /**
+ * Check if an event is active within a date range, accounting for multi-day events.
+ * A multi-day event (with series_end) is active if its run overlaps the range:
+ *   date_local <= rangeEnd AND series_end >= rangeStart
+ * A single-day event is active if date_local is within [rangeStart, rangeEnd].
+ */
+function isEventInDateRange(event, rangeStart, rangeEnd) {
+  const d = getEventDate(event);
+  if (!d) return null; // caller decides how to handle undated events
+  // Multi-day event: check if the event's run overlaps the query range
+  if (event.series_end && event.series_end >= rangeStart) {
+    return d <= rangeEnd;
+  }
+  // Single-day event: standard range check
+  return d >= rangeStart && d <= rangeEnd;
+}
+
+/**
  * Rank events by date (today first) then proximity to target neighborhood.
  * Filter: include everything within ~3km.
  * Sort: today > tomorrow > future, then closest first within each tier.
@@ -267,9 +284,9 @@ function filterUpcomingEvents(events, { refTimeMs } = {}) {
       } catch {}
     }
 
-    // Filter out events whose date is in the past
+    // Filter out events whose date is in the past (but keep ongoing multi-day events)
     const eventDate = getEventDate(e);
-    if (eventDate && eventDate < todayNyc) return false;
+    if (eventDate && eventDate < todayNyc && !(e.series_end && e.series_end >= todayNyc)) return false;
 
     // No time info — keep if date is today or missing
     return true;
@@ -320,4 +337,4 @@ function getAdjacentNeighborhoods(hood, count = 3) {
     .map(d => d.name);
 }
 
-module.exports = { resolveNeighborhood, rankEventsByProximity, getNycDateString, getNycUtcOffset, inferCategory, haversine, filterUpcomingEvents, getEventDate, parseAsNycTime, filterByTimeAfter, getAdjacentNeighborhoods };
+module.exports = { resolveNeighborhood, rankEventsByProximity, getNycDateString, getNycUtcOffset, inferCategory, haversine, filterUpcomingEvents, getEventDate, isEventInDateRange, parseAsNycTime, filterByTimeAfter, getAdjacentNeighborhoods };

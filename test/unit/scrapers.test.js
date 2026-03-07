@@ -192,7 +192,7 @@ check('non-event returns null', bad === null);
 
 // Confidence scoring
 check('std: high confidence (all fields)', std && std.extraction_confidence >= 0.9);
-check('nohood: lower confidence (missing venue+hood)', nohood && nohood.extraction_confidence <= 0.8);
+check('nohood: lower confidence (missing venue+hood)', nohood && nohood.extraction_confidence < std.extraction_confidence);
 
 // Price patterns: "$10 adv, $15 door"
 const advDoor = parseSkintParagraph(

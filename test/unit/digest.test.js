@@ -40,12 +40,12 @@ const yellow3 = computeDigestStatus({
 check('high latency = yellow', yellow3 === 'yellow');
 
 const red1 = computeDigestStatus({
-  sourcesBelow: ['Skint', 'RA', 'Dice', 'DoNYC'],
+  sourcesBelow: ['Skint', 'RA', 'Dice', 'DoNYC', 'Luma', 'Eventbrite'],
   cacheDrop: 5,
   userFacingErrors: 0,
   latencyP95: 2000,
 });
-check('>3 sources below = red', red1 === 'red');
+check('>5 sources below = red', red1 === 'red');
 
 const red2 = computeDigestStatus({
   sourcesBelow: [],

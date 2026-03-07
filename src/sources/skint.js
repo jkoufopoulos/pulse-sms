@@ -263,13 +263,9 @@ function parseSkintParagraph(text, dateLocal) {
     description = description.slice(0, 197) + '...';
   }
 
-  // 7. Confidence based on extracted field count
-  let confidence = 0.5;
-  if (eventName) confidence += 0.1;
-  if (dateLocal) confidence += 0.1;
-  if (venue) confidence += 0.1;
-  if (startTime) confidence += 0.1;
-  if (neighborhood) confidence += 0.1;
+  // 7. Confidence based on evidence field coverage (aligns with audit expectations)
+  const evidenceFields = [eventName, timeStr, venue, priceDisplay].filter(Boolean).length;
+  let confidence = 0.4 + evidenceFields * 0.15; // 0.4 base → 0.55/0.70/0.85/1.0
 
   // Compute end date — if end hour < start hour, it crosses midnight
   let endDate = dateLocal;
@@ -581,7 +577,7 @@ function parseOngoingParagraph(text, todayIso, refYear) {
           is_free: false,
           price_display: null,
           category: inferCategory(eventName),
-          extraction_confidence: 0.5 + (eventName ? 0.1 : 0) + 0.1 + (seriesEnd ? 0.1 : 0),
+          extraction_confidence: 0.4 + (eventName ? 0.15 : 0),
           source_url: 'https://theskint.com/ongoing-events/',
           series_end: seriesEnd,
         };
@@ -669,11 +665,9 @@ function parseOngoingParagraph(text, todayIso, refYear) {
   }
 
   // Confidence based on extracted fields
-  let confidence = 0.5;
-  if (eventName) confidence += 0.1;
-  if (venue) confidence += 0.1;
-  if (neighborhood) confidence += 0.1;
-  if (seriesEnd) confidence += 0.1;
+  // Confidence based on evidence field coverage (ongoing events rarely have time)
+  const evidenceFields = [eventName, null /* no time for ongoing */, venue, priceDisplay].filter(Boolean).length;
+  let confidence = 0.4 + evidenceFields * 0.15; // 0.4 base → 0.55/0.70/0.85/1.0
 
   return {
     name: eventName,

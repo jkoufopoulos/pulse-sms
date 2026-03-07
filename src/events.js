@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { SOURCES, SOURCE_TIERS, SOURCE_LABELS, SOURCE_DB_NAMES, MERGE_ORDER } = require('./source-registry');
 const { sourceHealth, saveHealthData, updateSourceHealth, updateScrapeStats, computeEventMix, getHealthStatus: _getHealthStatus } = require('./source-health');
-const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate, parseAsNycTime } = require('./geo');
+const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate, isEventInDateRange, parseAsNycTime } = require('./geo');
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues, lookupVenue, lookupVenueSize } = require('./venues');
 const { filterIncomplete, filterKidsEvents, isGarbageName } = require('./curation');
 const { eventMatchesFilters, failsTimeGate } = require('./pipeline');
@@ -184,20 +184,18 @@ async function getTopPicks(count = 10) {
   const todayNyc = getNycDateString(0);
   const tomorrowNyc = getNycDateString(1);
 
-  // First try: today + tomorrow only
+  // First try: today + tomorrow only (includes ongoing multi-day events)
   let dateFiltered = qualityFiltered.filter(e => {
-    const d = getEventDate(e);
-    if (!d) return false;
-    return d >= todayNyc && d <= tomorrowNyc;
+    const active = isEventInDateRange(e, todayNyc, tomorrowNyc);
+    return active === null ? false : active;
   });
 
   // Widen to 7 days if pool is thin (< 5 scoreable events)
   if (dateFiltered.length < 5) {
     const weekOutNyc = getNycDateString(7);
     dateFiltered = qualityFiltered.filter(e => {
-      const d = getEventDate(e);
-      if (!d) return false;
-      return d >= todayNyc && d <= weekOutNyc;
+      const active = isEventInDateRange(e, todayNyc, weekOutNyc);
+      return active === null ? false : active;
     });
   }
 
@@ -473,9 +471,8 @@ async function refreshCache() {
     const today = getNycDateString(0);
     const monthOut = getNycDateString(30);
     const dateFiltered = allEvents.filter(e => {
-      const d = getEventDate(e);
-      if (!d) return true; // keep undated events (perennials, venues)
-      return d >= yesterday && d <= monthOut;
+      const active = isEventInDateRange(e, yesterday, monthOut);
+      return active === null ? true : active; // keep undated events (perennials, venues)
     });
     let validEvents = filterKidsEvents(dateFiltered);
     const staleCount = allEvents.length - dateFiltered.length;
@@ -552,9 +549,8 @@ async function refreshCache() {
       // SQLite failed — fall back to 7-day in-memory cache
       console.warn('SQLite write failed, using in-memory cache:', err.message);
       const weekFiltered = validEvents.filter(e => {
-        const d = getEventDate(e);
-        if (!d) return true;
-        return d >= yesterday && d <= weekOut;
+        const active = isEventInDateRange(e, yesterday, weekOut);
+        return active === null ? true : active;
       });
       eventCache = weekFiltered;
       cacheTimestamp = Date.now();
@@ -697,9 +693,8 @@ async function refreshSources(sourceNames, { reprocess = false } = {}) {
   const today = getNycDateString(0);
   const monthOut = getNycDateString(30);
   const dateFiltered = newEvents.filter(e => {
-    const d = getEventDate(e);
-    if (!d) return true;
-    return d >= yesterday && d <= monthOut;
+    const active = isEventInDateRange(e, yesterday, monthOut);
+    return active === null ? true : active;
   });
   const validNew = filterKidsEvents(dateFiltered);
 
@@ -727,9 +722,8 @@ async function refreshSources(sourceNames, { reprocess = false } = {}) {
     // SQLite failed — fall back to in-memory merge
     console.warn('SQLite selective refresh failed, using in-memory:', err.message);
     const weekFiltered = validNew.filter(e => {
-      const d = getEventDate(e);
-      if (!d) return true;
-      return d >= today && d <= weekOut;
+      const active = isEventInDateRange(e, today, weekOut);
+      return active === null ? true : active;
     });
     eventCache = [...kept, ...weekFiltered];
     cacheTimestamp = Date.now();
@@ -803,9 +797,8 @@ async function getEvents(neighborhood, { dateRange } = {}) {
   const rangeStart = dateRange?.start || todayNyc;
   const rangeEnd = dateRange?.end || weekOutNyc;
   const filtered = ranked.filter(e => {
-    const d = getEventDate(e);
-    if (!d) return true; // keep undated events
-    return d >= rangeStart && d <= rangeEnd;
+    const active = isEventInDateRange(e, rangeStart, rangeEnd);
+    return active === null ? true : active; // keep undated events
   });
 
   console.log(`${filtered.length} events near ${neighborhood} (range ${rangeStart}..${rangeEnd}, cache: ${eventCache.length})`);
@@ -855,9 +848,8 @@ async function getEventsForBorough(borough, { dateRange, filters } = {}) {
   const rangeStart = dateRange?.start || todayNyc;
   const rangeEnd = dateRange?.end || weekOutNyc;
   const dateFiltered = inBorough.filter(e => {
-    const d = getEventDate(e);
-    if (!d) return true;
-    return d >= rangeStart && d <= rangeEnd;
+    const active = isEventInDateRange(e, rangeStart, rangeEnd);
+    return active === null ? true : active;
   });
 
   // Sort by date proximity x source tier x source vibe (discovery first)
@@ -897,9 +889,8 @@ async function getEventsCitywide({ dateRange, filters } = {}) {
   const rangeStart = dateRange?.start || todayNyc;
   const rangeEnd = dateRange?.end || weekOutNyc;
   const dateFiltered = qualityFiltered.filter(e => {
-    const d = getEventDate(e);
-    if (!d) return true;
-    return d >= rangeStart && d <= rangeEnd;
+    const active = isEventInDateRange(e, rangeStart, rangeEnd);
+    return active === null ? true : active;
   });
 
   // Rank by: date proximity (today first) x source tier x source vibe (discovery first)
@@ -1015,9 +1006,8 @@ function scanCityWide(filters) {
   const rangeStart = filters.date_range?.start || todayNyc;
   const rangeEnd = filters.date_range?.end || tomorrowNyc;
   const dateFiltered = qualityFiltered.filter(e => {
-    const d = getEventDate(e);
-    if (!d) return true;
-    return d >= rangeStart && d <= rangeEnd;
+    const active = isEventInDateRange(e, rangeStart, rangeEnd);
+    return active === null ? true : active;
   });
 
   let candidates = dateFiltered;

@@ -1,5 +1,5 @@
 const { setResponseState } = require('./session');
-const { filterByTimeAfter, parseAsNycTime, getEventDate } = require('./geo');
+const { filterByTimeAfter, parseAsNycTime, getEventDate, isEventInDateRange } = require('./geo');
 const { VALID_CATEGORIES } = require('./evals/scrape-audit');
 
 /**
@@ -253,14 +253,11 @@ function eventMatchesFilters(event, filters) {
   } else if (filters.category && event.category !== filters.category) {
     return false;
   }
-  // Date range filter: check event's date falls within range
+  // Date range filter: check event's date falls within range (multi-day events use series_end)
   if (filters.date_range) {
-    const eventDate = getEventDate(event);
-    if (eventDate) {
-      if (eventDate < filters.date_range.start || eventDate > filters.date_range.end) return false;
-    }
-    // Events without dates get soft match — we don't know if they're in range
-    if (!eventDate) return 'soft';
+    const active = isEventInDateRange(event, filters.date_range.start, filters.date_range.end);
+    if (active === null) return 'soft'; // undated — we don't know if they're in range
+    if (!active) return false;
   }
   // vibe has no event field to match — LLM handles vibe selection
   // If time filter active but event has no parseable time, downgrade to soft —
