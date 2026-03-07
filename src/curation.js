@@ -22,4 +22,4 @@ function filterIncomplete(events, threshold = 0.4) {
   return events.filter(e => (e.completeness || 0) >= threshold);
 }
 
-module.exports = { filterKidsEvents, filterIncomplete, KIDS_PATTERNS };
+module.exports = { filterKidsEvents, filterIncomplete };

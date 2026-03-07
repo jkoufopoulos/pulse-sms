@@ -450,35 +450,4 @@ function extractNeighborhood(message) {
   return null;
 }
 
-function getNeighborhoodCoords(name) {
-  const data = NEIGHBORHOODS[name];
-  if (!data) return null;
-  return { lat: data.lat, lng: data.lng, radius_km: data.radius_km };
-}
-
-// Known NYC-adjacent areas we don't cover — map to nearest alternatives
-const UNSUPPORTED_HOODS = {
-  'roosevelt island': ['Upper East Side', 'Astoria'],
-  'staten island': [],
-  'st george': [],
-  'hoboken': [],
-  'jersey city': [],
-};
-
-/**
- * Detect if a message refers to a real NYC place we don't support yet.
- * Returns { name, nearby } or null.
- */
-function detectUnsupported(message) {
-  const lower = message.toLowerCase().trim();
-  for (const [name, nearby] of Object.entries(UNSUPPORTED_HOODS)) {
-    const regex = new RegExp(`(?<!\\w)${escapeRegex(name)}(?!\\w)`);
-    if (regex.test(lower)) {
-      const title = name.split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
-      return { name: title, nearby };
-    }
-  }
-  return null;
-}
-
-module.exports = { NEIGHBORHOODS, BOROUGHS, extractNeighborhood, detectBorough, detectUnsupported, getNeighborhoodCoords };
+module.exports = { NEIGHBORHOODS, BOROUGHS, extractNeighborhood, detectBorough };

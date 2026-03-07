@@ -23,10 +23,6 @@ const { sendRuntimeAlert } = require('./alerts');
 const {
   callAgentBrain, continueWithResults, serializePoolForContinuation,
   brainCompose, welcomeCompose, buildBrainSystemPrompt,
-  getGeminiClient, GEMINI_SAFETY, BRAIN_TOOLS,
-  callAgentBrainAnthropic, extractGeminiUsage, withTimeout,
-  stripCodeFences, reconcilePicks,
-  BRAIN_COMPOSE_SYSTEM, BRAIN_COMPOSE_SCHEMA, WELCOME_COMPOSE_SYSTEM,
 } = require('./brain-llm');
 const {
   executeSearchEvents, executeRespond, handleWelcome,

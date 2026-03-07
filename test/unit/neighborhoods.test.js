@@ -1,5 +1,5 @@
 const { check } = require('../helpers');
-const { extractNeighborhood, detectBorough, detectUnsupported } = require('../../src/neighborhoods');
+const { extractNeighborhood, detectBorough } = require('../../src/neighborhoods');
 
 // ---- extractNeighborhood ----
 console.log('\nextractNeighborhood:');
@@ -26,12 +26,6 @@ check('detectBorough bk', detectBorough('anything in bk')?.borough === 'brooklyn
 check('detectBorough queens', detectBorough('queens')?.borough === 'queens');
 check('detectBorough brooklyn has hoods', detectBorough('brooklyn tonight')?.neighborhoods?.includes('Williamsburg'));
 check('detectBorough non-borough', detectBorough('east village') === null);
-// detectUnsupported tests
-check('detectUnsupported hoboken', detectUnsupported('hoboken')?.name === 'Hoboken');
-check('detectUnsupported hoboken has no nearby', detectUnsupported('hoboken')?.nearby?.length === 0);
-check('detectUnsupported known hood returns null', detectUnsupported('east village') === null);
-check('detectUnsupported bay ridge now supported', detectUnsupported('bay ridge') === null);
-check('detectUnsupported gibberish returns null', detectUnsupported('asdfjkl') === null);
 // New neighborhoods
 check('extractNeighborhood gramercy', extractNeighborhood('gramercy tonight') === 'Gramercy');
 check('extractNeighborhood clinton hill', extractNeighborhood('clinton hill bars') === 'Clinton Hill');
