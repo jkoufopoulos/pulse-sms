@@ -64,6 +64,7 @@ function startTrace(phone_masked, input_message) {
     brain_tool: null,       // "search_events" or "respond"
     brain_params: null,     // the tool call parameters
     brain_latency_ms: null, // brain LLM call time
+    brain_iterations: [],   // per-iteration timing [{tool, ms}]
     brain_provider: null,   // "gemini", "anthropic", or "mechanical"
     brain_error: null,      // error message if brain failed
     annotation: null,
@@ -410,8 +411,51 @@ function saveConversation(rawPhone, { label } = {}) {
   }
 }
 
+/**
+ * Compute latency percentile stats from an array of traces.
+ */
+function computeLatencyStats(traces) {
+  const zero = { count: 0, avg: 0, p50: 0, p95: 0, p99: 0, max: 0, brain_p50: 0, brain_p95: 0, outliers: [] };
+  if (!traces?.length) return zero;
+
+  const totals = traces.map(t => t.total_latency_ms || 0).sort((a, b) => a - b);
+  const brains = traces.filter(t => t.brain_latency_ms != null).map(t => t.brain_latency_ms).sort((a, b) => a - b);
+
+  function percentile(sorted, p) {
+    if (sorted.length === 0) return 0;
+    const idx = Math.ceil(p / 100 * sorted.length) - 1;
+    return sorted[Math.max(0, idx)];
+  }
+
+  const p95 = percentile(totals, 95);
+  const outlierThreshold = Math.max(p95 * 1.5, 8000);
+  const outliers = traces
+    .filter(t => (t.total_latency_ms || 0) > outlierThreshold)
+    .map(t => ({
+      id: t.id,
+      total_ms: t.total_latency_ms,
+      brain_ms: t.brain_latency_ms,
+      intent: t.output_intent,
+      message: (t.input_message || '').slice(0, 40),
+      timestamp: t.timestamp,
+    }))
+    .slice(0, 10);
+
+  return {
+    count: totals.length,
+    avg: Math.round(totals.reduce((a, b) => a + b, 0) / totals.length),
+    p50: percentile(totals, 50),
+    p95,
+    p99: percentile(totals, 99),
+    max: totals[totals.length - 1],
+    brain_p50: percentile(brains, 50),
+    brain_p95: percentile(brains, 95),
+    outliers,
+  };
+}
+
 module.exports = {
   startTrace, saveTrace, loadTraces, annotateTrace, getRecentTraces, getTraceById, getLatestTraceForPhone,
   recordConversationTurn, startConversationCapture, stopConversationCapture, saveConversation,
-  PRICING, recordAICost
+  PRICING, recordAICost, computeLatencyStats
 };

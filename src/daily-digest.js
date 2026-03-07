@@ -127,7 +127,9 @@ function generateDigest(eventCache, scrapeStats) {
     new Date(a.timestamp).getTime() > oneDayAgo
   ).length;
 
-  const latencyP95 = 0; // placeholder — traces not easily accessible from this module
+  const { computeLatencyStats, getRecentTraces } = require('./traces');
+  const latencyStats = computeLatencyStats(getRecentTraces(200));
+  const latencyP95 = latencyStats.p95;
 
   const status = computeDigestStatus({ sourcesBelow, cacheDrop, userFacingErrors, latencyP95 });
   const activeSourceCount = sourceData.filter(s => s.count > 0).length;
@@ -152,6 +154,12 @@ function generateDigest(eventCache, scrapeStats) {
       duration_ms: scrapeStats?.totalDurationMs || null,
       sources_ok: scrapeStats?.sourcesOk || 0,
       sources_failed: scrapeStats?.sourcesFailed || 0,
+    },
+    latency: {
+      p50: latencyStats.p50,
+      p95: latencyStats.p95,
+      max: latencyStats.max,
+      outlier_count: latencyStats.outliers.length,
     },
   };
 
@@ -184,6 +192,11 @@ function formatDigestEmail(report) {
 
   if (report.scrape.duration_ms) {
     lines.push(`Scrape: ${(report.scrape.duration_ms / 1000).toFixed(1)}s | ${report.scrape.sources_ok} ok, ${report.scrape.sources_failed} failed`);
+    lines.push('');
+  }
+
+  if (report.latency) {
+    lines.push(`Latency: p50 ${(report.latency.p50 / 1000).toFixed(1)}s | p95 ${(report.latency.p95 / 1000).toFixed(1)}s | max ${(report.latency.max / 1000).toFixed(1)}s${report.latency.outlier_count > 0 ? ` | ${report.latency.outlier_count} outliers` : ''}`);
     lines.push('');
   }
 

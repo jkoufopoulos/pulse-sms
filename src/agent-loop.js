@@ -414,6 +414,8 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
 
     // Trace
     trace.brain_provider = loopResult.provider;
+    trace.brain_latency_ms = loopResult.elapsed_ms || null;
+    trace.brain_iterations = loopResult.iterations || [];
     trace.brain_tool_calls = loopResult.toolCalls.map(tc => ({ name: tc.name, params: tc.params }));
     trace.routing.pre_routed = false;
     trace.routing.provider = loopResult.provider;
@@ -501,6 +503,8 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
 
         recordAICost(trace, 'brain_fallback', fallbackResult.totalUsage, fallbackResult.provider);
         trackAICost(phone, fallbackResult.totalUsage, fallbackResult.provider);
+        trace.brain_latency_ms = (trace.brain_latency_ms || 0) + (fallbackResult.elapsed_ms || 0);
+        trace.brain_iterations = [...(trace.brain_iterations || []), ...(fallbackResult.iterations || [])];
 
         const fbCompose = [...fallbackResult.toolCalls].reverse().find(tc => tc.name === 'compose_sms');
         const fbRespond = [...fallbackResult.toolCalls].reverse().find(tc => tc.name === 'respond');

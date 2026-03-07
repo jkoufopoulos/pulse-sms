@@ -178,11 +178,16 @@ Replaced 400-line switch statement with true multi-turn agent loop. `runAgentLoo
   - **Open: Pipeline recovery (2026-03-07)** -- Plan: `docs/plans/2026-03-07-self-healing-pipeline.md`. Five steps: graduated alerting, per-source timeouts, retry on timeout, quarantine diagnostics, auto-disable after 7 failures.
 - Web discovery crawlers -- Targeted searches for niche events beyond whitelisted sources
 
+### Observability
+
+- **Latency tracking** -- Plan: `docs/plans/2026-03-07-latency-tracking.md`. Populate `brain_latency_ms` from `runAgentLoop`, per-iteration timing, `/api/health/latency` endpoint (p50/p95/p99/max + outliers), wire `latencyP95` into daily digest (replaces placeholder), enhanced slow-request logging with brain breakdown.
+
 ### Infrastructure + Product
 
 - PostgreSQL -- Persistent event storage, user sessions, conversation history
 - Profile-based event ranking -- Re-rank tagged pool using user profile signals
 - Proactive user alerts -- Unsolicited texts for high-match events (opt-in, frequency caps)
+- Google Maps planning -- User asks the agent to "add these to maps" or "map it" and Pulse generates a Google Maps link with one or more picked events as pins. Helps users plan routes based on proximity to each other and to their current location. Could use Google Maps URLs with waypoints (`/dir/` or `/search/` with multiple query params). Key design questions: (1) do we send a single map link or per-event links, (2) do we include the user's location as origin if shared, (3) how to handle events without precise coordinates (venue geocoding via `venues.js`).
 - SMS map sharing -- Shareable map of picked event locations
 - Group planning / voting -- Multi-user coordination via shareable pick list
 - Paid tier -- Stripe billing, $5-10/month

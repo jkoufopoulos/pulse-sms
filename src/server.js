@@ -119,6 +119,32 @@ app.get('/api/health/costs', (req, res) => {
   });
 });
 
+// Latency stats API -- same auth gating as /health
+app.get('/api/health/latency', (req, res) => {
+  const authToken = process.env.HEALTH_AUTH_TOKEN;
+  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
+  const hasValidToken = authToken && req.query.token === authToken;
+
+  if (!isTestMode && !hasValidToken) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const { computeLatencyStats } = require('./traces');
+  const traces = getRecentTraces(200);
+
+  const nycToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  const todayTraces = traces.filter(t => {
+    if (!t.timestamp) return false;
+    const traceDate = new Date(t.timestamp).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+    return traceDate === nycToday;
+  });
+
+  res.json({
+    today: computeLatencyStats(todayTraces),
+    recent: computeLatencyStats(traces),
+  });
+});
+
 // SMS webhook
 app.use('/api/sms', smsRoutes);
 

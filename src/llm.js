@@ -393,6 +393,7 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
   const provider = getProvider(model);
   const loopStart = Date.now();
   const toolCalls = [];
+  const iterations = [];
   let totalUsage = { input_tokens: 0, output_tokens: 0 };
 
   function addUsage(usage) {
@@ -435,10 +436,11 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
       if (!fnCall?.functionCall) {
         // No tool call — LLM is done, return text
         const textPart = parts.find(p => p.text);
-        return { text: textPart?.text || '', toolCalls, totalUsage, provider };
+        return { text: textPart?.text || '', toolCalls, totalUsage, provider, elapsed_ms: Date.now() - loopStart, iterations };
       }
 
       // Execute the tool
+      const iterStart = Date.now();
       const toolName = fnCall.functionCall.name;
       const toolParams = fnCall.functionCall.args || {};
       const toolResult = await executeTool(toolName, toolParams);
@@ -446,7 +448,8 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
 
       // Stop early if this is a terminal tool (no extra LLM call needed)
       if (stopTools.includes(toolName)) {
-        return { text: '', toolCalls, totalUsage, provider };
+        iterations.push({ tool: toolName, ms: Date.now() - iterStart });
+        return { text: '', toolCalls, totalUsage, provider, elapsed_ms: Date.now() - loopStart, iterations };
       }
 
       // Send result back
@@ -460,14 +463,17 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
       // Handle MALFORMED_FUNCTION_CALL — model tried to call a tool but generated bad JSON
       if (response.candidates?.[0]?.finishReason === 'MALFORMED_FUNCTION_CALL') {
         console.warn(`[agentLoop] MALFORMED_FUNCTION_CALL on turn ${i + 2}`);
-        return { text: '', toolCalls, totalUsage, provider, malformedCall: true };
+        iterations.push({ tool: toolName, ms: Date.now() - iterStart });
+        return { text: '', toolCalls, totalUsage, provider, malformedCall: true, elapsed_ms: Date.now() - loopStart, iterations };
       }
+
+      iterations.push({ tool: toolName, ms: Date.now() - iterStart });
     }
 
     // Hit max iterations — extract whatever text we have
     const finalParts = response.candidates?.[0]?.content?.parts || [];
     const finalText = finalParts.find(p => p.text);
-    return { text: finalText?.text || '', toolCalls, totalUsage, provider };
+    return { text: finalText?.text || '', toolCalls, totalUsage, provider, elapsed_ms: Date.now() - loopStart, iterations };
   }
 
   if (provider === 'anthropic') {
@@ -493,16 +499,18 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
       if (!toolBlock) {
         // No tool call — return text
         const textBlock = response.content.find(b => b.type === 'text');
-        return { text: textBlock?.text || '', toolCalls, totalUsage, provider };
+        return { text: textBlock?.text || '', toolCalls, totalUsage, provider, elapsed_ms: Date.now() - loopStart, iterations };
       }
 
       // Execute the tool
+      const iterStart = Date.now();
       const toolResult = await executeTool(toolBlock.name, toolBlock.input || {});
       toolCalls.push({ name: toolBlock.name, params: toolBlock.input || {}, result: toolResult });
 
       // Stop early if this is a terminal tool (no extra LLM call needed)
       if (stopTools.includes(toolBlock.name)) {
-        return { text: '', toolCalls, totalUsage, provider };
+        iterations.push({ tool: toolBlock.name, ms: Date.now() - iterStart });
+        return { text: '', toolCalls, totalUsage, provider, elapsed_ms: Date.now() - loopStart, iterations };
       }
 
       // Append assistant response + tool result for next turn
@@ -511,10 +519,12 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
         role: 'user',
         content: [{ type: 'tool_result', tool_use_id: toolBlock.id, content: JSON.stringify(toolResult) }],
       });
+
+      iterations.push({ tool: toolBlock.name, ms: Date.now() - iterStart });
     }
 
     // Hit max iterations
-    return { text: '', toolCalls, totalUsage, provider };
+    return { text: '', toolCalls, totalUsage, provider, elapsed_ms: Date.now() - loopStart, iterations };
   }
 
   throw new Error(`Unsupported provider: ${provider}`);

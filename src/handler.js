@@ -210,9 +210,11 @@ async function handleMessageAI(phone, message) {
     if (trace.total_latency_ms > SLOW_THRESHOLD_MS) {
       const breakdown = [
         `route: ${trace.routing.latency_ms}ms`,
+        trace.brain_latency_ms != null ? `brain: ${trace.brain_latency_ms}ms` : null,
         trace.events.getEvents_ms != null ? `events: ${trace.events.getEvents_ms}ms` : null,
         `compose: ${trace.composition.latency_ms}ms`,
         `total: ${trace.total_latency_ms}ms`,
+        trace.brain_iterations?.length > 1 ? `iterations: ${trace.brain_iterations.map(it => `${it.tool}:${it.ms}ms`).join(',')}` : null,
       ].filter(Boolean).join(' | ');
       console.warn(`[SLOW] ${(trace.total_latency_ms / 1000).toFixed(1)}s | ${breakdown} | intent=${trace.output_intent} | msg="${trace.input_message.slice(0, 40)}"`);
 
