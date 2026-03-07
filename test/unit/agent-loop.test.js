@@ -48,3 +48,11 @@ check('multi-call: last search wins', deriveIntent([
   { name: 'search_events', params: { intent: 'new_search' } },
   { name: 'search_events', params: { intent: 'refine' } },
 ]) === 'events');
+
+// ---- show_welcome in BRAIN_TOOLS ----
+console.log('\nshow_welcome tool:');
+
+const { BRAIN_TOOLS } = require('../../src/brain-llm');
+const welcomeTool = BRAIN_TOOLS.find(t => t.name === 'show_welcome');
+check('show_welcome tool exists in BRAIN_TOOLS', !!welcomeTool);
+check('show_welcome has no required params', !welcomeTool.parameters.required || welcomeTool.parameters.required.length === 0);

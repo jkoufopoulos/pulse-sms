@@ -102,6 +102,14 @@ const BRAIN_TOOLS = [
       required: ['sms_text', 'picks'],
     },
   },
+  {
+    name: 'show_welcome',
+    description: 'Show tonight\'s top picks as a welcome message. ONLY call this when the SESSION CONTEXT says "First message — new session" AND the user sent a casual greeting (hey, hi, yo, hello, what\'s up, etc). Do NOT use for returning users, specific requests, questions, or abuse.',
+    parameters: {
+      type: 'object',
+      properties: {},
+    },
+  },
 ];
 
 // --- System prompt for the brain ---
