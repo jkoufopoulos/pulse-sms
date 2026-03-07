@@ -78,5 +78,5 @@ npm test               # smoke tests (905 tests, $0)
 ## Links
 
 - [Simulator](https://web-production-c8fdb.up.railway.app/test) — try it in a browser
-- [Architecture Explorer](https://web-production-c8fdb.up.railway.app/architecture) — interactive pipeline diagram
+- [Architecture Explorer](https://jkoufopoulos.github.io/pulse-sms/architecture.html) — interactive pipeline diagram
 - [Health Dashboard](https://web-production-c8fdb.up.railway.app/health) — scraper status and event counts

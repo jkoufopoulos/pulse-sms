@@ -124,8 +124,7 @@ app.use('/api/sms', smsRoutes);
 
 // Architecture explorer (read-only doc, always available)
 app.get('/architecture', (req, res) => {
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
-  res.sendFile(require('path').join(__dirname, 'architecture.html'));
+  res.redirect(301, 'https://jkoufopoulos.github.io/pulse-sms/architecture.html');
 });
 
 // Eval report viewer (read-only, always available)
