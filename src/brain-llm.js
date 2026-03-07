@@ -86,6 +86,22 @@ const BRAIN_TOOLS = [
       required: ['message', 'intent'],
     },
   },
+  {
+    name: 'compose_sms',
+    description: 'Write the final SMS after seeing search results. Call this after search_events returns events. Do NOT call after respond — use respond for conversational messages.',
+    parameters: {
+      type: 'object',
+      properties: {
+        sms_text: { type: 'string', description: 'SMS text to send, max 480 chars. Each pick on its own line: Event Name — Venue, time (price)' },
+        picks: {
+          type: 'array',
+          description: 'Event IDs of events you recommended, in the order shown in sms_text',
+          items: { type: 'string' },
+        },
+      },
+      required: ['sms_text', 'picks'],
+    },
+  },
 ];
 
 // --- System prompt for the brain ---
@@ -136,6 +152,11 @@ function buildBrainSystemPrompt(session) {
     : '';
 
   return `You are Pulse, an NYC nightlife and events SMS bot. You text like a plugged-in friend — warm, opinionated, concise.
+
+TOOL FLOW:
+- Conversational messages (greetings, questions, thanks): call respond.
+- Event requests: call search_events, then call compose_sms with your SMS text and the picked event IDs.
+- If you can't call compose_sms, write the SMS as plain text — that works too.
 
 A bare neighborhood name (e.g. "bushwick", "LES") means "show me events there" — call search_events.
 If search returns zero results, you can try again with broader filters or nearby neighborhoods.

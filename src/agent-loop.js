@@ -98,9 +98,13 @@ function deriveIntent(toolCalls) {
     return 'events';
   }
 
-  // Only respond calls
+  // Only respond or compose_sms calls
   const lastRespond = [...toolCalls].reverse().find(tc => tc.name === 'respond');
   if (lastRespond) return 'conversational';
+
+  // compose_sms without search_events — shouldn't happen but handle it
+  const lastCompose = [...toolCalls].reverse().find(tc => tc.name === 'compose_sms');
+  if (lastCompose) return 'events';
 
   return 'conversational';
 }
@@ -117,6 +121,10 @@ function deriveIntent(toolCalls) {
 async function executeTool(toolName, params, session, phone, trace) {
   if (toolName === 'respond') {
     return { ok: true, intent: params.intent };
+  }
+
+  if (toolName === 'compose_sms') {
+    return { ok: true };
   }
 
   if (toolName === 'search_events') {
@@ -216,20 +224,22 @@ async function executeTool(toolName, params, session, phone, trace) {
         };
       }
 
-      // Found — return event details for LLM to compose
+      // Found — compose details SMS from template (no LLM call needed)
       const event = detailsResult.event;
+      const price = event.is_free ? 'Free' : (event.price_display || 'Check price');
+      const desc = event.description_short || event.short_detail || '';
+      const time = event.start_time_local
+        ? new Date(event.start_time_local).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })
+        : 'tonight';
+      const lines = [
+        `${event.name} — ${event.venue_name}, ${event.neighborhood || ''}`,
+        `${time} | ${price}`,
+        desc ? `\n${desc}` : '',
+      ].filter(Boolean);
+      const detailSms = lines.join('\n');
       return {
-        intent: 'details',
-        event: {
-          id: event.id, name: event.name, venue_name: event.venue_name,
-          neighborhood: event.neighborhood, category: event.category,
-          start_time_local: event.start_time_local, date_local: event.date_local,
-          is_free: event.is_free, price_display: event.price_display,
-          description: event.description_short || event.short_detail || '',
-          ticket_url: event.ticket_url || event.source_url || null,
-          venue_address: event.venue_address || null,
-          why: detailsResult.pick?.why || '',
-        },
+        ok: true,
+        _smsText: detailSms,
         _detailsResult: detailsResult,
       };
     }
@@ -272,6 +282,11 @@ function saveSessionFromToolCalls(phone, session, toolCalls, smsText) {
 
   const lastSearch = [...toolCalls].reverse().find(tc => tc.name === 'search_events');
   const lastRespond = [...toolCalls].reverse().find(tc => tc.name === 'respond');
+  const lastCompose = [...toolCalls].reverse().find(tc => tc.name === 'compose_sms');
+
+  // Build picks: prefer compose_sms (structured), fall back to extractPicksFromSms (fuzzy)
+  const composePickIds = lastCompose?.params?.picks || [];
+  let composePicks = composePickIds.map((id, i) => ({ rank: i + 1, event_id: id }));
 
   // respond only (no search) — preserve existing session
   if (!lastSearch && lastRespond) {
@@ -322,13 +337,12 @@ function saveSessionFromToolCalls(phone, session, toolCalls, smsText) {
       return;
     }
 
-    // Extract picks from SMS text
-    const picks = extractPicksFromSms(smsText, moreResult.events || []);
     const eventMap = buildEventMap(moreResult.events || []);
+    const morePicks = composePicks.length > 0 ? composePicks : extractPicksFromSms(smsText, moreResult.events || []);
 
     saveResponseFrame(phone, {
       mode: 'more',
-      picks,
+      picks: morePicks,
       prevSession: session,
       eventMap: session?.lastEvents || eventMap,
       neighborhood: moreResult.neighborhood,
@@ -345,19 +359,19 @@ function saveSessionFromToolCalls(phone, session, toolCalls, smsText) {
   const poolResult = result?._poolResult;
   if (!poolResult) return;
 
-  // Extract picks from SMS text
-  const allEvents = [...(poolResult.curated || []), ...(poolResult.pool || [])];
-  const picks = extractPicksFromSms(smsText, allEvents);
   const eventMap = buildEventMap(poolResult.curated || []);
   for (const e of (poolResult.pool || [])) eventMap[e.id] = e;
 
+  const allEvents = [...(poolResult.curated || []), ...(poolResult.pool || [])];
+  const searchPicks = composePicks.length > 0 ? composePicks : extractPicksFromSms(smsText, allEvents);
+
   saveResponseFrame(phone, {
-    picks,
+    picks: searchPicks,
     eventMap,
     neighborhood: poolResult.hood,
     borough: poolResult.borough,
     filters: poolResult.activeFilters,
-    offeredIds: picks.map(p => p.event_id),
+    offeredIds: searchPicks.map(p => p.event_id),
     visitedHoods: [...new Set([...(session?.visitedHoods || []), poolResult.hood || poolResult.borough || 'citywide'])],
     pending: poolResult.suggestedHood ? { neighborhood: poolResult.suggestedHood, filters: poolResult.activeFilters } : null,
   });
@@ -391,7 +405,7 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     const loopResult = await runAgentLoop(
       MODELS.brain, systemPrompt, message, BRAIN_TOOLS,
       executeAndTrack,
-      { maxIterations: 3, timeout: 12000 }
+      { maxIterations: 3, timeout: 12000, stopTools: ['respond', 'compose_sms'] }
     );
 
     // Record costs
@@ -404,13 +418,34 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     trace.routing.pre_routed = false;
     trace.routing.provider = loopResult.provider;
 
-    // Determine SMS: respond tool = params.message, search = final text
+    // Determine SMS: compose_sms > respond > _smsText (details) > loopResult.text
     let smsText;
+    const lastCompose = [...rawResults].reverse().find(tc => tc.name === 'compose_sms');
     const lastRespond = [...rawResults].reverse().find(tc => tc.name === 'respond');
-    if (lastRespond) {
+    const detailsResult = [...rawResults].reverse().find(tc => tc.result?._smsText);
+    if (lastCompose) {
+      smsText = lastCompose.params.sms_text;
+    } else if (lastRespond) {
       smsText = lastRespond.params.message;
+    } else if (detailsResult) {
+      smsText = detailsResult.result._smsText;
     } else {
       smsText = loopResult.text;
+    }
+    // Fallback: if model failed to compose (MALFORMED_FUNCTION_CALL), build SMS from pool
+    if (!smsText) {
+      const lastSearchFb = [...rawResults].reverse().find(tc => tc.name === 'search_events');
+      const pool = lastSearchFb?.result?._poolResult?.pool;
+      if (pool?.length > 0) {
+        const top3 = pool.slice(0, 3);
+        const hood = lastSearchFb.result?._poolResult?.hood || 'NYC';
+        const lines = top3.map(e => {
+          const price = e.is_free ? 'free' : (e.price_display || 'check price');
+          return `${e.name} — ${e.venue_name}, ${e.start_time_local ? new Date(e.start_time_local).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) : 'tonight'} (${price})`;
+        });
+        smsText = `Tonight in ${hood}:\n\n${lines.join('\n')}\n\nReply 1-3 for details or MORE for more picks.`;
+        console.warn(`[agent-loop] Used template fallback for SMS composition`);
+      }
     }
     smsText = smartTruncate(smsText || "Tell me what you're in the mood for -- drop a neighborhood or a vibe.");
 
@@ -428,9 +463,12 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
       const poolResult = lastSearch.result._poolResult;
       const eventMap = buildEventMap(poolResult.curated || []);
       for (const e of (poolResult.pool || [])) eventMap[e.id] = e;
-      const picks = extractPicksFromSms(smsText, [...(poolResult.curated || []), ...(poolResult.pool || [])]);
-      if (picks.length > 0) {
-        smsText = injectMissingPrices(smsText, picks, eventMap);
+      const allEvents = [...(poolResult.curated || []), ...(poolResult.pool || [])];
+      const pricePicks = lastCompose
+        ? (lastCompose.params.picks || []).map((id, i) => ({ rank: i + 1, event_id: id }))
+        : extractPicksFromSms(smsText, allEvents);
+      if (pricePicks.length > 0) {
+        smsText = injectMissingPrices(smsText, pricePicks, eventMap);
       }
     }
 
@@ -458,14 +496,15 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
         const fallbackResult = await runAgentLoop(
           MODELS.fallback, systemPrompt, message, BRAIN_TOOLS,
           async (toolName, params) => sanitizeForLLM(await executeTool(toolName, params, session, phone, trace)),
-          { maxIterations: 2, timeout: 12000 }
+          { maxIterations: 2, timeout: 12000, stopTools: ['respond', 'compose_sms'] }
         );
 
         recordAICost(trace, 'brain_fallback', fallbackResult.totalUsage, fallbackResult.provider);
         trackAICost(phone, fallbackResult.totalUsage, fallbackResult.provider);
 
-        const lastRespond = [...fallbackResult.toolCalls].reverse().find(tc => tc.name === 'respond');
-        let fbSmsText = lastRespond ? lastRespond.params.message : fallbackResult.text;
+        const fbCompose = [...fallbackResult.toolCalls].reverse().find(tc => tc.name === 'compose_sms');
+        const fbRespond = [...fallbackResult.toolCalls].reverse().find(tc => tc.name === 'respond');
+        let fbSmsText = fbCompose ? fbCompose.params.sms_text : fbRespond ? fbRespond.params.message : fallbackResult.text;
         fbSmsText = smartTruncate(fbSmsText || "Tell me what you're in the mood for!");
 
         await sendSMS(phone, fbSmsText);

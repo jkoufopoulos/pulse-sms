@@ -389,7 +389,7 @@ async function continueChat(chatSession, toolName, toolResult, options = {}) {
  * @returns {{ text: string, toolCalls: Array<{name, params, result}>, totalUsage: object, provider: string }}
  */
 async function runAgentLoop(model, systemPrompt, message, tools, executeTool, options = {}) {
-  const { maxIterations = 3, timeout = 15000 } = options;
+  const { maxIterations = 3, timeout = 15000, stopTools = [] } = options;
   const provider = getProvider(model);
   const loopStart = Date.now();
   const toolCalls = [];
@@ -444,6 +444,11 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
       const toolResult = await executeTool(toolName, toolParams);
       toolCalls.push({ name: toolName, params: toolParams, result: toolResult });
 
+      // Stop early if this is a terminal tool (no extra LLM call needed)
+      if (stopTools.includes(toolName)) {
+        return { text: '', toolCalls, totalUsage, provider };
+      }
+
       // Send result back
       result = await withTimeout(
         chat.sendMessage([{ functionResponse: { name: toolName, response: toolResult } }]),
@@ -451,6 +456,12 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
       );
       response = result.response;
       addUsage(extractGeminiUsage(response));
+
+      // Handle MALFORMED_FUNCTION_CALL — model tried to call a tool but generated bad JSON
+      if (response.candidates?.[0]?.finishReason === 'MALFORMED_FUNCTION_CALL') {
+        console.warn(`[agentLoop] MALFORMED_FUNCTION_CALL on turn ${i + 2}`);
+        return { text: '', toolCalls, totalUsage, provider, malformedCall: true };
+      }
     }
 
     // Hit max iterations — extract whatever text we have
@@ -488,6 +499,11 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
       // Execute the tool
       const toolResult = await executeTool(toolBlock.name, toolBlock.input || {});
       toolCalls.push({ name: toolBlock.name, params: toolBlock.input || {}, result: toolResult });
+
+      // Stop early if this is a terminal tool (no extra LLM call needed)
+      if (stopTools.includes(toolBlock.name)) {
+        return { text: '', toolCalls, totalUsage, provider };
+      }
 
       // Append assistant response + tool result for next turn
       messages.push({ role: 'assistant', content: response.content });
