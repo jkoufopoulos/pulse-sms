@@ -46,7 +46,7 @@ The server must be running for pipeline evals, scenario evals, and A/B evals. Un
 npm test
 ```
 
-**Read the output:** Every line says `PASS` or `FAIL` with the test name. Exit code 0 = all pass. Currently 124 tests.
+**Read the output:** Every line says `PASS` or `FAIL` with the test name. Exit code 0 = all pass. Currently 905+ tests.
 
 **When to run:** After any code change, before committing. This is the fastest feedback loop.
 
@@ -150,39 +150,16 @@ node scripts/run-evals.js
 node scripts/run-evals.js --url=http://localhost:3000
 ```
 
-Runs 24 deterministic checks per trace:
+Runs 6 invariant checks per trace (trimmed from 24 in Phase 5, 2026-03-07):
 
-**Core:**
 1. `char_limit` — SMS under 480 chars
-2. `valid_intent` — intent is one of 6 valid types
+2. `valid_intent` — intent is one of the valid types
 3. `valid_neighborhood` — neighborhood is in the known set
 4. `response_not_empty` — SMS is not blank
 5. `valid_urls` — all URLs in SMS are parseable
 6. `latency_under_10s` — total response time under 10 seconds
 
-**Data accuracy:**
-7. `picked_events_exist` — pick IDs match sent event IDs
-8. `day_label_accuracy` — "tonight" matches today's events, "tomorrow" matches tomorrow's
-9. `pick_count_accuracy` — numbered items in SMS match picks count
-10. `neighborhood_accuracy` — picked events are in the claimed neighborhood
-11. `category_adherence` — picks match the active category filter
-12. `free_claim_accuracy` — picks match the free_only filter
-13. `compound_filter_accuracy` — picks satisfy both free + category simultaneously
-14. `filter_match_alignment` — picks come from [MATCH]-tagged pool events
-15. `time_filter_accuracy` — picks start after the time_after filter
-16. `neighborhood_expansion_transparency` — SMS acknowledges when picks are from nearby hoods
-17. `price_transparency` — SMS mentions price or "free" when data is available
-
-**Schema/routing:**
-18. `schema_compliance` — LLM raw response is valid JSON with required fields
-19. `model_routing_captured` — trace has model routing score, tier, and model
-20. `ai_cost_tracked` — AI cost recorded for LLM-hitting traces
-
-**Behavioral:**
-21. `off_topic_redirect` — conversational responses redirect to events
-22. `filter_intent_gating` — filter state derived from agent brain tool call params (P1)
-23. `split_validation_effective` — reports split-mode intervention stats (informational)
-24. `discovery_lean` — measures editorial lean toward discovery/niche sources (informational)
+The following 18 checks were removed during Phase 5 code eval trimming: `picked_events_exist`, `day_label_accuracy`, `pick_count_accuracy`, `neighborhood_accuracy`, `category_adherence`, `free_claim_accuracy`, `compound_filter_accuracy`, `filter_match_alignment`, `time_filter_accuracy`, `neighborhood_expansion_transparency`, `price_transparency`, `schema_compliance`, `model_routing_captured`, `ai_cost_tracked`, `off_topic_redirect`, `filter_intent_gating`, `split_validation_effective`, `discovery_lean`.
 
 Plus expectation checks per case (expected intent, expected neighborhood, banned words).
 
@@ -286,7 +263,7 @@ Key things to look for:
 
 ## Layer 3b: Regression Evals
 
-**What it checks:** Principle-specific behavioral assertions tied to P1-P12 architecture principles. Each scenario has deterministic assertions (not LLM-judged) that verify specific invariants.
+**What it checks:** Principle-specific behavioral assertions tied to P1-P7 architecture principles. Each scenario has deterministic assertions (not LLM-judged) that verify specific invariants.
 
 **Test cases:** `data/fixtures/regression-scenarios.json` — 124 scenarios with assertions tied to specific principles.
 
@@ -299,7 +276,7 @@ node scripts/run-regression-evals.js
 node scripts/run-regression-evals.js --url=https://web-production-c8fdb.up.railway.app
 ```
 
-**When to run:** After any change that touches handler.js, agent-brain.js, pipeline.js, or session state logic. These catch principle violations that scenario evals might miss.
+**When to run:** After any change that touches handler.js, agent-loop.js, brain-llm.js, pipeline.js, or session state logic. These catch principle violations that scenario evals might miss.
 
 ---
 

@@ -514,7 +514,7 @@
       </li>
       <li>
         <span class="layer-num">3</span>
-        <span><strong>Code evals</strong> &mdash; 24 deterministic trace checks on full pipeline output: char limit, valid intent, valid neighborhood, picked events exist, day-label accuracy, filter match alignment, and more. <strong style="color: var(--green);">Free. ~3min.</strong></span>
+        <span><strong>Code evals</strong> &mdash; 6 invariant checks on full pipeline output: char limit, valid intent, valid neighborhood, picked events exist, day-label accuracy, filter match alignment, and more. <strong style="color: var(--green);">Free. ~3min.</strong></span>
       </li>
       <li>
         <span class="layer-num">4</span>
@@ -728,7 +728,7 @@
     <p class="section-label">Layer 3</p>
     <h2 class="section-title">Code evals</h2>
     <div class="section-body">
-      <p>The workhorse layer. Sends 386 scenario cases through the full live pipeline (routing, event fetch, curation, compose, SMS send), then runs 24 deterministic checks on each trace. Free, because the checks are just JavaScript &mdash; the only cost is the compose calls during the pipeline run.</p>
+      <p>The workhorse layer. Sends 386 scenario cases through the full live pipeline (routing, event fetch, curation, compose, SMS send), then runs 6 invariant checks on each trace. Free, because the checks are just JavaScript &mdash; the only cost is the compose calls during the pipeline run.</p>
     </div>
 
     <div class="code-block"><span class="hl-dim"># Code checks only (free after initial pipeline run)</span>
@@ -1076,7 +1076,7 @@ ls -t data/reports/eval-*.json | head -1 | xargs cat | jq '
     <details>
       <summary><span class="step-label">Step 4</span> Pipeline evals <span class="step-preview">free, ~3min</span></summary>
       <div class="detail-body">
-        <p>386 scenario cases through the full pipeline. 24 deterministic checks + expectation assertions per case.</p>
+        <p>386 scenario cases through the full pipeline. 6 invariant checks + expectation assertions per case.</p>
         <div class="code-block"><span class="hl">npm run eval</span></div>
       </div>
     </details>

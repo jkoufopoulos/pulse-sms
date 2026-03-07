@@ -341,11 +341,11 @@
 <p class="subtitle">Pulse turns a text message into a curated night out. Users text a neighborhood — "Bushwick", "LES", "prospect park" — and get back 1-3 opinionated event picks under 480 characters. They can reply a number for details, "more" for extra picks, or refine with follow-ups like "how about comedy" or "later tonight." The entire experience happens in a single SMS thread with no app, no account, and no links until you ask.</p>
 
 <div class="metrics">
-  <div class="metric"><div class="metric-value">2</div><div class="metric-label">LLM prompts (agent brain + extraction)</div></div>
+  <div class="metric"><div class="metric-value">2</div><div class="metric-label">LLM prompts (agent loop + extraction)</div></div>
   <div class="metric"><div class="metric-value">22</div><div class="metric-label">Event sources (scrapers)</div></div>
-  <div class="metric"><div class="metric-value">36</div><div class="metric-label">NYC neighborhoods</div></div>
-  <div class="metric"><div class="metric-value">7</div><div class="metric-label">Intent types</div></div>
-  <div class="metric"><div class="metric-value">1</div><div class="metric-label">Agent brain call (tool calling + compose)</div></div>
+  <div class="metric"><div class="metric-value">75</div><div class="metric-label">NYC neighborhoods</div></div>
+  <div class="metric"><div class="metric-value">2</div><div class="metric-label">Agent tools (search_events + respond)</div></div>
+  <div class="metric"><div class="metric-value">3</div><div class="metric-label">Max agent loop iterations</div></div>
   <div class="metric"><div class="metric-value">4</div><div class="metric-label">LLM-powered scrapers</div></div>
   <div class="metric"><div class="metric-value">480</div><div class="metric-label">SMS char limit</div></div>
   <div class="metric"><div class="metric-value">27</div><div class="metric-label">Files in src/</div></div>
@@ -366,8 +366,8 @@
   <tr>
     <td><strong>SMS Pipeline</strong></td>
     <td>On each incoming text</td>
-    <td>Agent brain (Gemini 2.5 Flash Lite tool calling + compose). Haiku fallback on Gemini failure. Zero scraping.</td>
-    <td>2-3 seconds</td>
+    <td>Agent loop (Gemini 2.5 Flash Lite multi-turn tool calling, max 3 iterations). Model writes plain text SMS. Haiku fallback on Gemini failure. Zero scraping.</td>
+    <td>2-5 seconds</td>
     <td>Per message</td>
   </tr>
 </table>
@@ -473,7 +473,7 @@
 <!-- ============================================================ -->
 <section id="sms-pipeline">
 <h2>SMS Request Pipeline</h2>
-<p>When a user texts Pulse, the message goes through this flow. The agent brain handles all semantic understanding via Gemini 2.5 Flash Lite tool calling, with checkMechanical catching $0 shortcuts first.</p>
+<p>When a user texts Pulse, the message goes through this flow. The agent loop handles all semantic understanding via Gemini 2.5 Flash Lite multi-turn tool calling (max 3 iterations), with checkMechanical catching help + TCPA only ($0).</p>
 
 <div class="flow">
   <div class="flow-step">
@@ -494,21 +494,21 @@
     <div class="step-label">$0 Shortcuts</div>
     <div class="step-title">checkMechanical()</div>
     <div class="step-file">agent-brain.js</div>
-    <div class="step-detail">help, 1-5 details, more, greetings/bye — handled without LLM ($0)</div>
+    <div class="step-detail">help + TCPA only — handled without LLM ($0)</div>
   </div>
   <div class="flow-arrow">&rarr;</div>
   <div class="flow-step llm">
-    <div class="step-label">Agent Brain</div>
-    <div class="step-title">callAgentBrain()</div>
-    <div class="step-file">agent-brain.js</div>
-    <div class="step-detail">Gemini 2.5 Flash Lite with 3 tools: search_events, get_details, respond. Haiku fallback on Gemini 503.</div>
+    <div class="step-label">Agent Loop</div>
+    <div class="step-title">handleAgentRequest()</div>
+    <div class="step-file">agent-loop.js</div>
+    <div class="step-detail">Orchestrator: calls runAgentLoop() with 2 tools: search_events, respond. Haiku fallback on Gemini failure.</div>
   </div>
   <div class="flow-arrow">&rarr;</div>
   <div class="flow-step llm">
-    <div class="step-label">Compose</div>
-    <div class="step-title">brainCompose()</div>
-    <div class="step-file">agent-brain.js</div>
-    <div class="step-detail">Gemini 2.5 Flash Lite SMS composition (~400 token prompt). ~$0.0005/msg total.</div>
+    <div class="step-label">Multi-turn Loop</div>
+    <div class="step-title">runAgentLoop()</div>
+    <div class="step-file">llm.js</div>
+    <div class="step-detail">Gemini 2.5 Flash Lite multi-turn tool calling (max 3 iterations). Model calls tools, gets results, writes plain text SMS. ~$0.001/msg.</div>
   </div>
   <div class="flow-arrow">&rarr;</div>
   <div class="flow-step">
@@ -520,18 +520,14 @@
 </div>
 
 <h3>checkMechanical Coverage</h3>
-<p><code>checkMechanical()</code> in agent-brain.js handles a small set of messages as $0 shortcuts. Everything else goes to the agent brain's tool calling for semantic understanding.</p>
+<p><code>checkMechanical()</code> in agent-brain.js handles help + TCPA only ($0). Everything else — including bare numbers, "more", greetings, filters — goes to the agent loop's tool calling for semantic understanding.</p>
 <table>
   <tr><th>Pattern</th><th>Intent</th><th>Example</th></tr>
   <tr><td><code>/^(help|\?)$/i</code></td><td>help</td><td>"help", "?"</td></tr>
-  <tr><td><code>/^[1-5]$/</code></td><td>details (with session)</td><td>"1", "2", "3"</td></tr>
-  <tr><td><code>/^(more|show me more|...)$/i</code></td><td>more</td><td>"more", "what else"</td></tr>
-  <tr><td><code>/^(hey|hi|hello|...)$/i</code></td><td>greeting</td><td>"hey", "hello"</td></tr>
-  <tr><td><code>/^(thanks|thank you|...)$/i</code></td><td>thanks</td><td>"thanks", "ty"</td></tr>
-  <tr><td><code>/^(bye|later|...)$/i</code></td><td>bye</td><td>"bye", "peace"</td></tr>
+  <tr><td>TCPA opt-out words</td><td>TCPA</td><td>"STOP", "UNSUBSCRIBE", "CANCEL", "QUIT"</td></tr>
 </table>
 <div class="annotation">
-  <strong>Everything else goes to the agent brain.</strong> Filter detection (category, time, vibe, free), neighborhood resolution, compound requests, off-topic deflection, boroughs — all handled by Gemini tool calling via <code>search_events</code> params. No pre-router or deterministic filter injection.
+  <strong>Everything else goes to the agent loop.</strong> Bare numbers, "more", greetings, filter detection (category, time, vibe, free), neighborhood resolution, compound requests, off-topic deflection, boroughs — all handled by Gemini multi-turn tool calling via <code>search_events</code> and <code>respond</code> tools. No pre-router or deterministic filter injection.
 </div>
 
 <h3>Error Handling</h3>
@@ -550,9 +546,9 @@
     <td>sendRuntimeAlert('handler_error')</td>
   </tr>
   <tr>
-    <td><span class="badge badge-error">Gemini failure (503)</span></td>
+    <td><span class="badge badge-error">Gemini failure</span></td>
     <td>Falls back to Anthropic Haiku</td>
-    <td><code>agent-brain.js</code></td>
+    <td><code>agent-loop.js</code></td>
     <td>Console only</td>
   </tr>
   <tr>
@@ -567,36 +563,36 @@
 <!-- ============================================================ -->
 <section id="intents">
 <h2>Intent System</h2>
-<p>Every incoming message is routed through <code>checkMechanical()</code> first for $0 shortcuts. Everything else goes to the agent brain, which decides intent via tool calls.</p>
+<p>Every incoming message is routed through <code>checkMechanical()</code> first for help + TCPA ($0). Everything else goes to the agent loop, which decides intent via tool calls.</p>
 
 <div class="intent-grid">
   <div class="intent-card">
     <h4>events / search</h4>
-    <div class="route">Agent brain: search_events(neighborhood, categories, time_filter, free_only, date_range)</div>
-    <div class="handler">callAgentBrain() → search_events tool → brainCompose()</div>
-    <div class="llm-calls">LLM calls: 1 agent brain + 1 compose (Gemini 2.5 Flash Lite)</div>
-    <p>Core flow. Agent brain calls search_events with structured params. Tool execution fetches/filters events from cache. brainCompose writes the SMS. saveResponseFrame saves activeFilters from tool call params. Handles neighborhoods, compound requests ("free comedy in bushwick"), follow-ups ("how about comedy", "later tonight"), and filter refinement — all via tool call params.</p>
+    <div class="route">Agent loop: search_events(neighborhood, categories, time_filter, free_only, date_range)</div>
+    <div class="handler">handleAgentRequest() → runAgentLoop() → search_events tool → model writes plain text SMS</div>
+    <div class="llm-calls">LLM calls: 1 agent loop (Gemini 2.5 Flash Lite, multi-turn, ~$0.001)</div>
+    <p>Core flow. Agent loop calls search_events with structured params. Tool execution fetches/filters events from cache. Model writes the SMS as plain text when ready. saveSessionFromToolCalls saves state from tool call params. Handles neighborhoods, compound requests ("free comedy in bushwick"), follow-ups ("how about comedy", "later tonight"), and filter refinement — all via tool call params.</p>
   </div>
   <div class="intent-card">
     <h4>more</h4>
-    <div class="route">checkMechanical: "more", "what else"</div>
-    <div class="handler">handleMore() — intent-handlers.js</div>
-    <div class="llm-calls">LLM calls: 1 compose</div>
-    <p>$0 mechanical shortcut. Shows next batch from session's remaining events. Tracks allOfferedIds to avoid repeats. Falls back to perennial picks when scraped events exhausted.</p>
+    <div class="route">Agent loop: search_events(intent: "more")</div>
+    <div class="handler">handleAgentRequest() → runAgentLoop() → search_events tool</div>
+    <div class="llm-calls">LLM calls: 1 agent loop (~$0.001)</div>
+    <p>Shows next batch from session's remaining events. Agent loop calls search_events with intent "more". Tracks allOfferedIds to avoid repeats. Falls back to perennial picks when scraped events exhausted.</p>
   </div>
   <div class="intent-card">
     <h4>free</h4>
-    <div class="route">Agent brain: search_events(free_only: true)</div>
-    <div class="handler">callAgentBrain() → search_events tool</div>
-    <div class="llm-calls">LLM calls: 1 agent brain + 1 compose</div>
+    <div class="route">Agent loop: search_events(free_only: true)</div>
+    <div class="handler">handleAgentRequest() → runAgentLoop() → search_events tool</div>
+    <div class="llm-calls">LLM calls: 1 agent loop (~$0.001)</div>
     <p>Agent brain sets free_only in tool call params. Filters events by is_free. Searches adjacent neighborhoods if none found locally.</p>
   </div>
   <div class="intent-card">
     <h4>details</h4>
-    <div class="route">checkMechanical: "1"-"5" | Agent brain: get_details tool</div>
-    <div class="handler">checkMechanical ($0) or callAgentBrain() → get_details tool</div>
-    <div class="llm-calls">LLM calls: 0 (mechanical) or 1 agent brain + 1 compose</div>
-    <p>Bare numbers 1-5 are caught by checkMechanical ($0). Event name references go through the agent brain's get_details tool. Falls back to formatEventDetails() if compose fails.</p>
+    <div class="route">Agent loop: search_events(intent: "details", pick_reference: "2")</div>
+    <div class="handler">handleAgentRequest() → runAgentLoop() → search_events tool</div>
+    <div class="llm-calls">LLM calls: 1 agent loop (~$0.001)</div>
+    <p>Bare numbers and event name references both go through the agent loop's search_events tool with intent "details". Fuzzy pick matching via executeDetails. Falls back to formatEventDetails() if compose fails.</p>
   </div>
   <div class="intent-card">
     <h4>help</h4>
@@ -607,17 +603,17 @@
   </div>
   <div class="intent-card">
     <h4>conversational</h4>
-    <div class="route">checkMechanical: greetings/thanks/bye | Agent brain: respond tool</div>
-    <div class="handler">checkMechanical ($0) or callAgentBrain() → respond tool</div>
-    <div class="llm-calls">LLM calls: 0 (mechanical) or 1 agent brain + 1 compose</div>
-    <p>Simple greetings/thanks/bye caught by checkMechanical ($0). Off-topic, complex conversational messages, and boroughs go through the agent brain's respond tool. Always redirects back to events.</p>
+    <div class="route">Agent loop: respond tool</div>
+    <div class="handler">handleAgentRequest() → runAgentLoop() → respond tool</div>
+    <div class="llm-calls">LLM calls: 1 agent loop (~$0.001)</div>
+    <p>Greetings, thanks, bye, off-topic, complex conversational messages, and boroughs all go through the agent loop's respond tool. Always redirects back to events.</p>
   </div>
   <div class="intent-card">
     <h4>nudge_accept</h4>
-    <div class="route">Agent brain: search_events with nearby neighborhood</div>
-    <div class="handler">callAgentBrain() → search_events tool</div>
-    <div class="llm-calls">LLM calls: 1 agent brain + 1 compose</div>
-    <p>User said "yes" to "would you travel to X?" nudge. Agent brain serves nearby events.</p>
+    <div class="route">Agent loop: search_events with nearby neighborhood</div>
+    <div class="handler">handleAgentRequest() → runAgentLoop() → search_events tool</div>
+    <div class="llm-calls">LLM calls: 1 agent loop (~$0.001)</div>
+    <p>User said "yes" to "would you travel to X?" nudge. Agent loop serves nearby events.</p>
   </div>
 </div>
 
@@ -626,21 +622,20 @@
   │
   ├─ <span class="file">request-guard.js</span> — <span class="data">TCPA opt-out, dedup, budget, rate limit</span>
   │
-  ├─ <span class="file">agent-brain.js:checkMechanical()</span> — <span class="data">$0 shortcuts</span>
+  ├─ <span class="file">agent-brain.js:checkMechanical()</span> — <span class="data">help + TCPA only ($0)</span>
   │   ├─ help → <span class="data">static help text, no LLM</span>
-  │   ├─ details (1-5) → <span class="data">handleDetails(), no LLM</span>
-  │   ├─ more → <span class="data">handleMore(), 1 compose call</span>
-  │   ├─ greetings/thanks/bye → <span class="data">handleConversational(), no LLM</span>
-  │   └─ no match → <span class="llm">fall through to agent brain</span>
+  │   ├─ TCPA → <span class="data">silently dropped (STOP, UNSUBSCRIBE, etc.)</span>
+  │   └─ no match → <span class="llm">fall through to agent loop</span>
   │
-  ├─ <span class="file">agent-brain.js:callAgentBrain()</span> — <span class="llm">Gemini 2.5 Flash Lite tool calling</span>
-  │   ├─ search_events(hood, cats, time, date, free, intent) → <span class="data">fetch + filter events from cache</span>
-  │   ├─ get_details(pick_number) → <span class="data">event detail lookup</span>
-  │   └─ respond(message) → <span class="data">conversational / off-topic</span>
+  ├─ <span class="file">agent-loop.js:handleAgentRequest()</span> — <span class="llm">orchestrator</span>
+  │   └─ <span class="file">llm.js:runAgentLoop()</span> — <span class="llm">Gemini 2.5 Flash Lite multi-turn tool calling (max 3 iterations)</span>
+  │       ├─ search_events(hood, cats, time, date, free, intent) → <span class="data">fetch + filter events from cache</span>
+  │       └─ respond(message) → <span class="data">conversational / off-topic</span>
+  │       └─ model writes plain text SMS when ready
   │
-  ├─ <span class="file">agent-brain.js:brainCompose()</span> — <span class="llm">Gemini 2.5 Flash Lite SMS composition</span>
+  ├─ <span class="file">agent-loop.js:saveSessionFromToolCalls()</span> — <span class="data">deterministic session save from tool call params (P1: structured tools own state)</span>
   │
-  └─ <span class="file">pipeline.js:saveResponseFrame()</span> — <span class="data">deterministic session save from tool call params (P1: structured tools own state)</span></div>
+  └─ <span class="file">pipeline.js:saveResponseFrame()</span> — <span class="data">atomic session write</span></div>
 </section>
 
 <!-- ============================================================ -->
@@ -651,18 +646,10 @@
 <table>
   <tr><th>Call</th><th>Model</th><th>System Prompt</th><th>When</th><th>Timeout</th><th>Pipeline</th></tr>
   <tr>
-    <td><strong>callAgentBrain()</strong></td>
+    <td><strong>runAgentLoop()</strong></td>
     <td>Gemini 2.5 Flash Lite (Haiku fallback)</td>
-    <td>Tool-calling agent (search_events, get_details, respond)</td>
+    <td>buildBrainSystemPrompt() — tool-calling agent (search_events, respond). Model writes plain text SMS.</td>
     <td>Every SMS not caught by checkMechanical</td>
-    <td>10s</td>
-    <td><span class="badge badge-io">SMS</span></td>
-  </tr>
-  <tr>
-    <td><strong>brainCompose()</strong></td>
-    <td>Gemini 2.5 Flash Lite (Haiku fallback)</td>
-    <td>BRAIN_COMPOSE_SYSTEM (agent-brain.js)</td>
-    <td>After callAgentBrain() tool execution</td>
     <td>10s</td>
     <td><span class="badge badge-io">SMS</span></td>
   </tr>
@@ -686,7 +673,7 @@
 
 <h3>LLM Call Frequency Analysis</h3>
 <div class="annotation">
-  <strong>Hot path (per SMS):</strong> Agent brain (Gemini 2.5 Flash Lite tool calling + compose, ~$0.0005/msg). checkMechanical handles ~15% of messages as $0 shortcuts (help, 1-5, more, greetings). The remaining ~85% go through callAgentBrain + brainCompose.
+  <strong>Hot path (per SMS):</strong> Agent loop (Gemini 2.5 Flash Lite multi-turn tool calling, ~$0.001/msg). checkMechanical handles only help + TCPA as $0 shortcuts. Everything else goes through the agent loop — the model calls tools, gets results, and writes the SMS as plain text.
 </div>
 <div class="annotation">
   <strong>Cold path (daily):</strong> 4 extraction calls during scrape. Each processes large HTML/email documents (5-50KB) with 8192 max tokens.
@@ -695,7 +682,7 @@
 <h3>Token Budget Estimates</h3>
 <table>
   <tr><th>Call</th><th>System Prompt</th><th>User Content (typical)</th><th>Output</th><th>Total per call</th></tr>
-  <tr><td>callAgentBrain + brainCompose</td><td>~400 tokens (tool-calling + compose)</td><td>~200-600 tokens</td><td>~200-400 tokens</td><td>~800-1,400</td></tr>
+  <tr><td>runAgentLoop (multi-turn)</td><td>~400 tokens (tool-calling prompt)</td><td>~200-600 tokens</td><td>~200-400 tokens</td><td>~800-1,400</td></tr>
   <tr><td>extractEvents</td><td>~1,600 tokens</td><td>~2,000-10,000 tokens</td><td>~2,000-6,000 tokens</td><td>~5,600-17,600</td></tr>
   <tr><td>composeDetails</td><td>~400 tokens</td><td>~200-500 tokens</td><td>~200-300 tokens</td><td>~800-1,200</td></tr>
 </table>
@@ -757,21 +744,16 @@ EXAMPLES: Skint-style newsletter, Screen Slate film listing, Nonsense NYC email<
 
 <div class="prompt-block">
   <div class="prompt-header" onclick="togglePrompt(this)">
-    <span class="prompt-name">2. BRAIN_COMPOSE_SYSTEM — SMS Composition</span>
-    <span class="prompt-meta">~400 tokens | Used by: brainCompose() | agent-brain.js | Hot path</span>
+    <span class="prompt-name">2. buildBrainSystemPrompt — Agent Loop System Prompt</span>
+    <span class="prompt-meta">~400 tokens | Used by: runAgentLoop() | brain-llm.js | Hot path</span>
   </div>
-  <div class="prompt-content hidden" id="prompt-brain-compose">Role: Pulse — NYC nightlife SMS bot. Write a short, warm SMS recommending events.
+  <div class="prompt-content hidden" id="prompt-brain-compose">Role: Pulse — NYC nightlife SMS bot. Agent loop with 2 tools: search_events and respond.
 
-Lightweight compose prompt used after agent brain tool execution. Takes the tool results
-(events, details, or conversational response) and composes the final SMS message.
+The model calls tools to fetch events or handle conversation, receives results,
+and writes the final SMS as plain text when ready. Multi-turn loop, max 3 iterations.
 
-Gemini 2.5 Flash Lite with structured JSON output schema.
-
-OUTPUT:
-{
-  "sms": "the SMS text to send",
-  "picks": [{ id, name, venue_name }]
-}</div>
+Gemini 2.5 Flash Lite with tool calling. No separate compose step — the model
+writes natural prose SMS directly as its final text output.</div>
 </div>
 
 <div class="prompt-block">
@@ -797,10 +779,10 @@ CONSTRAINTS:
 </div>
 
 <div class="annotation">
-  <strong>Agent brain prompts:</strong> BRAIN_COMPOSE_SYSTEM and WELCOME_COMPOSE_SYSTEM live in <code>agent-brain.js</code> (not exported from prompts.js). The agent brain uses Gemini 2.5 Flash Lite with 3 tools: <code>search_events</code>, <code>get_details</code>, <code>respond</code>. Falls back to Anthropic Haiku on Gemini 503s.
+  <strong>Agent loop prompt:</strong> <code>buildBrainSystemPrompt()</code> lives in <code>brain-llm.js</code> (not exported from prompts.js). The agent loop uses Gemini 2.5 Flash Lite with 2 tools: <code>search_events</code> and <code>respond</code>. The model writes the SMS as plain text — no separate compose step. Falls back to Anthropic Haiku on Gemini failure.
 </div>
 <div class="annotation">
-  <strong>prompts.js exports:</strong> EXTRACTION_PROMPT, DETAILS_SYSTEM. The UNIFIED_SYSTEM prompt remains in prompts.js but is no longer used in the hot path — the agent brain has its own inline prompts.
+  <strong>prompts.js exports:</strong> EXTRACTION_PROMPT, DETAILS_SYSTEM. The UNIFIED_SYSTEM prompt remains in prompts.js but is no longer used in the hot path — the agent loop has its own inline prompt via buildBrainSystemPrompt.
 </div>
 </section>
 
@@ -1045,12 +1027,15 @@ CONSTRAINTS:
 <h2>File Dependency Map</h2>
 
 <div class="dep-graph"><span class="file">server.js</span> (Express setup, routes, schedule)
-  ├── <span class="file">handler.js</span> (orchestrator: checkMechanical → agent brain → save)
+  ├── <span class="file">handler.js</span> (orchestrator: checkMechanical → agent loop → save)
   │   ├── <span class="file">request-guard.js</span> (TCPA, dedup, per-user budget, IP rate limiting)
-  │   ├── <span class="llm">agent-brain.js</span> (checkMechanical, callAgentBrain, brainCompose — Gemini 2.5 Flash Lite)
-  │   │   └── <span class="file">neighborhoods.js</span> (36 hoods, aliases, landmarks)
+  │   ├── <span class="file">agent-brain.js</span> (checkMechanical only — help + TCPA, ~21 lines)
+  │   ├── <span class="llm">agent-loop.js</span> (handleAgentRequest orchestrator, executeTool callback, saveSessionFromToolCalls)
+  │   │   └── <span class="llm">llm.js</span> (runAgentLoop — multi-turn tool calling, max 3 iterations)
+  │   │       └── <span class="file">brain-llm.js</span> (BRAIN_TOOLS, buildBrainSystemPrompt, serializePoolForContinuation)
+  │   ├── <span class="file">brain-execute.js</span> (buildSearchPool, executeMore, executeDetails, validatePicks)
   │   ├── <span class="file">pipeline.js</span> (buildTaggedPool, eventMatchesFilters, saveResponseFrame)
-  │   ├── <span class="file">intent-handlers.js</span> (help, conversational, details, more)
+  │   ├── <span class="file">intent-handlers.js</span> (help response)
   │   │   ├── <span class="llm">ai.js</span> (composeDetails, extractEvents)
   │   │   │   ├── <span class="file">prompts.js</span> (DETAILS_SYSTEM, EXTRACTION_PROMPT)
   │   │   │   └── <span class="file">formatters.js</span> (smartTruncate)
@@ -1083,12 +1068,16 @@ CONSTRAINTS:
 <h3>File Purpose Summary</h3>
 <table>
   <tr><th>File</th><th>Lines</th><th>Type</th><th>LLM?</th><th>Purpose</th></tr>
-  <tr><td><code>server.js</code></td><td>~560</td><td><span class="badge badge-io">IO</span></td><td>No</td><td>Express setup, routes, health check, daily schedule, 7 UI dashboards</td></tr>
-  <tr><td><code>handler.js</code></td><td>~431</td><td><span class="badge badge-logic">Logic</span></td><td>No</td><td>Orchestrator: checkMechanical → agent brain → deterministic save</td></tr>
+  <tr><td><code>server.js</code></td><td>~560</td><td><span class="badge badge-io">IO</span></td><td>No</td><td>Express setup, routes, health check, daily schedule, 8 UI dashboards</td></tr>
+  <tr><td><code>handler.js</code></td><td>~431</td><td><span class="badge badge-logic">Logic</span></td><td>No</td><td>Orchestrator: checkMechanical → agent loop → deterministic save</td></tr>
   <tr><td><code>request-guard.js</code></td><td>~150</td><td><span class="badge badge-logic">Logic</span></td><td>No</td><td>TCPA opt-out, Twilio dedup, per-user AI budget, IP rate limiting</td></tr>
-  <tr><td><code>agent-brain.js</code></td><td>~800</td><td><span class="badge badge-llm">LLM</span></td><td>Yes</td><td>Sole SMS path: checkMechanical ($0), callAgentBrain (Gemini tool calling), brainCompose (Gemini compose). Haiku fallback.</td></tr>
+  <tr><td><code>agent-brain.js</code></td><td>~21</td><td><span class="badge badge-logic">Logic</span></td><td>No</td><td>checkMechanical only (help + TCPA). Re-exports executeMore/executeDetails for tests.</td></tr>
+  <tr><td><code>agent-loop.js</code></td><td>~150</td><td><span class="badge badge-llm">LLM</span></td><td>Yes</td><td>Agent loop orchestrator: handleAgentRequest, executeTool (callback), saveSessionFromToolCalls. Haiku fallback.</td></tr>
+  <tr><td><code>llm.js</code></td><td>~300</td><td><span class="badge badge-llm">LLM</span></td><td>Yes</td><td>Provider-agnostic LLM: generate(), callWithTools(), continueChat(), runAgentLoop() (multi-turn tool calling loop)</td></tr>
+  <tr><td><code>brain-llm.js</code></td><td>~200</td><td><span class="badge badge-llm">LLM</span></td><td>Prompts</td><td>BRAIN_TOOLS (2 tools), buildBrainSystemPrompt, serializePoolForContinuation</td></tr>
+  <tr><td><code>brain-execute.js</code></td><td>~300</td><td><span class="badge badge-logic">Logic</span></td><td>No</td><td>Pure tool implementations: buildSearchPool, executeMore, executeDetails, validatePicks</td></tr>
   <tr><td><code>pipeline.js</code></td><td>~458</td><td><span class="badge badge-logic">Logic</span></td><td>No</td><td>buildTaggedPool, eventMatchesFilters, saveResponseFrame (atomic session writes)</td></tr>
-  <tr><td><code>intent-handlers.js</code></td><td>~235</td><td><span class="badge badge-logic">Logic</span></td><td>Indirect</td><td>Mechanical intent handlers — help, conversational, details, more</td></tr>
+  <tr><td><code>intent-handlers.js</code></td><td>~235</td><td><span class="badge badge-logic">Logic</span></td><td>Indirect</td><td>Help response handler</td></tr>
   <tr><td><code>ai.js</code></td><td>~605</td><td><span class="badge badge-llm">LLM</span></td><td>Yes</td><td>composeDetails, extractEvents (scrape-time)</td></tr>
   <tr><td><code>prompts.js</code></td><td>~395</td><td><span class="badge badge-llm">LLM</span></td><td>Prompts</td><td>EXTRACTION_PROMPT, DETAILS_SYSTEM (UNIFIED_SYSTEM retained but unused in hot path)</td></tr>
   <tr><td><code>source-registry.js</code></td><td>~150</td><td><span class="badge badge-data">Data</span></td><td>No</td><td>Single SOURCES array (22 entries), SOURCE_TIERS, MERGE_ORDER</td></tr>
@@ -1096,7 +1085,7 @@ CONSTRAINTS:
   <tr><td><code>curation.js</code></td><td>~45</td><td><span class="badge badge-logic">Logic</span></td><td>No</td><td>Pre-compose filters: kids events, perennial validation, low confidence</td></tr>
   <tr><td><code>events.js</code></td><td>~577</td><td><span class="badge badge-data">Data</span></td><td>No</td><td>Daily event cache + disk persistence, cross-source dedup, quality gates</td></tr>
   <tr><td><code>geo.js</code></td><td>~249</td><td><span class="badge badge-logic">Logic</span></td><td>No</td><td>Neighborhood resolution, proximity, time filtering, haversine</td></tr>
-  <tr><td><code>neighborhoods.js</code></td><td>~302</td><td><span class="badge badge-data">Data</span></td><td>No</td><td>36 neighborhoods, aliases, landmarks, borough detection</td></tr>
+  <tr><td><code>neighborhoods.js</code></td><td>~302</td><td><span class="badge badge-data">Data</span></td><td>No</td><td>75 neighborhoods, aliases, landmarks, borough detection</td></tr>
   <tr><td><code>venues.js</code></td><td>~313</td><td><span class="badge badge-data">Data</span></td><td>No</td><td>~190 venue coords, auto-learning, Nominatim geocoding</td></tr>
   <tr><td><code>session.js</code></td><td>~36</td><td><span class="badge badge-data">Data</span></td><td>No</td><td>In-memory session store with TTL</td></tr>
   <tr><td><code>preference-profile.js</code></td><td>~235</td><td><span class="badge badge-data">Data</span></td><td>No</td><td>Cross-session user profiles — neighborhoods, categories, price/time preferences. Hashed phone keys on disk.</td></tr>
@@ -1112,9 +1101,9 @@ CONSTRAINTS:
 <!-- ============================================================ -->
 <section id="skills">
 <h2>Where Claude Adds Value</h2>
-<p>Pulse uses Gemini/Claude for exactly 4 things. Each one is chosen because code can't do it well — and LLM-specific strengths (language understanding, taste, tone, messy-input parsing) are the right tool.</p>
+<p>Pulse uses Gemini/Claude for exactly 3 things. Each one is chosen because code can't do it well — and LLM-specific strengths (language understanding, taste, tone, messy-input parsing) are the right tool.</p>
 
-<h3>LLM's 4 Jobs</h3>
+<h3>LLM's 3 Jobs</h3>
 
 <div class="intent-grid">
   <div class="intent-card" style="border-left: 3px solid var(--accent3);">
@@ -1126,26 +1115,18 @@ CONSTRAINTS:
   </div>
 
   <div class="intent-card" style="border-left: 3px solid var(--accent3);">
-    <h4>2. Agent Brain — Intent Understanding via Tool Calling</h4>
-    <div class="handler">agent-brain.js:callAgentBrain() | Gemini 2.5 Flash Lite | SMS pipeline (~85% of messages)</div>
-    <p style="margin-top: 8px;">checkMechanical handles ~15% of messages as $0 shortcuts. The agent brain handles the rest — understanding intent via tool calling (search_events, get_details, respond). Tool call params carry structured state: neighborhood, categories, time_filter, free_only, date_range. Handles neighborhoods, compound requests ("free comedy in bushwick"), off-topic deflection, boroughs, and all semantic understanding.</p>
-    <p><strong>Why LLM:</strong> These messages require understanding context + intent + geography simultaneously. "village" could be East Village, West Village, or Greenwich Village depending on context. "got jazz?" with a Bushwick session means "jazz near Bushwick" not "jazz anywhere." Code can't infer this reliably.</p>
-    <p><strong>Why not code:</strong> The legacy pre-router caught clear patterns, but NLP for open-ended SMS messages with slang, abbreviations, and implicit session context is where statistical matching fails. The agent brain's tool calling gives structured params (safe for state) while using LLM semantic understanding for interpretation.</p>
+    <h4>2. Agent Loop — Intent Understanding + Curation + SMS Writing</h4>
+    <div class="handler">agent-loop.js:handleAgentRequest() → llm.js:runAgentLoop() | Gemini 2.5 Flash Lite | SMS pipeline (all messages except help + TCPA)</div>
+    <p style="margin-top: 8px;">The agent loop handles everything: understanding intent via tool calling (search_events, respond), curating picks from the event pool, and writing the final SMS as natural prose — all in one multi-turn loop (max 3 iterations). Tool call params carry structured state: neighborhood, categories, time_filter, free_only, date_range. No separate compose step — the model writes plain text SMS directly.</p>
+    <p><strong>Why LLM:</strong> These messages require understanding context + intent + geography simultaneously. "village" could be East Village, West Village, or Greenwich Village depending on context. "got jazz?" with a Bushwick session means "jazz near Bushwick" not "jazz anywhere." The model also writes opinionated, personality-driven SMS — "legendary basement spot, incredible players" vs "Jazz at Smalls Jazz Club, 9:30pm, $20." The personality IS the product.</p>
+    <p><strong>Why not code:</strong> NLP for open-ended SMS messages with slang, abbreviations, and implicit session context is where statistical matching fails. The agent loop's tool calling gives structured params (safe for state) while using LLM semantic understanding for interpretation. And code can't write with taste and voice.</p>
   </div>
 
   <div class="intent-card" style="border-left: 3px solid var(--accent3);">
-    <h4>3. Curation + SMS Writing — Taste and Voice</h4>
-    <div class="handler">agent-brain.js:brainCompose() | BRAIN_COMPOSE_SYSTEM | SMS pipeline</div>
-    <p style="margin-top: 8px;">Given 4-8 candidate events, Claude picks the best 1-3 and writes an opinionated SMS that sounds like a plugged-in friend texting. It balances tonight-vs-tomorrow, source trust, neighborhood fit, and "curation taste" (preferring indie/interesting over corporate/generic).</p>
-    <p><strong>Why Claude:</strong> Two things code can't do: (1) <em>Taste</em> — ranking "DJ night at a small Bushwick venue" above "hotel bar happy hour" requires judgment that doesn't reduce to a sort function. (2) <em>Voice</em> — "legendary basement spot, incredible players" vs "Jazz at Smalls Jazz Club, 9:30pm, $20." The personality IS the product.</p>
-    <p><strong>Why not code:</strong> Code handles the pre-filtering (proximity ranking, time filtering, dedup). But the final pick + write step is where Claude's "opinion" creates the UX that makes Pulse feel like a friend, not a search engine.</p>
-  </div>
-
-  <div class="intent-card" style="border-left: 3px solid var(--accent3);">
-    <h4>4. Details Writing — Natural Language About a Venue</h4>
+    <h4>3. Details Writing — Natural Language About a Venue</h4>
     <div class="handler">ai.js:composeDetails() | DETAILS_SYSTEM | SMS pipeline (on demand)</div>
     <p style="margin-top: 8px;">When a user replies "1" to get details on a pick, Claude writes a natural-language description of the event: why it's worth going, the vibe, time, price, and a link. 320-char limit.</p>
-    <p><strong>Why Claude:</strong> Same voice/tone benefit as compose. A structured fallback exists (<code>formatEventDetails()</code>) but it reads like a database dump. Claude makes it feel like a friend giving you the rundown.</p>
+    <p><strong>Why Claude:</strong> Same voice/tone benefit as the agent loop. A structured fallback exists (<code>formatEventDetails()</code>) but it reads like a database dump. Claude makes it feel like a friend giving you the rundown.</p>
     <p><strong>Why not code:</strong> There IS a code fallback — it's used when Claude fails. The code version works but lacks personality. The Claude version is the premium experience.</p>
   </div>
 </div>
@@ -1156,14 +1137,14 @@ CONSTRAINTS:
 <table>
   <tr><th>Operation</th><th>Implementation</th><th>Why Not Claude</th></tr>
   <tr>
-    <td>Mechanical shortcuts (~15%)</td>
-    <td><code>agent-brain.js:checkMechanical()</code> — 6 pattern groups</td>
-    <td>Bare "more", "1-5", "help", "hey", "thanks", "bye" don't need semantic understanding. Pattern matching is instant and $0.</td>
+    <td>Mechanical shortcuts (help + TCPA)</td>
+    <td><code>agent-brain.js:checkMechanical()</code> — 2 pattern groups</td>
+    <td>"help"/"?" and TCPA opt-out words don't need semantic understanding. Pattern matching is instant and $0.</td>
   </tr>
   <tr>
     <td>Neighborhood resolution</td>
     <td><code>neighborhoods.js</code> — alias map, landmarks, subway stops</td>
-    <td>36 neighborhoods with known aliases. A lookup table is faster and more reliable than inference.</td>
+    <td>75 neighborhoods with known aliases. A lookup table is faster and more reliable than inference.</td>
   </tr>
   <tr>
     <td>Event filtering + ranking</td>
@@ -1202,27 +1183,27 @@ CONSTRAINTS:
   </tr>
 </table>
 
-<h3>Agent Brain Architecture</h3>
-<p>The agent brain replaces the old composable skills system. Instead of assembling prompt snippets per-call, the agent brain uses tool calling for structured intent + compose for SMS writing.</p>
+<h3>Agent Loop Architecture</h3>
+<p>The agent loop replaces the old agent brain + brainCompose two-step. Instead of separate tool-calling and compose LLM calls, the agent loop uses multi-turn tool calling — the model calls tools, gets results, and writes the SMS as plain text in one continuous loop.</p>
 
 <table>
-  <tr><th>Before (unified + skills)</th><th>After (agent brain)</th></tr>
+  <tr><th>Before (agent brain + brainCompose)</th><th>After (agent loop)</th></tr>
   <tr>
-    <td>Pre-router (17 pattern groups) + mergeFilters + buildTaggedPool + composable skills (~2,300 token prompts)</td>
-    <td>checkMechanical (6 patterns, $0) + callAgentBrain (Gemini tool calling, ~400 tokens) + brainCompose (~400 tokens)</td>
+    <td>checkMechanical (6 patterns, $0) + callAgentBrain (Gemini tool calling) + brainCompose (Gemini compose) — two separate LLM steps</td>
+    <td>checkMechanical (help + TCPA, $0) + handleAgentRequest → runAgentLoop (Gemini multi-turn tool calling, max 3 iterations) — one continuous loop, model writes SMS directly</td>
   </tr>
   <tr>
-    <td>State derived from pre-router filter detection + LLM-reported filters, merged deterministically</td>
-    <td>State derived directly from tool call params (search_events args). Structured, validated, no parsing from free text.</td>
+    <td>State derived from tool call params, but compose was a separate step with its own prompt (BRAIN_COMPOSE_SYSTEM)</td>
+    <td>State derived directly from tool call params (search_events args). Model writes plain text SMS — no separate compose step, no BRAIN_COMPOSE_SYSTEM.</td>
   </tr>
   <tr>
-    <td>Single LLM call does routing + filtering + curation + composition</td>
-    <td>Tool calling separates intent (which tool?) from execution (fetch events) from composition (write SMS). Each step is observable.</td>
+    <td>Tool calling separates intent from execution, then a second LLM call composes the SMS</td>
+    <td>Multi-turn loop: model calls tools → code executes them → results fed back → model decides next action or writes SMS. Each step is observable.</td>
   </tr>
 </table>
 
 <div class="annotation">
-  <strong>Design principle:</strong> The LLM's attention budget is finite. The agent brain keeps prompts small (~400 tokens vs ~2,300) by delegating state to structured tool params. Deterministic curation (curation.js) still runs pre-compose — the LLM focuses on taste and writing.
+  <strong>Design principle:</strong> The LLM's attention budget is finite. The agent loop keeps prompts small (~400 tokens) by delegating state to structured tool params. Deterministic curation (curation.js) still runs pre-compose — the LLM focuses on taste and writing. The model writes natural prose SMS, not numbered emoji lists.
 </div>
 
 <h3>Remaining Opportunities</h3>

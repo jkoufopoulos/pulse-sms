@@ -947,16 +947,28 @@
     // Timestamp
     addEl('div', 'sms-time', 'Today, 6:42 PM');
 
-    // Welcome message — matches production handleWelcome (numbered emoji picks)
+    // Welcome message — agent writes natural prose
     showTyping();
     await wait(1200);
     hideTyping();
     addRawBubble(
-      'I\u2019m Pulse \u2014 your plugged-in friend for NYC. Tell me what you\u2019re into tonight, just ask. Here\u2019s a few things on my radar:<br><br>' +
-      '1) \ud83c\udfb5 Jazz at Smalls (West Village) \u2014 tonight 7:30pm, $20<br>' +
-      '2) \ud83c\udfad Stand-up at Eastville (East Village) \u2014 tonight 8pm, $12<br>' +
-      '3) \ud83c\udfb6 DJ set at Nublu (East Village) \u2014 tonight 10pm, free<br><br>' +
-      'Any of those sound good? Or tell me a vibe, a neighborhood, whatever.',
+      'Hey! I\u2019m Pulse \u2014 your plugged-in friend for NYC nightlife. What neighborhood are you thinking tonight? Or just tell me a vibe \u2014 comedy, live music, something weird \u2014 and I\u2019ll find you something good.',
+      'sms-recv'
+    );
+
+    await wait(1400);
+
+    // User texts a neighborhood
+    addBubble('east village', 'sms-sent');
+
+    await wait(600);
+    showTyping();
+    await wait(2000);
+    hideTyping();
+
+    // Pulse response — natural prose (matches current agent behavior)
+    addRawBubble(
+      'Smalls has a killer jazz set tonight at 7:30 \u2014 intimate basement room, $20 cover. Eastville is doing stand-up at 8 ($12), and there\u2019s a free DJ set at Nublu starting at 10. Any of those sound good?',
       'sms-recv'
     );
 
@@ -967,28 +979,12 @@
 
     await wait(600);
     showTyping();
-    await wait(2000);
-    hideTyping();
-
-    // Pulse response — natural prose, no numbered lists (matches current agent behavior)
-    addRawBubble(
-      'East Village tonight has some good ones. Smalls has a jazz set at 7:30 ($20), Eastville is doing stand-up at 8 ($12), and there\u2019s a free DJ set at Nublu starting at 10. Want details on any of those, or should I keep digging?',
-      'sms-recv'
-    );
-
-    await wait(1400);
-
-    // User asks for details
-    addBubble('the jazz one', 'sms-sent');
-
-    await wait(600);
-    showTyping();
     await wait(1800);
     hideTyping();
 
     // Detail response — natural prose
     addRawBubble(
-      'Smalls Jazz Club &mdash; 183 W 10th St, 7:30pm. Legendary basement club with two sets nightly, BYOB-friendly. $20 cover. One of those places that makes you feel like you found something special. smallslive.com',
+      'Smalls Jazz Club \u2014 183 W 10th St, 7:30pm. Legendary basement club with two sets nightly, BYOB-friendly. $20 cover. One of those places that makes you feel like you found something special. smallslive.com',
       'sms-recv'
     );
 

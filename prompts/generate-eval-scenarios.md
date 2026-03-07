@@ -82,7 +82,7 @@ Your 20 scenarios **must** include at least one scenario for each of these:
 - **User messages** feel like real texts: lowercase, typos, abbreviations, no punctuation, slang. At least 3 scenarios should have phone-style short messages.
 - **Links** are always separate follow-up messages from Pulse (one per pick), never inline in the picks message.
 - **Details** are a single natural paragraph, max 320 chars, with one link at the end.
-- **Picks** use the numbered format: intro line, numbered items (1–3) with blank lines between, reply footer: `"Reply 1-N for details, MORE for extra picks, or FREE for free events"`.
+- **Picks** are written as natural prose -- conversational, opinionated recommendations. NOT numbered lists. No "Reply 1-N for details" footer. The agent handles detail requests naturally when users reference picks by number, name, or description.
 - Show **ideal Pulse behavior** in every scenario — what it *should* say, not the broken version.
 - **Date awareness**: TODAY events say "tonight"/"today", TOMORROW events say "tomorrow"/"tomorrow night". Never mislabel.
 - **Travel nudge**: Include transit tips when relevant ("Both easy on the 7 train", "Quick ride on the G").

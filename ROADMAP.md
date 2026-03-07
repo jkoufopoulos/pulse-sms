@@ -1,7 +1,7 @@
 # Pulse -- Roadmap
 
 > Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-05 (Phase 4 complete: 2 tools, natural prose, agent-native details/more)
+> Last updated: 2026-03-07 (Phase 5 complete: true agent loop via runAgentLoop + handleAgentRequest)
 
 ---
 
@@ -37,7 +37,7 @@ Every code path that sends an SMS must end with the same atomic session save fun
 
 Every structured field in the LLM output is a surface for hallucination and drift. Fields the code already knows before calling the LLM should never be in the LLM's output schema.
 
-**Current:** The agent brain uses 2 tools (`search_events`, `respond`) with validated parameter schemas. `search_events` handles all event intents (search, refine, more, details) via the `intent` param. SMS composition happens in the same Gemini chat session via multi-turn tool calling. `brainCompose` kept as fallback only.
+**Current:** The agent brain uses 2 tools (`search_events`, `respond`) with validated parameter schemas. `search_events` handles all event intents (search, refine, more, details) via the `intent` param. The model writes plain text SMS directly in the agent loop -- no separate compose step.
 
 ### P6. Mechanical Shortcuts for $0 Operations, LLM for Everything Else
 
@@ -59,20 +59,23 @@ Validate structural contracts in the hot path (do `picks[].event_id` values exis
 
 ```
 message -> checkMechanical (help + TCPA only, $0)
-  -> callAgentBrain (Gemini 2.5 Flash Lite chat session + tool calling)
-  -> search_events (search/refine/pivot/more/details): buildSearchPool or executeMore/executeDetails → functionResponse → same session writes natural prose SMS
-  -> respond: conversational (greetings, thanks, bye)
-  -> atomic save (saveResponseFrame) -> SMS
+  -> handleAgentRequest (agent-loop.js)
+  -> runAgentLoop (llm.js, multi-turn tool calling, max 3 iterations)
+  -> model calls search_events or respond tools
+  -> code executes tool, result fed back to model
+  -> model writes plain text SMS when ready
+  -> saveSessionFromToolCalls -> saveResponseFrame -> SMS
 ```
 
-2 tools: `search_events` (all event intents) + `respond` (conversation). Natural prose SMS — no numbered lists.
+2 tools: `search_events` (all event intents) + `respond` (conversation). Natural prose SMS -- no numbered lists.
 
-Fallback chain: continuation failure → brainCompose, Gemini failure → Anthropic Haiku.
+Fallback chain: Gemini failure -> Anthropic Haiku.
 
 **Key decisions:**
 - **(2026-03-05, Phase 1):** Deleted unified-flow.js, model-router.js, pre-router.js, src/skills/ (~1,300 lines). Agent brain is the only code path.
 - **(2026-03-05, Phase 2):** Single Gemini chat session for search_events. The model that understands intent writes the SMS via multi-turn tool calling. brainCompose kept for handleMore.
-- **(2026-03-05, Phase 4):** Collapsed tools 3→2 (deleted get_details). checkMechanical reduced to help+TCPA. Natural prose replaces numbered lists. Agent handles more/details natively via search_events intents.
+- **(2026-03-05, Phase 4):** Collapsed tools 3->2 (deleted get_details). checkMechanical reduced to help+TCPA. Natural prose replaces numbered lists. Agent handles more/details natively via search_events intents.
+- **(2026-03-07, Phase 5):** True agent loop. Replaced 400-line switch with `runAgentLoop` (llm.js) + `handleAgentRequest` (agent-loop.js). Deleted `callAgentBrain`, `brainCompose`, `welcomeCompose`, `continueWithResults`, `handleWelcome`, `handleMore` (~1000 lines). Model writes plain text SMS directly. No separate compose step.
 
 ---
 
@@ -127,7 +130,7 @@ Fallback chain: continuation failure → brainCompose, Gemini failure → Anthro
 
 ## Feature Roadmap
 
-### Agent-Native Evolution (Priority -- 5 phases)
+### Agent-Native Evolution (Priority -- 6 phases)
 
 **North star:** Pulse is a single agent loop that works with any tool-calling model, owns the full conversation, and builds a relationship with each user over time.
 
@@ -147,7 +150,11 @@ Added structured conversation history: tool calls (name + params), tool results 
 
 Collapsed tools from 3 to 2 (deleted `get_details`). `search_events` handles more/details via intent param + `pick_reference`. `checkMechanical` reduced to help + TCPA only. Numbered pick lists replaced with natural prose SMS. Agent references picks by number, name, venue, or category via fuzzy matching (`executeDetails`). ~310 lines of dead code removed from intent-handlers.js.
 
-**Phase 5: Preference Learning in the Loop** -- The agent knows you
+**Phase 5: True Agent Loop** -- **Done (2026-03-07)**
+
+Replaced 400-line switch statement with true multi-turn agent loop. `runAgentLoop` in llm.js runs tool calling loop (max 3 iterations). `handleAgentRequest` in agent-loop.js orchestrates. Model calls tools, gets results, decides next action or writes plain text SMS. Deleted ~1000 lines: `callAgentBrain`, `brainCompose`, `welcomeCompose`, `continueWithResults`, `handleWelcome`, `handleMore`. Simplified system prompt. Agent writes SMS as plain text (no JSON wrapper, no separate compose).
+
+**Phase 6: Preference Learning in the Loop** -- The agent knows you
 
 - `preference-profile.js` data injected into agent system prompt
 - Agent adapts: discovery-heavy for explorers, community-focused for new-to-city users
@@ -206,7 +213,7 @@ Collapsed tools from 3 to 2 (deleted `get_details`). `search_events` handles mor
 | Prompt hygiene (see below) | Medium | Audit completed 2026-03-07. 6 action items identified. |
 | Price data gap (21% unknown) | Low | Structurally unavailable from some sources |
 | No horizontal scalability | Low | Single-process, in-memory sessions |
-| Preference learning partially active | Low | User pick categories injected into agent context (2026-03-07). Full profile injection is Phase 5. |
+| Preference learning partially active | Low | User pick categories injected into agent context (2026-03-07). Full profile injection is Phase 6. |
 
 ### Prompt Hygiene Audit (2026-03-07)
 
@@ -216,11 +223,11 @@ Comprehensive review of all prompts in `prompts.js` and `brain-llm.js`. The prom
 
 1. **Dual-role prompt (routing + composition):** `buildBrainSystemPrompt` asks Gemini Flash Lite to both route (classify intent, call tools) and compose (write natural SMS) in one system prompt. These are different cognitive tasks -- routing is classification (high reliability), composition is generation (lower reliability). Compose rules (~50% of the prompt) are invisible during routing and only activate after the tool result comes back.
 
-2. **Curation taste duplicated 3x:** The curation taste block (pick hierarchy, source signal, venue signal, skip rules, diversity, interactive bonus) is copy-pasted across `buildBrainSystemPrompt`, `BRAIN_COMPOSE_SYSTEM`, and `WELCOME_COMPOSE_SYSTEM`. Maintenance risk: tuning curation requires updating 3 prompts.
+2. **Curation taste duplicated 3x:** The curation taste block (pick hierarchy, source signal, venue signal, skip rules, diversity, interactive bonus) was copy-pasted across `buildBrainSystemPrompt`, `BRAIN_COMPOSE_SYSTEM`, and `WELCOME_COMPOSE_SYSTEM`. `BRAIN_COMPOSE_SYSTEM` and `WELCOME_COMPOSE_SYSTEM` were deleted in Phase 5 (2026-03-07). `CURATION_TASTE_COMMON` shared constant created (action item #3).
 
-3. **`UNIFIED_SYSTEM` possibly dead code:** Exported from `prompts.js` but may not be used in the hot path. Contains `SHARED_UNDERSTANDING` with complex filter_intent logic. If dead, it's 145 lines of misleading code. If live, it contradicts `buildBrainSystemPrompt` (numbered lists vs prose).
+3. **`UNIFIED_SYSTEM`, `BRAIN_COMPOSE_SYSTEM`, `WELCOME_COMPOSE_SYSTEM` deleted:** All three prompts were deleted in Phase 5 (2026-03-07). The agent loop handles routing and composition in a single multi-turn flow -- no separate compose step. This finding is resolved.
 
-4. **Excessive routing examples:** `buildBrainSystemPrompt` has 24 routing examples (lines 134-157). Research suggests 3-5 well-chosen examples are optimal for tool calling. Beyond that, diminishing returns and increased input tokens on every call.
+4. **Routing/compose split no longer relevant:** The agent loop (Phase 5) handles routing and composition in a single multi-turn flow. The model calls tools, gets results, and writes SMS as plain text. There is no separate compose prompt to inject via `functionResponse`. This finding is superseded by Phase 5 architecture.
 
 5. **Non-deterministic instructions for deterministic constraints:** Several rules are unreliable as prompt instructions:
    - "Under 480 characters" -- LLMs can't count chars. `smartTruncate` backstops this (good).
@@ -228,7 +235,7 @@ Comprehensive review of all prompts in `prompts.js` and `brain-llm.js`. The prom
    - "Do NOT say 'Reply MORE' when is_last_batch" -- Negative instructions ~70-80% reliable.
    - filter_intent classification (6 action types with edge cases) -- Most drift-prone area.
 
-6. **Numbered lists vs prose contradiction:** `UNIFIED_SYSTEM` says "Use numbered format." `buildBrainSystemPrompt` says "NOT a numbered list." Currently separated by code path but confusing for maintenance.
+6. **Numbered lists vs prose contradiction resolved:** `UNIFIED_SYSTEM` (deleted in Phase 5) said "Use numbered format." `buildBrainSystemPrompt` says "NOT a numbered list." No longer a contradiction -- `UNIFIED_SYSTEM` was removed.
 
 **Action items (ordered by impact):**
 
@@ -237,11 +244,11 @@ Comprehensive review of all prompts in `prompts.js` and `brain-llm.js`. The prom
 | ~~1~~ | ~~Verify `UNIFIED_SYSTEM` usage; delete if dead~~ | ~~None~~ | ~~Small~~ | **Done (2026-03-07).** Already removed from prompts.js. |
 | ~~2~~ | ~~Trim routing examples to 5-8~~ | ~~Low~~ | ~~Small~~ | **Done (2026-03-07).** Trimmed to 11 focused examples covering key edge cases. |
 | ~~3~~ | ~~Extract curation taste into shared constant~~ | ~~None~~ | ~~Small~~ | **Done (2026-03-07).** `CURATION_TASTE_COMMON` shared across 3 prompts. |
-| 4 | Separate routing prompt from compose prompt | Medium | Medium | Inject compose rules via `functionResponse` context instead of front-loading. Reduces routing prompt by ~50%. Risk: changes the flow that's currently working at 99.2% eval. Run evals before/after. |
+| ~~4~~ | ~~Separate routing prompt from compose prompt~~ | ~~Medium~~ | ~~Medium~~ | **Superseded (2026-03-07).** Phase 5 agent loop eliminated the routing/compose split. No separate compose step exists. |
 | 5 | Move filter_intent to deterministic code | Medium | Medium | Derive from tool params (intent="pivot" -> clear filters). Aligns with P1. Risk: edge cases in "nvm"/"forget it" disambiguation. |
 | 6 | Add deterministic post-processing for price/day labels | Low | Small | Like `smartTruncate` but for other constraints. Backstop, not replacement. |
 
-**Risk assessment:** Items 1-3 are safe refactors with no behavior change. Items 4-5 change the LLM interaction pattern and should be gated behind eval runs (before/after comparison on the 417-scenario golden dataset). Item 6 is additive safety net.
+**Risk assessment:** Items 1-4 are done or superseded by Phase 5. Item 5 changes the LLM interaction pattern and should be gated behind eval runs (before/after comparison on the 417-scenario golden dataset). Item 6 is additive safety net.
 
 ---
 
