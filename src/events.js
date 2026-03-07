@@ -199,11 +199,12 @@ async function getTopPicks(count = 10) {
     });
   }
 
-  // Score each event
-  const scored = dateFiltered.map(e => ({
-    ...e,
-    interestingness: scoreInterestingness(e),
-  }));
+  // Score each event — today's events get a +3 bonus for welcome urgency
+  const scored = dateFiltered.map(e => {
+    const base = scoreInterestingness(e);
+    const todayBonus = getEventDate(e) === todayNyc ? 3 : 0;
+    return { ...e, interestingness: base + todayBonus };
+  });
 
   return selectDiversePicks(scored, count);
 }

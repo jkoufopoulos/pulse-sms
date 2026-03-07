@@ -11,8 +11,9 @@ const { recordAICost } = require('./traces');
 const { setSession } = require('./session');
 const { trackAICost } = require('./request-guard');
 const { updateProfile } = require('./preference-profile');
-const { smartTruncate } = require('./formatters');
+const { smartTruncate, formatTime } = require('./formatters');
 const { brainCompose, welcomeCompose } = require('./brain-llm');
+const { parseAsNycTime } = require('./geo');
 
 // --- Date range resolution ---
 
@@ -516,9 +517,67 @@ async function executeRespond(params, session, phone, trace) {
   return { sms, intent: 'conversational' };
 }
 
+const WELCOME_EMOJI = {
+  comedy: '\ud83c\udfad', theater: '\ud83c\udfad',
+  live_music: '\ud83c\udfb5', nightlife: '\ud83c\udfb5',
+  art: '\ud83c\udfa8', film: '\ud83c\udfac',
+  community: '\ud83c\udf89', food_drink: '\ud83c\udf89',
+};
+
+/**
+ * Format a compact time label for welcome picks.
+ * Today → "tonight" or "today Xpm". Tomorrow → "tomorrow Xpm". Further → "Sat Xpm".
+ */
+function welcomeTimeLabel(event) {
+  const todayNyc = getNycDateString(0);
+  const tomorrowNyc = getNycDateString(1);
+  const eventDate = event.date_local || null;
+
+  let timeStr = '';
+  if (event.start_time_local) {
+    const ms = parseAsNycTime(event.start_time_local);
+    if (!isNaN(ms)) {
+      const d = new Date(ms);
+      timeStr = d.toLocaleString('en-US', {
+        timeZone: 'America/New_York',
+        hour: 'numeric', minute: '2-digit',
+      }).replace(':00', '').toLowerCase();
+    }
+  }
+
+  if (eventDate === todayNyc) {
+    if (!timeStr) return 'tonight';
+    // 6pm+ → "tonight Xpm", earlier → "today Xpm"
+    const hour = event.start_time_local ? new Date(parseAsNycTime(event.start_time_local)).getHours() : 18;
+    return hour >= 18 ? `tonight ${timeStr}` : `today ${timeStr}`;
+  }
+  if (eventDate === tomorrowNyc) {
+    return timeStr ? `tomorrow ${timeStr}` : 'tomorrow';
+  }
+  // Further out — day name
+  if (eventDate) {
+    const dayName = new Date(eventDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' });
+    return timeStr ? `${dayName} ${timeStr}` : dayName;
+  }
+  return timeStr || 'tonight';
+}
+
+/**
+ * Format a single welcome pick line: emoji Name — Venue (Hood), time, price
+ */
+function formatWelcomePick(event, rank) {
+  const emoji = WELCOME_EMOJI[event.category] || '\u2728';
+  const venue = event.venue_name || '';
+  const hood = event.neighborhood ? ` (${event.neighborhood})` : '';
+  const time = welcomeTimeLabel(event);
+  const price = event.is_free ? 'free' : (event.price_display || '');
+  const priceStr = price ? `, ${price}` : '';
+  return `${rank}) ${emoji} ${event.name} \u2014 ${venue}${hood}, ${time}${priceStr}`;
+}
+
 /**
  * Handle first-message welcome flow: fetch interestingness-ranked events,
- * compose welcome+picks, save session, send SMS.
+ * compose deterministic welcome, save session. No LLM call — sub-second response.
  */
 async function handleWelcome(phone, session, trace) {
   const { getTopPicks } = require('./events');
@@ -528,7 +587,7 @@ async function handleWelcome(phone, session, trace) {
   trace.events.getEvents_ms = Date.now() - eventsStart;
   trace.events.candidates_count = topEvents.length;
   trace.events.candidate_ids = topEvents.map(e => e.id);
-  trace.events.sent_to_claude = topEvents.length;
+  trace.events.sent_to_claude = 0; // deterministic — no LLM
   trace.events.sent_ids = topEvents.map(e => e.id);
   trace.events.sent_pool = topEvents.map(e => ({
     id: e.id, name: e.name, venue_name: e.venue_name, neighborhood: e.neighborhood,
@@ -538,25 +597,31 @@ async function handleWelcome(phone, session, trace) {
   }));
 
   if (topEvents.length === 0) {
-    const sms = "Hey! I'm Pulse \u2014 I find the stuff in NYC you won't find on Instagram. Tell me a neighborhood, a vibe, or what you're in the mood for tonight.";
+    const sms = "Hey, I'm Pulse \u2014 your plugged-in friend for NYC. Text me a neighborhood or what you're in the mood for.";
     saveResponseFrame(phone, { picks: [], eventMap: {}, neighborhood: null, filters: null, offeredIds: [] });
     return { sms, intent: 'conversational', picks: [], activeFilters: {}, eventMap: {} };
   }
 
-  const composeStart = Date.now();
-  const result = await welcomeCompose(topEvents);
-  trace.composition.latency_ms = Date.now() - composeStart;
-  trace.composition.raw_response = result._raw || null;
-  trace.composition.reasoning = result.reasoning || null;
+  // Deterministic compose — pick top 3, format directly
+  const picks3 = topEvents.slice(0, 3);
+  const pickLines = picks3.map((e, i) => formatWelcomePick(e, i + 1));
+  const sms = smartTruncate(
+    `I'm Pulse \u2014 here's what's good:\n\n${pickLines.join('\n')}\n\nAny of those? Or text me a neighborhood.`
+  );
+
+  trace.composition.latency_ms = 0;
+  trace.composition.reasoning = 'deterministic: top 3 by interestingness with category diversity';
   trace.composition.active_filters = {};
   trace.composition.neighborhood_used = 'citywide';
 
-  recordAICost(trace, 'compose', result._usage, result._provider);
-  trackAICost(phone, result._usage, result._provider);
-
   const eventMap = {};
   for (const e of topEvents) eventMap[e.id] = e;
-  const validPicks = validatePicks(result.picks, topEvents);
+
+  const validPicks = picks3.map((e, i) => ({
+    rank: i + 1,
+    event_id: e.id,
+    why: `interestingness: ${e.interestingness}, ${e.source_vibe || 'unknown'} source`,
+  }));
 
   trace.composition.picks = validPicks.map(p => {
     const evt = eventMap[p.event_id];
@@ -578,7 +643,7 @@ async function handleWelcome(phone, session, trace) {
     visitedHoods: ['citywide'],
   });
 
-  return { sms: result.sms_text, intent: 'events', picks: validPicks, activeFilters: {}, eventMap };
+  return { sms, intent: 'events', picks: validPicks, activeFilters: {}, eventMap };
 }
 
 module.exports = {
