@@ -322,14 +322,14 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
           trackAICost(phone, composeResult._usage, composeResult._provider);
           trace.composition.raw_response = composeResult._raw || null;
           trace.composition.reasoning = composeResult.reasoning || null;
-          execResult = { sms: smartTruncate(composeResult.sms_text), intent: 'details' };
+          execResult = { sms: smartTruncate(composeResult.sms_text), intent: 'details', picks: [detailsResult.pick], eventMap: { [event.id]: event } };
         } catch (err) {
           console.warn('Details continuation failed, falling back to composeDetails:', err.message);
           const { composeDetails } = require('./ai');
           const result = await composeDetails(event, detailsResult.pick?.why);
           recordAICost(trace, 'compose', result._usage, result._provider);
           trackAICost(phone, result._usage, result._provider);
-          execResult = { sms: smartTruncate(result.sms_text), intent: 'details' };
+          execResult = { sms: smartTruncate(result.sms_text), intent: 'details', picks: [detailsResult.pick], eventMap: { [event.id]: event } };
         }
       } else {
         // Anthropic fallback — use composeDetails
@@ -338,7 +338,7 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
         const result = await composeDetails(event, detailsResult.pick?.why);
         recordAICost(trace, 'compose', result._usage, result._provider);
         trackAICost(phone, result._usage, result._provider);
-        execResult = { sms: smartTruncate(result.sms_text), intent: 'details' };
+        execResult = { sms: smartTruncate(result.sms_text), intent: 'details', picks: [detailsResult.pick], eventMap: { [event.id]: event } };
       }
     } else if (brainResult.tool === 'search_events') {
       const poolResult = await buildSearchPool(brainResult.params, session, phone, trace);

@@ -211,7 +211,7 @@ ${curationTasteBlock(CURATION_DIVERSITY_DEFAULT)}
 - Under 480 characters total. No URLs.
 - Voice: friend texting. Opinionated, concise, warm.
 - CONNECT your SMS to what the user originally asked.
-- For DETAILS responses: write a rich, opinionated detail message including venue, time, price, description, and URL. Under 480 chars.
+- For DETAILS responses: write a rich, opinionated detail message including venue, time, price, and description. No URL — the link is sent separately. Under 480 chars.
 - For MORE responses with is_last_batch=true: mention these are the last picks and suggest trying a different neighborhood if suggestions are provided. Do NOT say "reply MORE".
 
 Return JSON: { "reasoning": "2-3 sentences on why you chose these picks over the others in the pool. What made the winners stand out? What did you skip and why?", "sms_text": "the full SMS", "picks": [{"rank": 1, "event_id": "id from the event", "why": "short reason"}] }
