@@ -173,3 +173,43 @@ check('details: returns noPicks when null session', detNull.noPicks === true);
 const staleSession = { ...detailsSession, lastResponseHadPicks: false, lastNeighborhood: 'Bushwick' };
 const detStale = executeDetails('2', staleSession);
 check('details: returns stalePicks when lastResponseHadPicks is false', detStale.stalePicks === true && detStale.neighborhood === 'Bushwick');
+
+// ---- executeWelcome helpers ----
+console.log('\nexecuteWelcome helpers:');
+
+const { formatWelcomePick, welcomeTimeLabel } = require('../../src/brain-execute');
+
+check('formatWelcomePick exists', typeof formatWelcomePick === 'function');
+check('welcomeTimeLabel exists', typeof welcomeTimeLabel === 'function');
+
+// Test welcomeTimeLabel with a today event
+const todayDate = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+const todayEvent = {
+  date_local: todayDate,
+  start_time_local: todayDate + 'T20:00:00',
+};
+const todayLabel = welcomeTimeLabel(todayEvent);
+check('today evening event label contains "tonight"', todayLabel.includes('tonight'));
+
+// Test formatWelcomePick
+const testWelcomeEvent = {
+  name: 'Jazz Night',
+  venue_name: 'Blue Note',
+  neighborhood: 'Greenwich Village',
+  category: 'jazz',
+  is_free: false,
+  price_display: '$20',
+  date_local: todayDate,
+  start_time_local: todayDate + 'T20:00:00',
+};
+const pickLine = formatWelcomePick(testWelcomeEvent, 1);
+check('pick line starts with rank', pickLine.startsWith('1)'));
+check('pick line contains event name', pickLine.includes('Jazz Night'));
+check('pick line contains venue', pickLine.includes('Blue Note'));
+check('pick line contains neighborhood', pickLine.includes('Greenwich Village'));
+check('pick line contains price', pickLine.includes('$20'));
+
+// Test free event
+const freeEvent = { ...testWelcomeEvent, is_free: true, price_display: null };
+const freeLine = formatWelcomePick(freeEvent, 2);
+check('free event shows "free"', freeLine.includes('free'));

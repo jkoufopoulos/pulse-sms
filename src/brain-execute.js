@@ -418,7 +418,102 @@ async function buildSearchPool(params, session, phone, trace) {
   };
 }
 
+// --- Welcome experience helpers (deterministic, $0) ---
+
+const { parseAsNycTime } = require('./geo');
+const { smartTruncate } = require('./formatters');
+
+const WELCOME_EMOJI = {
+  comedy: '\u{1F3AD}', theater: '\u{1F3AD}',
+  live_music: '\u{1F3B5}', nightlife: '\u{1F3B5}',
+  art: '\u{1F3A8}', film: '\u{1F3AC}',
+  community: '\u{1F389}', food_drink: '\u{1F389}',
+};
+
+/**
+ * Format a compact time label for welcome picks.
+ * Today -> "tonight" or "today Xpm". Tomorrow -> "tomorrow Xpm". Further -> "Sat Xpm".
+ */
+function welcomeTimeLabel(event) {
+  const todayNyc = getNycDateString(0);
+  const tomorrowNyc = getNycDateString(1);
+  const eventDate = event.date_local || null;
+
+  let timeStr = '';
+  if (event.start_time_local) {
+    const ms = parseAsNycTime(event.start_time_local);
+    if (!isNaN(ms)) {
+      const d = new Date(ms);
+      timeStr = d.toLocaleString('en-US', {
+        timeZone: 'America/New_York',
+        hour: 'numeric', minute: '2-digit',
+      }).replace(':00', '').toLowerCase();
+    }
+  }
+
+  if (eventDate === todayNyc) {
+    if (!timeStr) return 'tonight';
+    const hour = event.start_time_local ? new Date(parseAsNycTime(event.start_time_local)).getHours() : 18;
+    return hour >= 18 ? `tonight ${timeStr}` : `today ${timeStr}`;
+  }
+  if (eventDate === tomorrowNyc) {
+    return timeStr ? `tomorrow ${timeStr}` : 'tomorrow';
+  }
+  if (eventDate) {
+    const dayName = new Date(eventDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' });
+    return timeStr ? `${dayName} ${timeStr}` : dayName;
+  }
+  return timeStr || 'tonight';
+}
+
+/**
+ * Format a single welcome pick line: emoji Name — Venue (Hood), time, price
+ */
+function formatWelcomePick(event, rank) {
+  const emoji = WELCOME_EMOJI[event.category] || '\u2728';
+  const venue = event.venue_name || '';
+  const hood = event.neighborhood ? ` (${event.neighborhood})` : '';
+  const time = welcomeTimeLabel(event);
+  const price = event.is_free ? 'free' : (event.price_display || '');
+  const priceStr = price ? `, ${price}` : '';
+  return `${rank}) ${emoji} ${event.name} \u2014 ${venue}${hood}, ${time}${priceStr}`;
+}
+
+/**
+ * Execute the show_welcome tool: fetch top picks, format deterministically.
+ * Returns { smsText, picks, eventMap } or { smsText } (fallback, no events).
+ */
+async function executeWelcome() {
+  const { getTopPicks } = require('./events');
+  const topEvents = await getTopPicks(5);
+
+  if (topEvents.length === 0) {
+    return {
+      smsText: "Hey, I'm Pulse \u2014 your plugged-in friend for NYC nightlife. Tell me what you're in the mood for tonight.",
+      picks: [],
+      eventMap: {},
+    };
+  }
+
+  const picks3 = topEvents.slice(0, 3);
+  const pickLines = picks3.map((e, i) => formatWelcomePick(e, i + 1));
+  const smsText = smartTruncate(
+    `I'm Pulse \u2014 here's what's good tonight:\n\n${pickLines.join('\n')}\n\nAny of those? Or tell me what you're in the mood for`
+  );
+
+  const eventMap = {};
+  for (const e of topEvents) eventMap[e.id] = e;
+
+  const picks = picks3.map((e, i) => ({
+    rank: i + 1,
+    event_id: e.id,
+    why: `interestingness: ${e.interestingness}, ${e.source_vibe || 'unknown'} source`,
+  }));
+
+  return { smsText, picks, eventMap };
+}
+
 module.exports = {
   resolveDateRange, executeMore, executeDetails, validatePicks,
-  buildSearchPool,
+  buildSearchPool, executeWelcome, formatWelcomePick, welcomeTimeLabel,
 };
