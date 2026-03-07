@@ -166,7 +166,9 @@ Collapsed tools from 3 to 2 (deleted `get_details`). `search_events` handles mor
 - Comedy source -- Dedicated scraper for Comedy Cellar, UCB, Caveat
 - Gallery/art source -- Gallery listing aggregator
 - Happy hour detection -- Surface as filterable category
-- Self-healing scraper pipeline -- **Done (2026-03-05).** `scrape-guard.js`: baseline gates (count drift, field coverage drift, date sanity, duplicate spike) quarantine broken sources at scrape time. Post-scrape audit wires `checkSourceCompleteness` + `runExtractionAudit` to alerting. Yesterday's cached events serve as automatic fallback.
+- Self-healing scraper pipeline -- **Partial (2026-03-05, revised 2026-03-07).** `scrape-guard.js`: baseline gates (count drift, field coverage drift, date sanity, duplicate spike) quarantine broken sources at scrape time. Post-scrape audit wires `checkSourceCompleteness` + `runExtractionAudit` to alerting. Yesterday's cached events serve as automatic fallback.
+  - **Open: Scrape resilience (2026-03-07)** -- Plan: `docs/plans/2026-03-07-scrape-resilience.md`. Four fixes: (1) volatile source baseline uses median not mean — stops false quarantine of Yutori/NonsenseNYC, (2) duplicate spike detection allows multi-show venues — stops false quarantine of TinyCupboard, (3) Yutori extraction garbage filters — reject non-events, streaming releases, venue-as-name, (4) Yutori category quality — add film category, reduce "other" bucket from 41%.
+  - **Open: Pipeline recovery (2026-03-07)** -- Plan: `docs/plans/2026-03-07-self-healing-pipeline.md`. Five steps: graduated alerting, per-source timeouts, retry on timeout, quarantine diagnostics, auto-disable after 7 failures.
 - Web discovery crawlers -- Targeted searches for niche events beyond whitelisted sources
 
 ### Infrastructure + Product
@@ -247,7 +249,7 @@ Comprehensive review of all prompts in `prompts.js` and `brain-llm.js`. The prom
 
 | Period | Highlights |
 |--------|-----------|
-| Mar 7 | Agent curation: taste prompt in all compose paths, pool widened 15→40, deterministic welcome ($0, ~40ms), time-aware filtering (6h window), editorial_signal + scarcity extraction metadata, discovery-source editorial stamp, pick reasoning observability (Tasks 1-6), user pick history in agent context, prompt hygiene #1-3 complete. POV doc: `docs/plans/2026-03-06-agent-curation-pov.md`. |
+| Mar 7 | Agent curation: taste prompt in all compose paths, pool widened 15→40, deterministic welcome ($0, ~40ms), time-aware filtering (6h window), editorial_signal + scarcity extraction metadata, discovery-source editorial stamp, pick reasoning observability (Tasks 1-6), user pick history in agent context, prompt hygiene #1-3 complete. POV doc: `docs/plans/2026-03-06-agent-curation-pov.md`. Scrape fixes: price removed from welcome picks, `isGarbageName` quality gate, inactive source pruning bug (Skint/NYCParks), source eval labels (SkintOngoing/ScreenSlate), RA `is_free` fix (uses `isTicketed` fallback). |
 | Mar 5 | Phase 1-4 complete. Codebase audit: dead exports removed (pipeline.js), stale pre-router comments cleaned (code-evals.js, traces.js, agent-brain.js), CLAUDE.md/AGENTS.md/ROADMAP.md synced to Phase 4 (2 tools, checkMechanical = help+TCPA only). Scrape guard (baseline gates + post-scrape audit). First-message welcome flow. Quality eval runner + browse page. |
 | Mar 3 | Eval suite audit (34 new scenarios, 417 total). Community layer Phase 2 (editorial voice, source vibe, venue size, interaction format). Skint multi-day parsing. Description coverage for Luma/Songkick/DoNYC. |
 | Mar 2 | Agent brain (`agent-brain.js`) with 99.9% code eval. Cross-source recurrence detection (485 patterns). Gemini Flash fallback chain. Broad query support (citywide + date range). New sources: Tiny Cupboard, Brooklyn Comedy Collective, NYC Trivia League, BK Mag, Sofar Sounds. EventbriteComedy fix (0 -> 55 events). |
