@@ -56,3 +56,16 @@ const { BRAIN_TOOLS } = require('../../src/brain-llm');
 const welcomeTool = BRAIN_TOOLS.find(t => t.name === 'show_welcome');
 check('show_welcome tool exists in BRAIN_TOOLS', !!welcomeTool);
 check('show_welcome has no required params', !welcomeTool.parameters.required || welcomeTool.parameters.required.length === 0);
+
+// ---- buildBrainSystemPrompt first-session indicator ----
+console.log('\nbuildBrainSystemPrompt first-session:');
+
+const { buildBrainSystemPrompt } = require('../../src/brain-llm');
+
+const freshSession = {};
+const freshPrompt = buildBrainSystemPrompt(freshSession);
+check('fresh session prompt contains first-message indicator', freshPrompt.includes('First message — new session'));
+
+const returningSession = { conversationHistory: [{ role: 'user', content: 'hey' }], lastNeighborhood: 'bushwick' };
+const returningPrompt = buildBrainSystemPrompt(returningSession);
+check('returning session prompt does NOT contain first-message indicator', !returningPrompt.includes('First message — new session'));

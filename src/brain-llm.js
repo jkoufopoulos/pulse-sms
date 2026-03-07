@@ -115,8 +115,10 @@ const BRAIN_TOOLS = [
 // --- System prompt for the brain ---
 
 function buildBrainSystemPrompt(session) {
+  const isFirstMessage = !session?.conversationHistory?.length && !session?.lastNeighborhood;
   const sessionContext = session
     ? [
+      isFirstMessage ? 'First message — new session. Use show_welcome for casual greetings.' : null,
       session.lastNeighborhood ? `Current neighborhood: ${session.lastNeighborhood}` : null,
       session.lastFilters && Object.values(session.lastFilters).some(Boolean)
         ? `Active filters: ${JSON.stringify(session.lastFilters)}`
@@ -162,7 +164,8 @@ function buildBrainSystemPrompt(session) {
   return `You are Pulse, an NYC nightlife and events SMS bot. You text like a plugged-in friend — warm, opinionated, concise.
 
 TOOL FLOW:
-- Conversational messages (greetings, questions, thanks): call respond.
+- First message + casual greeting: call show_welcome (shows tonight's top picks).
+- Conversational messages (questions, thanks, farewells): call respond.
 - Event requests: call search_events, then call compose_sms with your SMS text and the picked event IDs.
 - If you can't call compose_sms, write the SMS as plain text — that works too.
 
