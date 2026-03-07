@@ -535,8 +535,8 @@
     </ul>
 
     <div class="stats" style="margin-top: 24px;">
-      <span class="stat"><em>539</em> unit tests</span>
-      <span class="stat"><em>24</em> code eval checks</span>
+      <span class="stat"><em>905+</em> unit tests</span>
+      <span class="stat"><em>6</em> invariant checks</span>
       <span class="stat"><em>8</em> extraction audit checks</span>
       <span class="stat"><em>386</em> scenario cases</span>
       <span class="stat"><em>~$0.70</em> full eval run</span>
@@ -634,10 +634,10 @@
   <span class="hl-green">PASS</span>: LES
   <span class="hl-green">PASS</span>: williamsburg
   ...
-<span class="hl-green">539 passed</span>, 0 failed</div>
+<span class="hl-green">905 passed</span>, 0 failed</div>
 
     <div class="section-body" style="margin-top: 16px;">
-      <p><strong>What's covered:</strong> neighborhood extraction (36 hoods, aliases, landmarks, subway stops), event ID hashing and cross-source dedup, venue resolution and geo math, formatters and SMS truncation, mechanical shortcut matching (greetings, details, more, free, filters), session merge logic, TCPA opt-out patterns, eval functions themselves.</p>
+      <p><strong>What's covered:</strong> neighborhood extraction (75 hoods, aliases, landmarks, subway stops), event ID hashing and cross-source dedup, venue resolution and geo math, formatters and SMS truncation, mechanical shortcut matching (help + TCPA), session merge logic, TCPA opt-out patterns, eval functions themselves.</p>
       <p><strong>What's not covered:</strong> Anything that requires an LLM call or live data. That's what the other layers are for.</p>
     </div>
   </div>
@@ -760,7 +760,7 @@
           </tr>
           <tr>
             <td class="col-name">valid_neighborhood</td>
-            <td>Resolved neighborhood not in the 36-neighborhood map</td>
+            <td>Resolved neighborhood not in the 75-neighborhood map</td>
           </tr>
           <tr>
             <td class="col-name">response_not_empty</td>
@@ -854,7 +854,7 @@
     </div>
 
     <div class="section-body" style="margin-top: 16px;">
-      <p>Each test case can also include <strong>expectation assertions</strong>: expected intent, expected neighborhood, expected event presence, and banned words. These are checked alongside the 24 code evals. For example, "williamsburg" should route to <code>intent: "events"</code> and resolve to <code>"Williamsburg"</code>.</p>
+      <p>Each test case can also include <strong>expectation assertions</strong>: expected intent, expected neighborhood, expected event presence, and banned words. These are checked alongside the 6 invariant checks. For example, "williamsburg" should route to <code>intent: "events"</code> and resolve to <code>"Williamsburg"</code>.</p>
     </div>
 
     <div class="card" style="margin-top: 20px;">
