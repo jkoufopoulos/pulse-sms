@@ -7,7 +7,7 @@ const RA_NYC_AREA_ID = 8;
 function parseRACost(cost) {
   if (cost == null || cost === '') return null;
   const s = String(cost).trim();
-  if (s === '0') return { is_free: true, price_display: 'free' };
+  if (s === '0' || /\bfree\b/i.test(s)) return { is_free: true, price_display: 'free' };
   // Range like "7-15"
   const range = s.match(/^(\$?)(\d+(?:\.\d+)?)\s*-\s*(\$?)(\d+(?:\.\d+)?)(\+?)$/);
   if (range) {
@@ -18,8 +18,8 @@ function parseRACost(cost) {
   if (single) {
     return { is_free: false, price_display: `$${single[1]}${single[2]}` };
   }
-  // Unrecognized format — pass through as-is
-  return { is_free: false, price_display: s };
+  // Unrecognized format — return null so caller can use fallback signals
+  return null;
 }
 
 const RA_QUERY = `query GET_EVENT_LISTINGS($filters: FilterInputDtoInput, $filterOptions: FilterOptionsInputDtoInput, $page: Int, $pageSize: Int) {
@@ -135,8 +135,8 @@ async function fetchRAEvents() {
           end_time_local: endTime,
           date_local: dateLocal,
           time_window: null,
-          is_free: parseRACost(e.cost)?.is_free ?? /\bfree\b/i.test(e.title || ''),
-          price_display: parseRACost(e.cost)?.price_display ?? (/\bfree\b/i.test(e.title || '') ? 'free' : null),
+          is_free: parseRACost(e.cost)?.is_free ?? (e.isTicketed === false || /\bfree\b/i.test(e.title || '')),
+          price_display: parseRACost(e.cost)?.price_display ?? ((e.isTicketed === false || /\bfree\b/i.test(e.title || '')) ? 'free' : null),
           category: 'nightlife',
           subcategory: null,
           ticket_url: e.contentUrl ? `https://ra.co${e.contentUrl}` : null,
