@@ -69,3 +69,12 @@ check('fresh session prompt contains first-message indicator', freshPrompt.inclu
 const returningSession = { conversationHistory: [{ role: 'user', content: 'hey' }], lastNeighborhood: 'bushwick' };
 const returningPrompt = buildBrainSystemPrompt(returningSession);
 check('returning session prompt does NOT contain first-message indicator', !returningPrompt.includes('First message — new session'));
+
+// ---- deriveIntent with show_welcome ----
+console.log('\nderiveIntent with show_welcome:');
+
+check('show_welcome -> welcome', deriveIntent([{ name: 'show_welcome', params: {} }]) === 'welcome');
+check('show_welcome + respond -> welcome (welcome wins)', deriveIntent([
+  { name: 'show_welcome', params: {} },
+  { name: 'respond', params: { intent: 'greeting' } },
+]) === 'welcome');

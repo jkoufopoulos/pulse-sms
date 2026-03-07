@@ -15,7 +15,7 @@
 const { runAgentLoop } = require('./llm');
 const { MODELS } = require('./model-config');
 const { BRAIN_TOOLS, buildBrainSystemPrompt, serializePoolForContinuation } = require('./brain-llm');
-const { buildSearchPool, executeMore, executeDetails } = require('./brain-execute');
+const { buildSearchPool, executeMore, executeDetails, executeWelcome } = require('./brain-execute');
 const { buildEventMap, saveResponseFrame, buildExhaustionMessage, sendPickUrls } = require('./pipeline');
 const { sendSMS, maskPhone } = require('./twilio');
 const { recordAICost } = require('./traces');
@@ -89,6 +89,9 @@ function extractPicksFromSms(smsText, events) {
 function deriveIntent(toolCalls) {
   if (!toolCalls?.length) return 'conversational';
 
+  const hasWelcome = toolCalls.find(tc => tc.name === 'show_welcome');
+  if (hasWelcome) return 'welcome';
+
   // Last search_events call determines intent
   const lastSearch = [...toolCalls].reverse().find(tc => tc.name === 'search_events');
   if (lastSearch) {
@@ -125,6 +128,15 @@ async function executeTool(toolName, params, session, phone, trace) {
 
   if (toolName === 'compose_sms') {
     return { ok: true };
+  }
+
+  if (toolName === 'show_welcome') {
+    const result = await executeWelcome();
+    return {
+      ok: true,
+      _welcomeResult: result,
+      _smsText: result.smsText,
+    };
   }
 
   if (toolName === 'search_events') {
@@ -283,6 +295,7 @@ function saveSessionFromToolCalls(phone, session, toolCalls, smsText) {
   const lastSearch = [...toolCalls].reverse().find(tc => tc.name === 'search_events');
   const lastRespond = [...toolCalls].reverse().find(tc => tc.name === 'respond');
   const lastCompose = [...toolCalls].reverse().find(tc => tc.name === 'compose_sms');
+  const lastWelcome = [...toolCalls].reverse().find(tc => tc.name === 'show_welcome');
 
   // Build picks: prefer compose_sms (structured), fall back to extractPicksFromSms (fuzzy)
   const composePickIds = lastCompose?.params?.picks || [];
@@ -300,6 +313,22 @@ function saveSessionFromToolCalls(phone, session, toolCalls, smsText) {
       visitedHoods: session?.visitedHoods || [],
       lastResponseHadPicks: false,
     });
+    return;
+  }
+
+  // show_welcome — save welcome picks as initial session state
+  if (lastWelcome) {
+    const wr = lastWelcome.result?._welcomeResult;
+    if (wr) {
+      saveResponseFrame(phone, {
+        picks: wr.picks || [],
+        eventMap: wr.eventMap || {},
+        neighborhood: 'citywide',
+        filters: null,
+        offeredIds: (wr.picks || []).map(p => p.event_id),
+        visitedHoods: ['citywide'],
+      });
+    }
     return;
   }
 
@@ -405,7 +434,7 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     const loopResult = await runAgentLoop(
       MODELS.brain, systemPrompt, message, BRAIN_TOOLS,
       executeAndTrack,
-      { maxIterations: 3, timeout: 12000, stopTools: ['respond', 'compose_sms'] }
+      { maxIterations: 3, timeout: 12000, stopTools: ['respond', 'compose_sms', 'show_welcome'] }
     );
 
     // Record costs
@@ -498,7 +527,7 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
         const fallbackResult = await runAgentLoop(
           MODELS.fallback, systemPrompt, message, BRAIN_TOOLS,
           async (toolName, params) => sanitizeForLLM(await executeTool(toolName, params, session, phone, trace)),
-          { maxIterations: 2, timeout: 12000, stopTools: ['respond', 'compose_sms'] }
+          { maxIterations: 2, timeout: 12000, stopTools: ['respond', 'compose_sms', 'show_welcome'] }
         );
 
         recordAICost(trace, 'brain_fallback', fallbackResult.totalUsage, fallbackResult.provider);
