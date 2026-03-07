@@ -12,6 +12,11 @@ const NON_EVENT_CATEGORIES = [
   /psychology/i, /relationship/i, /social\s+skills/i, /friendships?/i,
   /productivity/i, /career/i, /hiring/i, /recruiting/i,
   /legal/i, /compliance/i, /tax\b/i,
+  // streaming / media releases
+  /streaming/i, /netflix/i, /hulu/i, /disney\+/i, /prime\s+video/i, /apple\s+tv/i,
+  /release\s+date/i, /coming\s+soon/i,
+  // academic / research
+  /research/i, /whitepaper/i, /case\s+study/i,
 ];
 
 /**
@@ -26,6 +31,9 @@ const NON_EVENT_FILENAMES = [
   /friendship/i, /relationship/i, /self-help/i, /coaching/i,
   /leadership/i, /career-/i, /hiring-/i, /tax-/i, /legal-/i,
   /productivity/i, /psychology/i, /social-skill/i,
+  /netflix/i, /streaming/i, /hulu/i, /disney/i,
+  /release-date/i, /coming-soon/i,
+  /research/i, /whitepaper/i, /case-study/i,
 ];
 
 /**

@@ -4,7 +4,7 @@ const { SOURCES, SOURCE_TIERS, SOURCE_LABELS, SOURCE_DB_NAMES, MERGE_ORDER } = r
 const { sourceHealth, saveHealthData, updateSourceHealth, updateScrapeStats, computeEventMix, getHealthStatus: _getHealthStatus } = require('./source-health');
 const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate, parseAsNycTime } = require('./geo');
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues, lookupVenue, lookupVenueSize } = require('./venues');
-const { filterIncomplete, filterKidsEvents } = require('./curation');
+const { filterIncomplete, filterKidsEvents, isGarbageName } = require('./curation');
 const { eventMatchesFilters, failsTimeGate } = require('./pipeline');
 const { computeCompleteness, backfillEvidence, backfillDateTimes } = require('./sources/shared');
 const { captureExtractionInput, getExtractionInputs, clearExtractionInputs } = require('./extraction-capture');
@@ -749,22 +749,6 @@ async function refreshSources(sourceNames, { reprocess = false } = {}) {
 // ============================================================
 // Main entry: get events for a neighborhood (reads from cache)
 // ============================================================
-
-/**
- * Detect garbage event names — dates, metadata fields, or too-short strings
- * that slipped through extraction.
- */
-const GARBAGE_NAME_RE = /^(day\s*[&+]\s*date|date\s*[&+]\s*day)\b/i;
-const DATE_ONLY_RE = /^(monday|tuesday|wednesday|thursday|friday|saturday|sunday)?,?\s*(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}/i;
-
-function isGarbageName(name) {
-  if (!name || name.length < 4) return true;
-  if (GARBAGE_NAME_RE.test(name)) return true;
-  // Name is just a date string (e.g. "Friday, March 7, 2026")
-  const stripped = name.replace(/[^a-zA-Z0-9 ]/g, ' ').trim();
-  if (DATE_ONLY_RE.test(stripped)) return true;
-  return false;
-}
 
 /**
  * Quality-gate filter — shared between getEvents and getEventsCitywide.
