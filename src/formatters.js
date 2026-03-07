@@ -170,4 +170,38 @@ function isSearchUrl(url) {
   }
 }
 
-module.exports = { formatTime, cleanUrl, formatEventDetails, smartTruncate, isSearchUrl };
+/**
+ * Deterministic price injection backstop.
+ * If the LLM-composed SMS mentions an event by name but omits its price,
+ * append a compact price hint. Only acts when there's room under 480 chars.
+ */
+function injectMissingPrices(sms, picks, eventMap) {
+  if (!picks?.length || !eventMap) return sms;
+
+  const pricePattern = /\$\d|free\b|no cover|\bcover\b/i;
+  // If the SMS already has price info, skip
+  if (pricePattern.test(sms)) return sms;
+
+  // Collect price tags from picked events that have actionable price data
+  const priceTags = [];
+  for (const pick of picks) {
+    const evt = eventMap[pick.event_id];
+    if (!evt) continue;
+    let tag = null;
+    if (evt.is_free) tag = 'free';
+    else if (evt.price_display && /\$\d/.test(evt.price_display)) tag = evt.price_display;
+    if (tag) priceTags.push(tag);
+  }
+
+  if (priceTags.length === 0) return sms;
+
+  // Build a compact suffix
+  const unique = [...new Set(priceTags)];
+  const suffix = ` (${unique.join(', ')})`;
+  if (sms.length + suffix.length <= 480) {
+    return sms + suffix;
+  }
+  return sms;
+}
+
+module.exports = { formatTime, cleanUrl, formatEventDetails, smartTruncate, isSearchUrl, injectMissingPrices };

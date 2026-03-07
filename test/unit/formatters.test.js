@@ -1,5 +1,5 @@
 const { check } = require('../helpers');
-const { formatTime, cleanUrl, formatEventDetails, smartTruncate } = require('../../src/formatters');
+const { formatTime, cleanUrl, formatEventDetails, smartTruncate, injectMissingPrices } = require('../../src/formatters');
 
 // ---- formatTime ----
 console.log('\nformatTime:');
@@ -57,3 +57,22 @@ check('truncated ends with ellipsis', smartTruncate('word '.repeat(100)).endsWit
 check('does not cut mid-word', !smartTruncate('word '.repeat(100)).endsWith('wor…'));
 const urlText = 'Event name\nhttps://example.com/' + 'x'.repeat(500);
 check('drops partial URL line', !smartTruncate(urlText).includes('https://'));
+
+// ---- injectMissingPrices ----
+console.log('\ninjectMissingPrices:');
+
+const eventMap = {
+  'e1': { is_free: true, price_display: 'Free' },
+  'e2': { is_free: false, price_display: '$20' },
+  'e3': { is_free: false, price_display: null },
+};
+const picks = [{ event_id: 'e1' }, { event_id: 'e2' }];
+
+check('skips when SMS already has price', injectMissingPrices('Great show, $15 cover', picks, eventMap) === 'Great show, $15 cover');
+check('skips when SMS says free', injectMissingPrices('Great free show tonight', picks, eventMap) === 'Great free show tonight');
+check('injects when price missing', injectMissingPrices('Great show tonight', picks, eventMap).includes('free'));
+check('injects multiple prices', injectMissingPrices('Great show tonight', picks, eventMap).includes('$20'));
+check('no picks returns unchanged', injectMissingPrices('Great show', [], eventMap) === 'Great show');
+check('no eventMap returns unchanged', injectMissingPrices('Great show', picks, null) === 'Great show');
+check('no actionable price returns unchanged', injectMissingPrices('Great show', [{ event_id: 'e3' }], eventMap) === 'Great show');
+check('respects 480 char limit', injectMissingPrices('x'.repeat(478), picks, eventMap).length <= 480);

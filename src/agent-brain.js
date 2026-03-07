@@ -16,7 +16,7 @@ const { getSession, setSession, addToHistory } = require('./session');
 const { trackAICost, OPT_OUT_KEYWORDS } = require('./request-guard');
 const { handleHelp } = require('./intent-handlers');
 const { updateProfile } = require('./preference-profile');
-const { smartTruncate } = require('./formatters');
+const { smartTruncate, injectMissingPrices } = require('./formatters');
 const { sendRuntimeAlert } = require('./alerts');
 
 // Split modules
@@ -125,6 +125,16 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
     if (brainResult.tool === 'search_events' && brainResult.params.intent === 'more') {
       // --- More intent: pull next batch from session pool ---
       const moreResult = executeMore(session);
+
+      // Populate trace with the more batch so code evals can validate picks
+      if (moreResult.events?.length) {
+        trace.events.sent_ids = moreResult.events.map(e => e.id);
+        trace.events.sent_pool = moreResult.events.map(e => ({
+          id: e.id, name: e.name, venue_name: e.venue_name,
+          neighborhood: e.neighborhood, category: e.category,
+          is_free: e.is_free, price_display: e.price_display,
+        }));
+      }
 
       if (moreResult.noContext) {
         execResult = {
@@ -416,6 +426,11 @@ async function handleAgentBrainRequest(phone, message, session, trace, finalizeT
     } else {
       // Unknown tool — treat as conversational
       execResult = { sms: "Having a moment — try again!", intent: 'conversational' };
+    }
+
+    // Post-processing: inject price if LLM omitted it
+    if (execResult.picks?.length && execResult.eventMap) {
+      execResult.sms = injectMissingPrices(execResult.sms, execResult.picks, execResult.eventMap);
     }
 
     // Send SMS and finalize
