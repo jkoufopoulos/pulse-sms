@@ -176,22 +176,10 @@ async function dispatchPreRouterIntent(route, ctx) {
 
   if (route.intent === 'referral') {
     const referral = lookupReferralCode(route.referralCode);
-    if (referral) {
-      recordAttribution(phone, route.referralCode);
-      const { handleWelcome } = require('./agent-brain');
-      const welcomeResult = await handleWelcome(phone, session, trace);
-      trace.routing.result = { intent: 'welcome_referral', confidence: 1.0 };
-      await sendSMS(phone, welcomeResult.sms);
-      finalizeTrace(welcomeResult.sms, 'referral');
-      return;
-    }
-    // Expired referral — still welcome the user
-    const { handleWelcome } = require('./agent-brain');
-    const welcomeResult = await handleWelcome(phone, session, trace);
-    trace.routing.result = { intent: 'welcome_referral_expired', confidence: 1.0 };
-    await sendSMS(phone, welcomeResult.sms);
-    finalizeTrace(welcomeResult.sms, 'referral_expired');
-    return;
+    if (referral) recordAttribution(phone, route.referralCode);
+    // Let the agent loop handle the welcome
+    const { handleAgentRequest } = require('./agent-loop');
+    return handleAgentRequest(phone, ctx.message, session, trace, finalizeTrace);
   }
 
   if (route.intent === 'help') return handleHelp(ctx);
@@ -231,12 +219,11 @@ async function handleMessageAI(phone, message) {
     }
   }
 
-  const { handleAgentBrainRequest, checkMechanical } = require('./agent-brain');
+  const { checkMechanical } = require('./agent-brain');
 
-  // Mechanical pre-check: help, bare numbers, "more" — $0 AI cost
+  // Mechanical pre-check: help + TCPA — $0 AI cost
   const mechanical = checkMechanical(message, session);
   if (mechanical) {
-    // Set up session + history for mechanical handlers
     if (!getSession(phone)) setSession(phone, {});
     addToHistory(phone, 'user', message);
 
@@ -253,8 +240,9 @@ async function handleMessageAI(phone, message) {
     return trace.id;
   }
 
-  // Agent brain handles everything else
-  return handleAgentBrainRequest(phone, message, session, trace, finalizeTrace);
+  // Agent loop handles everything else
+  const { handleAgentRequest } = require('./agent-loop');
+  return handleAgentRequest(phone, message, session, trace, finalizeTrace);
 }
 
 // Cleanup intervals (for graceful shutdown)
