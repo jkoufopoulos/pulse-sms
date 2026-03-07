@@ -204,7 +204,7 @@ Collapsed tools from 3 to 2 (deleted `get_details`). `search_events` handles mor
 | Prompt hygiene (see below) | Medium | Audit completed 2026-03-07. 6 action items identified. |
 | Price data gap (21% unknown) | Low | Structurally unavailable from some sources |
 | No horizontal scalability | Low | Single-process, in-memory sessions |
-| Preference learning not yet active | Low | Profiles captured but not injected into prompts -- Phase 5 |
+| Preference learning partially active | Low | User pick categories injected into agent context (2026-03-07). Full profile injection is Phase 5. |
 
 ### Prompt Hygiene Audit (2026-03-07)
 
@@ -232,9 +232,9 @@ Comprehensive review of all prompts in `prompts.js` and `brain-llm.js`. The prom
 
 | # | Action | Risk | Effort | Rationale |
 |---|--------|------|--------|-----------|
-| 1 | Verify `UNIFIED_SYSTEM` usage; delete if dead | None | Small | Dead code removal, no behavior change |
-| 2 | Trim routing examples to 5-8 | Low | Small | Fewer input tokens, keep ambiguous edge cases only |
-| 3 | Extract curation taste into shared constant | None | Small | Single source of truth, like `SHARED_UNDERSTANDING` |
+| ~~1~~ | ~~Verify `UNIFIED_SYSTEM` usage; delete if dead~~ | ~~None~~ | ~~Small~~ | **Done (2026-03-07).** Already removed from prompts.js. |
+| ~~2~~ | ~~Trim routing examples to 5-8~~ | ~~Low~~ | ~~Small~~ | **Done (2026-03-07).** Trimmed to 11 focused examples covering key edge cases. |
+| ~~3~~ | ~~Extract curation taste into shared constant~~ | ~~None~~ | ~~Small~~ | **Done (2026-03-07).** `CURATION_TASTE_COMMON` shared across 3 prompts. |
 | 4 | Separate routing prompt from compose prompt | Medium | Medium | Inject compose rules via `functionResponse` context instead of front-loading. Reduces routing prompt by ~50%. Risk: changes the flow that's currently working at 99.2% eval. Run evals before/after. |
 | 5 | Move filter_intent to deterministic code | Medium | Medium | Derive from tool params (intent="pivot" -> clear filters). Aligns with P1. Risk: edge cases in "nvm"/"forget it" disambiguation. |
 | 6 | Add deterministic post-processing for price/day labels | Low | Small | Like `smartTruncate` but for other constraints. Backstop, not replacement. |
@@ -247,6 +247,7 @@ Comprehensive review of all prompts in `prompts.js` and `brain-llm.js`. The prom
 
 | Period | Highlights |
 |--------|-----------|
+| Mar 7 | Agent curation: taste prompt in all compose paths, pool widened 15→40, deterministic welcome ($0, ~40ms), time-aware filtering (6h window), editorial_signal + scarcity extraction metadata, discovery-source editorial stamp, pick reasoning observability (Tasks 1-6), user pick history in agent context, prompt hygiene #1-3 complete. POV doc: `docs/plans/2026-03-06-agent-curation-pov.md`. |
 | Mar 5 | Phase 1-4 complete. Codebase audit: dead exports removed (pipeline.js), stale pre-router comments cleaned (code-evals.js, traces.js, agent-brain.js), CLAUDE.md/AGENTS.md/ROADMAP.md synced to Phase 4 (2 tools, checkMechanical = help+TCPA only). Scrape guard (baseline gates + post-scrape audit). First-message welcome flow. Quality eval runner + browse page. |
 | Mar 3 | Eval suite audit (34 new scenarios, 417 total). Community layer Phase 2 (editorial voice, source vibe, venue size, interaction format). Skint multi-day parsing. Description coverage for Luma/Songkick/DoNYC. |
 | Mar 2 | Agent brain (`agent-brain.js`) with 99.9% code eval. Cross-source recurrence detection (485 patterns). Gemini Flash fallback chain. Broad query support (citywide + date range). New sources: Tiny Cupboard, Brooklyn Comedy Collective, NYC Trivia League, BK Mag, Sofar Sounds. EventbriteComedy fix (0 -> 55 events). |
