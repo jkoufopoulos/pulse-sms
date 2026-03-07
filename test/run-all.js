@@ -19,6 +19,7 @@ require('./unit/agent-brain.test');
 require('./unit/digest.test');
 require('./unit/model-config.test');
 require('./unit/llm.test');
+require('./unit/agent-loop.test');
 const misc = require('./unit/misc.test');
 const profile = require('./unit/preference-profile.test');
 
