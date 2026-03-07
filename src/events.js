@@ -134,7 +134,9 @@ function scoreInterestingness(event) {
   const rarityScore = !event.is_recurring ? 2
     : (event.interaction_format === 'interactive' ? 1 : 0);
   const venueScore = VENUE_SCORES[event.venue_size] ?? 0;
-  return vibeScore + rarityScore + venueScore;
+  const editorialBonus = event.editorial_signal ? 2 : 0;
+  const scarcityBonus = event.scarcity ? 2 : 0;
+  return vibeScore + rarityScore + venueScore + editorialBonus + scarcityBonus;
 }
 
 /**

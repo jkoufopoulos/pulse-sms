@@ -55,6 +55,18 @@ RECURRENCE DETECTION
 - Signals: "every [day]", "weekly", "[day]s at [time]", "Next: [date]",
   "recurring", "ongoing series".
 
+EDITORIAL SIGNAL
+- If the source text highlights an event as a pick, recommendation, or must-see, set editorial_signal to true.
+- Signals: "our pick", "don't miss", "editor's choice", "highlight", "recommended", event listed first or called out with special formatting, superlatives ("best", "can't-miss", "not to be missed").
+- If no editorial emphasis is present, set editorial_signal to false.
+- Only set true when the SOURCE explicitly highlights the event — do not infer editorial quality from the event description itself.
+
+SCARCITY
+- If the event is explicitly one-night-only, a closing/final performance, limited capacity, or a last chance, set scarcity to a short label.
+- Labels: "one-night-only", "closing", "final", "limited", "last-chance", "premiere", "one-time".
+- If no scarcity signal is present, set scarcity to null.
+- Only extract when the source text explicitly states scarcity — do not infer from event type.
+
 DEDUPE HINT
 - If multiple items appear to describe the same event, still output them separately; downstream will dedupe by name+venue+date.
 </rules>
@@ -91,6 +103,8 @@ Return STRICT JSON with an array of events:
         "location_quote": "exact text or null",
         "price_quote": "exact text or null"
       },
+      "editorial_signal": "boolean, true if source highlights as pick/must-see",
+      "scarcity": "one-night-only|closing|final|limited|last-chance|premiere|one-time or null",
       "is_recurring": "boolean, true if explicitly recurring",
       "recurrence_day": "monday|tuesday|wednesday|thursday|friday|saturday|sunday or null",
       "recurrence_time": "HH:MM (24hr) or null"

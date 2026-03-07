@@ -234,6 +234,22 @@ check('no source_vibe = platform default', scoreInterestingness({
   is_recurring: false, venue_size: 'medium',
 }) === 2);
 
+check('editorial_signal adds +2', scoreInterestingness({
+  source_vibe: 'discovery', is_recurring: false, venue_size: 'intimate', editorial_signal: true,
+}) === 8);
+
+check('scarcity adds +2', scoreInterestingness({
+  source_vibe: 'discovery', is_recurring: false, venue_size: 'intimate', scarcity: 'one-night-only',
+}) === 8);
+
+check('editorial + scarcity adds +4', scoreInterestingness({
+  source_vibe: 'discovery', is_recurring: false, venue_size: 'intimate', editorial_signal: true, scarcity: 'closing',
+}) === 10);
+
+check('no editorial/scarcity = no bonus', scoreInterestingness({
+  source_vibe: 'discovery', is_recurring: false, venue_size: 'intimate', editorial_signal: false, scarcity: null,
+}) === 6);
+
 // ---- selectDiversePicks ----
 const { selectDiversePicks } = require('../../src/events');
 

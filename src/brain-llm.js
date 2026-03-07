@@ -18,7 +18,9 @@ const CURATION_TASTE_COMMON = `CURATION TASTE — how to pick from the pool:
 - PICK HIERARCHY: one-off > limited run > weekly recurring > daily recurring. A one-night-only event is almost always more interesting than something that happens every week.
 - SOURCE SIGNAL: source_vibe tells you how the event was discovered. "discovery" = editorial pick from a tastemaker. "niche" = focused community venue. "platform" = aggregator listing. "mainstream" = commercial. Lead with discovery/niche. Use platform/mainstream only to fill gaps.
 - VENUE SIGNAL: venue_size "intimate" or "medium" = more personal, worth highlighting. "large"/"massive" = probably a well-known act the user already knows about.
-- SKIP THESE unless the user specifically asked: big-name touring acts, generic DJ nights at mega-clubs, recurring bar trivia at chain venues. These are the filler — everyone already knows about them.`;
+- SKIP THESE unless the user specifically asked: big-name touring acts, generic DJ nights at mega-clubs, recurring bar trivia at chain venues. These are the filler — everyone already knows about them.
+- EDITORIAL SIGNAL: editorial:true means the source editor highlighted this as a pick. These are pre-vetted by tastemakers — strong signal to include.
+- SCARCITY: scarcity:"one-night-only" or "closing" or "limited" means this event won't be around next week. Urgency makes a pick feel valuable — favor these.`;
 
 const CURATION_DIVERSITY_DEFAULT = `- DIVERSITY: default to 3 different categories. But if the user asked for something specific ("comedy"), go deep — give 3 comedy picks, don't force an art show in there.`;
 const CURATION_DIVERSITY_WELCOME = `- DIVERSITY: pick 3 different categories. The welcome message is a first impression — show range.`;
@@ -323,6 +325,8 @@ function serializePoolForContinuation(poolResult) {
       venue_size: e.venue_size || undefined,
       interaction_format: e.interaction_format || undefined,
       source_vibe: e.source_vibe || undefined,
+      editorial: e.editorial_signal || undefined,
+      scarcity: e.scarcity || undefined,
       tags: [tag, nearbyTag].filter(Boolean).join(' ') || undefined,
     };
   });

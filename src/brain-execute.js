@@ -344,6 +344,8 @@ async function buildSearchPool(params, session, phone, trace) {
     is_free: e.is_free, price_display: e.price_display, source_name: e.source_name,
     filter_match: e.filter_match, ticket_url: e.ticket_url || null,
     source_vibe: e.source_vibe || null,
+    editorial_signal: e.editorial_signal || false,
+    scarcity: e.scarcity || null,
     interestingness: scoreInterestingness(e),
   }));
   trace.events.pool_meta = { matchCount, hardCount, softCount, isSparse };
@@ -593,7 +595,10 @@ async function handleWelcome(phone, session, trace) {
     id: e.id, name: e.name, venue_name: e.venue_name, neighborhood: e.neighborhood,
     category: e.category, start_time_local: e.start_time_local, date_local: e.date_local,
     is_free: e.is_free, price_display: e.price_display, source_name: e.source_name,
-    source_vibe: e.source_vibe || null, interestingness: e.interestingness,
+    source_vibe: e.source_vibe || null,
+    editorial_signal: e.editorial_signal || false,
+    scarcity: e.scarcity || null,
+    interestingness: e.interestingness,
   }));
 
   if (topEvents.length === 0) {
