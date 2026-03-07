@@ -18,6 +18,10 @@ function getBaselineStats(label) {
 
   const avgCount = okEntries.reduce((sum, h) => sum + h.count, 0) / okEntries.length;
 
+  const counts = okEntries.map(h => h.count).sort((a, b) => a - b);
+  const mid = Math.floor(counts.length / 2);
+  const medianCount = counts.length % 2 === 1 ? counts[mid] : (counts[mid - 1] + counts[mid]) / 2;
+
   const avgCoverage = { name: 0, venue_name: 0, date_local: 0 };
   let coverageEntries = 0;
   for (const h of okEntries) {
@@ -34,7 +38,7 @@ function getBaselineStats(label) {
     avgCoverage.date_local /= coverageEntries;
   }
 
-  return { avgCount, avgCoverage, entries: okEntries.length };
+  return { avgCount, medianCount, avgCoverage, entries: okEntries.length };
 }
 
 function checkBaseline(label, events) {
@@ -42,11 +46,14 @@ function checkBaseline(label, events) {
   if (!baseline) return { quarantined: false, reason: null };
 
   // 1. Count drift
-  if (events.length < baseline.avgCount * COUNT_DRIFT_THRESHOLD &&
-      baseline.avgCount >= 10) {
+  const isVolatile = !!sourceHealth[label]?.volatile;
+  const baselineCount = isVolatile ? baseline.medianCount : baseline.avgCount;
+  const baselineLabel = isVolatile ? 'median' : 'avg';
+  if (events.length < baselineCount * COUNT_DRIFT_THRESHOLD &&
+      baselineCount >= 10) {
     return {
       quarantined: true,
-      reason: `count drift: ${events.length} events vs ${Math.round(baseline.avgCount)} avg`,
+      reason: `count drift: ${events.length} events vs ${Math.round(baselineCount)} ${baselineLabel}`,
     };
   }
 

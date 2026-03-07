@@ -82,8 +82,30 @@ sh['TestNewSource'] = { ...mkEntry(), history: buildHistory(50, 2) };
 const newResult = checkBaseline('TestNewSource', new Array(5).fill({ name: 'E', venue_name: 'V', date_local: '2026-03-05' }));
 check('new source (<3 history): not quarantined', newResult.quarantined === false);
 
+// --- Volatile source: uses median instead of mean ---
+console.log('\nvolatile source baseline:');
+
+// Simulate volatile history: 3, 14, 1108, 74, 43 (median=43, mean=248)
+sh['TestVolatile'] = { ...mkEntry(), history: [], volatile: true };
+for (const count of [3, 14, 1108, 74, 43]) {
+  sh['TestVolatile'].history.push({
+    timestamp: new Date().toISOString(), count, durationMs: 100, status: 'ok',
+    fieldCoverage: { name: 0.95, venue_name: 0.90, date_local: 0.85 },
+  });
+}
+
+// 28 events: below mean*0.4 (248*0.4=99) but above median*0.4 (43*0.4=17)
+const volatileEvents = Array.from({ length: 28 }, (_, i) => ({ name: `Event ${i}`, venue_name: 'V', date_local: '2026-03-05' }));
+const volatileResult = checkBaseline('TestVolatile', volatileEvents);
+check('volatile source: not quarantined (28 > median*0.4=17)', volatileResult.quarantined === false);
+
+// Truly low count should still quarantine
+const veryLowEvents = Array.from({ length: 5 }, (_, i) => ({ name: `Event ${i}`, venue_name: 'V', date_local: '2026-03-05' }));
+const veryLowResult = checkBaseline('TestVolatile', veryLowEvents);
+check('volatile source: quarantined when truly low (5 < median*0.4=17)', veryLowResult.quarantined === true);
+
 // Clean up
-for (const k of ['TestGuard', 'TestFieldDrift', 'TestDupes', 'TestDates', 'TestNewSource']) {
+for (const k of ['TestGuard', 'TestFieldDrift', 'TestDupes', 'TestDates', 'TestNewSource', 'TestVolatile']) {
   delete sh[k];
 }
 

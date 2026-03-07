@@ -425,6 +425,8 @@ async function refreshCache() {
 
       // Record health BEFORE baseline check (so history accumulates)
       updateSourceHealth(label, result);
+      const sourceEntry = SOURCES.find(s => s.label === label);
+      if (sourceEntry?.volatile) sourceHealth[label].volatile = true;
 
       if (result.status === 'error' || result.status === 'timeout') {
         console.error(`${label} failed:`, result.error);
@@ -676,6 +678,8 @@ async function refreshSources(sourceNames, { reprocess = false } = {}) {
       : { events: [], durationMs: 0, status: 'error', error: settled.reason?.message };
 
     updateSourceHealth(label, { events, durationMs, status, error });
+    const sourceEntry = SOURCES.find(s => s.label === label);
+    if (sourceEntry?.volatile) sourceHealth[label].volatile = true;
 
     for (const e of events) {
       if (!seen.has(e.id)) {
