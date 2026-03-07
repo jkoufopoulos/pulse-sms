@@ -575,9 +575,7 @@ function formatWelcomePick(event, rank) {
   const venue = event.venue_name || '';
   const hood = event.neighborhood ? ` (${event.neighborhood})` : '';
   const time = welcomeTimeLabel(event);
-  const price = event.is_free ? 'free' : (event.price_display || '');
-  const priceStr = price ? `, ${price}` : '';
-  return `${rank}) ${emoji} ${event.name} \u2014 ${venue}${hood}, ${time}${priceStr}`;
+  return `${rank}) ${emoji} ${event.name} \u2014 ${venue}${hood}, ${time}`;
 }
 
 /**

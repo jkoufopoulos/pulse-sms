@@ -1,5 +1,6 @@
 const { check } = require('../helpers');
 const { makeEventId, normalizeExtractedEvent, normalizeEventName } = require('../../src/sources');
+const { isGarbageName } = require('../../src/events');
 
 // ---- makeEventId ----
 console.log('\nmakeEventId:');
@@ -278,3 +279,17 @@ const picks2 = selectDiversePicks(twoCategories, 3);
 check('fills from best remaining when diversity exhausted', picks2.length === 3);
 
 check('empty pool returns empty', selectDiversePicks([], 3).length === 0);
+
+// ---- isGarbageName ----
+console.log('\nisGarbageName:');
+check('rejects "Day & Date: Friday, March 7, 2026"', isGarbageName('Day & Date: Friday, March 7, 2026'));
+check('rejects "Day + Date: Saturday"', isGarbageName('Day + Date: Saturday'));
+check('rejects bare date "Friday, March 7, 2026"', isGarbageName('Friday, March 7, 2026'));
+check('rejects bare date "March 7, 2026"', isGarbageName('March 7, 2026'));
+check('rejects empty string', isGarbageName(''));
+check('rejects null', isGarbageName(null));
+check('rejects short name "DJ"', isGarbageName('DJ'));
+check('keeps real event "Blade Rave"', !isGarbageName('Blade Rave'));
+check('keeps real event "Femme Photographers"', !isGarbageName('Femme Photographers'));
+check('keeps "March of the Penguins" (month word in real name)', !isGarbageName('March of the Penguins'));
+check('keeps "Friday Night Lights"', !isGarbageName('Friday Night Lights'));
