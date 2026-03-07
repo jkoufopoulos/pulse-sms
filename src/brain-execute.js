@@ -3,7 +3,7 @@
  */
 
 const { extractNeighborhood, BOROUGHS, detectBorough } = require('./neighborhoods');
-const { getAdjacentNeighborhoods, getNycDateString, filterByTimeAfter } = require('./geo');
+const { getAdjacentNeighborhoods, getNycDateString, filterByTimeAfter, filterUpcomingEvents } = require('./geo');
 const { getEvents, getEventsForBorough, getEventsCitywide, getCacheStatus, scoreInterestingness } = require('./events');
 const { filterKidsEvents } = require('./curation');
 const { buildTaggedPool, buildEventMap, saveResponseFrame, mergeFilters, buildZeroMatchResponse, describeFilters, failsTimeGate, eventMatchesFilters } = require('./pipeline');
@@ -325,6 +325,9 @@ async function buildSearchPool(params, session, phone, trace) {
     const raw = await getEventsCitywide({ dateRange: activeFilters.date_range, filters: activeFilters });
     curated = filterKidsEvents(raw);
   }
+
+  // Drop events that already started 2+ hours ago
+  curated = filterUpcomingEvents(curated);
 
   trace.events.getEvents_ms = Date.now() - eventsStart;
   trace.events.cache_size = getCacheStatus().cache_size;
