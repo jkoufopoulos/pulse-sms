@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { SOURCES, SOURCE_TIERS, SOURCE_LABELS, MERGE_ORDER } = require('./source-registry');
 const { sourceHealth, saveHealthData, updateSourceHealth, updateScrapeStats, computeEventMix, getHealthStatus: _getHealthStatus } = require('./source-health');
-const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate } = require('./geo');
+const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate, parseAsNycTime } = require('./geo');
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues, lookupVenue, lookupVenueSize } = require('./venues');
 const { filterIncomplete, filterKidsEvents } = require('./curation');
 const { eventMatchesFilters, failsTimeGate } = require('./pipeline');
@@ -199,11 +199,28 @@ async function getTopPicks(count = 10) {
     });
   }
 
-  // Score each event — today's events get a +3 bonus for welcome urgency
-  const scored = dateFiltered.map(e => {
+  // Drop events that already started 2+ hours ago
+  const upcoming = filterUpcomingEvents(dateFiltered);
+
+  // Time-window filter: prefer events starting soon. Widen if pool is thin.
+  const now = Date.now();
+  function withinHours(events, hours) {
+    return events.filter(e => {
+      if (!e.start_time_local) return true; // no time → keep
+      const startMs = parseAsNycTime(e.start_time_local);
+      if (isNaN(startMs)) return true;
+      return (startMs - now) / (1000 * 60 * 60) <= hours;
+    });
+  }
+  let timeFiltered = withinHours(upcoming, 6);
+  if (timeFiltered.length < 5) timeFiltered = withinHours(upcoming, 12);
+  if (timeFiltered.length < 5) timeFiltered = upcoming;
+
+  const scored = timeFiltered.map(e => {
     const base = scoreInterestingness(e);
-    const todayBonus = getEventDate(e) === todayNyc ? 3 : 0;
-    return { ...e, interestingness: base + todayBonus };
+    // Penalize events with no start time — we can't verify they're actually soon
+    const timePenalty = e.start_time_local ? 0 : -2;
+    return { ...e, interestingness: base + timePenalty };
   });
 
   return selectDiversePicks(scored, count);
