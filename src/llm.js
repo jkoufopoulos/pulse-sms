@@ -15,6 +15,50 @@ const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@googl
 const { getProvider } = require('./model-config');
 const { smartTruncate } = require('./formatters');
 
+// --- String sanitization ---
+
+/**
+ * Strip lone surrogates from a string to prevent invalid JSON errors.
+ * Scraped event data sometimes contains broken emoji/Unicode.
+ */
+function stripLoneSurrogates(str) {
+  if (typeof str !== 'string') return str;
+  let result = '';
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    if (code >= 0xD800 && code <= 0xDBFF) {
+      // High surrogate — keep only if followed by low surrogate
+      const next = i + 1 < str.length ? str.charCodeAt(i + 1) : 0;
+      if (next >= 0xDC00 && next <= 0xDFFF) {
+        result += str[i] + str[i + 1];
+        i++; // skip the low surrogate
+      }
+      // else: lone high surrogate, skip it
+    } else if (code >= 0xDC00 && code <= 0xDFFF) {
+      // Lone low surrogate, skip it
+    } else {
+      result += str[i];
+    }
+  }
+  return result;
+}
+
+/**
+ * Recursively sanitize all strings in an object/array to remove lone surrogates.
+ */
+function sanitizeUnicode(obj) {
+  if (typeof obj === 'string') return stripLoneSurrogates(obj);
+  if (Array.isArray(obj)) return obj.map(sanitizeUnicode);
+  if (obj && typeof obj === 'object') {
+    const clean = {};
+    for (const [k, v] of Object.entries(obj)) {
+      clean[k] = sanitizeUnicode(v);
+    }
+    return clean;
+  }
+  return obj;
+}
+
 // --- Lazy singleton clients ---
 
 let _geminiClient = null;
@@ -350,7 +394,7 @@ async function continueChat(chatSession, toolName, toolResult, options = {}) {
         content: [{
           type: 'tool_result',
           tool_use_id: chatSession._toolBlock.id,
-          content: JSON.stringify(toolResult),
+          content: JSON.stringify(sanitizeUnicode(toolResult)),
         }],
       },
     ];
@@ -517,7 +561,7 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
       messages.push({ role: 'assistant', content: response.content });
       messages.push({
         role: 'user',
-        content: [{ type: 'tool_result', tool_use_id: toolBlock.id, content: JSON.stringify(toolResult) }],
+        content: [{ type: 'tool_result', tool_use_id: toolBlock.id, content: JSON.stringify(sanitizeUnicode(toolResult)) }],
       });
 
       iterations.push({ tool: toolBlock.name, ms: Date.now() - iterStart });
