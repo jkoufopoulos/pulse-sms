@@ -95,4 +95,9 @@ const SOURCE_EXPECTATIONS = Object.fromEntries(
   SOURCES.map(s => [s.label, { minExpected: s.minExpected || 0, schedule: s.schedule || null }])
 );
 
-module.exports = { SOURCES, SOURCE_TIERS, SOURCE_LABELS, SOURCE_DB_NAMES, ENDPOINT_URLS, MERGE_ORDER, SOURCE_EXPECTATIONS, validateSources };
+// Map label → the source_name used in the event cache (dbName if set, else lowercase label)
+const SOURCE_CACHE_NAMES = Object.fromEntries(
+  SOURCES.map(s => [s.label, s.dbName || s.label.toLowerCase()])
+);
+
+module.exports = { SOURCES, SOURCE_TIERS, SOURCE_LABELS, SOURCE_DB_NAMES, ENDPOINT_URLS, MERGE_ORDER, SOURCE_EXPECTATIONS, SOURCE_CACHE_NAMES, validateSources };

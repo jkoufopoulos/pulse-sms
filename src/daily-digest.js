@@ -1,4 +1,4 @@
-const { SOURCE_LABELS, SOURCE_EXPECTATIONS } = require('./source-registry');
+const { SOURCE_LABELS, SOURCE_EXPECTATIONS, SOURCE_CACHE_NAMES } = require('./source-registry');
 const { sourceHealth } = require('./source-health');
 const { getNycDateString } = require('./geo');
 const { getRecentAlerts } = require('./alerts');
@@ -91,11 +91,14 @@ function generateDigest(eventCache, scrapeStats) {
       : 0;
     const expectations = SOURCE_EXPECTATIONS[label] || { minExpected: 0, schedule: null };
     const isQuarantined = health?.lastStatus === 'quarantined';
+    // Use scrape count from health data (accurate per-source), fall back to cache count
+    const cacheName = SOURCE_CACHE_NAMES[label] || label.toLowerCase();
+    const count = health?.lastStatus === 'ok' ? (health.lastCount || 0) : (sourceCounts[cacheName] || 0);
     return {
       name: label,
-      count: sourceCounts[label.toLowerCase()] || 0,
+      count,
       avg7d,
-      status: (sourceCounts[label.toLowerCase()] || 0) >= expectations.minExpected * 0.4 ? 'ok' : 'warn',
+      status: count >= expectations.minExpected * 0.4 ? 'ok' : 'warn',
       isQuarantined,
       quarantineReason: isQuarantined ? health?.lastQuarantineReason : null,
       ...expectations,
