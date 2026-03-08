@@ -7201,15 +7201,15 @@
         },
         {
           "sender": "pulse",
-          "message": "Greenpoint",
-          "assert": "contains"
+          "message": "Greenpoint"
         }
       ],
       "testing": "When user asks for a neighborhood that has events, lead with that neighborhood. Don't pivot to nearby. If user pushes back, re-search don't just apologize.",
-      "expected_behavior": "Turn 1: Greenpoint events first (may mention nearby as supplement). Turn 2: Greenpoint bar/nightlife events. Turn 3: Re-search Greenpoint, not just an apology.",
+      "expected_behavior": "Turn 1: Greenpoint events first (may mention nearby as supplement). Turn 2: Greenpoint bar/nightlife events. Turn 3: If user claims Pulse said something it didn't, gently correct -- don't fabricate agreement. Offer to search again.",
       "failure_modes": [
         "Dismisses requested neighborhood ('not much in Greenpoint')",
         "Pivots entirely to nearby neighborhood",
+        "Agrees with false premise about what it previously said",
         "Pushback gets respond instead of search_events"
       ],
       "difficulty": "must_pass"
