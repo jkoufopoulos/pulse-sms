@@ -14,7 +14,7 @@
 
 const { runAgentLoop, generate } = require('./llm');
 const { MODELS } = require('./model-config');
-const { BRAIN_TOOLS, buildBrainSystemPrompt, serializePoolForContinuation } = require('./brain-llm');
+const { BRAIN_TOOLS, buildBrainSystemPrompt, serializePoolForContinuation, cleanEventName } = require('./brain-llm');
 const { buildSearchPool, executeMore, executeDetails, executeWelcome } = require('./brain-execute');
 const { buildEventMap, saveResponseFrame, buildExhaustionMessage, sendPickUrls } = require('./pipeline');
 const { sendSMS, maskPhone } = require('./twilio');
@@ -170,10 +170,22 @@ async function executeTool(toolName, params, session, phone, trace) {
 
   if (toolName === 'show_welcome') {
     const result = await executeWelcome();
+    // Return event data for the model to compose (not pre-composed SMS)
+    const events = (result.topEvents || []).map(e => ({
+      id: e.id, name: cleanEventName((e.name || '').slice(0, 80)), venue_name: e.venue_name,
+      neighborhood: e.neighborhood, start_time_local: e.start_time_local,
+      is_free: e.is_free, price_display: e.price_display, category: e.category,
+      short_detail: (e.short_detail || e.description_short || '').slice(0, 100),
+      source_vibe: e.source_vibe || undefined,
+    }));
+    const msg = events.length > 0
+      ? "Here are tonight's top picks across NYC. Introduce yourself as Pulse and recommend 1-2 of these. End with a question — ask what neighborhood they're in or what vibe they're looking for."
+      : "No events loaded yet. Introduce yourself as Pulse, say you're a plugged-in friend for NYC nightlife, and ask what neighborhood they're in or what they're looking for tonight.";
     return {
       ok: true,
+      message: msg,
+      events: events.length > 0 ? events : undefined,
       _welcomeResult: result,
-      _smsText: result.smsText,
     };
   }
 
@@ -215,7 +227,7 @@ async function executeTool(toolName, params, session, phone, trace) {
         is_last_batch: moreResult.isLastBatch || false,
         suggestions: moreResult.suggestions,
         events: moreResult.events.map(e => ({
-          id: e.id, name: (e.name || '').slice(0, 80), venue_name: e.venue_name,
+          id: e.id, name: cleanEventName((e.name || '').slice(0, 80)), venue_name: e.venue_name,
           neighborhood: e.neighborhood,
           day: e.date_local === todayNyc ? 'TODAY' : e.date_local === tomorrowNyc ? 'TOMORROW' : e.date_local,
           start_time_local: e.start_time_local,
@@ -507,7 +519,7 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     const loopResult = await runAgentLoop(
       MODELS.brain, systemPrompt, message, BRAIN_TOOLS,
       executeAndTrack,
-      { maxIterations: 3, timeout: 12000, stopTools: ['respond', 'compose_sms', 'show_welcome'] }
+      { maxIterations: 3, timeout: 12000, stopTools: ['respond', 'compose_sms'] }
     );
 
     // Record costs
@@ -611,7 +623,7 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
         const fallbackResult = await runAgentLoop(
           MODELS.fallback, systemPrompt, message, BRAIN_TOOLS,
           async (toolName, params) => sanitizeForLLM(await executeTool(toolName, params, session, phone, trace)),
-          { maxIterations: 2, timeout: 12000, stopTools: ['respond', 'compose_sms', 'show_welcome'] }
+          { maxIterations: 2, timeout: 12000, stopTools: ['respond', 'compose_sms'] }
         );
 
         recordAICost(trace, 'brain_fallback', fallbackResult.totalUsage, fallbackResult.provider);

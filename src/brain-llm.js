@@ -31,7 +31,7 @@ function curationTasteBlock(diversityLine) {
 const BRAIN_TOOLS = [
   {
     name: 'search_events',
-    description: 'Search for event recommendations. Use when the user wants to see events, asks about a neighborhood, mentions a category, or requests any kind of activity.',
+    description: 'Search for event recommendations. Use when the user wants to see events, asks about a neighborhood, mentions a category, or requests any kind of activity. Also use when the user asks about a specific pick you already showed ("tell me about that", "what\'s the free one", "more about #2") — set intent to "details".',
     parameters: {
       type: 'object',
       properties: {
@@ -73,7 +73,7 @@ const BRAIN_TOOLS = [
   },
   {
     name: 'respond',
-    description: 'Respond conversationally when no event search is needed. Use for greetings, thanks, farewells, off-topic chat, or when the user needs clarification.',
+    description: 'Respond conversationally when no event search is needed. Use for greetings, thanks, farewells, off-topic chat, or when the user asks how Pulse works. Do NOT use when the user asks about a specific event or pick — use search_events with intent "details" instead.',
     parameters: {
       type: 'object',
       properties: {
@@ -168,7 +168,12 @@ TOOL FLOW:
 - First message + casual greeting: call show_welcome (shows tonight's top picks).
 - Conversational messages (questions, thanks, farewells): call respond.
 - Event requests: call search_events, then call compose_sms with your SMS text and the picked event IDs.
+- User asks about a pick you showed: call search_events({intent: "details", pick_reference: "the free show"}).
 - If you can't call compose_sms, write the SMS as plain text — that works too.
+
+Example — user says "tell me about the free show" after you showed picks:
+→ search_events({intent: "details", pick_reference: "the free show"})
+NOT respond — that loses the event context.
 
 A bare neighborhood name (e.g. "bushwick", "LES") means "show me events there" — call search_events.
 If search returns zero results, you can try again with broader filters or nearby neighborhoods.
@@ -177,20 +182,41 @@ If the user pushes back on your picks or says you got something wrong, call sear
 SESSION CONTEXT:
 ${sessionContext}${historyBlock}
 
-SMS FORMAT:
-- Pick 1-3 events. Be opinionated — recommend the best, don't list everything.
-- Each pick on its own line: Event Name — Venue, time. Add a few words about what it actually is if the name doesn't make it obvious (e.g. "live jazz trio", "standup showcase", "indie DJ night").
-- Don't include price in the initial picks — save that for details. Never write "price not listed" or "TBA".
-- Say "tonight" for today evening, "today at [time]" for afternoon. "tomorrow" for tomorrow.
-- ALWAYS lead with events in the neighborhood the user asked about, even if there are only 1-2. Only say a neighborhood is quiet if there are literally zero events there.
-- If the search results include a nearby_highlight, tease that neighborhood in a closing line. Keep it natural — "Williamsburg's stacked tonight too — say 'williamsburg' to see" not "nearby_highlight detected."
-- HARD LIMIT: 480 characters total. No URLs. If your message is over 480 chars, cut picks — never send a truncated message.
-- For details: write a rich description with venue, time, price. No URL (sent separately).
+SMS VOICE — this is the most important section:
+You're texting a friend. Every message should feel like one half of a conversation, not a broadcast.
+- ACKNOWLEDGE first. "Park Slope tonight —" or "Gotcha, something mellower..." or "Bushwick's got options —". Show you heard them.
+- RECOMMEND, don't list. Lead with your top pick and say WHY in a few words: "Alison Leiby at Union Hall, 7:30 — she wrote for Maisel, genuinely funny hour." Not "Alison Leiby: For This? — Union Hall, 7:30pm tonight. Stand-up from the Marvelous Mrs. Maisel writer—sharp hour."
+- 1-2 picks max, woven into natural prose. A third pick only if it's a genuinely different vibe. Never 4+.
+- ALWAYS end with a hook — a question or invitation that makes them want to reply. "Want details?" "I've got weirder stuff if you want." "Looking for a specific vibe?" This is what makes it a conversation, not a flyer.
+- Match their energy. Short casual message → short casual response. Specific request → specific answer.
+- Don't include price in initial picks. Never write "price not listed" or "TBA".
+- Say "tonight" for today evening, "today at [time]" for afternoon, "tomorrow" for tomorrow.
+- ALWAYS lead with events in the requested neighborhood. Only say it's quiet if there are literally zero events.
+- If search results include a nearby_highlight, tease it naturally: "Williamsburg's stacked too if you want to see."
+- HARD LIMIT: 480 characters total. No URLs. Cut picks to stay under — never send a truncated message.
+- For details: rich description with venue, time, price. No URL (sent separately).
 - For more with is_last_batch=true: mention these are the last picks, suggest a different neighborhood.
 
 ${curationTasteBlock(CURATION_DIVERSITY_DEFAULT)}`;
 }
 
+
+/**
+ * Strip promotional prefixes/suffixes from event names so the model
+ * writes naturally instead of copying ALL-CAPS marketing labels.
+ * The is_free field already carries free status — no need in the name.
+ */
+function cleanEventName(name) {
+  if (!name) return name;
+  return name
+    // Leading labels: "FREE SHOW!", "Free Show:", "SOLD OUT -", etc.
+    .replace(/^(?:FREE\s*SHOW[!:]?\s*[-–—:]?\s*|SOLD\s*OUT[!:]?\s*[-–—:]?\s*)/i, '')
+    // Trailing labels: "(SOLD OUT)", "SOLD OUT", "(Free!)"
+    .replace(/\s*\(?\s*SOLD\s*OUT\s*\)?\s*$/i, '')
+    // "Frantic! Free Show" → "Frantic!" (trailing "Free Show")
+    .replace(/\s+Free\s+Show\s*$/i, '')
+    .trim();
+}
 
 /**
  * Serialize event pool into compact format for Gemini functionResponse.
@@ -210,7 +236,7 @@ function serializePoolForContinuation(poolResult) {
     const tag = e.filter_match === 'hard' ? '[MATCH]' : e.filter_match === 'soft' ? '[SOFT]' : '';
     const nearbyTag = (neighborhood && e.neighborhood && e.neighborhood !== neighborhood) ? '[NEARBY]' : '';
     return {
-      id: e.id, name: (e.name || '').slice(0, 80), venue_name: e.venue_name,
+      id: e.id, name: cleanEventName((e.name || '').slice(0, 80)), venue_name: e.venue_name,
       neighborhood: e.neighborhood, day: dayLabel, start_time_local: e.start_time_local,
       is_free: e.is_free, price_display: e.price_display, category: e.category,
       short_detail: (e.short_detail || e.description_short || '').slice(0, 100),
@@ -250,6 +276,7 @@ module.exports = {
   BRAIN_TOOLS,
   buildBrainSystemPrompt,
   serializePoolForContinuation,
+  cleanEventName,
   stripCodeFences,
   NEIGHBORHOOD_NAMES,
 };
