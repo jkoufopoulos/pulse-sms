@@ -4,7 +4,7 @@
 
 const { extractNeighborhood, BOROUGHS, detectBorough } = require('./neighborhoods');
 const { getAdjacentNeighborhoods, getNycDateString, filterByTimeAfter, filterUpcomingEvents } = require('./geo');
-const { getEvents, getEventsForBorough, getEventsCitywide, getCacheStatus, scoreInterestingness } = require('./events');
+const { getEvents, getEventsForBorough, getEventsCitywide, getCacheStatus, scoreInterestingness, selectDiversePicks } = require('./events');
 const { filterKidsEvents } = require('./curation');
 const { buildTaggedPool, buildEventMap, saveResponseFrame, mergeFilters, buildZeroMatchResponse, describeFilters, failsTimeGate, eventMatchesFilters } = require('./pipeline');
 const { setSession } = require('./session');
@@ -513,7 +513,48 @@ async function executeWelcome() {
   return { smsText, picks, eventMap };
 }
 
+// --- Pool curation: score and trim to top N ---
+
+const DEFAULT_POOL_SIZE = 10;
+
+/**
+ * Score every event by interestingness, then select top N with category diversity.
+ * Requested-hood events are prioritized; nearby events pad remaining slots.
+ * Returns { curatedPool, fullScoredPool }.
+ */
+function curatePool(pool, requestedHood, { poolSize = DEFAULT_POOL_SIZE } = {}) {
+  if (!pool || pool.length === 0) {
+    return { curatedPool: [], fullScoredPool: [] };
+  }
+
+  // 1. Score every event
+  const fullScoredPool = pool.map(e => ({
+    ...e,
+    interestingness: scoreInterestingness(e),
+  }));
+
+  // 2. Split into requested hood vs nearby
+  const hoodEvents = fullScoredPool.filter(e => e.neighborhood === requestedHood);
+  const nearbyEvents = fullScoredPool.filter(e => e.neighborhood !== requestedHood);
+
+  // 3. Pick top N from requested hood with category diversity
+  const hoodPicks = selectDiversePicks(hoodEvents, poolSize);
+
+  // 4. If hood doesn't fill poolSize, pad with best nearby sorted by interestingness
+  let curatedPool;
+  if (hoodPicks.length >= poolSize) {
+    curatedPool = hoodPicks.slice(0, poolSize);
+  } else {
+    const nearbySorted = [...nearbyEvents].sort((a, b) => b.interestingness - a.interestingness);
+    const remaining = poolSize - hoodPicks.length;
+    curatedPool = [...hoodPicks, ...nearbySorted.slice(0, remaining)];
+  }
+
+  return { curatedPool, fullScoredPool };
+}
+
 module.exports = {
   resolveDateRange, executeMore, executeDetails, validatePicks,
   buildSearchPool, executeWelcome, formatWelcomePick, welcomeTimeLabel,
+  curatePool, DEFAULT_POOL_SIZE,
 };

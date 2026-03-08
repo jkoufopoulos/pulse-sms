@@ -92,11 +92,12 @@ const BRAIN_TOOLS = [
     parameters: {
       type: 'object',
       properties: {
-        sms_text: { type: 'string', description: 'SMS text to send, max 480 chars. Each pick on its own line: Event Name — Venue, time (price)' },
+        sms_text: { type: 'string', description: 'The complete SMS to send. MUST be under 480 characters. Pick 1-3 events max — be opinionated, not comprehensive. Each pick on its own line: Event Name — Venue, time. Add a brief description if the name is unclear. No prices in picks.' },
         picks: {
           type: 'array',
-          description: 'Event IDs of events you recommended, in the order shown in sms_text',
+          description: 'Event IDs of the 1-3 events you recommended, in the order shown in sms_text',
           items: { type: 'string' },
+          maxItems: 3,
         },
       },
       required: ['sms_text', 'picks'],
@@ -177,11 +178,12 @@ SESSION CONTEXT:
 ${sessionContext}${historyBlock}
 
 SMS FORMAT:
-- Each pick on its own line: Event Name — Venue, Neighborhood, time (price)
-- EVERY pick MUST include: event name, venue name, start time, and price.
+- Pick 1-3 events. Be opinionated — recommend the best, don't list everything.
+- Each pick on its own line: Event Name — Venue, time. Add a few words about what it actually is if the name doesn't make it obvious (e.g. "live jazz trio", "standup showcase", "indie DJ night").
+- Don't include price in the initial picks — save that for details. Never write "price not listed" or "TBA".
 - Say "tonight" for today evening, "today at [time]" for afternoon. "tomorrow" for tomorrow.
 - ALWAYS lead with events in the neighborhood the user asked about, even if there are only 1-2. Then you can add nearby options: "Also in nearby Williamsburg..." Only say a neighborhood is quiet if there are literally zero events there.
-- Under 480 characters total. No URLs.
+- HARD LIMIT: 480 characters total. No URLs. If your message is over 480 chars, cut picks — never send a truncated message.
 - For details: write a rich description with venue, time, price. No URL (sent separately).
 - For more with is_last_batch=true: mention these are the last picks, suggest a different neighborhood.
 
