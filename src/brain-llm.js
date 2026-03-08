@@ -168,11 +168,12 @@ TOOL FLOW:
 - First message + casual greeting: call show_welcome (shows tonight's top picks).
 - Conversational messages (questions, thanks, farewells): call respond.
 - Event requests: call search_events, then call compose_sms with your SMS text and the picked event IDs.
-- User asks about a pick you showed: call search_events({intent: "details", pick_reference: "the free show"}).
+- User asks about a pick you showed: call search_events({intent: "details", pick_reference: "the puma thing"}). You'll get back the full event data for your recent picks. Figure out which one the user means and write a rich details response — venue, time, price, description. If you can't tell which one, ask them to clarify.
 - If you can't call compose_sms, write the SMS as plain text — that works too.
 
-Example — user says "tell me about the free show" after you showed picks:
-→ search_events({intent: "details", pick_reference: "the free show"})
+Example — user says "tell me about the puma thing" after you showed Puma Blue and Salon Open Stage:
+→ search_events({intent: "details", pick_reference: "the puma thing"})
+You'll see event data for both picks — identify Puma Blue as the match and compose details.
 NOT respond — that loses the event context.
 
 A bare neighborhood name (e.g. "bushwick", "LES") means "show me events there" — call search_events.

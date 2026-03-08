@@ -97,3 +97,38 @@ check('over 480 triggers rebuild', rebuilt.rebuilt === true);
 
 check('>3 picks triggers rebuild', validateComposeSms('picks', ['e1','e2','e3','e4'], goodPool).rebuilt === true);
 check('0 picks triggers rebuild', validateComposeSms('no picks', [], goodPool).rebuilt === true);
+
+// ---- executeTool details returns event data for model ----
+console.log('\nexecuteTool details returns event data:');
+
+const { executeTool } = require('../../src/agent-loop');
+
+const detailsSession = {
+  lastPicks: [
+    { rank: 1, event_id: 'e1' },
+    { rank: 2, event_id: 'e2' },
+  ],
+  lastEvents: {
+    e1: { id: 'e1', name: 'Jazz Night', venue_name: 'Blue Note', category: 'jazz', neighborhood: 'Greenwich Village', start_time_local: '2026-03-08T22:00:00', is_free: false, price_display: '$20', description_short: 'Weekly jazz jam session' },
+    e2: { id: 'e2', name: 'Comedy Hour', venue_name: 'Tiny Cupboard', category: 'comedy', neighborhood: 'LES', start_time_local: '2026-03-08T21:00:00', is_free: true, description_short: 'Open mic comedy night' },
+  },
+};
+const dummyTrace = { events: {}, composition: {} };
+
+(async () => {
+  // Returns event data (not _smsText)
+  const detResult = await executeTool('search_events', { intent: 'details', pick_reference: 'jazz' }, detailsSession, '+1234', dummyTrace);
+  check('details returns events array', Array.isArray(detResult.events));
+  check('details returns pick_reference', detResult.pick_reference === 'jazz');
+  check('details events have description', detResult.events[0].description_short !== undefined);
+  check('details does NOT return _smsText', detResult._smsText === undefined);
+
+  // No picks returns not_found
+  const noPickResult = await executeTool('search_events', { intent: 'details', pick_reference: '1' }, { lastPicks: [] }, '+1234', dummyTrace);
+  check('details no picks returns not_found', noPickResult.not_found === true);
+
+  // Stale picks returns stale
+  const staleSession2 = { ...detailsSession, lastResponseHadPicks: false, lastNeighborhood: 'Bushwick' };
+  const staleResult = await executeTool('search_events', { intent: 'details', pick_reference: '1' }, staleSession2, '+1234', dummyTrace);
+  check('details stale returns stale', staleResult.stale === true);
+})();

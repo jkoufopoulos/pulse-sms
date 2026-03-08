@@ -15,7 +15,7 @@
 const { runAgentLoop, generate } = require('./llm');
 const { MODELS } = require('./model-config');
 const { BRAIN_TOOLS, buildBrainSystemPrompt, serializePoolForContinuation, cleanEventName } = require('./brain-llm');
-const { buildSearchPool, executeMore, executeDetails, executeWelcome } = require('./brain-execute');
+const { buildSearchPool, executeMore, executeWelcome } = require('./brain-execute');
 const { buildEventMap, saveResponseFrame, buildExhaustionMessage, sendPickUrls } = require('./pipeline');
 const { sendSMS, maskPhone } = require('./twilio');
 const { recordAICost } = require('./traces');
@@ -255,54 +255,43 @@ async function executeTool(toolName, params, session, phone, trace) {
       };
     }
 
-    // --- Details intent ---
+    // --- Details intent: return event data for model to compose ---
     if (params.intent === 'details') {
-      const detailsResult = executeDetails(params.pick_reference, session);
-
-      if (detailsResult.noPicks) {
+      if (!session?.lastPicks?.length || !session?.lastEvents) {
         return {
           not_found: true,
           message: "I don't have any picks loaded -- tell me what you're looking for!",
-          _detailsResult: detailsResult,
         };
       }
 
-      if (detailsResult.stalePicks) {
-        const hood = detailsResult.neighborhood;
+      if (session.lastResponseHadPicks === false) {
+        const hood = session.lastNeighborhood;
         return {
           stale: true,
           message: hood
             ? `I don't have a pick list up right now -- ask for more ${hood} picks, or tell me what you're looking for!`
             : "I don't have a pick list up right now -- tell me what you're looking for!",
-          _detailsResult: detailsResult,
         };
       }
 
-      if (!detailsResult.found) {
+      // Return full event data for all lastPicks — model resolves the reference
+      const events = session.lastPicks.map(p => {
+        const e = session.lastEvents[p.event_id];
+        if (!e) return null;
         return {
-          not_found: true,
-          message: "I'm not sure which event you mean -- can you be more specific?",
-          _detailsResult: detailsResult,
+          id: e.id, name: cleanEventName((e.name || '').slice(0, 80)),
+          venue_name: e.venue_name, neighborhood: e.neighborhood,
+          start_time_local: e.start_time_local, category: e.category,
+          is_free: e.is_free, price_display: e.price_display,
+          description_short: e.description_short || e.short_detail || '',
+          recurring: e.is_recurring ? e.recurrence_label : undefined,
         };
-      }
+      }).filter(Boolean);
 
-      // Found — compose details SMS from template (no LLM call needed)
-      const event = detailsResult.event;
-      const price = event.is_free ? 'Free' : (event.price_display || 'Check price');
-      const desc = event.description_short || event.short_detail || '';
-      const time = event.start_time_local
-        ? new Date(event.start_time_local).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })
-        : 'tonight';
-      const lines = [
-        `${event.name} — ${event.venue_name}, ${event.neighborhood || ''}`,
-        `${time} | ${price}`,
-        desc ? `\n${desc}` : '',
-      ].filter(Boolean);
-      const detailSms = lines.join('\n');
       return {
-        ok: true,
-        _smsText: detailSms,
-        _detailsResult: detailsResult,
+        pick_reference: params.pick_reference,
+        events,
+        message: `The user wants details about "${params.pick_reference || 'a pick'}". Here are the picks you showed them. Identify which one they mean and compose a rich details response with venue, time, price, and description. If you can't tell which one, ask them to clarify.`,
       };
     }
 
@@ -534,11 +523,10 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     trace.routing.pre_routed = false;
     trace.routing.provider = loopResult.provider;
 
-    // Determine SMS: compose_sms > respond > _smsText (details) > loopResult.text
+    // Determine SMS: compose_sms > respond > loopResult.text (model-composed)
     let smsText;
     const lastCompose = [...rawResults].reverse().find(tc => tc.name === 'compose_sms');
     const lastRespond = [...rawResults].reverse().find(tc => tc.name === 'respond');
-    const detailsResult = [...rawResults].reverse().find(tc => tc.result?._smsText);
     if (lastCompose) {
       const lastSearch = [...rawResults].reverse().find(tc => tc.name === 'search_events');
       const pool = lastSearch?.result?._poolResult?.pool || [];
@@ -550,8 +538,6 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
       }
     } else if (lastRespond) {
       smsText = lastRespond.params.message;
-    } else if (detailsResult) {
-      smsText = detailsResult.result._smsText;
     } else {
       smsText = loopResult.text;
     }
@@ -603,10 +589,11 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     await sendSMS(phone, smsText);
 
     // Send pick URLs for details
-    if (intent === 'details' && lastSearch?.result?._detailsResult) {
-      const dr = lastSearch.result._detailsResult;
-      if (dr.found && dr.event) {
-        await sendPickUrls(phone, [dr.pick], { [dr.event.id]: dr.event });
+    if (intent === 'details') {
+      const detailEvents = Object.values(session?.lastEvents || {});
+      const detailPicks = extractPicksFromSms(smsText, detailEvents);
+      if (detailPicks.length > 0) {
+        await sendPickUrls(phone, detailPicks.slice(0, 1), session?.lastEvents || {});
       }
     }
 
