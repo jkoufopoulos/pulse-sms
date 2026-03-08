@@ -52,6 +52,17 @@ check('SOURCES includes Skint', SOURCES.some(s => s.label === 'Skint'));
 check('Skint weight is 0.9', SOURCES.find(s => s.label === 'Skint').weight === 0.9);
 check('Tavily not in daily scrape SOURCES', !SOURCES.some(s => s.label === 'Tavily'));
 
+// ---- Email source channel ----
+console.log('\nEmail source channel:');
+const { EMAIL_SOURCES } = require('../../src/source-registry');
+check('EMAIL_SOURCES is an array', Array.isArray(EMAIL_SOURCES));
+check('EMAIL_SOURCES has 3 entries', EMAIL_SOURCES.length === 3);
+check('NonsenseNYC is email channel', EMAIL_SOURCES.some(s => s.label === 'NonsenseNYC'));
+check('Yutori is email channel', EMAIL_SOURCES.some(s => s.label === 'Yutori'));
+check('ScreenSlate is email channel', EMAIL_SOURCES.some(s => s.label === 'ScreenSlate'));
+check('RA is NOT email channel', !EMAIL_SOURCES.some(s => s.label === 'RA'));
+check('all email sources have fetch functions', EMAIL_SOURCES.every(s => typeof s.fetch === 'function'));
+
 // ---- getHealthStatus shape ----
 console.log('\ngetHealthStatus:');
 
