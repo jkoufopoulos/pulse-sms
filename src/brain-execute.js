@@ -349,6 +349,7 @@ async function buildSearchPool(params, session, phone, trace) {
     interestingness: scoreInterestingness(e),
   }));
   trace.events.pool_meta = { matchCount, hardCount, softCount, isSparse };
+  trace.events.full_scored_count = fullScoredPool.length;
 
   // Track why events were excluded from the pool
   const poolIds = new Set(events.map(e => e.id));
@@ -412,6 +413,8 @@ async function buildSearchPool(params, session, phone, trace) {
   const reqPoolEvents = fullScoredPool.filter(e => e.neighborhood === hood);
   const nearbyPoolEvents = fullScoredPool.filter(e => e.neighborhood !== hood);
   const nearbyHighlight = hood ? computeNearbyHighlight(reqPoolEvents, nearbyPoolEvents, hood) : null;
+  if (nearbyHighlight) console.log(`[nearby-highlight] ${hood} → ${nearbyHighlight.hood}: ${nearbyHighlight.reason}`);
+  trace.events.nearby_highlight = nearbyHighlight || null;
 
   return {
     zeroMatch: null,

@@ -81,6 +81,7 @@ if (process.env.PULSE_TEST_MODE === 'true') {
         sent_to_claude: trace.events?.sent_to_claude,
         sent_pool: trace.events?.sent_pool,
         pool_meta: trace.events?.pool_meta,
+        nearby_highlight: trace.events?.nearby_highlight || null,
         picks: trace.composition?.picks,
       } : null;
       res.json({ ok: true, messages: captured, trace_summary, trace });
