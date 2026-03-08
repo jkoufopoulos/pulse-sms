@@ -13,6 +13,7 @@
  *   node scripts/run-regression-evals.js --url http://...     # Custom server
  *   node scripts/run-regression-evals.js --concurrency 10     # Parallel scenarios (default: 5)
  *   node scripts/run-regression-evals.js --judge               # Enable LLM judge (off by default)
+ *   node scripts/run-regression-evals.js --model gemini-2.5-flash  # Override brain model
  */
 
 require('dotenv').config();
@@ -34,6 +35,8 @@ const CONCURRENCY = parseInt(
   args.find(a => a.startsWith('--concurrency='))?.split('=')[1]
   || (args.includes('--concurrency') ? args[args.indexOf('--concurrency') + 1] : null)
   || '5', 10);
+const BRAIN_MODEL = args.find(a => a.startsWith('--model='))?.split('=')[1]
+  || (args.includes('--model') ? args[args.indexOf('--model') + 1] : null);
 const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-haiku-4-5-20251001';
 const NO_JUDGE = !args.includes('--judge');
 
@@ -134,7 +137,7 @@ async function runScenario(scenario, phoneNumber) {
       res = await fetch(`${BASE}/api/sms/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ Body: userTurn.message, From: phoneNumber }),
+        body: JSON.stringify({ Body: userTurn.message, From: phoneNumber, ...(BRAIN_MODEL && { Model: BRAIN_MODEL }) }),
         signal: AbortSignal.timeout(28000), // abort before Railway's 30s proxy timeout
       });
       data = await res.json().catch(() => ({ error: `HTTP ${res.status} (non-JSON response)` }));
@@ -194,7 +197,7 @@ async function main() {
     process.exit(0);
   }
 
-  console.log(`Running ${scenarios.length} regression scenarios against ${BASE} (concurrency: ${CONCURRENCY})\n`);
+  console.log(`Running ${scenarios.length} regression scenarios against ${BASE} (concurrency: ${CONCURRENCY})${BRAIN_MODEL ? ` [model: ${BRAIN_MODEL}]` : ''}\n`);
 
   // Fetch cache metadata for reproducibility
   let cacheMeta = null;
@@ -206,6 +209,7 @@ async function main() {
   const report = {
     timestamp: new Date().toISOString(),
     base_url: BASE,
+    brain_model: BRAIN_MODEL || '(server default)',
     judge_model: JUDGE_MODEL,
     cache_meta: cacheMeta,
     principles,

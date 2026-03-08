@@ -58,12 +58,18 @@ if (process.env.PULSE_TEST_MODE === 'true') {
       }
     }
 
-    const { Body: message, From: phone } = req.body;
+    const { Body: message, From: phone, Model: modelOverride } = req.body;
     if (!message?.trim()) {
       return res.status(400).json({ error: 'Missing Body parameter' });
     }
     const testPhone = phone || '+10000000000';
     enableTestCapture(testPhone);
+
+    // Temporarily override brain model if requested
+    const { MODELS } = require('./model-config');
+    const originalModel = MODELS.brain;
+    if (modelOverride) MODELS.brain = modelOverride;
+
     const TEST_TIMEOUT_MS = 25000; // 25s — return before Railway's 30s proxy timeout
     try {
       const traceId = await Promise.race([
@@ -88,6 +94,8 @@ if (process.env.PULSE_TEST_MODE === 'true') {
     } catch (err) {
       const captured = disableTestCapture(testPhone);
       res.status(500).json({ error: err.message, messages: captured });
+    } finally {
+      if (modelOverride) MODELS.brain = originalModel;
     }
   });
   console.log('Test endpoint enabled: POST /api/sms/test');

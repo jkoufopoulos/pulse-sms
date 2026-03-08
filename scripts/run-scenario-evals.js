@@ -15,6 +15,7 @@
  *   node scripts/run-scenario-evals.js --concurrency 15          # Parallel scenarios (default: 10)
  *   node scripts/run-scenario-evals.js --judge                   # Enable LLM judge (off by default)
  *   node scripts/run-scenario-evals.js --pipeline agent_brain    # Run agent brain scenarios
+ *   node scripts/run-scenario-evals.js --model gemini-2.5-flash  # Override brain model
  */
 
 require('dotenv').config();
@@ -38,6 +39,8 @@ const isRemote = BASE !== 'http://localhost:3000';
 const CONCURRENCY = parseInt(args.find(a => a.startsWith('--concurrency='))?.split('=')[1]
   || (args.includes('--concurrency') ? args[args.indexOf('--concurrency') + 1] : null)
   || (isRemote ? '5' : '10'), 10);
+const BRAIN_MODEL = args.find(a => a.startsWith('--model='))?.split('=')[1]
+  || (args.includes('--model') ? args[args.indexOf('--model') + 1] : null);
 const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-haiku-4-5-20251001';
 const BUDGET_LIMIT = parseFloat(args.find(a => a.startsWith('--budget='))?.split('=')[1]
   || (args.includes('--budget') ? args[args.indexOf('--budget') + 1] : null)
@@ -207,7 +210,7 @@ async function runScenario(scenario, phoneNumber) {
       res = await fetch(`${BASE}/api/sms/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ Body: turn.message, From: phoneNumber }),
+        body: JSON.stringify({ Body: turn.message, From: phoneNumber, ...(BRAIN_MODEL && { Model: BRAIN_MODEL }) }),
         signal: AbortSignal.timeout(28000), // abort before Railway's 30s proxy timeout
       });
       data = await res.json().catch(() => ({ error: `HTTP ${res.status} (non-JSON response)` }));
@@ -276,7 +279,7 @@ async function main() {
     process.exit(0);
   }
 
-  console.log(`Running ${scenarios.length} multi-turn scenarios against ${BASE} (concurrency: ${CONCURRENCY})\n`);
+  console.log(`Running ${scenarios.length} multi-turn scenarios against ${BASE} (concurrency: ${CONCURRENCY})${BRAIN_MODEL ? ` [model: ${BRAIN_MODEL}]` : ''}\n`);
 
   // Fetch cache metadata for reproducibility
   let cacheMeta = null;
@@ -288,6 +291,7 @@ async function main() {
   const report = {
     timestamp: new Date().toISOString(),
     base_url: BASE,
+    brain_model: BRAIN_MODEL || '(server default)',
     judge_model: JUDGE_MODEL,
     concurrency: CONCURRENCY,
     budget_limit: BUDGET_LIMIT,
