@@ -1051,6 +1051,54 @@ function clearSchedule() {
   if (dailyTimer) clearTimeout(dailyTimer);
 }
 
+// ============================================================
+// Email-only poll scheduler — catches newsletters between full scrapes
+// ============================================================
+
+const EMAIL_POLL_HOURS = [6, 14, 22]; // ET hours not covered by full scrape (10, 18)
+
+function msUntilNextEmailPoll() {
+  const now = new Date();
+  const nycStr = now.toLocaleString('en-US', { timeZone: 'America/New_York', hour12: false });
+  const [datePart, timePart] = nycStr.split(', ');
+  const [hour, minute, second] = timePart.split(':').map(Number);
+  const nowSeconds = hour * 3600 + minute * 60 + second;
+
+  let bestMs = Infinity;
+  let bestHour = EMAIL_POLL_HOURS[0];
+  for (const h of EMAIL_POLL_HOURS) {
+    let diffSeconds = h * 3600 - nowSeconds;
+    if (diffSeconds <= 0) diffSeconds += 24 * 3600;
+    const ms = diffSeconds * 1000;
+    if (ms < bestMs) {
+      bestMs = ms;
+      bestHour = h;
+    }
+  }
+  return { ms: bestMs, hour: bestHour };
+}
+
+let emailPollTimer = null;
+
+function scheduleEmailPolls() {
+  const { ms, hour } = msUntilNextEmailPoll();
+  const hours = (ms / 3600000).toFixed(1);
+  console.log(`Next email poll in ${hours} hours (${hour}:00 ET)`);
+
+  emailPollTimer = setTimeout(async () => {
+    try {
+      await refreshEmailSources();
+    } catch (err) {
+      console.error('[EMAIL-POLL] Scheduled poll failed:', err.message);
+    }
+    scheduleEmailPolls();
+  }, ms);
+}
+
+function clearEmailSchedule() {
+  if (emailPollTimer) clearTimeout(emailPollTimer);
+}
+
 function getCacheStatus() {
   return {
     cache_size: eventCache.length,
@@ -1122,4 +1170,4 @@ function scanCityWide(filters) {
     .map(([neighborhood, matchCount]) => ({ neighborhood, matchCount }));
 }
 
-module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, refreshEmailSources, getEvents, getEventsForBorough, getEventsCitywide, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs, scanCityWide, scoreInterestingness, selectDiversePicks, getTopPicks, isGarbageName };
+module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, refreshEmailSources, getEvents, getEventsForBorough, getEventsCitywide, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, scheduleEmailPolls, clearEmailSchedule, captureExtractionInput, getExtractionInputs, scanCityWide, scoreInterestingness, selectDiversePicks, getTopPicks, isGarbageName };

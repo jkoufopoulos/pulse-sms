@@ -4,7 +4,7 @@ const express = require('express');
 const helmet = require('helmet');
 const smsRoutes = require('./handler');
 const { clearSmsIntervals, getInflightCount } = require('./handler');
-const { refreshCache, getCacheStatus, getHealthStatus, getEventById, isCacheFresh, scheduleDailyScrape, clearSchedule } = require('./events');
+const { refreshCache, getCacheStatus, getHealthStatus, getEventById, isCacheFresh, scheduleDailyScrape, clearSchedule, scheduleEmailPolls, clearEmailSchedule } = require('./events');
 const { loadProfiles } = require('./preference-profile');
 const { loadReferrals, clearReferralInterval } = require('./referral');
 const { loadSessions, flushSessions, clearSessionInterval } = require('./session');
@@ -598,6 +598,7 @@ const server = app.listen(PORT, () => {
     refreshCache().catch(err => console.error('Initial cache load failed:', err.message));
   }
   scheduleDailyScrape();
+  scheduleEmailPolls();
 });
 
 // Graceful shutdown — wait for in-flight requests before exiting
@@ -611,6 +612,7 @@ async function shutdown(signal) {
 
   // Phase 1: Stop accepting new connections + clear scheduled work
   clearSchedule();
+  clearEmailSchedule();
   clearSmsIntervals();
   clearReferralInterval();
   clearSessionInterval();

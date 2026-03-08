@@ -68,6 +68,12 @@ console.log('\nrefreshEmailSources:');
 const { refreshEmailSources } = require('../../src/events');
 check('refreshEmailSources is exported', typeof refreshEmailSources === 'function');
 
+// ---- Email poll scheduler ----
+console.log('\nEmail poll scheduler:');
+const { scheduleEmailPolls, clearEmailSchedule } = require('../../src/events');
+check('scheduleEmailPolls is exported', typeof scheduleEmailPolls === 'function');
+check('clearEmailSchedule is exported', typeof clearEmailSchedule === 'function');
+
 // ---- getHealthStatus shape ----
 console.log('\ngetHealthStatus:');
 
