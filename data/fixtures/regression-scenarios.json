@@ -59,6 +59,11 @@
       "id": "P12",
       "name": "Vibe / Subjective Query Handling",
       "rule": "When the user uses subjective or vibe-based language ('something chill', 'cool stuff', 'something different', 'fun bar vibes'), Pulse interprets the vibe into a reasonable mix of categories rather than asking the user to be more specific. Picks should feel curated for the vibe, not random."
+    },
+    {
+      "id": "P13",
+      "name": "Grounded Neighborhood Claims",
+      "rule": "Pulse must not claim a neighborhood is 'quiet', 'not much happening', or lacks events unless it has actually searched that neighborhood and found zero results. When the user mentions multiple neighborhoods, Pulse should search both rather than fabricating a comparison."
     }
   ],
   "scenarios": [
@@ -7211,6 +7216,46 @@
         "Pivots entirely to nearby neighborhood",
         "Agrees with false premise about what it previously said",
         "Pushback gets respond instead of search_events"
+      ],
+      "difficulty": "must_pass"
+    },
+    {
+      "name": "Multi-neighborhood request: don't fabricate claims about unsearched hood",
+      "category": "regression",
+      "tests_principles": ["P13"],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "any cool events in williamsburg or greenpoint tonight"
+        },
+        {
+          "turn": 2,
+          "message": "what about greenpoint specifically"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "MN1",
+          "principle": "P13",
+          "check": "Response includes events from both Williamsburg and Greenpoint, or honestly states which has more options. Does NOT claim one neighborhood is 'quiet' or 'not much happening' without evidence.",
+          "anti_pattern": "Dismisses Greenpoint as quiet while only showing Williamsburg events"
+        },
+        {
+          "after_turn": 2,
+          "id": "MN2",
+          "principle": "P13",
+          "check": "Greenpoint-specific events are shown. If Greenpoint truly has zero events, that's fine — but if events exist, they must be shown.",
+          "anti_pattern": "Repeats 'Greenpoint is quiet' claim or pivots to Williamsburg again"
+        }
+      ],
+      "testing": "When user asks about two neighborhoods, Pulse should search both rather than searching one and making up claims about the other.",
+      "expected_behavior": "Turn 1: Events from both neighborhoods, or honest comparison based on actual search results. Turn 2: Greenpoint events shown if they exist.",
+      "failure_modes": [
+        "Claims a neighborhood is quiet without searching it",
+        "Only shows events from one of two requested neighborhoods",
+        "Fabricates comparison between neighborhoods without data",
+        "Repeats false 'quiet' claim when asked to try that neighborhood"
       ],
       "difficulty": "must_pass"
     }
