@@ -12,7 +12,7 @@
  *   - sanitizeForLLM strips _ prefixed keys before data goes to the model
  */
 
-const { runAgentLoop } = require('./llm');
+const { runAgentLoop, generate } = require('./llm');
 const { MODELS } = require('./model-config');
 const { BRAIN_TOOLS, buildBrainSystemPrompt, serializePoolForContinuation } = require('./brain-llm');
 const { buildSearchPool, executeMore, executeDetails, executeWelcome } = require('./brain-execute');
@@ -25,6 +25,44 @@ const { updateProfile } = require('./preference-profile');
 const { smartTruncate, injectMissingPrices } = require('./formatters');
 const { sendRuntimeAlert } = require('./alerts');
 const { getAdjacentNeighborhoods, getNycDateString } = require('./geo');
+
+// ---------------------------------------------------------------------------
+// SMS length enforcement — agentic rewrite loop
+// ---------------------------------------------------------------------------
+
+const SMS_CHAR_LIMIT = 480;
+
+/**
+ * If smsText exceeds 480 chars, ask the model to shorten it (1 attempt).
+ * Returns the original text if already within limit, or the shortened version.
+ * Falls through to smartTruncate if the rewrite still exceeds the limit.
+ */
+async function rewriteIfTooLong(smsText, trace) {
+  if (!smsText || smsText.length <= SMS_CHAR_LIMIT) return smsText;
+
+  const overBy = smsText.length - SMS_CHAR_LIMIT;
+  console.log(`[agent-loop] SMS is ${smsText.length} chars (${overBy} over limit), requesting rewrite`);
+
+  try {
+    const result = await generate(MODELS.brain,
+      'You are an SMS editor. Shorten the following SMS to under 480 characters. Keep the same events, tone, and style. Do not add anything new. Return ONLY the shortened SMS text, nothing else.',
+      `This SMS is ${smsText.length} characters but must be under 480. Shorten it:\n\n${smsText}`,
+      { maxTokens: 512, temperature: 0, timeout: 5000 }
+    );
+
+    const rewritten = (result.text || '').trim();
+    if (rewritten && rewritten.length <= SMS_CHAR_LIMIT && rewritten.length > 50) {
+      console.log(`[agent-loop] Rewrite succeeded: ${smsText.length} → ${rewritten.length} chars`);
+      if (trace) trace.composition.rewrite = { from: smsText.length, to: rewritten.length };
+      return rewritten;
+    }
+    console.warn(`[agent-loop] Rewrite returned ${rewritten.length} chars, falling back to truncate`);
+  } catch (err) {
+    console.warn(`[agent-loop] Rewrite failed: ${err.message}`);
+  }
+
+  return smsText; // smartTruncate will handle it downstream
+}
 
 // ---------------------------------------------------------------------------
 // Pure helpers
@@ -522,7 +560,9 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
         console.warn(`[agent-loop] Used template fallback for SMS composition`);
       }
     }
-    smsText = smartTruncate(smsText || "Tell me what you're in the mood for -- drop a neighborhood or a vibe.");
+    smsText = smsText || "Tell me what you're in the mood for -- drop a neighborhood or a vibe.";
+    smsText = await rewriteIfTooLong(smsText, trace);
+    smsText = smartTruncate(smsText); // final safety net
 
     // History
     for (const tc of rawResults) {
