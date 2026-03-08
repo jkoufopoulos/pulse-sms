@@ -1,5 +1,5 @@
 const { setResponseState } = require('./session');
-const { filterByTimeAfter, parseAsNycTime, getEventDate, isEventInDateRange } = require('./geo');
+const { filterByTimeAfter, getEventDate, isEventInDateRange } = require('./geo');
 const { VALID_CATEGORIES } = require('./evals/scrape-audit');
 
 /**
@@ -226,10 +226,10 @@ function mergeFilters(existing, incoming) {
 function failsTimeGate(event, timeAfter) {
   if (!event.start_time_local || !/T\d{2}:/.test(event.start_time_local)) return false;
   try {
-    const ms = parseAsNycTime(event.start_time_local);
-    if (isNaN(ms)) return false;
-    const nycDate = new Date(ms).toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', hour12: false });
-    const [h, m] = nycDate.split(':').map(Number);
+    // start_time_local is already in NYC local time — extract h:m directly
+    const timeMatch = event.start_time_local.match(/T(\d{2}):(\d{2})/);
+    if (!timeMatch) return false;
+    const [h, m] = [Number(timeMatch[1]), Number(timeMatch[2])];
     const eventMinutes = h * 60 + m;
     const [filterH, filterM] = timeAfter.split(':').map(Number);
     const filterMinutes = filterH * 60 + filterM;

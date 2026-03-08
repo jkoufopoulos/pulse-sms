@@ -440,7 +440,7 @@ async function saveSession() {
     });
     const data = await res.json();
     if (data.ok) {
-      addMessage(`Session saved (${data.turn_count} turns) → ${data.filepath}`, 'system');
+      addMessage(`Session saved (${data.turn_count} turns) → conversation #${data.id}`, 'system');
       saveBtn.textContent = 'Saved!';
       saveBtn.style.color = '#34C759';
       setTimeout(() => { saveBtn.textContent = 'Save'; saveBtn.disabled = false; }, 2000);

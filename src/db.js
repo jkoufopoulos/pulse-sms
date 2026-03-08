@@ -100,6 +100,19 @@ function runMigrations(db) {
       report TEXT NOT NULL,
       email_sent INTEGER DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS conversations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      phone_masked TEXT NOT NULL,
+      label TEXT,
+      first_message TEXT,
+      started_at TEXT,
+      saved_at TEXT NOT NULL,
+      turn_count INTEGER NOT NULL,
+      turns TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_conversations_saved ON conversations(saved_at);
   `);
 
   // Migration: add normalized_name column for recurrence detection
@@ -645,6 +658,30 @@ function getYesterdayDigest() {
   return { ...rows[1], report: JSON.parse(rows[1].report) };
 }
 
+// --- Conversations ---
+
+function saveConversationToDb({ phone_masked, label, first_message, started_at, turn_count, turns }) {
+  const d = getDb();
+  const saved_at = new Date().toISOString();
+  const result = d.prepare(`
+    INSERT INTO conversations (phone_masked, label, first_message, started_at, saved_at, turn_count, turns)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(phone_masked, label || null, first_message || null, started_at || null, saved_at, turn_count, JSON.stringify(turns));
+  return { ok: true, id: result.lastInsertRowid, turn_count };
+}
+
+function getSavedConversations(id) {
+  const d = getDb();
+  if (id) {
+    const row = d.prepare('SELECT * FROM conversations WHERE id = ?').get(id);
+    if (!row) return null;
+    return { ...row, turns: JSON.parse(row.turns) };
+  }
+  return d.prepare(
+    'SELECT id, phone_masked, label, first_message, started_at, saved_at, turn_count FROM conversations ORDER BY saved_at DESC'
+  ).all();
+}
+
 module.exports = {
   getDb,
   closeDb,
@@ -666,6 +703,8 @@ module.exports = {
   markDigestEmailed,
   getDigests,
   getYesterdayDigest,
+  saveConversationToDb,
+  getSavedConversations,
   // Exposed for testing
   makePatternKey,
   normalizePatternName,

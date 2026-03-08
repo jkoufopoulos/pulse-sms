@@ -11,7 +11,6 @@ const path = require('path');
 const crypto = require('crypto');
 
 const TRACES_DIR = path.join(__dirname, '..', 'data', 'traces');
-const CONVERSATIONS_DIR = path.join(__dirname, '..', 'data', 'conversations');
 const RING_BUFFER_SIZE = 200;
 
 // Per-token pricing by provider (shared source of truth)
@@ -20,8 +19,6 @@ const PRICING = {
   gemini:    { input: 0.10 / 1_000_000, output: 0.40 / 1_000_000 },  // Gemini 2.5 Flash
 };
 const MAX_TRACE_FILES = 4;
-const CONVERSATION_IDLE_MS = 10 * 60 * 1000; // 10 minutes
-const CONVERSATION_CHECK_MS = 5 * 60 * 1000; // check every 5 minutes
 
 // In-memory ring buffer for fast access
 const traceBuffer = [];
@@ -247,7 +244,6 @@ function getLatestTraceForPhone(phone_masked) {
 // --- Conversation capture (test mode only) ---
 
 const conversations = new Map(); // phone_masked → { turns, lastActivity, startedAt }
-let conversationFlushInterval = null;
 
 /**
  * Record a conversation turn from a completed trace.
@@ -298,117 +294,27 @@ function recordConversationTurn(trace) {
 }
 
 /**
- * Flush a single conversation to disk.
- */
-function flushConversation(key, conv) {
-  try {
-    if (!fs.existsSync(CONVERSATIONS_DIR)) {
-      fs.mkdirSync(CONVERSATIONS_DIR, { recursive: true });
-    }
-    const d = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-    const filepath = path.join(CONVERSATIONS_DIR, `conversations-${d}.jsonl`);
-    const record = {
-      phone_masked: key,
-      started_at: conv.startedAt,
-      ended_at: conv.turns[conv.turns.length - 1]?.timestamp || conv.startedAt,
-      turn_count: conv.turns.length,
-      turns: conv.turns
-    };
-    fs.appendFileSync(filepath, JSON.stringify(record) + '\n');
-  } catch (err) {
-    console.error('Failed to flush conversation:', err.message);
-  }
-}
-
-/**
- * Flush idle conversations (no activity for CONVERSATION_IDLE_MS).
- */
-function flushIdleConversations() {
-  const now = Date.now();
-  for (const [key, conv] of conversations) {
-    if (now - conv.lastActivity >= CONVERSATION_IDLE_MS) {
-      flushConversation(key, conv);
-      conversations.delete(key);
-    }
-  }
-}
-
-/**
- * Flush all active conversations to disk (called on shutdown).
- */
-function flushAllConversations() {
-  for (const [key, conv] of conversations) {
-    flushConversation(key, conv);
-  }
-  conversations.clear();
-}
-
-/**
- * Start the idle-flush interval timer. Call once at startup (test mode only).
- */
-function startConversationCapture() {
-  if (process.env.PULSE_TEST_MODE !== 'true') return;
-  if (conversationFlushInterval) return;
-  conversationFlushInterval = setInterval(flushIdleConversations, CONVERSATION_CHECK_MS);
-  conversationFlushInterval.unref(); // don't prevent process exit
-  console.log('Conversation capture active (test mode)');
-}
-
-/**
- * Stop the idle-flush interval and flush remaining conversations.
- */
-function stopConversationCapture() {
-  if (conversationFlushInterval) {
-    clearInterval(conversationFlushInterval);
-    conversationFlushInterval = null;
-  }
-  flushAllConversations();
-}
-
-const SAVED_DIR = path.join(CONVERSATIONS_DIR, 'saved');
-
-/**
- * Save a specific phone's conversation on demand (admin action from simulator).
- * Accepts the raw phone number, masks it, looks up active conversation.
- * Saves to data/conversations/saved/ with a descriptive filename.
- * Returns { ok, filepath, turn_count } or { ok: false, error }.
+ * Save a specific phone's conversation to SQLite on demand (admin action from simulator).
+ * Returns { ok, id, turn_count } or { ok: false, error }.
  */
 function saveConversation(rawPhone, { label } = {}) {
   const { maskPhone } = require('./twilio');
+  const { saveConversationToDb } = require('./db');
   const masked = maskPhone(rawPhone);
   const conv = conversations.get(masked);
   if (!conv || conv.turns.length === 0) {
     return { ok: false, error: 'No active conversation for this phone' };
   }
 
-  try {
-    if (!fs.existsSync(SAVED_DIR)) {
-      fs.mkdirSync(SAVED_DIR, { recursive: true });
-    }
-    const d = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-    const t = new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour12: false, hour: '2-digit', minute: '2-digit' }).replace(':', '');
-    const slug = label ? '-' + label.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) : '';
-    const filename = `${d}_${t}${slug}.json`;
-    const filepath = path.join(SAVED_DIR, filename);
-
-    // Build first user message preview for quick scanning
-    const firstUserMsg = conv.turns.find(t => t.sender === 'user')?.message || '';
-
-    const record = {
-      phone_masked: masked,
-      label: label || null,
-      first_message: firstUserMsg,
-      started_at: conv.startedAt,
-      saved_at: new Date().toISOString(),
-      turn_count: conv.turns.length,
-      turns: conv.turns
-    };
-    fs.writeFileSync(filepath, JSON.stringify(record, null, 2));
-    return { ok: true, filepath: filename, turn_count: conv.turns.length };
-  } catch (err) {
-    console.error('Failed to save conversation:', err.message);
-    return { ok: false, error: err.message };
-  }
+  const firstUserMsg = conv.turns.find(t => t.sender === 'user')?.message || '';
+  return saveConversationToDb({
+    phone_masked: masked,
+    label: label || null,
+    first_message: firstUserMsg,
+    started_at: conv.startedAt,
+    turn_count: conv.turns.length,
+    turns: conv.turns,
+  });
 }
 
 /**
@@ -456,6 +362,6 @@ function computeLatencyStats(traces) {
 
 module.exports = {
   startTrace, saveTrace, loadTraces, annotateTrace, getRecentTraces, getTraceById, getLatestTraceForPhone,
-  recordConversationTurn, startConversationCapture, stopConversationCapture, saveConversation,
+  recordConversationTurn, saveConversation,
   PRICING, recordAICost, computeLatencyStats
 };
