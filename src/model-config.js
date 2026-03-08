@@ -6,7 +6,7 @@
  */
 
 const MODELS = {
-  brain:    process.env.PULSE_MODEL_BRAIN    || 'gemini-2.5-flash-lite',   // tool calling — Gemini routes better
+  brain:    process.env.PULSE_MODEL_BRAIN    || 'claude-haiku-4-5-20251001', // tool calling + SMS composition
   extract:  process.env.PULSE_MODEL_EXTRACT  || 'claude-haiku-4-5-20251001', // event extraction — Claude excels at structured XML
   details:  process.env.PULSE_MODEL_DETAILS  || 'gemini-2.5-flash',         // detail composition — used by ai.js composeDetails
   fallback: process.env.PULSE_MODEL_FALLBACK || 'claude-haiku-4-5-20251001', // fallback for any role
