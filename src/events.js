@@ -1100,11 +1100,14 @@ function clearEmailSchedule() {
 }
 
 function getCacheStatus() {
+  const nextEmail = msUntilNextEmailPoll();
   return {
     cache_size: eventCache.length,
     cache_age_minutes: cacheTimestamp ? Math.round((Date.now() - cacheTimestamp) / 60000) : null,
     cache_fresh: eventCache.length > 0,
     sources: { ...sourceHealth },
+    next_email_poll_hours: parseFloat((nextEmail.ms / 3600000).toFixed(1)),
+    next_email_poll_hour_et: nextEmail.hour,
   };
 }
 
