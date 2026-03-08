@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { SOURCES, SOURCE_TIERS, SOURCE_LABELS, SOURCE_DB_NAMES, MERGE_ORDER } = require('./source-registry');
+const { SOURCES, SOURCE_TIERS, SOURCE_LABELS, SOURCE_DB_NAMES, MERGE_ORDER, EMAIL_SOURCES } = require('./source-registry');
 const { sourceHealth, saveHealthData, updateSourceHealth, updateScrapeStats, computeEventMix, getHealthStatus: _getHealthStatus } = require('./source-health');
 const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate, isEventInDateRange, parseAsNycTime } = require('./geo');
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues, lookupVenue, lookupVenueSize } = require('./venues');
@@ -635,6 +635,100 @@ async function refreshCache() {
 }
 
 // ============================================================
+// Incremental email-only refresh — poll email sources between
+// full scrapes so newsletter events appear within minutes.
+// ============================================================
+
+let emailRefreshPromise = null;
+
+async function refreshEmailSources() {
+  if (emailRefreshPromise) return emailRefreshPromise;
+  // Skip if a full refresh is already running — it covers email sources
+  if (refreshPromise) {
+    console.log('Full scrape in progress, skipping email-only poll');
+    return;
+  }
+
+  emailRefreshPromise = (async () => {
+    console.log(`Polling ${EMAIL_SOURCES.length} email sources...`);
+    const start = Date.now();
+
+    const fetchResults = await Promise.allSettled(
+      EMAIL_SOURCES.map(s => timedFetch(s.fetch, s.label, s.weight)),
+    );
+
+    const existingIds = new Set(eventCache.map(e => e.id));
+    let added = 0;
+
+    for (let i = 0; i < EMAIL_SOURCES.length; i++) {
+      const label = EMAIL_SOURCES[i].label;
+      const settled = fetchResults[i];
+      const result = settled.status === 'fulfilled'
+        ? settled.value
+        : { events: [], durationMs: 0, status: 'error', error: settled.reason?.message || 'unknown' };
+
+      // Update health tracking
+      updateSourceHealth(label, result);
+
+      if (result.status === 'error' || result.status === 'timeout') {
+        console.error(`[EMAIL-POLL] ${label} failed:`, result.error);
+        continue;
+      }
+
+      // Baseline gate (same as full scrape)
+      if (result.status === 'ok') {
+        const verdict = checkBaseline(label, result.events);
+        if (verdict.quarantined) {
+          console.warn(`[EMAIL-POLL] Quarantined ${label}: ${verdict.reason}`);
+          sourceHealth[label].lastStatus = 'quarantined';
+          sourceHealth[label].lastQuarantineReason = verdict.reason;
+          continue;
+        }
+      }
+
+      // Quality gates on new events
+      const gated = applyQualityGates(result.events);
+
+      for (const e of gated) {
+        if (!existingIds.has(e.id)) {
+          existingIds.add(e.id);
+          eventCache.push(e);
+          added++;
+        }
+      }
+
+      console.log(`[EMAIL-POLL] ${label}: ${result.events.length} fetched, ${gated.length} after gates`);
+    }
+
+    // Persist if we added anything
+    if (added > 0) {
+      try {
+        const db = require('./db');
+        const newEvents = eventCache.filter(e => EMAIL_SOURCES.some(s => s.label === e.source_name));
+        if (newEvents.length > 0) db.upsertEvents(newEvents);
+      } catch (err) {
+        console.warn('[EMAIL-POLL] SQLite upsert failed:', err.message);
+      }
+
+      try {
+        atomicWriteSync(CACHE_FILE, JSON.stringify({ events: eventCache, timestamp: cacheTimestamp }));
+      } catch (err) {
+        console.error('[EMAIL-POLL] Cache persist failed:', err.message);
+      }
+    }
+
+    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+    console.log(`[EMAIL-POLL] Done in ${elapsed}s — ${added} new events added (cache: ${eventCache.length})`);
+  })();
+
+  try {
+    await emailRefreshPromise;
+  } finally {
+    emailRefreshPromise = null;
+  }
+}
+
+// ============================================================
 // Selective source refresh — re-scrape specific sources only
 // ============================================================
 
@@ -1028,4 +1122,4 @@ function scanCityWide(filters) {
     .map(([neighborhood, matchCount]) => ({ neighborhood, matchCount }));
 }
 
-module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, getEvents, getEventsForBorough, getEventsCitywide, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs, scanCityWide, scoreInterestingness, selectDiversePicks, getTopPicks, isGarbageName };
+module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, refreshEmailSources, getEvents, getEventsForBorough, getEventsCitywide, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, captureExtractionInput, getExtractionInputs, scanCityWide, scoreInterestingness, selectDiversePicks, getTopPicks, isGarbageName };

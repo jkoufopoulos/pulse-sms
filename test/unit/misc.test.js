@@ -63,6 +63,11 @@ check('ScreenSlate is email channel', EMAIL_SOURCES.some(s => s.label === 'Scree
 check('RA is NOT email channel', !EMAIL_SOURCES.some(s => s.label === 'RA'));
 check('all email sources have fetch functions', EMAIL_SOURCES.every(s => typeof s.fetch === 'function'));
 
+// ---- refreshEmailSources ----
+console.log('\nrefreshEmailSources:');
+const { refreshEmailSources } = require('../../src/events');
+check('refreshEmailSources is exported', typeof refreshEmailSources === 'function');
+
 // ---- getHealthStatus shape ----
 console.log('\ngetHealthStatus:');
 
