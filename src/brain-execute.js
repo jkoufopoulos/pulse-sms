@@ -559,7 +559,7 @@ function computeNearbyHighlight(requestedEvents, nearbyEvents, requestedHood) {
     }
   }
 
-  if (!bestHood || bestAvg < reqAvg * 1.5 || bestAvg - reqAvg < 3) return null;
+  if (!bestHood || bestAvg < reqAvg * 1.3 || bestAvg - reqAvg < 2) return null;
 
   const topPick = bestEvents[0];
   const scarcityCount = bestEvents.filter(e => e.scarcity).length;
