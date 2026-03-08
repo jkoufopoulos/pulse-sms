@@ -330,8 +330,11 @@ async function buildSearchPool(params, session, phone, trace) {
 
   // 5. Build tagged pool
   const taggedResult = buildTaggedPool(curated, activeFilters, { citywide: isCitywide || isBorough });
-  events = taggedResult.pool;
   const { matchCount, hardCount, softCount, isSparse } = taggedResult;
+
+  // 5b. Score and trim pool to top N for the model
+  const { curatedPool: trimmedPool, fullScoredPool } = curatePool(taggedResult.pool, hood);
+  events = trimmedPool;
 
   trace.events.sent_to_claude = events.length;
   trace.events.sent_ids = events.map(e => e.id);
@@ -405,9 +408,15 @@ async function buildSearchPool(params, session, phone, trace) {
   const excludeIds = [...new Set([...prevPickIds, ...prevOfferedIds])];
   const suggestedHood = (isSparse || matchCount === 0) && nearbyHoods.length > 0 ? nearbyHoods[0] : null;
 
+  // 7. Compute nearby highlight from full scored pool
+  const reqPoolEvents = fullScoredPool.filter(e => e.neighborhood === hood);
+  const nearbyPoolEvents = fullScoredPool.filter(e => e.neighborhood !== hood);
+  const nearbyHighlight = hood ? computeNearbyHighlight(reqPoolEvents, nearbyPoolEvents, hood) : null;
+
   return {
     zeroMatch: null,
     pool: events,
+    fullScoredPool,
     curated,
     activeFilters,
     hood, borough, isBorough, isCitywide,
@@ -415,6 +424,7 @@ async function buildSearchPool(params, session, phone, trace) {
     nearbyHoods,
     suggestedHood,
     excludeIds,
+    nearbyHighlight,
   };
 }
 
@@ -515,6 +525,58 @@ async function executeWelcome() {
 
 // --- Pool curation: score and trim to top N ---
 
+/**
+ * Compare interestingness of requested hood vs nearby hoods.
+ * Returns a highlight object if a nearby hood is notably stronger, null otherwise.
+ */
+function computeNearbyHighlight(requestedEvents, nearbyEvents, requestedHood) {
+  if (!nearbyEvents || nearbyEvents.length === 0) return null;
+
+  const reqScores = requestedEvents
+    .filter(e => e.neighborhood === requestedHood)
+    .map(e => e.interestingness || 0)
+    .sort((a, b) => b - a)
+    .slice(0, 3);
+  const reqAvg = reqScores.length > 0 ? reqScores.reduce((a, b) => a + b, 0) / reqScores.length : 0;
+
+  const byHood = {};
+  for (const e of nearbyEvents) {
+    if (e.neighborhood === requestedHood) continue;
+    if (!byHood[e.neighborhood]) byHood[e.neighborhood] = [];
+    byHood[e.neighborhood].push(e);
+  }
+
+  let bestHood = null;
+  let bestAvg = 0;
+  let bestEvents = [];
+  for (const [hood, events] of Object.entries(byHood)) {
+    const scores = events.map(e => e.interestingness || 0).sort((a, b) => b - a).slice(0, 3);
+    const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+    if (avg > bestAvg) {
+      bestAvg = avg;
+      bestHood = hood;
+      bestEvents = events.sort((a, b) => (b.interestingness || 0) - (a.interestingness || 0));
+    }
+  }
+
+  if (!bestHood || bestAvg < reqAvg * 1.5 || bestAvg - reqAvg < 3) return null;
+
+  const topPick = bestEvents[0];
+  const scarcityCount = bestEvents.filter(e => e.scarcity).length;
+  const editorialCount = bestEvents.filter(e => e.editorial_signal).length;
+
+  const reasons = [];
+  if (scarcityCount > 0) reasons.push(`${scarcityCount} one-night-only event${scarcityCount > 1 ? 's' : ''}`);
+  if (editorialCount > 0) reasons.push(`${editorialCount} editor's pick${editorialCount > 1 ? 's' : ''}`);
+  if (reasons.length === 0) reasons.push('stronger lineup tonight');
+
+  return {
+    hood: bestHood,
+    reason: reasons.join(', '),
+    top_pick: `${topPick.name} at ${topPick.venue_name}`,
+  };
+}
+
 const DEFAULT_POOL_SIZE = 10;
 
 /**
@@ -556,5 +618,5 @@ function curatePool(pool, requestedHood, { poolSize = DEFAULT_POOL_SIZE } = {}) 
 module.exports = {
   resolveDateRange, executeMore, executeDetails, validatePicks,
   buildSearchPool, executeWelcome, formatWelcomePick, welcomeTimeLabel,
-  curatePool, DEFAULT_POOL_SIZE,
+  curatePool, computeNearbyHighlight, DEFAULT_POOL_SIZE,
 };

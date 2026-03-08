@@ -182,7 +182,8 @@ SMS FORMAT:
 - Each pick on its own line: Event Name — Venue, time. Add a few words about what it actually is if the name doesn't make it obvious (e.g. "live jazz trio", "standup showcase", "indie DJ night").
 - Don't include price in the initial picks — save that for details. Never write "price not listed" or "TBA".
 - Say "tonight" for today evening, "today at [time]" for afternoon. "tomorrow" for tomorrow.
-- ALWAYS lead with events in the neighborhood the user asked about, even if there are only 1-2. Then you can add nearby options: "Also in nearby Williamsburg..." Only say a neighborhood is quiet if there are literally zero events there.
+- ALWAYS lead with events in the neighborhood the user asked about, even if there are only 1-2. Only say a neighborhood is quiet if there are literally zero events there.
+- If the search results include a nearby_highlight, tease that neighborhood in a closing line. Keep it natural — "Williamsburg's stacked tonight too — say 'williamsburg' to see" not "nearby_highlight detected."
 - HARD LIMIT: 480 characters total. No URLs. If your message is over 480 chars, cut picks — never send a truncated message.
 - For details: write a rich description with venue, time, price. No URL (sent separately).
 - For more with is_last_batch=true: mention these are the last picks, suggest a different neighborhood.
@@ -198,7 +199,8 @@ function serializePoolForContinuation(poolResult) {
   const todayNyc = getNycDateString(0);
   const tomorrowNyc = getNycDateString(1);
   const { pool, hood: neighborhood, activeFilters, isSparse, matchCount,
-          nearbyHoods, suggestedHood, excludeIds, isCitywide, isBorough, borough } = poolResult;
+          nearbyHoods, suggestedHood, excludeIds, isCitywide, isBorough, borough,
+          nearbyHighlight } = poolResult;
 
   const hoodLabel = isBorough ? `${borough} (borough-wide)` : isCitywide ? 'citywide' : neighborhood || 'NYC';
   const filterDesc = activeFilters && Object.values(activeFilters).some(Boolean) ? describeFilters(activeFilters) : '';
@@ -230,6 +232,7 @@ function serializePoolForContinuation(poolResult) {
     nearby_hoods: isSparse ? nearbyHoods : undefined,
     suggested_neighborhood: suggestedHood || undefined,
     exclude_ids: excludeIds?.length > 0 ? excludeIds : undefined,
+    nearby_highlight: nearbyHighlight || undefined,
     events,
   };
 }

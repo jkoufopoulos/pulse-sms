@@ -410,6 +410,41 @@ function saveSessionFromToolCalls(phone, session, toolCalls, smsText) {
 }
 
 // ---------------------------------------------------------------------------
+// Validate compose_sms output
+// ---------------------------------------------------------------------------
+
+/**
+ * Validate compose_sms output. If sms_text > 480 chars or picks outside 1-3,
+ * rebuild from pool events. Model owns editorial voice; this is the safety net.
+ */
+function validateComposeSms(smsText, pickIds, pool) {
+  const valid = smsText && smsText.length <= 480 && pickIds.length >= 1 && pickIds.length <= 3;
+  if (valid) return { smsText, picks: pickIds, rebuilt: false };
+
+  console.warn(`[agent-loop] compose_sms validation failed: ${smsText?.length || 0} chars, ${pickIds.length} picks — rebuilding`);
+
+  const useIds = pickIds.slice(0, 3);
+  const poolMap = new Map(pool.map(e => [e.id, e]));
+  let events = useIds.map(id => poolMap.get(id)).filter(Boolean);
+  if (events.length === 0) events = pool.slice(0, 3);
+
+  const lines = events.map(e => {
+    const time = e.start_time_local
+      ? new Date(e.start_time_local).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })
+      : 'tonight';
+    return `${e.name} — ${e.venue_name}, ${time}`;
+  });
+  const hood = events[0]?.neighborhood || 'NYC';
+  const rebuilt = `Tonight in ${hood}:\n\n${lines.join('\n')}\n\nReply a number for details or "more" for more picks`;
+
+  return {
+    smsText: smartTruncate(rebuilt),
+    picks: events.map(e => e.id),
+    rebuilt: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Main orchestrator
 // ---------------------------------------------------------------------------
 
@@ -455,7 +490,14 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     const lastRespond = [...rawResults].reverse().find(tc => tc.name === 'respond');
     const detailsResult = [...rawResults].reverse().find(tc => tc.result?._smsText);
     if (lastCompose) {
-      smsText = lastCompose.params.sms_text;
+      const lastSearch = [...rawResults].reverse().find(tc => tc.name === 'search_events');
+      const pool = lastSearch?.result?._poolResult?.pool || [];
+      const validated = validateComposeSms(lastCompose.params.sms_text, lastCompose.params.picks || [], pool);
+      smsText = validated.smsText;
+      if (validated.rebuilt) {
+        trace.composition.rebuilt = true;
+        lastCompose.params.picks = validated.picks;
+      }
     } else if (lastRespond) {
       smsText = lastRespond.params.message;
     } else if (detailsResult) {
@@ -471,10 +513,12 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
         const top3 = pool.slice(0, 3);
         const hood = lastSearchFb.result?._poolResult?.hood || 'NYC';
         const lines = top3.map(e => {
-          const price = e.is_free ? 'free' : (e.price_display || 'check price');
-          return `${e.name} — ${e.venue_name}, ${e.start_time_local ? new Date(e.start_time_local).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) : 'tonight'} (${price})`;
+          const time = e.start_time_local
+            ? new Date(e.start_time_local).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })
+            : 'tonight';
+          return `${e.name} — ${e.venue_name}, ${time}`;
         });
-        smsText = `Tonight in ${hood}:\n\n${lines.join('\n')}\n\nReply 1-3 for details or MORE for more picks.`;
+        smsText = `Tonight in ${hood}:\n\n${lines.join('\n')}\n\nReply a number for details or "more" for more picks`;
         console.warn(`[agent-loop] Used template fallback for SMS composition`);
       }
     }
@@ -570,4 +614,5 @@ module.exports = {
   saveSessionFromToolCalls,
   extractPicksFromSms,
   deriveIntent,
+  validateComposeSms,
 };

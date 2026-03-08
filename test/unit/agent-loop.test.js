@@ -1,5 +1,5 @@
 const { check } = require('../helpers');
-const { sanitizeForLLM, extractPicksFromSms, deriveIntent } = require('../../src/agent-loop');
+const { sanitizeForLLM, extractPicksFromSms, deriveIntent, validateComposeSms } = require('../../src/agent-loop');
 
 // ---- sanitizeForLLM ----
 console.log('\nsanitizeForLLM:');
@@ -78,3 +78,22 @@ check('show_welcome + respond -> welcome (welcome wins)', deriveIntent([
   { name: 'show_welcome', params: {} },
   { name: 'respond', params: { intent: 'greeting' } },
 ]) === 'welcome');
+
+// ---- validateComposeSms ----
+console.log('\nvalidateComposeSms:');
+
+const goodPool = [
+  { id: 'e1', name: 'Jazz Night', venue_name: 'Blue Note', neighborhood: 'Greenwich Village', start_time_local: '2026-03-07T22:00:00' },
+  { id: 'e2', name: 'Comedy Hour', venue_name: 'Tiny Cupboard', neighborhood: 'LES', start_time_local: '2026-03-07T21:00:00' },
+  { id: 'e3', name: 'Art Opening', venue_name: 'Pioneer Works', neighborhood: 'Red Hook', start_time_local: '2026-03-07T19:00:00' },
+];
+
+const good = validateComposeSms('Tonight:\n\nJazz Night — Blue Note, 10pm\nComedy Hour — Tiny Cupboard, 9pm', ['e1', 'e2'], goodPool);
+check('valid SMS passes through', good.smsText.includes('Jazz Night'));
+check('valid SMS not rebuilt', good.rebuilt === false);
+
+const rebuilt = validateComposeSms('x'.repeat(500), ['e1', 'e2', 'e3'], goodPool);
+check('over 480 triggers rebuild', rebuilt.rebuilt === true);
+
+check('>3 picks triggers rebuild', validateComposeSms('picks', ['e1','e2','e3','e4'], goodPool).rebuilt === true);
+check('0 picks triggers rebuild', validateComposeSms('no picks', [], goodPool).rebuilt === true);
