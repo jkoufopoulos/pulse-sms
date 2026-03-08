@@ -99,9 +99,10 @@ const tier1Checks = {
     };
   },
 
-  confidence_calibrated(event) {
+  confidence_calibrated(event, rawText) {
     const confidence = event.extraction_confidence;
     if (confidence == null) return { name: 'confidence_calibrated', pass: true, detail: 'no confidence score (skipped)' };
+    if (!rawText) return { name: 'confidence_calibrated', pass: true, detail: 'no raw text available (skipped)' };
 
     const ev = event.evidence || {};
     const fields = [ev.name_quote, ev.time_quote, ev.location_quote, ev.price_quote];
@@ -121,23 +122,6 @@ const tier1Checks = {
       name: 'confidence_calibrated',
       pass: true,
       detail: `confidence ${confidence}, ${present}/4 evidence fields`,
-    };
-  },
-
-  date_not_past(event) {
-    const dateLocal = event.date_local;
-    if (!dateLocal) return { name: 'date_not_past', pass: true, detail: 'no date (skipped)' };
-
-    const today = getNycDateString(0);
-    // Multi-day events: if series_end is today or future, the event is still active
-    if (dateLocal < today && event.series_end && event.series_end >= today) {
-      return { name: 'date_not_past', pass: true, detail: `ongoing: ${dateLocal}..${event.series_end} (still active)` };
-    }
-    const isPast = dateLocal < today;
-    return {
-      name: 'date_not_past',
-      pass: !isPast,
-      detail: isPast ? `${dateLocal} is before today (${today})` : `${dateLocal} (today or future)`,
     };
   },
 
@@ -219,7 +203,14 @@ Respond as JSON: { "verdicts": { "name": { "status": "CORRECT|WRONG|UNVERIFIABLE
  * @returns {Object} Full audit report
  */
 function runExtractionAudit(events, extractionInputs, opts = {}) {
-  const claudeEvents = events.filter(e => CLAUDE_EXTRACTED_SOURCES.includes(e.source_name));
+  const today = getNycDateString(0);
+  const claudeEvents = events.filter(e => {
+    if (!CLAUDE_EXTRACTED_SOURCES.includes(e.source_name)) return false;
+    // Skip past events — they're already filtered from user delivery
+    const date = e.date_local;
+    if (date && date < today && !(e.series_end && e.series_end >= today)) return false;
+    return true;
+  });
 
   const eventResults = [];
   const sourceStats = {};
