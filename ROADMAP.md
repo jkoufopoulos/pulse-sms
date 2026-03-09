@@ -1,57 +1,46 @@
-# Pulse -- Roadmap
+# Pulse — Roadmap
 
-> Single source of truth for architecture principles, evolution strategy, open issues, and planned work.
-> Last updated: 2026-03-07 (Phase 5 complete: true agent loop via runAgentLoop + handleAgentRequest)
+> Single source of truth for architecture principles, planned work, and completed phases.
+> Last updated: 2026-03-08
+> North star: **"Feel like a local."** See [Product Vision](docs/VISION.md) and [Architecture Review](docs/plans/2026-03-08-architecture-review-design.md).
 
 ---
 
 ## Architecture Principles
 
-These principles govern how Pulse splits work between deterministic code and LLM tool calling. They were developed from regression eval failures, reviewed across multiple models, and updated when the agent brain became the sole architecture (2026-03-05).
+These principles govern how Pulse splits work between deterministic code and LLM tool calling. Developed from regression eval failures, reviewed across multiple models, updated when the agent brain became the sole architecture (2026-03-05).
 
 ### P1. Structured Tool Calls Own State, Free-Text Owns Language
 
-Session state is derived from structured, validated sources -- never parsed from free-text LLM output. The LLM's tool call parameters (`search_events` args: neighborhood, categories, time_filter, date_range, free_only, intent) ARE the system of record for filters and intent. Tool params are machine-readable, schema-validated, and deterministic -- safe state sources. The LLM's free-text SMS output is for the user, not for the system.
+Session state is derived from structured, validated sources — never parsed from free-text LLM output. The LLM's tool call parameters (`search_events` args) ARE the system of record for filters and intent.
 
 **In practice:** The agent brain calls `search_events({ neighborhood: "bushwick", categories: ["comedy"], free_only: true })`. The handler reads these tool params to set `activeFilters` and `lastNeighborhood`.
 
-**Anti-pattern:** Parsing the LLM's free-text SMS response (or any unstructured output field) to extract state like filters or neighborhood. We tried reading `filters_used` from LLM output (2026-02-22) and reverted it because it made the LLM a secondary source of truth for state.
+**Anti-pattern:** Parsing the LLM's free-text SMS response to extract state. We tried reading `filters_used` from LLM output (2026-02-22) and reverted it.
 
-### ~~P2. Separate Reasoning from Rendering~~ -- **Retired**
+### ~~P2. Separate Reasoning from Rendering~~ — Retired
 
-Originally proposed splitting LLM calls into a reasoning pass and a rendering pass. Abandoned -- the agent brain's tool calling architecture handles structured output and natural language in one flow. Dead code cleaned up.
+Abandoned — the agent brain's tool calling handles structured output and natural language in one flow.
 
 ### P3. Extract at the Boundary, Then Trust Internal Types
 
-Wherever the LLM produces structured data, validate and normalize it once at the ingestion boundary. After that boundary, internal code trusts internal types. Don't normalize some LLM fields and trust others -- inconsistent validation is worse than none.
-
-**In practice:** `normalizeFilters()` maps subcategories to canonical values (jazz->live_music) at the boundary. This applies uniformly to every structured field from tool call params.
+Wherever the LLM produces structured data, validate and normalize it once at the ingestion boundary. After that, internal code trusts internal types.
 
 ### P4. One Save Path, Not Parallel Paths That Must Agree
 
-Every code path that sends an SMS must end with the same atomic session save function. No hand-built `setSession` merges, no conditional field sets, no paths that "forget" to save filters.
-
-**Current state:** All SMS-sending paths end with `saveResponseFrame`. No exceptions.
+Every code path that sends an SMS must end with `saveResponseFrame`. No exceptions.
 
 ### P5. Minimal LLM Output Contract
 
-Every structured field in the LLM output is a surface for hallucination and drift. Fields the code already knows before calling the LLM should never be in the LLM's output schema.
-
-**Current:** The agent brain uses 2 tools (`search_events`, `respond`) with validated parameter schemas. `search_events` handles all event intents (search, refine, more, details) via the `intent` param. The model writes plain text SMS directly in the agent loop -- no separate compose step.
+Fields the code already knows before calling the LLM should never be in the LLM's output schema. The model writes plain text SMS directly — no separate compose step.
 
 ### P6. Mechanical Shortcuts for $0 Operations, LLM for Everything Else
 
-Use deterministic code only for operations that don't need language understanding and can be handled at $0. Everything else -- including compound filters, semantic intent, and ambiguous language -- goes to the agent brain's tool calling.
-
-**$0 mechanical (checkMechanical):** "help"/"?" (canned response) and TCPA opt-out keywords. These are pattern-matched and never hit the LLM.
-
-**Agent brain handles natively:** Bare numbers ("2"), "more", greetings/thanks/bye, "free comedy in bushwick", "later in the week", "how about something lowkey", "trivia or art stuff in greenpoint". The LLM expresses intent through structured tool params.
+`checkMechanical` handles "help"/"?" and TCPA opt-out at $0. Everything else — including bare numbers, "more", greetings, compound filters — goes to the agent brain.
 
 ### P7. Validate the Contract, Not the Content
 
-Validate structural contracts in the hot path (do `picks[].event_id` values exist in the pool?). Let evals catch quality issues offline.
-
-**Done (2026-02-22):** Event ID validation added -- `validPicks` filters against `eventMap` before session save.
+Validate structural contracts in the hot path (do pick IDs exist in the pool?). Let evals catch quality issues offline.
 
 ---
 
@@ -67,15 +56,155 @@ message -> checkMechanical (help + TCPA only, $0)
   -> saveSessionFromToolCalls -> saveResponseFrame -> SMS
 ```
 
-2 tools: `search_events` (all event intents) + `respond` (conversation). Natural prose SMS -- no numbered lists.
+2 core tools: `search_events` (all event intents) + `respond` (conversation). Plus `compose_sms` (structured pick validation) and `show_welcome` (returning users). Fallback chain: Gemini -> Anthropic Haiku.
 
-Fallback chain: Gemini failure -> Anthropic Haiku.
+---
 
-**Key decisions:**
-- **(2026-03-05, Phase 1):** Deleted unified-flow.js, model-router.js, pre-router.js, src/skills/ (~1,300 lines). Agent brain is the only code path.
-- **(2026-03-05, Phase 2):** Single Gemini chat session for search_events. The model that understands intent writes the SMS via multi-turn tool calling. brainCompose kept for handleMore.
-- **(2026-03-05, Phase 4):** Collapsed tools 3->2 (deleted get_details). checkMechanical reduced to help+TCPA. Natural prose replaces numbered lists. Agent handles more/details natively via search_events intents.
-- **(2026-03-07, Phase 5):** True agent loop. Replaced 400-line switch with `runAgentLoop` (llm.js) + `handleAgentRequest` (agent-loop.js). Deleted `callAgentBrain`, `brainCompose`, `welcomeCompose`, `continueWithResults`, `handleWelcome`, `handleMore` (~1000 lines). Model writes plain text SMS directly. No separate compose step.
+## Planned Work
+
+### Phase 7: Tastemaker Voice (Prompt)
+
+*The agent speaks like a local, not a search engine. Highest ROI work — prompt changes only, no code.*
+
+**Story: The agent explains WHY, not just WHAT**
+> As a user, when I get a pick, I want to know why it's interesting tonight — not just the name, venue, and time.
+
+- [ ] Add metadata translation guide to system prompt: teach agent to speak about `source_vibe`, `venue_size`, `scarcity`, `editorial`, `interaction_format` in natural language
+  - `source_vibe "discovery"` → "this popped up on the underground radar"
+  - `venue_size "intimate"` → "tiny room, maybe 50 people, right up front"
+  - `scarcity "one-night-only"` → "one-off, not coming back"
+  - `editorial: true` → "a tastemaker picked this one out"
+  - `interaction_format "interactive"` → "you're not just watching, you're in it"
+- [ ] Rewrite system prompt examples from list-style to contrasting-picks style
+- [ ] Run scenario evals before/after to measure voice quality change
+
+**Story: Narrow by showing, not asking**
+> As a user, when I text a bare neighborhood, I want the agent to show me two contrasting options instead of asking me a generic vibe question.
+
+- [ ] Replace "ask one vibe question" prompt guidance with "narrow by contrasting picks"
+- [ ] Add mood-to-category mapping guidance: teach agent that "chill" means intimate venues + jazz/vinyl/film, "I want to dance" means dj/nightlife + medium-large venues
+- [ ] Add "acknowledge and build" pattern: every response references what the user just said
+- [ ] Update eval golden scenarios to reflect new conversation style
+
+**Story: Details that build trust**
+> As a user, when I ask for details about a pick, I want the response to lead with what the venue feels like, not just event metadata.
+
+- [ ] Add details structure to system prompt: venue experience → event → logistics → practical tip
+- [ ] Evaluate whether `composeDetails` in `ai.js` can be consolidated into the agent loop (agent has conversation context that `composeDetails` doesn't)
+
+### Phase 8: Venue Knowledge Layer (Data + Code)
+
+*Give the agent actual local knowledge about venues — the data that makes "feel like a local" possible.*
+
+**Story: The agent knows what venues feel like**
+> As a user, when I get a pick at Union Pool, I want to hear "sweaty dive bar, loud bands, cheap beer, gets packed by 9" — not just "Union Pool, Williamsburg."
+
+- [ ] Create `src/venue-knowledge.js` with structured venue profiles (vibe, known_for, crowd, tips, good_for)
+- [ ] Seed top 50 venues by frequency in event data (manual research + LLM-assisted draft, human reviewed)
+- [ ] Wire venue profiles into `serializePoolForContinuation()` — attach `venue_vibe` and `venue_tip` to each event
+- [ ] Wire venue profiles into details responses — `executeTool` for details intent looks up venue profile
+- [ ] Run scenario evals to verify agent uses venue knowledge naturally
+
+**Story: Yutori's editorial voice comes through**
+> As a user, when I get a pick that came from Yutori's newsletter, I want the agent to reference the editorial context — "Yutori called this the best kept secret in Bushwick" — not just a generic description.
+
+- [ ] Preserve source editorial blurbs through extraction as `editorial_note` field
+- [ ] Pass `editorial_note` to agent in pool serialization
+- [ ] Cache raw newsletter content in `.cache.json` alongside extracted events (enables re-extraction)
+
+**Story: Events in the "other" bucket become findable**
+> As a user looking for "art" or "something weird," I want events currently categorized as "other" to be properly classified so they show up in category searches.
+
+- [ ] Audit "other" category events — identify common reclassifiable types (immersive theater, sound baths, zine fairs, popup markets)
+- [ ] Add rules-based category remapping at extraction time
+- [ ] Measure: reduce "other" bucket from 41% to <20%
+
+### Phase 9: Serendipity + Personalization (Code)
+
+*The agent surprises you with something you didn't know you wanted, and gets smarter about you over time.*
+
+**Story: The wild card pick**
+> As a user asking for comedy in Bushwick, I want one of the picks to occasionally be something unexpected but great — a one-night-only interactive art show, a secret concert — that I never would have searched for.
+
+- [ ] Implement `scoreSurprise(event, userProfile)` — category distance, neighborhood distance, source obscurity, format novelty
+- [ ] Serendipity score = `quality * surprise` (quality from existing `scoreInterestingness`)
+- [ ] Prompt the agent to include a serendipity pick when available, framed naturally: "Also tonight — this weird thing at..."
+- [ ] Initially use global surprise signals (no user profile needed): discovery source + one-night-only + interactive = serendipitous for anyone
+
+**Story: Pulse remembers me across sessions**
+> As a returning user, I want Pulse to remember that I like jazz and Bushwick without me saying it every time.
+
+- [ ] Move preference data from ephemeral `preference-profile.js` to SQLite (keyed by hashed phone)
+- [ ] Store: neighborhood frequency, category frequency, time preferences, venue preferences, engagement rates
+- [ ] Inject persistent profile into `buildBrainSystemPrompt()` — agent sees lifetime patterns, not just last 2 hours
+- [ ] Feed persistent profiles into `scoreSurprise()` for personalized serendipity
+
+**Story: The agent adapts to how I decide**
+> As a user who always picks fast, I want fewer options. As a user who asks lots of questions, I want more context.
+
+- [ ] Track decision style signals: details-request rate, more-request rate, pivot rate, avg picks per session
+- [ ] Inject decision style into system prompt: "this user picks fast — be decisive, lead with one strong pick" vs. "this user explores — give more context and contrasts"
+
+### Phase 10: Proactive Outreach (Product)
+
+*Pulse texts you when something matches — the retention mechanism that makes SMS the right channel.*
+
+**Story: "There's a thing tonight you'd love"**
+> As an opted-in user, I want Pulse to text me once a week when there's a high-match event for my taste, without me having to initiate.
+
+- [ ] Proactive message scheduler: scan daily event cache against user profiles, identify high-confidence matches (>0.8)
+- [ ] Conservative cadence: 1 proactive message per week max
+- [ ] Track per-user response rate. Stop sending after 4 non-responses (don't wait for STOP).
+- [ ] Kill switch: pause feature if opt-out rate exceeds 3% for any cohort
+- [ ] TCPA compliance: explicit opt-in, immediate STOP processing
+
+**Story: Recurrence nudge**
+> As a user who went to trivia at Black Rabbit twice, I want Pulse to text me on Tuesday afternoon: "Black Rabbit has trivia again tonight. Want the details?"
+
+- [ ] Cross-reference recurring patterns DB with user attendance history
+- [ ] Trigger: user attended same recurring event 2+ times → eligible for nudge
+- [ ] Day/time: send 4-6 hours before event start
+
+### Phase 11: Data Layer Resilience (Infrastructure)
+
+*The data has to be trustworthy for the tastemaker voice to be trustworthy.*
+
+**Story: Scraper failures degrade gracefully**
+> As a system, when a source's markup changes, I want to detect partial degradation (not just total failure) and alert before coverage materially drops.
+
+- [ ] Source health scoring: rolling 7-day health per source (event count trend, extraction confidence avg, consecutive failures)
+- [ ] Auto-disable after 7 consecutive failures
+- [ ] Graduated alerting: yellow at 20% drop, red at 50% drop
+- [ ] Complete scrape resilience plan: volatile baseline (median not mean) for Yutori/NonsenseNYC, duplicate spike tolerance for multi-show venues
+
+**Story: Events are fresh when users actually text**
+> As a user texting at 8pm, I want today's data to include events posted after the 10am scrape — day-of announcements, cancellations, sold-out status.
+
+- [ ] Add 4pm ET scrape refresh for HTML sources (catches same-day updates with minimal architecture change)
+- [ ] Increase email polling frequency for newsletter sources to every 2 hours
+
+**Story: SMS quality doesn't silently degrade**
+> As a system, when a model update changes SMS composition behavior, I want to detect it before users notice.
+
+- [ ] Runtime quality sampling: async LLM judge on 5% of production SMS
+- [ ] 7-day rolling quality score with alert threshold (< 3.5/5.0)
+- [ ] Track character count distribution, pick count distribution, venue-knowledge usage rate
+
+**Story: Venue learning persists**
+> As a system, when I geocode a new venue, I want to remember it permanently instead of losing it on restart.
+
+- [ ] Wire `exportLearnedVenues()` to write to disk at end of scrape
+- [ ] Wire `importLearnedVenues()` on startup to warm the cache
+
+### Phase 12: Platform Expansion (Later)
+
+*The intelligence layer serves more surfaces and more cities.*
+
+- [ ] Web companion: browsable event page for longer sessions (SMS for discovery, web for depth)
+- [ ] Multi-channel: WhatsApp, iMessage (same agent, different transport)
+- [ ] Multi-city: only launch when 3+ editorial sources (weight >= 0.85) identified for the city. NYC → LA → Chicago.
+- [ ] Paid tier: Stripe billing, $5-10/month for unlimited + proactive alerts
+- [ ] Group planning: multi-user coordination via shareable pick list
 
 ---
 
@@ -110,170 +239,57 @@ Fallback chain: Gemini failure -> Anthropic Haiku.
 
 **Inactive (scrapers preserved):** OhMyRockness, SmallsLIVE, Ticketmaster, Tavily.
 
-### Category Gaps
+### Source gaps to address
 
-| Category | Coverage | Gap |
-|----------|----------|-----|
-| Electronic/dance | Strong (RA, Dice) | -- |
-| Indie/rock/punk | Good (Songkick, BrooklynVegan, Dice, Sofar) | -- |
-| Comedy | Good (TinyCupboard, BrooklynCC, EventbriteComedy, DoNYC, Dice) | 330 events from 10 sources |
-| Trivia | Good (NYC Trivia League, Yutori) | ~165 events/week |
-| Art/galleries | Moderate (EventbriteArts, Skint, Luma) | No gallery opening calendar |
-| Theater | Moderate (DoNYC, BAM, Dice) | No Broadway/off-Broadway source |
-| Community/social | Good (Luma, NYC Parks, Eventbrite, NYCTrivia) | -- |
-| Food/drink | Moderate (Luma) | Single source for food events |
-| Underground/DIY | Good (Nonsense NYC, Sofar Sounds, BKMag) | -- |
-| Jazz | Moderate (Skint, DoNYC) | -- |
-| Film | Good (Screen Slate, BAM, Skint Ongoing) | -- |
+| Category | Current coverage | Gap |
+|----------|-----------------|-----|
+| Comedy | Good (10 sources, 330 events) | No dedicated scraper for Comedy Cellar, UCB, Caveat |
+| Art/galleries | Moderate | No gallery opening calendar |
+| Food/drink | Moderate (Luma only) | Single source for food events |
+| Theater | Moderate (DoNYC, BAM, Dice) | No Broadway/off-Broadway (intentional — 70% tourist noise) |
 
 ---
 
-## Feature Roadmap
+## Completed Work
 
-### Agent-Native Evolution (Priority -- 6 phases)
+| Phase | Date | Summary |
+|-------|------|---------|
+| Phase 1: Unified Agent Loop | Mar 5 | Deleted unified-flow, model-router, pre-router, skills (~1,300 lines). One code path. |
+| Phase 2: Single-Turn Agent | Mar 5 | Merged routing + compose into single Gemini chat session. 99.2% code eval. |
+| Phase 3: Conversation History | Mar 5 | Structured history: tool calls, params, picks. Agent sees own decisions. History cap 6→10. |
+| Phase 4: Agent-Native Details/More | Mar 5 | Collapsed 3→2 tools. checkMechanical = help+TCPA only. Natural prose. ~310 lines removed. |
+| Phase 5: True Agent Loop | Mar 7 | `runAgentLoop` + `handleAgentRequest`. Deleted ~1000 lines. Model writes plain text SMS. |
+| Phase 6: Preference Learning (partial) | Mar 7 | User pick categories injected into agent context. Full profile injection planned (Phase 9). |
+| Community Layer Phase 1 | Mar 2 | Recurrence detection: 485 active patterns, 790 events stamped. |
+| Community Layer Phase 2 | Mar 3 | Venue size (200+ venues), interaction format, source vibe (4 tiers), editorial lean (51% discovery/niche). |
+| Scrape Guard | Mar 5 | Baseline gates, post-scrape audit, yesterday's cache fallback. |
+| Discovery Conversation | Mar 8 | Ask before recommending for vague requests. Vibe-first CTA. |
+| Prompt Hygiene | Mar 7 | Dead prompts deleted, examples trimmed, curation taste shared constant. 4 of 6 action items done. |
 
-**North star:** Pulse is a single agent loop that works with any tool-calling model, owns the full conversation, and builds a relationship with each user over time.
+### Prompt Hygiene — Open Items
 
-**Phase 1: Unified Agent Loop** -- **Done (2026-03-05)**
-
-Deleted unified-flow.js, model-router.js, pre-router.js, src/skills/. One code path: `callAgentBrain` with Gemini -> Claude fallback. `checkMechanical` extracted to agent-brain.js.
-
-**Phase 2: Single-Turn Agent** -- **Done (2026-03-05)**
-
-Merged routing + compose into a single Gemini chat session using multi-turn tool calling. The agent that understands user intent writes the SMS in the same generation via `functionResponse` continuation. `brainCompose` kept for `handleMore`. Fallback: `brainCompose` on continuation failure, Anthropic Haiku on Gemini failure. Code eval: 99.2% scenario, 98.4% regression.
-
-**Phase 3: Conversation History as State** -- **Partial (2026-03-05)**
-
-Added structured conversation history: tool calls (name + params), tool results (picks + match count + neighborhood), and user/assistant messages. Agent sees its own decisions across turns. History cap bumped 6 -> 10. Session fields kept for deterministic code -- removal deferred. Code eval: 98.6% regression (up from 98.4%).
-
-**Phase 4: Agent-Native Details and More** -- **Done (2026-03-05)**
-
-Collapsed tools from 3 to 2 (deleted `get_details`). `search_events` handles more/details via intent param + `pick_reference`. `checkMechanical` reduced to help + TCPA only. Numbered pick lists replaced with natural prose SMS. Agent references picks by number, name, venue, or category via fuzzy matching (`executeDetails`). ~310 lines of dead code removed from intent-handlers.js.
-
-**Phase 5: True Agent Loop** -- **Done (2026-03-07)**
-
-Replaced 400-line switch statement with true multi-turn agent loop. `runAgentLoop` in llm.js runs tool calling loop (max 3 iterations). `handleAgentRequest` in agent-loop.js orchestrates. Model calls tools, gets results, decides next action or writes plain text SMS. Deleted ~1000 lines: `callAgentBrain`, `brainCompose`, `welcomeCompose`, `continueWithResults`, `handleWelcome`, `handleMore`. Simplified system prompt. Agent writes SMS as plain text (no JSON wrapper, no separate compose).
-
-**Phase 6: Preference Learning in the Loop** -- The agent knows you
-
-- `preference-profile.js` data injected into agent system prompt
-- Agent adapts: discovery-heavy for explorers, community-focused for new-to-city users
-- Cross-session memory: "you went to trivia at Black Rabbit twice -- they have one tonight"
-
-### Community Layer
-
-**Phase 1: Recurrence detection** -- **Done (2026-03-02).** 485 active patterns, 790 events stamped `is_recurring`. LLM says "every Tues!" naturally.
-
-**Phase 2: Venue size + interaction format + source vibe + editorial voice** -- **Done (2026-03-03).** VENUE_SIZE map (200+ venues), `classifyInteractionFormat()` (keyword-specific), SOURCE_VIBE (4 tiers: discovery/niche/platform/mainstream), editorial lean in prompts + deterministic sort tiebreaker. 51% picks from discovery/niche sources (up from 28%).
-
-**Phase 3: Proactive persona capture** -- Planned. Detect community-seeking intent ("new here", "solo tonight"), amplify editorial lean, frame picks for joinability.
-
-### Source + Quality
-
-- Comedy source -- Dedicated scraper for Comedy Cellar, UCB, Caveat
-- Gallery/art source -- Gallery listing aggregator
-- Happy hour detection -- Surface as filterable category
-- Self-healing scraper pipeline -- **Partial (2026-03-05, revised 2026-03-07).** `scrape-guard.js`: baseline gates (count drift, field coverage drift, date sanity, duplicate spike) quarantine broken sources at scrape time. Post-scrape audit wires `checkSourceCompleteness` + `runExtractionAudit` to alerting. Yesterday's cached events serve as automatic fallback.
-  - **Open: Scrape resilience (2026-03-07)** -- Plan: `docs/plans/2026-03-07-scrape-resilience.md`. Four fixes: (1) volatile source baseline uses median not mean — stops false quarantine of Yutori/NonsenseNYC, (2) duplicate spike detection allows multi-show venues — stops false quarantine of TinyCupboard, (3) Yutori extraction garbage filters — reject non-events, streaming releases, venue-as-name, (4) Yutori category quality — add film category, reduce "other" bucket from 41%.
-  - **Open: Pipeline recovery (2026-03-07)** -- Plan: `docs/plans/2026-03-07-self-healing-pipeline.md`. Five steps: graduated alerting, per-source timeouts, retry on timeout, quarantine diagnostics, auto-disable after 7 failures.
-- Web discovery crawlers -- Targeted searches for niche events beyond whitelisted sources
-
-### Observability
-
-- **Latency tracking** -- Plan: `docs/plans/2026-03-07-latency-tracking.md`. Populate `brain_latency_ms` from `runAgentLoop`, per-iteration timing, `/api/health/latency` endpoint (p50/p95/p99/max + outliers), wire `latencyP95` into daily digest (replaces placeholder), enhanced slow-request logging with brain breakdown.
-
-### Infrastructure + Product
-
-- PostgreSQL -- Persistent event storage, user sessions, conversation history
-- Profile-based event ranking -- Re-rank tagged pool using user profile signals
-- Proactive user alerts -- Unsolicited texts for high-match events (opt-in, frequency caps)
-- Google Maps pins -- User asks "where are these?" or "map it" and Pulse generates a short link (via `/map/:id` redirect) to a Google Maps view with their current picks as pins. Lets users see spatial relationships between options to decide what's convenient. No routing or origin needed — just "here's where these 3 things are." Assumes: events have coords (via `venues.js`), user has picks in session (`lastPicks`), agent recognizes map intent via tool calling.
-- SMS map sharing -- Shareable map of picked event locations
-- Group planning / voting -- Multi-user coordination via shareable pick list
-- Paid tier -- Stripe billing, $5-10/month
-- Multi-city -- Same architecture, different sources
+| # | Action | Risk | Effort |
+|---|--------|------|--------|
+| 5 | Move filter_intent to deterministic code (derive from tool params) | Medium | Medium |
+| 6 | Add deterministic post-processing for price/day labels | Low | Small |
 
 ---
 
 ## Open Issues
-
-### Deferred (post-MVP)
 
 | Issue | Why deferred |
 |-------|-------------|
 | No processing ack during slow LLM calls | Adds extra Twilio cost |
 | No horizontal scalability | Single-process fine at current traffic |
 | No structured logging or correlation IDs | Operational improvement for scale |
-
----
-
-## Tech Debt
-
-| Item | Risk | Status |
-|------|------|--------|
-| ~~agent-brain.js is 1683 lines~~ | ~~Medium~~ | ~~Split into agent-brain.js (~450), brain-llm.js (~726), brain-execute.js (~561).~~ **Done (2026-03-05)** |
-| ~~Dead exports in pipeline.js~~ | ~~Low~~ | ~~`applyFilters`, `resolveActiveFilters` removed from exports. `normalizeFilterIntent` kept (tested).~~ **Done (2026-03-05)** |
-| ~~Stale comments in code-evals.js~~ | ~~Low~~ | ~~Code evals trimmed from 24 to 6 invariant checks. Old eval infrastructure archived.~~ **Done (2026-03-05)** |
-| ~~Stale comments in traces.js, agent-brain.js~~ | ~~Low~~ | ~~Updated for Phase 4 architecture.~~ **Done (2026-03-05)** |
-| Prompt hygiene (see below) | Medium | Audit completed 2026-03-07. 6 action items identified. |
-| Price data gap (21% unknown) | Low | Structurally unavailable from some sources |
-| No horizontal scalability | Low | Single-process, in-memory sessions |
-| Preference learning partially active | Low | User pick categories injected into agent context (2026-03-07). Full profile injection is Phase 6. |
-
-### Prompt Hygiene Audit (2026-03-07)
-
-Comprehensive review of all prompts in `prompts.js` and `brain-llm.js`. The prompts are not too long by absolute standards (~1500-1800 tokens each), but have structural issues that affect reliability.
-
-**Findings:**
-
-1. **Dual-role prompt (routing + composition):** `buildBrainSystemPrompt` asks Gemini Flash Lite to both route (classify intent, call tools) and compose (write natural SMS) in one system prompt. These are different cognitive tasks -- routing is classification (high reliability), composition is generation (lower reliability). Compose rules (~50% of the prompt) are invisible during routing and only activate after the tool result comes back.
-
-2. **Curation taste duplicated 3x:** The curation taste block (pick hierarchy, source signal, venue signal, skip rules, diversity, interactive bonus) was copy-pasted across `buildBrainSystemPrompt`, `BRAIN_COMPOSE_SYSTEM`, and `WELCOME_COMPOSE_SYSTEM`. `BRAIN_COMPOSE_SYSTEM` and `WELCOME_COMPOSE_SYSTEM` were deleted in Phase 5 (2026-03-07). `CURATION_TASTE_COMMON` shared constant created (action item #3).
-
-3. **`UNIFIED_SYSTEM`, `BRAIN_COMPOSE_SYSTEM`, `WELCOME_COMPOSE_SYSTEM` deleted:** All three prompts were deleted in Phase 5 (2026-03-07). The agent loop handles routing and composition in a single multi-turn flow -- no separate compose step. This finding is resolved.
-
-4. **Routing/compose split no longer relevant:** The agent loop (Phase 5) handles routing and composition in a single multi-turn flow. The model calls tools, gets results, and writes SMS as plain text. There is no separate compose prompt to inject via `functionResponse`. This finding is superseded by Phase 5 architecture.
-
-5. **Non-deterministic instructions for deterministic constraints:** Several rules are unreliable as prompt instructions:
-   - "Under 480 characters" -- LLMs can't count chars. `smartTruncate` backstops this (good).
-   - "EVERY pick MUST include price" -- ~80-90% compliance. Fails when source data lacks price.
-   - "Do NOT say 'Reply MORE' when is_last_batch" -- Negative instructions ~70-80% reliable.
-   - filter_intent classification (6 action types with edge cases) -- Most drift-prone area.
-
-6. **Numbered lists vs prose contradiction resolved:** `UNIFIED_SYSTEM` (deleted in Phase 5) said "Use numbered format." `buildBrainSystemPrompt` says "NOT a numbered list." No longer a contradiction -- `UNIFIED_SYSTEM` was removed.
-
-**Action items (ordered by impact):**
-
-| # | Action | Risk | Effort | Rationale |
-|---|--------|------|--------|-----------|
-| ~~1~~ | ~~Verify `UNIFIED_SYSTEM` usage; delete if dead~~ | ~~None~~ | ~~Small~~ | **Done (2026-03-07).** Already removed from prompts.js. |
-| ~~2~~ | ~~Trim routing examples to 5-8~~ | ~~Low~~ | ~~Small~~ | **Done (2026-03-07).** Trimmed to 11 focused examples covering key edge cases. |
-| ~~3~~ | ~~Extract curation taste into shared constant~~ | ~~None~~ | ~~Small~~ | **Done (2026-03-07).** `CURATION_TASTE_COMMON` shared across 3 prompts. |
-| ~~4~~ | ~~Separate routing prompt from compose prompt~~ | ~~Medium~~ | ~~Medium~~ | **Superseded (2026-03-07).** Phase 5 agent loop eliminated the routing/compose split. No separate compose step exists. |
-| 5 | Move filter_intent to deterministic code | Medium | Medium | Derive from tool params (intent="pivot" -> clear filters). Aligns with P1. Risk: edge cases in "nvm"/"forget it" disambiguation. |
-| 6 | Add deterministic post-processing for price/day labels | Low | Small | Like `smartTruncate` but for other constraints. Backstop, not replacement. |
-
-**Risk assessment:** Items 1-4 are done or superseded by Phase 5. Item 5 changes the LLM interaction pattern and should be gated behind eval runs (before/after comparison on the 417-scenario golden dataset). Item 6 is additive safety net.
-
----
-
-## Completed Work (Summary)
-
-| Period | Highlights |
-|--------|-----------|
-| Mar 7 | **Agent loop refactor**: replaced 400-line switch statement with true multi-turn agent loop (`runAgentLoop` in llm.js, `handleAgentRequest` in agent-loop.js). Model calls tools, gets results, decides next action or writes SMS as plain text. Deleted ~1000 lines: `handleAgentBrainRequest`, `brainCompose`, `welcomeCompose`, `continueWithResults`, `handleWelcome`, `callAgentBrain`. Simplified system prompt (removed routing rules, let model use judgment). **Welcome experience restored**: `show_welcome` tool — agent-routed, deterministically-executed. New users get top 3 picks on first greeting ($0, sub-second). CTA shifted from "text me a neighborhood" to "tell me what you're in the mood for" (vibe-first). Agent curation: taste prompt in all compose paths, pool widened 15→40, time-aware filtering (6h window), editorial_signal + scarcity extraction metadata, discovery-source editorial stamp, pick reasoning observability (Tasks 1-6), user pick history in agent context, prompt hygiene #1-3 complete. POV doc: `docs/plans/2026-03-06-agent-curation-pov.md`. Scrape fixes: price removed from welcome picks, `isGarbageName` quality gate, inactive source pruning bug (Skint/NYCParks), source eval labels (SkintOngoing/ScreenSlate), RA `is_free` fix (uses `isTicketed` fallback). |
-| Mar 5 | Phase 1-4 complete. Codebase audit: dead exports removed (pipeline.js), stale pre-router comments cleaned (code-evals.js, traces.js, agent-brain.js), CLAUDE.md/AGENTS.md/ROADMAP.md synced to Phase 4 (2 tools, checkMechanical = help+TCPA only). Scrape guard (baseline gates + post-scrape audit). First-message welcome flow. Quality eval runner + browse page. |
-| Mar 3 | Eval suite audit (34 new scenarios, 417 total). Community layer Phase 2 (editorial voice, source vibe, venue size, interaction format). Skint multi-day parsing. Description coverage for Luma/Songkick/DoNYC. |
-| Mar 2 | Agent brain (`agent-brain.js`) with 99.9% code eval. Cross-source recurrence detection (485 patterns). Gemini Flash fallback chain. Broad query support (citywide + date range). New sources: Tiny Cupboard, Brooklyn Comedy Collective, NYC Trivia League, BK Mag, Sofar Sounds. EventbriteComedy fix (0 -> 55 events). |
-| Mar 1 | Prompt audit (tool_use, tone reduction, shared sections). Structural filter drift fix (Step 2b). Degraded-mode fallback. Code eval accuracy overhaul (99.8%). Fragility audit (16 issues fixed). New sources: Luma, Screen Slate, Skint Ongoing. Dice multi-category. Scrape audit dashboards. Price coverage 27% -> 79%. Neighborhood resolution gap 171 -> 80. SQLite event store. 286 golden scenarios. |
-| Feb 21-28 | Unified LLM + tagged pool. Atomic session frames. Compound pre-router. Three-tier soft match. Deterministic state derivation (8->4 LLM fields). Gemini Flash switch. Session persistence. Referral cards. User preference profiles. |
+| Price data gap (21% unknown) | Structurally unavailable from some sources |
 
 ---
 
 ## Not Building
 
-- Yelp/Foursquare venue DB -- Google Places covers venue metadata needs
-- X/Twitter -- expensive API, poor geo, ToS risk
-- Time Out NY -- aggressive anti-bot, DoNYC covers similar
-- Untargeted general web crawling -- whitelist sources only
-- Real-time scraping -- SMS users don't need sub-daily freshness
+- Yelp/Foursquare venue DB — Google Places covers venue metadata needs
+- X/Twitter — expensive API, poor geo, ToS risk
+- Time Out NY — aggressive anti-bot, DoNYC covers similar
+- Untargeted general web crawling — whitelist sources only
+- Broadway/off-Broadway — 70% tourist noise, doesn't fit "feel like a local"
