@@ -130,6 +130,24 @@ function normalizeDateTimeFields(e) {
   }
 }
 
+/**
+ * Map non-canonical LLM-extracted categories to canonical ones.
+ * Canonical set: comedy, live_music, nightlife, art, theater, community,
+ * trivia, film, food_drink, spoken_word, other.
+ */
+const CATEGORY_CANON = {
+  music: 'live_music',
+  film: 'art',
+  dance: 'nightlife',
+  market: 'community',
+  literature: 'spoken_word',
+};
+
+function canonicalizeCategory(cat) {
+  if (!cat) return 'other';
+  return CATEGORY_CANON[cat] || cat;
+}
+
 function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
   normalizeDateTimeFields(e);
   const id = makeEventId(e.name, e.venue_name, e.date_local || e.start_time_local || '', sourceName, e.source_url, e.start_time_local);
@@ -167,10 +185,11 @@ function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
     time_window: e.time_window || null,
     is_free: e.is_free === true,
     price_display: e.price_display || null,
-    category: e.category === 'music' ? 'live_music'
-      : e.category === 'film' ? 'art'
-      : (e.category || 'other'),
+    category: canonicalizeCategory(e.category),
     subcategory: e.category === 'film' ? 'film'
+      : e.category === 'dance' ? 'dance'
+      : e.category === 'literature' ? 'literature'
+      : e.category === 'market' ? 'market'
       : (e.subcategory || null),
     extraction_confidence: e.extraction_confidence ?? e.confidence ?? null,
     completeness: computeCompleteness({

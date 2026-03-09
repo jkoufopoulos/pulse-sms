@@ -10,6 +10,61 @@ const { computeCompleteness, backfillEvidence, backfillDateTimes } = require('./
 const { captureExtractionInput, getExtractionInputs, clearExtractionInputs } = require('./extraction-capture');
 const { checkBaseline } = require('./scrape-guard');
 
+// ============================================================
+// Category remap + canonicalization (must be above boot code)
+// ============================================================
+
+const OTHER_REMAP_RULES = [
+  { pattern: /\b(sound bath|meditation|breathwork|yoga|wellness|healing)\b/i, category: 'community' },
+  { pattern: /\b(zine|popup market|pop-?up market|flea market|flea|vintage market|craft fair|bazaar|swap meet)\b/i, category: 'community' },
+  { pattern: /\b(workshop|class(?:es)?|seminar|lecture|talk(?:s)?)\b/i, category: 'community' },
+  { pattern: /\b(immersive|performance art|cabaret|burlesque|variety show|drag show|drag)\b/i, category: 'theater' },
+  { pattern: /\b(film|movie|screening|cinema|documentary|short films)\b/i, category: 'film' },
+  { pattern: /\b(vinyl night|dance party|disco|dj\b|dj set|club night|rave|techno night|house night)\b/i, category: 'nightlife' },
+  { pattern: /\b(jazz|acoustic|live band|songwriter|bluegrass|folk music|orchestra|ensemble|quartet|trio)\b/i, category: 'live_music' },
+  { pattern: /\b(trivia|quiz|game night|board game|bingo|karaoke)\b/i, category: 'trivia' },
+  { pattern: /\b(gallery|exhibition|art show|art opening|mural|sculpture)\b/i, category: 'art' },
+  { pattern: /\b(book reading|poetry|spoken word|storytelling|literary|book launch|reading series|open mic.*poet)\b/i, category: 'spoken_word' },
+  { pattern: /\b(wine tasting|supper club|food popup|food pop-?up|tasting|beer fest|cocktail|brunch)\b/i, category: 'food_drink' },
+];
+
+function remapOtherCategory(event) {
+  if (event.category !== 'other') return event;
+  const text = `${event.name || ''} ${event.description_short || event.short_detail || ''}`.toLowerCase();
+  for (const rule of OTHER_REMAP_RULES) {
+    if (rule.pattern.test(text)) {
+      event.category = rule.category;
+      return event;
+    }
+  }
+  return event;
+}
+
+const CATEGORY_CANON = {
+  music: 'live_music',
+  film: 'art',
+  dance: 'nightlife',
+  market: 'community',
+  literature: 'spoken_word',
+};
+
+function remapOtherCategories(events) {
+  let remapped = 0;
+  let canonicalized = 0;
+  for (const e of events) {
+    if (e.category && CATEGORY_CANON[e.category]) {
+      if (!e.subcategory) e.subcategory = e.category;
+      e.category = CATEGORY_CANON[e.category];
+      canonicalized++;
+    }
+    const before = e.category;
+    remapOtherCategory(e);
+    if (e.category !== before) remapped++;
+  }
+  if (remapped > 0) console.log(`Category remap: ${remapped} events moved from "other" to specific categories`);
+  if (canonicalized > 0) console.log(`Category canonicalization: ${canonicalized} non-standard categories normalized`);
+}
+
 /**
  * Stamp is_recurring + recurrence_label on events that match active recurring patterns.
  * Uses a Set lookup of pattern_keys — no per-event DB query.
@@ -346,6 +401,7 @@ if (eventCache.length === 0) {
     if (cached.events?.length > 0) {
       backfillEvidence(cached.events);
       backfillDateTimes(cached.events);
+      remapOtherCategories(cached.events);
       eventCache = cached.events;
       cacheTimestamp = cached.timestamp || 0;
       const ageMin = cacheTimestamp ? Math.round((Date.now() - cacheTimestamp) / 60000) : '?';
@@ -854,59 +910,7 @@ async function refreshSources(sourceNames, { reprocess = false } = {}) {
 // Main entry: get events for a neighborhood (reads from cache)
 // ============================================================
 
-/**
- * Remap events with category "other" to a specific category based on name/description patterns.
- * Mutates events in place. Only touches category === 'other'.
- */
-const OTHER_REMAP_RULES = [
-  // Community / wellness / markets
-  { pattern: /\b(sound bath|meditation|breathwork|yoga|wellness|healing)\b/i, category: 'community' },
-  { pattern: /\b(zine|popup market|pop-?up market|flea market|flea|vintage market|craft fair|bazaar|swap meet)\b/i, category: 'community' },
-  { pattern: /\b(workshop|class(?:es)?|seminar|lecture|talk(?:s)?)\b/i, category: 'community' },
-  // Theater / performance
-  { pattern: /\b(immersive|performance art|cabaret|burlesque|variety show|drag show|drag)\b/i, category: 'theater' },
-  // Film
-  { pattern: /\b(film|movie|screening|cinema|documentary|short films)\b/i, category: 'film' },
-  // Nightlife
-  { pattern: /\b(vinyl night|dance party|disco|dj\b|dj set|club night|rave|techno night|house night)\b/i, category: 'nightlife' },
-  // Live music
-  { pattern: /\b(jazz|acoustic|live band|songwriter|bluegrass|folk music|orchestra|ensemble|quartet|trio)\b/i, category: 'live_music' },
-  // Trivia / games
-  { pattern: /\b(trivia|quiz|game night|board game|bingo|karaoke)\b/i, category: 'trivia' },
-  // Art
-  { pattern: /\b(gallery|exhibition|art show|art opening|mural|sculpture)\b/i, category: 'art' },
-  // Spoken word / literary
-  { pattern: /\b(book reading|poetry|spoken word|storytelling|literary|book launch|reading series|open mic.*poet)\b/i, category: 'spoken_word' },
-  // Food & drink
-  { pattern: /\b(wine tasting|supper club|food popup|food pop-?up|tasting|beer fest|cocktail|brunch)\b/i, category: 'food_drink' },
-];
-
-function remapOtherCategory(event) {
-  if (event.category !== 'other') return event;
-  const text = `${event.name || ''} ${event.description_short || event.short_detail || ''}`.toLowerCase();
-  for (const rule of OTHER_REMAP_RULES) {
-    if (rule.pattern.test(text)) {
-      event.category = rule.category;
-      return event;
-    }
-  }
-  return event;
-}
-
-/**
- * Remap all "other" category events in an array. Mutates in place, logs count.
- */
-function remapOtherCategories(events) {
-  let remapped = 0;
-  for (const e of events) {
-    const before = e.category;
-    remapOtherCategory(e);
-    if (e.category !== before) remapped++;
-  }
-  if (remapped > 0) {
-    console.log(`Category remap: ${remapped} events moved from "other" to specific categories`);
-  }
-}
+/* remapOtherCategory / remapOtherCategories moved above boot code — see top of file */
 
 /**
  * Quality-gate filter — shared between getEvents and getEventsCitywide.
