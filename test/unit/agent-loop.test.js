@@ -64,7 +64,7 @@ const { buildBrainSystemPrompt } = require('../../src/brain-llm');
 
 const freshSession = {};
 const freshPrompt = buildBrainSystemPrompt(freshSession);
-check('fresh session prompt contains first-message indicator', freshPrompt.includes('First message — new session'));
+check('fresh session prompt contains first-message indicator', freshPrompt.includes('First message — new user'));
 
 const returningSession = { conversationHistory: [{ role: 'user', content: 'hey' }], lastNeighborhood: 'bushwick' };
 const returningPrompt = buildBrainSystemPrompt(returningSession);
