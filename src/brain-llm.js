@@ -117,8 +117,10 @@ const BRAIN_TOOLS = [
 
 function buildBrainSystemPrompt(session) {
   const isFirstMessage = !session?.conversationHistory?.length && !session?.lastNeighborhood;
+  const nycNow = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', weekday: 'short', month: 'short', day: 'numeric' });
   const sessionContext = session
     ? [
+      `Current time in NYC: ${nycNow}`,
       isFirstMessage ? 'First message — new session. Use show_welcome for casual greetings.' : null,
       session.lastNeighborhood ? `Current neighborhood: ${session.lastNeighborhood}` : null,
       session.lastFilters && Object.values(session.lastFilters).some(Boolean)

@@ -403,10 +403,12 @@ async function buildSearchPool(params, session, phone, trace) {
     };
   }
 
-  // Compute excludeIds and suggestedHood for compose
+  // Remove previously-shown events from the pool so model never recycles picks
   const prevPickIds = (session?.allPicks || session?.lastPicks || []).map(p => p.event_id);
   const prevOfferedIds = session?.allOfferedIds || [];
   const excludeIds = [...new Set([...prevPickIds, ...prevOfferedIds])];
+  const excludeSet = new Set(excludeIds);
+  events = events.filter(e => !excludeSet.has(e.id));
   const suggestedHood = (isSparse || matchCount === 0) && nearbyHoods.length > 0 ? nearbyHoods[0] : null;
 
   // 7. Compute nearby highlight from full scored pool
@@ -493,37 +495,23 @@ function formatWelcomePick(event, rank) {
 }
 
 /**
- * Execute the show_welcome tool: fetch top picks, format deterministically.
- * Returns { smsText, picks, eventMap } or { smsText } (fallback, no events).
+ * Execute the show_welcome tool: fetch top picks for model to compose.
+ * Returns { topEvents, picks, eventMap }. Model composes the SMS.
  */
 async function executeWelcome() {
   const { getTopPicks } = require('./events');
   const topEvents = await getTopPicks(5);
 
-  if (topEvents.length === 0) {
-    return {
-      smsText: "Hey, I'm Pulse \u2014 your plugged-in friend for NYC nightlife. Tell me what you're in the mood for tonight.",
-      picks: [],
-      eventMap: {},
-    };
-  }
-
-  const picks3 = topEvents.slice(0, 3);
-  const pickLines = picks3.map((e, i) => formatWelcomePick(e, i + 1));
-  const smsText = smartTruncate(
-    `I'm Pulse \u2014 here's what's good tonight:\n\n${pickLines.join('\n')}\n\nAny of those? Or tell me what you're in the mood for`
-  );
-
   const eventMap = {};
   for (const e of topEvents) eventMap[e.id] = e;
 
-  const picks = picks3.map((e, i) => ({
+  const picks = topEvents.slice(0, 3).map((e, i) => ({
     rank: i + 1,
     event_id: e.id,
     why: `interestingness: ${e.interestingness}, ${e.source_vibe || 'unknown'} source`,
   }));
 
-  return { smsText, picks, eventMap };
+  return { topEvents, picks, eventMap };
 }
 
 // --- Pool curation: score and trim to top N ---
