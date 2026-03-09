@@ -222,4 +222,4 @@ function clearSessionInterval() {
   }
 }
 
-module.exports = { getSession, setSession, setResponseState, clearSession, addToHistory, clearSessionInterval, loadSessions, flushSessions, acquireLock };
+module.exports = { getSession, setSession, setResponseState, clearSession, addToHistory, clearSessionInterval, loadSessions, flushSessions, acquireLock, hashPhone };

@@ -529,4 +529,212 @@ function upsertEvents(db, events) {
   testDb.close();
 }
 
+// ============================================================
+// scraped_events tests
+// ============================================================
+
+function createTestDbWithHistory() {
+  const db = createTestDb();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS scraped_events (
+      event_id TEXT NOT NULL,
+      scraped_date TEXT NOT NULL,
+      source_name TEXT,
+      name TEXT,
+      venue_name TEXT,
+      neighborhood TEXT,
+      date_local TEXT,
+      start_time_local TEXT,
+      category TEXT,
+      subcategory TEXT,
+      is_free INTEGER DEFAULT 0,
+      price_display TEXT,
+      source_weight REAL,
+      extraction_confidence REAL,
+      completeness REAL,
+      description_short TEXT,
+      source_url TEXT,
+      ticket_url TEXT,
+      editorial_note TEXT,
+      data_json TEXT,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (event_id, scraped_date)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_scraped_venue_date ON scraped_events(venue_name, date_local);
+    CREATE INDEX IF NOT EXISTS idx_scraped_cat_hood_date ON scraped_events(category, neighborhood, date_local);
+    CREATE INDEX IF NOT EXISTS idx_scraped_scraped_date ON scraped_events(scraped_date);
+
+    CREATE TABLE IF NOT EXISTS event_recommendations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      phone_hash TEXT NOT NULL,
+      event_id TEXT NOT NULL,
+      recommended_at TEXT NOT NULL,
+      user_engaged INTEGER DEFAULT 0
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_recs_phone ON event_recommendations(phone_hash, recommended_at);
+    CREATE INDEX IF NOT EXISTS idx_recs_event ON event_recommendations(event_id);
+  `);
+  return db;
+}
+
+// 20. scraped_events: basic insert
+{
+  console.log('\nScraped events (historical persistence):');
+
+  const db = createTestDbWithHistory();
+  const now = new Date().toISOString();
+  const e = makeTestEvent({ date_local: '2026-03-10' });
+
+  db.prepare(`
+    INSERT OR IGNORE INTO scraped_events (event_id, scraped_date, source_name, name, venue_name,
+      neighborhood, date_local, category, is_free, data_json, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(e.id, '2026-03-10', e.source_name, e.name, e.venue_name,
+    e.neighborhood, e.date_local, e.category, e.is_free ? 1 : 0, JSON.stringify(e), now);
+
+  const rows = db.prepare('SELECT * FROM scraped_events').all();
+  check('scraped_events: insert works', rows.length === 1);
+  check('scraped_events: event_id matches', rows[0].event_id === e.id);
+  check('scraped_events: scraped_date matches', rows[0].scraped_date === '2026-03-10');
+  db.close();
+}
+
+// 21. scraped_events: dedup key (event_id + scraped_date) enforced
+{
+  const db = createTestDbWithHistory();
+  const now = new Date().toISOString();
+  const e = makeTestEvent({ date_local: '2026-03-10' });
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO scraped_events (event_id, scraped_date, source_name, name, venue_name,
+      neighborhood, date_local, category, is_free, data_json, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  // Same event, same scraped_date — should be ignored
+  insert.run(e.id, '2026-03-10', e.source_name, e.name, e.venue_name,
+    e.neighborhood, e.date_local, e.category, 0, '{}', now);
+  insert.run(e.id, '2026-03-10', e.source_name, e.name, e.venue_name,
+    e.neighborhood, e.date_local, e.category, 0, '{}', now);
+
+  const count = db.prepare('SELECT COUNT(*) as n FROM scraped_events').get().n;
+  check('scraped_events: dedup key prevents duplicate', count === 1);
+
+  // Same event, different scraped_date — should insert
+  insert.run(e.id, '2026-03-11', e.source_name, e.name, e.venue_name,
+    e.neighborhood, e.date_local, e.category, 0, '{}', now);
+
+  const count2 = db.prepare('SELECT COUNT(*) as n FROM scraped_events').get().n;
+  check('scraped_events: different scraped_date allows insert', count2 === 2);
+  db.close();
+}
+
+// 22. scraped_events: data_json round-trip
+{
+  const db = createTestDbWithHistory();
+  const now = new Date().toISOString();
+  const e = makeTestEvent({ date_local: '2026-03-10', editorial_note: 'Tastemaker pick' });
+
+  db.prepare(`
+    INSERT OR IGNORE INTO scraped_events (event_id, scraped_date, source_name, name, venue_name,
+      neighborhood, date_local, category, is_free, editorial_note, data_json, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(e.id, '2026-03-10', e.source_name, e.name, e.venue_name,
+    e.neighborhood, e.date_local, e.category, 0, e.editorial_note, JSON.stringify(e), now);
+
+  const row = db.prepare('SELECT * FROM scraped_events WHERE event_id = ?').get(e.id);
+  const restored = JSON.parse(row.data_json);
+  check('scraped_events: data_json preserves full event', restored.name === e.name);
+  check('scraped_events: editorial_note stored', row.editorial_note === 'Tastemaker pick');
+  db.close();
+}
+
+// ============================================================
+// event_recommendations tests
+// ============================================================
+
+// 23. event_recommendations: insert
+{
+  console.log('\nEvent recommendations:');
+
+  const db = createTestDbWithHistory();
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    INSERT INTO event_recommendations (phone_hash, event_id, recommended_at, user_engaged)
+    VALUES (?, ?, ?, 0)
+  `).run('abc123hash', 'evt-001', now);
+
+  const rows = db.prepare('SELECT * FROM event_recommendations').all();
+  check('recommendations: insert works', rows.length === 1);
+  check('recommendations: phone_hash matches', rows[0].phone_hash === 'abc123hash');
+  check('recommendations: event_id matches', rows[0].event_id === 'evt-001');
+  check('recommendations: user_engaged defaults to 0', rows[0].user_engaged === 0);
+  db.close();
+}
+
+// 24. event_recommendations: update user_engaged
+{
+  const db = createTestDbWithHistory();
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    INSERT INTO event_recommendations (phone_hash, event_id, recommended_at, user_engaged)
+    VALUES (?, ?, ?, 0)
+  `).run('abc123hash', 'evt-001', now);
+
+  db.prepare(`
+    UPDATE event_recommendations SET user_engaged = 1
+    WHERE phone_hash = ? AND event_id = ? AND user_engaged = 0
+  `).run('abc123hash', 'evt-001');
+
+  const row = db.prepare('SELECT * FROM event_recommendations WHERE event_id = ?').get('evt-001');
+  check('recommendations: user_engaged updated to 1', row.user_engaged === 1);
+  db.close();
+}
+
+// 25. event_recommendations: multiple events for same phone
+{
+  const db = createTestDbWithHistory();
+  const now = new Date().toISOString();
+
+  const insert = db.prepare(`
+    INSERT INTO event_recommendations (phone_hash, event_id, recommended_at, user_engaged)
+    VALUES (?, ?, ?, 0)
+  `);
+
+  insert.run('user1hash', 'evt-001', now);
+  insert.run('user1hash', 'evt-002', now);
+  insert.run('user2hash', 'evt-001', now);
+
+  const user1 = db.prepare('SELECT * FROM event_recommendations WHERE phone_hash = ?').all('user1hash');
+  check('recommendations: multiple events per phone', user1.length === 2);
+
+  const evt1 = db.prepare('SELECT * FROM event_recommendations WHERE event_id = ?').all('evt-001');
+  check('recommendations: same event to multiple phones', evt1.length === 2);
+  db.close();
+}
+
+// 26. event_recommendations: engage only updates unengaged
+{
+  const db = createTestDbWithHistory();
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    INSERT INTO event_recommendations (phone_hash, event_id, recommended_at, user_engaged)
+    VALUES (?, ?, ?, 1)
+  `).run('abc123hash', 'evt-001', now);
+
+  // Second update should be a no-op (already engaged)
+  const result = db.prepare(`
+    UPDATE event_recommendations SET user_engaged = 1
+    WHERE phone_hash = ? AND event_id = ? AND user_engaged = 0
+  `).run('abc123hash', 'evt-001');
+
+  check('recommendations: engage idempotent (no changes on already-engaged)', result.changes === 0);
+  db.close();
+}
+
 module.exports = {};

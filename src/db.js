@@ -113,6 +113,46 @@ function runMigrations(db) {
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_saved ON conversations(saved_at);
+
+    CREATE TABLE IF NOT EXISTS scraped_events (
+      event_id TEXT NOT NULL,
+      scraped_date TEXT NOT NULL,
+      source_name TEXT,
+      name TEXT,
+      venue_name TEXT,
+      neighborhood TEXT,
+      date_local TEXT,
+      start_time_local TEXT,
+      category TEXT,
+      subcategory TEXT,
+      is_free INTEGER DEFAULT 0,
+      price_display TEXT,
+      source_weight REAL,
+      extraction_confidence REAL,
+      completeness REAL,
+      description_short TEXT,
+      source_url TEXT,
+      ticket_url TEXT,
+      editorial_note TEXT,
+      data_json TEXT,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (event_id, scraped_date)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_scraped_venue_date ON scraped_events(venue_name, date_local);
+    CREATE INDEX IF NOT EXISTS idx_scraped_cat_hood_date ON scraped_events(category, neighborhood, date_local);
+    CREATE INDEX IF NOT EXISTS idx_scraped_scraped_date ON scraped_events(scraped_date);
+
+    CREATE TABLE IF NOT EXISTS event_recommendations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      phone_hash TEXT NOT NULL,
+      event_id TEXT NOT NULL,
+      recommended_at TEXT NOT NULL,
+      user_engaged INTEGER DEFAULT 0
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_recs_phone ON event_recommendations(phone_hash, recommended_at);
+    CREATE INDEX IF NOT EXISTS idx_recs_event ON event_recommendations(event_id);
   `);
 
   // Migration: add normalized_name column for recurrence detection
@@ -682,6 +722,112 @@ function getSavedConversations(id) {
   ).all();
 }
 
+// --- Scraped events (historical persistence) ---
+
+/**
+ * Batch insert events into scraped_events for historical persistence.
+ * Uses INSERT OR IGNORE so (event_id, scraped_date) dedup is enforced.
+ * This is append-only storage — not used in the serving hot path.
+ */
+function insertScrapedEvents(events, scrapedDate) {
+  if (!events?.length) return 0;
+  const d = getDb();
+  const date = scrapedDate || new Date().toISOString().slice(0, 10);
+  const now = new Date().toISOString();
+
+  const insert = d.prepare(`
+    INSERT OR IGNORE INTO scraped_events (
+      event_id, scraped_date, source_name, name, venue_name, neighborhood,
+      date_local, start_time_local, category, subcategory, is_free, price_display,
+      source_weight, extraction_confidence, completeness, description_short,
+      source_url, ticket_url, editorial_note, data_json, created_at
+    ) VALUES (
+      @event_id, @scraped_date, @source_name, @name, @venue_name, @neighborhood,
+      @date_local, @start_time_local, @category, @subcategory, @is_free, @price_display,
+      @source_weight, @extraction_confidence, @completeness, @description_short,
+      @source_url, @ticket_url, @editorial_note, @data_json, @created_at
+    )
+  `);
+
+  const tx = d.transaction((rows) => {
+    let count = 0;
+    for (const row of rows) {
+      const result = insert.run(row);
+      count += result.changes;
+    }
+    return count;
+  });
+
+  const rows = events.map(e => ({
+    event_id: e.id,
+    scraped_date: date,
+    source_name: e.source_name || null,
+    name: e.name || null,
+    venue_name: e.venue_name || null,
+    neighborhood: e.neighborhood || null,
+    date_local: e.date_local || null,
+    start_time_local: e.start_time_local || null,
+    category: e.category || null,
+    subcategory: e.subcategory || null,
+    is_free: e.is_free ? 1 : 0,
+    price_display: e.price_display || null,
+    source_weight: e.source_weight ?? null,
+    extraction_confidence: e.extraction_confidence ?? null,
+    completeness: e.completeness ?? null,
+    description_short: e.description_short || e.short_detail || null,
+    source_url: e.source_url || null,
+    ticket_url: e.ticket_url || null,
+    editorial_note: e.editorial_note || null,
+    data_json: JSON.stringify(e),
+    created_at: now,
+  }));
+
+  const inserted = tx(rows);
+  if (inserted > 0) {
+    console.log(`Persisted ${inserted} events to scraped_events (date: ${date})`);
+  }
+  return inserted;
+}
+
+// --- Event recommendations ---
+
+/**
+ * Record that events were recommended to a user.
+ * phone_hash should be SHA-256 prefix (same as session.js hashPhone).
+ */
+function insertRecommendations(phoneHash, eventIds) {
+  if (!phoneHash || !eventIds?.length) return 0;
+  const d = getDb();
+  const now = new Date().toISOString();
+
+  const insert = d.prepare(`
+    INSERT INTO event_recommendations (phone_hash, event_id, recommended_at, user_engaged)
+    VALUES (?, ?, ?, 0)
+  `);
+
+  const tx = d.transaction((ids) => {
+    for (const id of ids) {
+      insert.run(phoneHash, id, now);
+    }
+    return ids.length;
+  });
+
+  return tx(eventIds);
+}
+
+/**
+ * Mark that a user engaged with a recommended event (asked for details, responded positively).
+ */
+function markRecommendationEngaged(phoneHash, eventId) {
+  if (!phoneHash || !eventId) return;
+  const d = getDb();
+  d.prepare(`
+    UPDATE event_recommendations SET user_engaged = 1
+    WHERE phone_hash = ? AND event_id = ?
+    AND user_engaged = 0
+  `).run(phoneHash, eventId);
+}
+
 module.exports = {
   getDb,
   closeDb,
@@ -705,6 +851,9 @@ module.exports = {
   getYesterdayDigest,
   saveConversationToDb,
   getSavedConversations,
+  insertScrapedEvents,
+  insertRecommendations,
+  markRecommendationEngaged,
   // Exposed for testing
   makePatternKey,
   normalizePatternName,

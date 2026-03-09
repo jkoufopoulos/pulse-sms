@@ -19,7 +19,7 @@ const { buildSearchPool, executeMore, executeWelcome } = require('./brain-execut
 const { buildEventMap, saveResponseFrame, buildExhaustionMessage, sendPickUrls } = require('./pipeline');
 const { sendSMS, maskPhone } = require('./twilio');
 const { recordAICost } = require('./traces');
-const { getSession, setSession, addToHistory } = require('./session');
+const { getSession, setSession, addToHistory, hashPhone } = require('./session');
 const { trackAICost } = require('./request-guard');
 const { updateProfile } = require('./preference-profile');
 const { smartTruncate, injectMissingPrices } = require('./formatters');
@@ -380,9 +380,18 @@ function saveSessionFromToolCalls(phone, session, toolCalls, smsText) {
   // Zero match — already saved in buildSearchPool
   if (result?._zeroMatch) return;
 
-  // Details — don't change picks/neighborhood
+  // Details — don't change picks/neighborhood, but track engagement
   if (intent === 'details') {
-    // No session change for details — picks stay the same
+    try {
+      const db = require('./db');
+      const ph = hashPhone(phone);
+      // Mark all lastPicks as engaged — the user showed interest
+      for (const pick of (session?.lastPicks || [])) {
+        if (pick.event_id) db.markRecommendationEngaged(ph, pick.event_id);
+      }
+    } catch (err) {
+      console.warn('engagement tracking failed:', err.message);
+    }
     return;
   }
 
@@ -421,6 +430,17 @@ function saveSessionFromToolCalls(phone, session, toolCalls, smsText) {
         ? { neighborhood: moreResult.suggestions[0], filters: moreResult.activeFilters || {} }
         : null,
     });
+
+    // Track more recommendations
+    const morePickIds = morePicks.map(p => p.event_id).filter(Boolean);
+    if (morePickIds.length > 0) {
+      try {
+        const db = require('./db');
+        db.insertRecommendations(hashPhone(phone), morePickIds);
+      } catch (err) {
+        console.warn('recommendation tracking (more) failed:', err.message);
+      }
+    }
     return;
   }
 
@@ -447,6 +467,17 @@ function saveSessionFromToolCalls(phone, session, toolCalls, smsText) {
 
   updateProfile(phone, { neighborhood: poolResult.hood, filters: poolResult.activeFilters, responseType: 'event_picks' })
     .catch(err => console.error('profile update failed:', err.message));
+
+  // Track recommendations in SQLite (append-only, non-blocking)
+  const pickEventIds = searchPicks.map(p => p.event_id).filter(Boolean);
+  if (pickEventIds.length > 0) {
+    try {
+      const db = require('./db');
+      db.insertRecommendations(hashPhone(phone), pickEventIds);
+    } catch (err) {
+      console.warn('recommendation tracking failed:', err.message);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------

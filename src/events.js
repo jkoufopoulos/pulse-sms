@@ -526,6 +526,10 @@ async function refreshCache() {
     try {
       const db = require('./db');
       db.upsertEvents(validEvents);
+      // Persist to historical scraped_events (append-only, never pruned)
+      try { db.insertScrapedEvents(validEvents); } catch (err) {
+        console.warn('scraped_events insert failed:', err.message);
+      }
       db.pruneOldEvents(getNycDateString(-30));
       db.pruneInactiveSources(SOURCE_DB_NAMES);
       // Detect recurring patterns from historical data
@@ -707,7 +711,12 @@ async function refreshEmailSources() {
       try {
         const db = require('./db');
         const newEvents = eventCache.filter(e => EMAIL_SOURCES.some(s => s.label === e.source_name));
-        if (newEvents.length > 0) db.upsertEvents(newEvents);
+        if (newEvents.length > 0) {
+          db.upsertEvents(newEvents);
+          try { db.insertScrapedEvents(newEvents); } catch (e2) {
+            console.warn('[EMAIL-POLL] scraped_events insert failed:', e2.message);
+          }
+        }
       } catch (err) {
         console.warn('[EMAIL-POLL] SQLite upsert failed:', err.message);
       }
@@ -803,6 +812,10 @@ async function refreshSources(sourceNames, { reprocess = false } = {}) {
     const db = require('./db');
     db.deleteEventsBySource(targets.map(s => s.label));
     db.upsertEvents(validNew);
+    // Persist to historical scraped_events (append-only)
+    try { db.insertScrapedEvents(validNew); } catch (err) {
+      console.warn('scraped_events insert failed (selective refresh):', err.message);
+    }
     // Rebuild from SQLite
     const dbEvents = db.getEventsInRange(today, weekOut);
     const occurrences = db.generateOccurrences(today, weekOut);
