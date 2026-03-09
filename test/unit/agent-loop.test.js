@@ -70,6 +70,22 @@ const returningSession = { conversationHistory: [{ role: 'user', content: 'hey' 
 const returningPrompt = buildBrainSystemPrompt(returningSession);
 check('returning session prompt does NOT contain first-message indicator', !returningPrompt.includes('First message — new session'));
 
+// ---- buildBrainSystemPrompt metadata translation guide ----
+console.log('\nbuildBrainSystemPrompt metadata translation:');
+
+const anyPrompt = buildBrainSystemPrompt({});
+check('prompt contains metadata translation guide', anyPrompt.includes('HOW TO TALK ABOUT PICKS'));
+check('prompt teaches source_vibe language', anyPrompt.includes('underground radar') || anyPrompt.includes('tastemaker'));
+check('prompt teaches venue_size language', anyPrompt.includes('tiny room') || anyPrompt.includes('intimate'));
+check('prompt teaches scarcity language', anyPrompt.includes('one-off') || anyPrompt.includes('not coming back'));
+
+// ---- buildBrainSystemPrompt contrasting picks pattern ----
+console.log('\nbuildBrainSystemPrompt contrasting picks:');
+
+check('prompt contains contrasting picks guidance', anyPrompt.includes('contrasting') || anyPrompt.includes('contrast'));
+check('prompt does NOT tell agent to ask date-night-friends-solo', !anyPrompt.includes('date night, friends, solo'));
+check('prompt teaches mood vocabulary mapping', anyPrompt.includes('chill') || anyPrompt.includes('mood'));
+
 // ---- deriveIntent with show_welcome ----
 console.log('\nderiveIntent with show_welcome:');
 
