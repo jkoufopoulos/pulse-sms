@@ -294,6 +294,7 @@ function serializePoolForContinuation(poolResult) {
       source_vibe: e.source_vibe || undefined,
       editorial: e.editorial_signal || undefined,
       scarcity: e.scarcity || undefined,
+      editorial_note: e.editorial_note || undefined,
       tags: [tag, nearbyTag].filter(Boolean).join(' ') || undefined,
     };
   });

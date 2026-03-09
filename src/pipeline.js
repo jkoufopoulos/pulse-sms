@@ -245,13 +245,32 @@ function failsTimeGate(event, timeAfter) {
  * Returns 'hard' (exact match), 'soft' (broad category match with subcategory),
  * or false (no match). Time is enforced upstream by failsTimeGate in buildTaggedPool.
  */
+// Categories that share enough overlap to soft-match each other.
+// e.g. user asks for "dance" → nightlife events are plausible matches.
+const CATEGORY_SOFT_MAP = {
+  dance: ['nightlife', 'dj'],
+  dj: ['nightlife', 'dance'],
+  nightlife: ['dance', 'dj'],
+  live_music: ['jazz', 'classical'],
+  jazz: ['live_music'],
+  classical: ['live_music'],
+};
+
 function eventMatchesFilters(event, filters) {
   if (filters.free_only && !event.is_free) return false;
   // Multi-category (OR match): event matches if its category is in the array
+  // Soft-match related categories so the model can judge relevance
   if (filters.categories && Array.isArray(filters.categories) && filters.categories.length > 0) {
-    if (!filters.categories.includes(event.category)) return false;
+    const isHard = filters.categories.includes(event.category);
+    if (!isHard) {
+      const isSoft = filters.categories.some(c => (CATEGORY_SOFT_MAP[c] || []).includes(event.category));
+      if (!isSoft) return false;
+      return 'soft';
+    }
   } else if (filters.category && event.category !== filters.category) {
-    return false;
+    const isSoft = (CATEGORY_SOFT_MAP[filters.category] || []).includes(event.category);
+    if (!isSoft) return false;
+    return 'soft';
   }
   // Date range filter: check event's date falls within range (multi-day events use series_end)
   if (filters.date_range) {

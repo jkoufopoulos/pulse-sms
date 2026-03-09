@@ -329,6 +329,7 @@ try {
     stampVenueSize(eventCache);
     stampInteractionFormat(eventCache);
     stampSourceVibe(eventCache);
+    remapOtherCategories(eventCache);
     cacheTimestamp = Date.now();
     console.log(`Loaded ${eventCache.length} events from SQLite (${dbEvents.length} scraped + ${fresh.length} recurring)`);
   }
@@ -543,6 +544,7 @@ async function refreshCache() {
       stampRecurrence(eventCache);
       stampVenueSize(eventCache);
       stampInteractionFormat(eventCache);
+      remapOtherCategories(eventCache);
       cacheTimestamp = Date.now();
       console.log(`SQLite: ${validEvents.length} events stored, serving ${eventCache.length} (${dbEvents.length} scraped + ${freshOccurrences.length} recurring)`);
     } catch (err) {
@@ -811,6 +813,7 @@ async function refreshSources(sourceNames, { reprocess = false } = {}) {
     stampVenueSize(eventCache);
     stampInteractionFormat(eventCache);
     stampSourceVibe(eventCache);
+    remapOtherCategories(eventCache);
     cacheTimestamp = Date.now();
   } catch (err) {
     // SQLite failed — fall back to in-memory merge
@@ -837,6 +840,60 @@ async function refreshSources(sourceNames, { reprocess = false } = {}) {
 // ============================================================
 // Main entry: get events for a neighborhood (reads from cache)
 // ============================================================
+
+/**
+ * Remap events with category "other" to a specific category based on name/description patterns.
+ * Mutates events in place. Only touches category === 'other'.
+ */
+const OTHER_REMAP_RULES = [
+  // Community / wellness / markets
+  { pattern: /\b(sound bath|meditation|breathwork|yoga|wellness|healing)\b/i, category: 'community' },
+  { pattern: /\b(zine|popup market|pop-?up market|flea market|flea|vintage market|craft fair|bazaar|swap meet)\b/i, category: 'community' },
+  { pattern: /\b(workshop|class(?:es)?|seminar|lecture|talk(?:s)?)\b/i, category: 'community' },
+  // Theater / performance
+  { pattern: /\b(immersive|performance art|cabaret|burlesque|variety show|drag show|drag)\b/i, category: 'theater' },
+  // Film
+  { pattern: /\b(film|movie|screening|cinema|documentary|short films)\b/i, category: 'film' },
+  // Nightlife
+  { pattern: /\b(vinyl night|dance party|disco|dj\b|dj set|club night|rave|techno night|house night)\b/i, category: 'nightlife' },
+  // Live music
+  { pattern: /\b(jazz|acoustic|live band|songwriter|bluegrass|folk music|orchestra|ensemble|quartet|trio)\b/i, category: 'live_music' },
+  // Trivia / games
+  { pattern: /\b(trivia|quiz|game night|board game|bingo|karaoke)\b/i, category: 'trivia' },
+  // Art
+  { pattern: /\b(gallery|exhibition|art show|art opening|mural|sculpture)\b/i, category: 'art' },
+  // Spoken word / literary
+  { pattern: /\b(book reading|poetry|spoken word|storytelling|literary|book launch|reading series|open mic.*poet)\b/i, category: 'spoken_word' },
+  // Food & drink
+  { pattern: /\b(wine tasting|supper club|food popup|food pop-?up|tasting|beer fest|cocktail|brunch)\b/i, category: 'food_drink' },
+];
+
+function remapOtherCategory(event) {
+  if (event.category !== 'other') return event;
+  const text = `${event.name || ''} ${event.description_short || event.short_detail || ''}`.toLowerCase();
+  for (const rule of OTHER_REMAP_RULES) {
+    if (rule.pattern.test(text)) {
+      event.category = rule.category;
+      return event;
+    }
+  }
+  return event;
+}
+
+/**
+ * Remap all "other" category events in an array. Mutates in place, logs count.
+ */
+function remapOtherCategories(events) {
+  let remapped = 0;
+  for (const e of events) {
+    const before = e.category;
+    remapOtherCategory(e);
+    if (e.category !== before) remapped++;
+  }
+  if (remapped > 0) {
+    console.log(`Category remap: ${remapped} events moved from "other" to specific categories`);
+  }
+}
 
 /**
  * Quality-gate filter — shared between getEvents and getEventsCitywide.
@@ -1173,4 +1230,4 @@ function scanCityWide(filters) {
     .map(([neighborhood, matchCount]) => ({ neighborhood, matchCount }));
 }
 
-module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, refreshEmailSources, getEvents, getEventsForBorough, getEventsCitywide, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, scheduleEmailPolls, clearEmailSchedule, captureExtractionInput, getExtractionInputs, scanCityWide, scoreInterestingness, selectDiversePicks, getTopPicks, isGarbageName };
+module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, refreshEmailSources, getEvents, getEventsForBorough, getEventsCitywide, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, scheduleEmailPolls, clearEmailSchedule, captureExtractionInput, getExtractionInputs, scanCityWide, scoreInterestingness, selectDiversePicks, getTopPicks, isGarbageName, remapOtherCategory };

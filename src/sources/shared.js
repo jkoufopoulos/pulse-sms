@@ -191,6 +191,7 @@ function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
       location_quote: e.venue_name && e.venue_name !== 'TBA' ? e.venue_name.toLowerCase() : null,
       price_quote: e.price_display ? e.price_display.toLowerCase() : (e.is_free === true ? 'free' : null),
     },
+    editorial_note: e.editorial_note || null,
     // Carry raw recurrence fields for downstream pattern detection (transient, not persisted to DB)
     ...((e.is_recurring || e.recurrence_day || e.recurrence_time) ? {
       _raw: {

@@ -104,6 +104,7 @@ Return STRICT JSON with an array of events:
         "price_quote": "exact text or null"
       },
       "editorial_signal": "boolean, true if source highlights as pick/must-see",
+      "editorial_note": "If the source text includes a recommendation, opinion, or editorial take on why this event is worth attending, capture it verbatim or closely paraphrased (1-2 sentences, max 150 chars). Otherwise null.",
       "scarcity": "one-night-only|closing|final|limited|last-chance|premiere|one-time or null",
       "is_recurring": "boolean, true if explicitly recurring",
       "recurrence_day": "monday|tuesday|wednesday|thursday|friday|saturday|sunday or null",

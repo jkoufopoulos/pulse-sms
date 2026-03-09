@@ -17,7 +17,7 @@ const { MODELS, getProvider } = require('../../src/model-config');
 check('brain defaults to claude-haiku-4-5-20251001', MODELS.brain === 'claude-haiku-4-5-20251001');
 check('extract defaults to claude-haiku-4-5-20251001', MODELS.extract === 'claude-haiku-4-5-20251001');
 check('details defaults to gemini-2.5-flash', MODELS.details === 'gemini-2.5-flash');
-check('fallback defaults to claude-haiku-4-5-20251001', MODELS.fallback === 'claude-haiku-4-5-20251001');
+check('fallback defaults to gemini-2.5-flash', MODELS.fallback === 'gemini-2.5-flash');
 
 // Provider detection
 check('gemini-2.5-flash → gemini', getProvider('gemini-2.5-flash') === 'gemini');

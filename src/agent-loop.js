@@ -284,6 +284,7 @@ async function executeTool(toolName, params, session, phone, trace) {
           start_time_local: e.start_time_local, category: e.category,
           is_free: e.is_free, price_display: e.price_display,
           description_short: e.description_short || e.short_detail || '',
+          editorial_note: e.editorial_note || undefined,
           recurring: e.is_recurring ? e.recurrence_label : undefined,
         };
       }).filter(Boolean);

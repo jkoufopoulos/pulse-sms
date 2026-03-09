@@ -138,6 +138,51 @@ check('jazz subcategory + free match → soft', eventMatchesFilters(
 ) === 'soft');
 
 
+// ---- soft category matching (related categories) ----
+console.log('\nSoft category matching:');
+
+// Single category: dance filter → nightlife event → soft
+check('dance filter + nightlife event → soft', eventMatchesFilters(
+  { category: 'nightlife', is_free: false, start_time_local: '2026-02-22T21:00:00' },
+  { category: 'dance' }
+) === 'soft');
+
+// Single category: dj filter → nightlife event → soft
+check('dj filter + nightlife event → soft', eventMatchesFilters(
+  { category: 'nightlife', is_free: false, start_time_local: '2026-02-22T21:00:00' },
+  { category: 'dj' }
+) === 'soft');
+
+// Single category: dance filter → comedy event → false (no soft relationship)
+check('dance filter + comedy event → false', eventMatchesFilters(
+  { category: 'comedy', is_free: false, start_time_local: '2026-02-22T21:00:00' },
+  { category: 'dance' }
+) === false);
+
+// Multi-category: [dance, dj] filter → nightlife event → soft
+check('[dance,dj] filter + nightlife event → soft', eventMatchesFilters(
+  { category: 'nightlife', is_free: false, start_time_local: '2026-02-22T21:00:00' },
+  { categories: ['dance', 'dj'] }
+) === 'soft');
+
+// Multi-category: [dance, dj] filter → dance event → hard
+check('[dance,dj] filter + dance event → hard', eventMatchesFilters(
+  { category: 'dance', is_free: false, start_time_local: '2026-02-22T21:00:00' },
+  { categories: ['dance', 'dj'] }
+) === 'hard');
+
+// Multi-category: [dance, dj] filter → comedy event → false
+check('[dance,dj] filter + comedy event → false', eventMatchesFilters(
+  { category: 'comedy', is_free: false, start_time_local: '2026-02-22T21:00:00' },
+  { categories: ['dance', 'dj'] }
+) === false);
+
+// Jazz filter → live_music event → soft
+check('jazz filter + live_music event → soft', eventMatchesFilters(
+  { category: 'live_music', is_free: false, start_time_local: '2026-02-22T21:00:00' },
+  { category: 'jazz' }
+) === 'soft');
+
 // ---- buildTaggedPool ----
 console.log('\nbuildTaggedPool:');
 

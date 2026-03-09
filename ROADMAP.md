@@ -69,27 +69,27 @@ message -> checkMechanical (help + TCPA only, $0)
 **Story: The agent explains WHY, not just WHAT**
 > As a user, when I get a pick, I want to know why it's interesting tonight — not just the name, venue, and time.
 
-- [ ] Add metadata translation guide to system prompt: teach agent to speak about `source_vibe`, `venue_size`, `scarcity`, `editorial`, `interaction_format` in natural language
+- [x] Add metadata translation guide to system prompt: teach agent to speak about `source_vibe`, `venue_size`, `scarcity`, `editorial`, `interaction_format` in natural language
   - `source_vibe "discovery"` → "this popped up on the underground radar"
   - `venue_size "intimate"` → "tiny room, maybe 50 people, right up front"
   - `scarcity "one-night-only"` → "one-off, not coming back"
   - `editorial: true` → "a tastemaker picked this one out"
   - `interaction_format "interactive"` → "you're not just watching, you're in it"
-- [ ] Rewrite system prompt examples from list-style to contrasting-picks style
+- [x] Rewrite system prompt examples from list-style to contrasting-picks style
 - [ ] Run scenario evals before/after to measure voice quality change
 
 **Story: Narrow by showing, not asking**
 > As a user, when I text a bare neighborhood, I want the agent to show me two contrasting options instead of asking me a generic vibe question.
 
-- [ ] Replace "ask one vibe question" prompt guidance with "narrow by contrasting picks"
-- [ ] Add mood-to-category mapping guidance: teach agent that "chill" means intimate venues + jazz/vinyl/film, "I want to dance" means dj/nightlife + medium-large venues
-- [ ] Add "acknowledge and build" pattern: every response references what the user just said
+- [x] Replace "ask one vibe question" prompt guidance with "narrow by contrasting picks"
+- [x] Add mood-to-category mapping guidance: teach agent that "chill" means intimate venues + jazz/vinyl/film, "I want to dance" means dj/nightlife + medium-large venues
+- [x] Add "acknowledge and build" pattern: every response references what the user just said
 - [ ] Update eval golden scenarios to reflect new conversation style
 
 **Story: Details that build trust**
 > As a user, when I ask for details about a pick, I want the response to lead with what the venue feels like, not just event metadata.
 
-- [ ] Add details structure to system prompt: venue experience → event → logistics → practical tip
+- [x] Add details structure to system prompt: venue experience → event → logistics → practical tip
 - [ ] Evaluate whether `composeDetails` in `ai.js` can be consolidated into the agent loop (agent has conversation context that `composeDetails` doesn't)
 
 ### Phase 8: Venue Knowledge Layer (Data + Code)
@@ -108,15 +108,15 @@ message -> checkMechanical (help + TCPA only, $0)
 **Story: Yutori's editorial voice comes through**
 > As a user, when I get a pick that came from Yutori's newsletter, I want the agent to reference the editorial context — "Yutori called this the best kept secret in Bushwick" — not just a generic description.
 
-- [ ] Preserve source editorial blurbs through extraction as `editorial_note` field
-- [ ] Pass `editorial_note` to agent in pool serialization
+- [x] Preserve source editorial blurbs through extraction as `editorial_note` field
+- [x] Pass `editorial_note` to agent in pool serialization
 - [ ] Cache raw newsletter content in `.cache.json` alongside extracted events (enables re-extraction)
 
 **Story: Events in the "other" bucket become findable**
 > As a user looking for "art" or "something weird," I want events currently categorized as "other" to be properly classified so they show up in category searches.
 
-- [ ] Audit "other" category events — identify common reclassifiable types (immersive theater, sound baths, zine fairs, popup markets)
-- [ ] Add rules-based category remapping at extraction time
+- [x] Audit "other" category events — identify common reclassifiable types (immersive theater, sound baths, zine fairs, popup markets)
+- [x] Add rules-based category remapping at cache build time (`remapOtherCategory` in events.js)
 - [ ] Measure: reduce "other" bucket from 41% to <20%
 
 ### Phase 9: Serendipity + Personalization (Code)
@@ -193,8 +193,8 @@ message -> checkMechanical (help + TCPA only, $0)
 **Story: Venue learning persists**
 > As a system, when I geocode a new venue, I want to remember it permanently instead of losing it on restart.
 
-- [ ] Wire `exportLearnedVenues()` to write to disk at end of scrape
-- [ ] Wire `importLearnedVenues()` on startup to warm the cache
+- [x] Wire `exportLearnedVenues()` to write to disk at end of scrape (already implemented)
+- [x] Wire `importLearnedVenues()` on startup to warm the cache (already implemented)
 
 ### Phase 12: Platform Expansion (Later)
 
@@ -265,6 +265,10 @@ message -> checkMechanical (help + TCPA only, $0)
 | Scrape Guard | Mar 5 | Baseline gates, post-scrape audit, yesterday's cache fallback. |
 | Discovery Conversation | Mar 8 | Ask before recommending for vague requests. Vibe-first CTA. |
 | Prompt Hygiene | Mar 7 | Dead prompts deleted, examples trimmed, curation taste shared constant. 4 of 6 action items done. |
+| Phase 7: Tastemaker Voice | Mar 8 | Metadata translation guide, contrasting picks, mood-to-category mapping, acknowledge-and-build, details structure. Prompt-only changes. |
+| "Other" Category Reduction | Mar 9 | `remapOtherCategory` rules-based remap: 11 pattern groups (sound bath→community, film→film, vinyl night→nightlife, etc.). Runs post-stamp in cache build. |
+| Editorial Note Preservation | Mar 9 | `editorial_note` field added to extraction prompt, carried through normalization→serialization→details. All 4 LLM-extracted sources benefit. |
+| Venue Learning Persistence | Mar 9 | Already implemented: `exportLearnedVenues`/`importLearnedVenues` wired to disk. 2500+ venues survive restarts. |
 
 ### Prompt Hygiene — Open Items
 

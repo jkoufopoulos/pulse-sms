@@ -1,6 +1,6 @@
 const { check } = require('../helpers');
 const { makeEventId, normalizeExtractedEvent, normalizeEventName } = require('../../src/sources');
-const { isGarbageName } = require('../../src/events');
+const { isGarbageName, remapOtherCategory } = require('../../src/events');
 
 // ---- makeEventId ----
 console.log('\nmakeEventId:');
@@ -301,3 +301,48 @@ check('keeps "Jazz at Lincoln Center Orchestra"', !isGarbageName('Jazz at Lincol
 check('keeps "Blade Rave at Elsewhere"', !isGarbageName('Blade Rave at Elsewhere'));
 check('keeps "Live Music at Brooklyn Bowl"', !isGarbageName('Live Music at Brooklyn Bowl'));
 check('keeps "Film Forum Double Feature"', !isGarbageName('Film Forum Double Feature'));
+
+// ---- remapOtherCategory ----
+console.log('\nremapOtherCategory:');
+
+// Should remap known patterns
+check('sound bath → community', remapOtherCategory({ category: 'other', name: 'Sound Bath at the Studio' }).category === 'community');
+check('meditation → community', remapOtherCategory({ category: 'other', name: 'Full Moon Meditation Circle' }).category === 'community');
+check('zine fair → community', remapOtherCategory({ category: 'other', name: 'Brooklyn Zine Fair 2026' }).category === 'community');
+check('popup market → community', remapOtherCategory({ category: 'other', name: 'Vintage Popup Market' }).category === 'community');
+check('flea market → community', remapOtherCategory({ category: 'other', name: 'Fort Greene Flea' }).category === 'community');
+check('immersive theater → theater', remapOtherCategory({ category: 'other', name: 'Immersive Theater Experience' }).category === 'theater');
+check('performance art → theater', remapOtherCategory({ category: 'other', name: 'Performance Art Night' }).category === 'theater');
+check('film screening → film', remapOtherCategory({ category: 'other', name: 'Short Film Screening' }).category === 'film');
+check('movie night → film', remapOtherCategory({ category: 'other', name: 'Outdoor Movie Night' }).category === 'film');
+check('documentary → film', remapOtherCategory({ category: 'other', name: 'Documentary Premiere' }).category === 'film');
+check('vinyl night → nightlife', remapOtherCategory({ category: 'other', name: 'Vinyl Night at Mood Ring' }).category === 'nightlife');
+check('dance party → nightlife', remapOtherCategory({ category: 'other', name: 'Disco Dance Party' }).category === 'nightlife');
+check('dj set → nightlife', remapOtherCategory({ category: 'other', name: 'Late Night DJ Set' }).category === 'nightlife');
+check('jazz → live_music', remapOtherCategory({ category: 'other', name: 'Jazz Jam Session' }).category === 'live_music');
+check('acoustic → live_music', remapOtherCategory({ category: 'other', name: 'Acoustic Night' }).category === 'live_music');
+check('live band → live_music', remapOtherCategory({ category: 'other', name: 'Live Band Showcase' }).category === 'live_music');
+check('trivia → trivia', remapOtherCategory({ category: 'other', name: 'Tuesday Trivia Night' }).category === 'trivia');
+check('quiz night → trivia', remapOtherCategory({ category: 'other', name: 'Pub Quiz Night' }).category === 'trivia');
+check('game night → trivia', remapOtherCategory({ category: 'other', name: 'Board Game Night' }).category === 'trivia');
+check('gallery opening → art', remapOtherCategory({ category: 'other', name: 'Gallery Opening Reception' }).category === 'art');
+check('art exhibition → art', remapOtherCategory({ category: 'other', name: 'New Art Exhibition' }).category === 'art');
+check('book reading → spoken_word', remapOtherCategory({ category: 'other', name: 'Book Reading & Signing' }).category === 'spoken_word');
+check('poetry slam → spoken_word', remapOtherCategory({ category: 'other', name: 'Poetry Slam Night' }).category === 'spoken_word');
+check('storytelling → spoken_word', remapOtherCategory({ category: 'other', name: 'Storytelling Open Mic' }).category === 'spoken_word');
+check('wine tasting → food_drink', remapOtherCategory({ category: 'other', name: 'Natural Wine Tasting' }).category === 'food_drink');
+check('supper club → food_drink', remapOtherCategory({ category: 'other', name: 'Underground Supper Club' }).category === 'food_drink');
+check('food popup → food_drink', remapOtherCategory({ category: 'other', name: 'Thai Food Popup' }).category === 'food_drink');
+
+// Should NOT remap non-other categories
+check('comedy stays comedy', remapOtherCategory({ category: 'comedy', name: 'Stand-up Night' }).category === 'comedy');
+
+// Should leave genuinely unknown "other" alone
+check('unknown stays other', remapOtherCategory({ category: 'other', name: 'Annual Gala Fundraiser' }).category === 'other');
+
+// Should also check description_short
+check('description match works', remapOtherCategory({ category: 'other', name: 'Special Event', description_short: 'An evening of jazz and cocktails' }).category === 'live_music');
+
+// Returns the same object (mutates in place)
+const remapEvt = { category: 'other', name: 'Trivia Tuesday' };
+check('returns same object', remapOtherCategory(remapEvt) === remapEvt);
