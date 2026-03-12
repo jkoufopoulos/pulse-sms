@@ -9,6 +9,7 @@ const { isGarbageName } = require('../../curation');
 const { preprocessYutoriHtml } = require('./html-preprocess');
 const { parseTriviaEvents } = require('./trivia-parser');
 const { parseNonTriviaEvents, resolveDayOfWeekDate } = require('./general-parser');
+const { parseStructuredYutoriHtml } = require('./structured-parser');
 const {
   YUTORI_DIR, PROCESSED_DIR, CACHE_FILE,
   loadCachedEvents, saveCachedEvents,
@@ -145,23 +146,22 @@ async function fetchYutoriEvents({ reprocess = false } = {}) {
         // Fall through to LLM if deterministic parse found nothing
       }
 
-      // Non-trivia event emails: try deterministic parse first (P6)
+      // Non-trivia event emails: try structured HTML parse first (P6)
       if (/\.html?$/i.test(file)) {
-        const content = preprocessYutoriHtml(raw);
-        const parsed = parseNonTriviaEvents(content, file);
-        const eventLineCount = content.split('\n').filter(l => l.trim().startsWith('[Event]')).length;
-
-        if (parsed.length > 0 && eventLineCount > 0 && parsed.length >= eventLineCount * 0.4) {
-          // Deterministic parse captured enough — skip LLM
-          console.log(`Yutori: deterministic parse → ${parsed.length}/${eventLineCount} events from ${file}`);
-          captureExtractionInput('yutori', content, null);
+        const dateMatch = file.match(/^(\d{4}-\d{2}-\d{2})/);
+        const parsed = parseStructuredYutoriHtml(raw, dateMatch ? dateMatch[1] : null);
+        if (parsed.length > 0) {
+          console.log(`Yutori: structured parse → ${parsed.length} events from ${file}`);
+          captureExtractionInput('yutori', raw.slice(0, 2000), null);
           const normalized = parsed
-            .map(e => normalizeExtractedEvent(e, 'yutori', 'aggregator', 0.8))
+            .map(e => normalizeExtractedEvent(e, 'yutori', 'aggregator', 0.85))
             .filter(e => e.name && e.completeness >= 0.25);
+          // Fix day-of-week mismatches
+          normalized.forEach(resolveDayOfWeekDate);
           triviaEvents.push(...normalized);
           continue;
         }
-        // Fall through to LLM if deterministic parse got < 40% of event lines
+        // Fall through to LLM if structured parse found nothing
       }
 
       const content = /\.html?$/i.test(file) ? preprocessYutoriHtml(raw) : raw;

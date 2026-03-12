@@ -17,6 +17,11 @@ const NON_EVENT_CATEGORIES = [
   /release\s+date/i, /coming\s+soon/i,
   // academic / research
   /research/i, /whitepaper/i, /case\s+study/i,
+  // tech / AI / venture
+  /\bAI\b/, /\bLLM/i, /\bmachine\s+learn/i, /\bGPT\b/i,
+  /longevity/i, /anti[- ]?aging/i,
+  /\bYC\b/, /series\s+[A-C]\b/i, /venture\s+capital/i,
+  /social\s+event\s+research/i,
 ];
 
 /**
@@ -34,6 +39,11 @@ const NON_EVENT_FILENAMES = [
   /netflix/i, /streaming/i, /hulu/i, /disney/i,
   /release-date/i, /coming-soon/i,
   /research/i, /whitepaper/i, /case-study/i,
+  // tech / AI / venture
+  /\bgpt-/i, /\bnvidia/i, /\bblackwell/i, /\bllm/i,
+  /longevity/i, /anti-aging/i, /\bklotho\b/i, /\bprogranulin\b/i,
+  /\byc\b/i, /series-a/i,
+  /social-luck/i, /social-event/i,
 ];
 
 /**
