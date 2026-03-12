@@ -46,6 +46,8 @@ const VENUE_MAP = {
   'Knitting Factory Brooklyn': { lat: 40.7112, lng: -73.9604 },
   'Sleepwalk': { lat: 40.7130, lng: -73.9608 },
   'Wythe Hotel': { lat: 40.7220, lng: -73.9578 },
+  'Moxy Williamsburg': { lat: 40.7140, lng: -73.9610 },
+  'Marche Rue Dix': { lat: 40.6898, lng: -73.9502 },
 
   // === Greenpoint ===
   'McCarren Parkhouse': { lat: 40.7206, lng: -73.9515 },
@@ -133,7 +135,11 @@ const VENUE_MAP = {
   'New York Public Library, Tompkins Square Branch': { lat: 40.7270, lng: -73.9810 },
   'The Alchemist\'s Kitchen Elixir Bar': { lat: 40.7245, lng: -73.9914 },
 
+  // === East Village (continued) ===
+  'Pangea': { lat: 40.7249, lng: -73.9840 },
+
   // === Flatiron / Union Square ===
+  'Center for Jewish History': { lat: 40.7383, lng: -73.9931 },
   'Green Room NYC': { lat: 40.7424, lng: -73.9927 },
   'Paragon': { lat: 40.7187, lng: -73.9904 },
   'Irving Plaza': { lat: 40.7349, lng: -73.9882 },
@@ -867,7 +873,18 @@ function normalizeName(name) {
 function lookupVenue(name) {
   if (!name) return null;
   const key = normalizeName(name);
-  return normalizedMap.get(key) || null;
+  const direct = normalizedMap.get(key);
+  if (direct) return direct;
+
+  // Try "Room at Venue" → lookup "Venue"
+  const atMatch = name.match(/\bat\s+(.+)/i);
+  if (atMatch) {
+    const parentKey = normalizeName(atMatch[1]);
+    const parent = normalizedMap.get(parentKey);
+    if (parent) return parent;
+  }
+
+  return null;
 }
 
 function learnVenueCoords(name, lat, lng) {
@@ -876,6 +893,29 @@ function learnVenueCoords(name, lat, lng) {
   if (!normalizedMap.has(key)) {
     normalizedMap.set(key, { lat, lng });
   }
+}
+
+// --- Venue profiles (loaded from data/venue-profiles.json on boot) ---
+const normalizedProfileMap = new Map();
+
+try {
+  const profilePath = require('path').join(__dirname, '../data/venue-profiles.json');
+  const profileData = JSON.parse(require('fs').readFileSync(profilePath, 'utf8'));
+  for (const [name, profile] of Object.entries(profileData)) {
+    normalizedProfileMap.set(normalizeName(name), profile);
+  }
+  console.log(`Loaded ${normalizedProfileMap.size} venue profiles`);
+} catch {
+  console.log('No venue profiles found (data/venue-profiles.json missing or invalid)');
+}
+
+/**
+ * Look up venue profile.
+ * Returns { vibe, known_for, crowd, tip } or null.
+ */
+function lookupVenueProfile(name) {
+  if (!name) return null;
+  return normalizedProfileMap.get(normalizeName(name)) || null;
 }
 
 // --- Persistence helpers ---
@@ -967,4 +1007,4 @@ async function batchGeocodeEvents(events) {
   console.log(`Geocoding done: ${resolved}/${unresolved.length} resolved`);
 }
 
-module.exports = { VENUE_MAP, VENUE_SIZE, lookupVenue, lookupVenueSize, learnVenueCoords, geocodeVenue, batchGeocodeEvents, exportLearnedVenues, importLearnedVenues };
+module.exports = { VENUE_MAP, VENUE_SIZE, lookupVenue, lookupVenueSize, lookupVenueProfile, learnVenueCoords, geocodeVenue, batchGeocodeEvents, exportLearnedVenues, importLearnedVenues };

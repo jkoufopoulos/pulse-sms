@@ -23,6 +23,7 @@ const { getSession, setSession, addToHistory, hashPhone } = require('./session')
 const { trackAICost } = require('./request-guard');
 const { updateProfile } = require('./preference-profile');
 const { smartTruncate, injectMissingPrices } = require('./formatters');
+const { lookupVenueProfile } = require('./venues');
 const { sendRuntimeAlert } = require('./alerts');
 const { getAdjacentNeighborhoods, getNycDateString } = require('./geo');
 
@@ -286,6 +287,7 @@ async function executeTool(toolName, params, session, phone, trace) {
           description_short: e.description_short || e.short_detail || '',
           editorial_note: e.editorial_note || undefined,
           recurring: e.is_recurring ? e.recurrence_label : undefined,
+          venue_profile: lookupVenueProfile(e.venue_name) || undefined,
         };
       }).filter(Boolean);
 

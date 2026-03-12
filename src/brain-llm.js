@@ -5,6 +5,7 @@
 const { NEIGHBORHOODS } = require('./neighborhoods');
 const { getNycDateString } = require('./geo');
 const { describeFilters } = require('./pipeline');
+const { lookupVenueProfile } = require('./venues');
 
 // --- Neighborhood list for system prompt ---
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
@@ -232,6 +233,7 @@ DETAILS RESPONSES:
 - Then the EVENT — who/what and why it's interesting. "Gun Outfit is a scuzzy post-punk duo from LA touring a new record, perfect fit for this room."
 - Then LOGISTICS — time, price, when to arrive. "Free, doors 8, music at 8:30."
 - End with a PRACTICAL TIP if you have one. "Gets packed early on free show nights — I'd aim for 8."
+- If the event has venue_profile (known_for, crowd, tip), USE IT. Lead with what the venue feels like. The profile tip is the insider knowledge — "gets packed early on free show nights, aim for 8" is gold.
 - For more with is_last_batch=true: mention these are the last picks, suggest a different neighborhood.
 
 HOW TO TALK ABOUT PICKS — turn metadata into natural language:
@@ -244,6 +246,7 @@ When you see these fields on events in the pool, USE them in your SMS. Don't jus
 - editorial: true → "a tastemaker picked this one out" or "editorially curated." Strong trust signal.
 - interaction_format "interactive" → sell the experience: "you're not just watching — open mic, game night, workshop. You're in it."
 - recurring → normalize it: "they do this every Tuesday, it's a reliable spot" or "weekly thing, always good."
+- venue_vibe → use it directly. "dark cocktail bar with a killer sound system" is better than anything you'd make up. Trust the profile and weave it into your pick description.
 
 ${curationTasteBlock(CURATION_DIVERSITY_DEFAULT)}`;
 }
@@ -295,6 +298,7 @@ function serializePoolForContinuation(poolResult) {
       editorial: e.editorial_signal || undefined,
       scarcity: e.scarcity || undefined,
       editorial_note: e.editorial_note || undefined,
+      venue_vibe: lookupVenueProfile(e.venue_name)?.vibe || undefined,
       tags: [tag, nearbyTag].filter(Boolean).join(' ') || undefined,
     };
   });

@@ -1,0 +1,182 @@
+{
+  "Mood Ring": {
+    "vibe": "Neon-lit astrology den with Wong Kar-wai energy and velvet booths that feel like a secret",
+    "known_for": "Astrology-themed cocktails on a rotating zodiac menu, women-owned LGBTQ+ safe space with a back-room dance floor and forward-thinking DJs",
+    "crowd": "Queer-friendly creative types, very diverse, everyone's chill — think post-2006 grads who care about good sound and $10 drinks",
+    "tip": "The back room is where the real party is — go late on weekends for DJ sets. Karaoke nights are a hidden gem on off-nights."
+  },
+  "House of Yes": {
+    "vibe": "Walked into a circus-rave fever dream where aerialists fly over the dance floor",
+    "known_for": "Wild themed costume parties, live burlesque and aerial performances, and a strict consent culture enforced by 'Consenticorns'",
+    "crowd": "Costumes-required energy — theater kids, burners, queer community, and anyone who left their inhibitions at home",
+    "tip": "Wear a costume on weekends or you'll feel naked. No phones on the dance floor. Arrive before 10:30 to skip the line — there's a costume box inside if you come unprepared."
+  },
+  "Bossa Nova Civic Club": {
+    "vibe": "Tiny tropical-themed sweatbox with a legit sound system and palm-tree wallpaper",
+    "known_for": "Underground house and techno since 2012 — Brooklyn's go-to for serious electronic music in an unpretentious, no-dress-code room",
+    "crowd": "Queer hipsters and techno heads who actually know the DJs — young, diverse, there to dance not pose",
+    "tip": "Get there before midnight on weekends and cover is free. Happy hour runs 5-10pm with $5 beers. Friday nights edge out Saturdays. Wear comfy shoes — you will sweat."
+  },
+  "Jupiter Disco": {
+    "vibe": "Unmarked door opens into a retro sci-fi spaceship bar straight out of Blade Runner",
+    "known_for": "Audiophile-grade sound, cocktails by ex-Death & Co and Maison Premiere bartenders, and a vinyl-only DJ program Thu-Sun",
+    "crowd": "Music nerds, cocktail people, and neighborhood regulars who treat it like their living room — inclusive and low-key",
+    "tip": "Bring tacos from the truck outside — they let you eat inside. Early evening is cocktail bar mode, late night it turns into a proper dance party. Look for the neon square on Flushing Ave."
+  },
+  "H0L0": {
+    "vibe": "Dark basement club with a killer sound system and zero pretense — just you and the music",
+    "known_for": "One of NYC's best small-room sound systems for techno and electronic music. Hosts a balanced mix of local and international DJs with a no-frills DIY ethos.",
+    "crowd": "Dedicated electronic music heads who care about sound quality over scene points. Diverse, respectful, there to dance not pose.",
+    "tip": "There's no A/C — it gets sweltering. Wear light layers and hydrate before you go because drinks are pricey and water stations are lacking."
+  },
+  "Market Hotel": {
+    "vibe": "Raw second-floor warehouse with a giant window where you watch J trains roll by mid-set",
+    "known_for": "Legendary Bushwick DIY venue since 2008, originally a Todd P space. Hosts indie, punk, experimental, and electronic. The stage sits in front of a massive bay window overlooking the elevated subway.",
+    "crowd": "Bushwick lifers, DIY music kids, and anyone who prefers cheap beer and loud guitars over bottle service. All-ages-friendly energy.",
+    "tip": "Grab a spot near the bay window — watching the train lights streak behind the band is the whole experience. Beer prices are low so tip your bartender well."
+  },
+  "Elsewhere": {
+    "vibe": "Sprawling warehouse playground with three stages, a rooftop, and something for every mood",
+    "known_for": "Multi-room venue built in an old furniture factory with Zone One (intimate emerging artists), The Hall (big touring acts), and a rooftop that hosts parties and film screenings.",
+    "crowd": "Genuinely diverse — bridges age, race, style, and taste. You'll see techno kids, indie fans, and rooftop hangers all in the same building.",
+    "tip": "Arrive early — lines get long fast. Start on the rooftop for sunset then work your way down to Zone One for the best discovery sets."
+  },
+  "TV Eye": {
+    "vibe": "Ridgewood hangout that's part venue, part backyard bar, part neighborhood living room",
+    "known_for": "Founded by the Sacred Bones Records crew plus Bowery Ballroom and WFMU folks. 250-cap live room with great sound, a courtyard patio, art gallery, and a real kitchen.",
+    "crowd": "Creative Ridgewood locals, record-label people, and chill music fans who want good sound without the Manhattan hassle.",
+    "tip": "Eat here — the burgers and wings are legit and way cheaper than nearby restaurants. Grab a Narragansett tallboy and post up in the backyard between sets."
+  },
+  "Baby's All Right": {
+    "vibe": "Retro-wallpapered front bar that opens into an intimate back room — party in the back",
+    "known_for": "Launching pad for indie acts before they blow up (SZA, Lorde, Billie Eilish all played early shows here). Live music 7 nights a week plus a legit restaurant.",
+    "crowd": "Young Williamsburg creative types who actually came to listen to the music, not just pose. Friendly, safe energy.",
+    "tip": "The front room has a motorized wall that drops so you can watch the show from the bar if the back room gets packed."
+  },
+  "Good Room": {
+    "vibe": "No-pretense dance club with one of the best disco balls in NYC and a chest-hitting sound system",
+    "known_for": "Proper house and techno programming in a come-as-you-are space. Two rooms (main room + 'the bad room') with different vibes.",
+    "crowd": "Genuinely diverse — not the bottle-service crowd, just people who came to dance. No dress code, no attitude at the door.",
+    "tip": "Buy tickets on RA ahead of time — walk-up lines run 20-40 min on good nights. The vibe changes completely depending on the DJ."
+  },
+  "Purgatory": {
+    "vibe": "80s East Village club-kid energy in a cozy Bushwick basement — fiercely inclusive and a little unhinged",
+    "known_for": "Women and queer-owned DIY venue mixing indie, noise rock, spoken word, drag, stand-up, and hip-hop. One of Brooklyn's most important underground spaces.",
+    "crowd": "Queer-friendly creative community — musicians, drag performers, poets, and the people who love them.",
+    "tip": "Order the Holy Water cocktail — it's the move. Grab a couch in the downstairs alcove early if you want a chill spot."
+  },
+  "ALPHAVILLE": {
+    "vibe": "Musician-owned neighborhood bar that's equal parts dive, music venue, and legit kitchen",
+    "known_for": "Community-driven live music programming run by actual musicians who book what they love. The food is surprisingly great — the burger and fried chicken are standouts.",
+    "crowd": "Bushwick locals and music heads — a little sceney but generally warm and unpretentious once you're in.",
+    "tip": "Eat here before or during the show — most people skip the food and they're missing out. Drink lines slow down when it gets packed, so grab one early."
+  },
+  "Sleepwalk": {
+    "vibe": "Sultry 1920s Shanghai-meets-Brooklyn cocktail den with a hidden back venue",
+    "known_for": "Art deco glam interior with a back stage hosting live music, DJs, comedy, burlesque, and variety shows nightly. Asian-inspired tapas and creative cocktails.",
+    "crowd": "Eclectic date-night and neighborhood crowd drawn by the moody atmosphere. Not a scene spot — people come for cocktails and stumble into the show.",
+    "tip": "Hit happy hour before 7pm ($2 off drinks). Book on Resy for weekends — the place is small and fills up fast. Open till 4am every night."
+  },
+  "National Sawdust": {
+    "vibe": "Acoustically pristine chamber hall carved out of a century-old sawdust factory",
+    "known_for": "World-class acoustics engineered by Arup. Adventurous programming across classical, experimental, electronic, and avant-garde. Only 350 capacity so every show feels personal.",
+    "crowd": "Culturally curious music lovers — more NPR tote bag than leather jacket. LGBTQIA-friendly. Skews a bit older and more attentive.",
+    "tip": "Standing floor is only 20 feet deep so every spot has great sightlines. The wrap-around balcony with cabaret tables is the move if you want to sit."
+  },
+  "C'mon Everybody": {
+    "vibe": "Glam 70s queer bar with a backroom stage — disco ball energy meets Bed-Stuy cool",
+    "known_for": "Queer-owned venue with drag shows, burlesque, themed dance parties, and live music almost every night in the back room.",
+    "crowd": "Wonderfully mixed — queer folks, music heads, neighborhood regulars, and anyone who likes dancing to old school R&B and disco without attitude.",
+    "tip": "Grab a cocktail at the mahogany bar up front first, then drift to the back room. Check their calendar — the themed nights are the move."
+  },
+  "Ode to Babel": {
+    "vibe": "Airy loft cocktail lounge with plants, exposed brick, and a DJ in the corner — effortlessly chill",
+    "known_for": "Black-owned cocktail bar run by twin sisters, doubling as a platform for local DJs, musicians, chefs, and makers. Great mocktails too.",
+    "crowd": "Creative neighborhood crowd — people who actually live nearby grabbing a drink after work or settling in for a low-key Saturday night.",
+    "tip": "Works just as well for daytime coffee as nighttime cocktails. Try the ginger beer cucumber citrus mocktail if you're not drinking."
+  },
+  "Public Records": {
+    "vibe": "Audiophile nightclub in an old ASPCA building — vegan food and a sound system from another planet",
+    "known_for": "Custom-built four-corner speaker system in the Sound Room, deep house and techno programming, fully vegan restaurant, and a record shop up front.",
+    "crowd": "Music-first people who actually came to dance and listen — DJs, sound nerds, the Gowanus creative set.",
+    "tip": "Stand under the disco ball in the Sound Room — it's the sweet spot where all four speakers converge. Bar area is free, Sound Room needs a ticket. No phones in the Sound Room."
+  },
+  "Friends and Lovers": {
+    "vibe": "No-pretense Crown Heights dance bar where the DJ always reads the room right",
+    "known_for": "Won BKMAG's Best Nightlife in Brooklyn. Legendary rotating parties — Almighty Burner (funk/soul/boogie on Wednesdays) and Future Old School (hip hop, last Saturday).",
+    "crowd": "The most welcoming room in Brooklyn — neighborhood regulars, dancers who actually move, all ages and backgrounds mixing easily.",
+    "tip": "Wednesday's Almighty Burner is the sleeper hit of the week. Get there by 9 if you want space to dance on weekends."
+  },
+  "Nublu": {
+    "vibe": "Glowing blue door on Ave C opens to a sweaty, trance-like jazz room that defies categories",
+    "known_for": "Avant-garde jazz, world music, and experimental acts curated by founder Ilhan Ersahin since 2002.",
+    "crowd": "Music-obsessed night owls who actually listen — curious locals, not bottle-service types. Everyone mingles between sets.",
+    "tip": "Get there before midnight or you'll be sardined. The secret backyard is a lifesaver on hot nights. No ATM inside, bring cash."
+  },
+  "Pianos": {
+    "vibe": "Grimy two-floor LES institution that smells like a basement but never stops being fun",
+    "known_for": "The definitive Lower East Side dive-meets-venue since 2002. Three spaces: front bar, back room for live bands, upstairs for dancing and DJs.",
+    "crowd": "Indie music nerds mixed with recent NYC transplants who just discovered the LES. Diverse, young, always packed.",
+    "tip": "Happy hour frozen margaritas are the move. Upstairs dance floor is where the night really happens. Don't wear anything you care about."
+  },
+  "Metrograph": {
+    "vibe": "A cinephile's speakeasy — retro-glam lobby downstairs, old Hollywood lounge upstairs",
+    "known_for": "Impeccable repertory film curation, new indie premieres, and Q&As in a gorgeous two-screen cinema with a full restaurant and cocktail bar.",
+    "crowd": "Stylish downtown film buffs — straw hats, vintage boots, couples sipping cocktails in the lounge. More Criterion Collection than AMC.",
+    "tip": "Grab a drink at the upstairs commissary bar before your screening — feels like 1950s Hollywood. Seats can be tight so arrive early."
+  },
+  "Club Cumming": {
+    "vibe": "Cheeky, glitter-dusted East Village cabaret where anything goes and everyone's welcome",
+    "known_for": "Alan Cumming's queer nightlife haven — cabaret, drag, burlesque, comedy, karaoke, and dance parties that channel old-school downtown NYC.",
+    "crowd": "Neighborhood gay men in vintage tees, gender-non-conforming millennials in glitter, straight allies in black — everyone packed in and vibing.",
+    "tip": "Check the schedule — every night is wildly different. It gets shoulder-to-shoulder fast so arrive early."
+  },
+  "Bell House": {
+    "vibe": "Cavernous converted warehouse with 25-foot ceilings and the energy of Brooklyn's living room",
+    "known_for": "Brooklyn's go-to for indie music, comedy, and brainy events like the monthly Secret Science Club.",
+    "crowd": "Culturally curious Brooklyn millennials and older — the type who go to a comedy show Friday and a science lecture Tuesday.",
+    "tip": "Sightlines are great from anywhere in the main room. Eat before you come — food options are limited."
+  },
+  "Union Hall": {
+    "vibe": "Part hunting lodge, part bocce court, part basement concert venue — all Park Slope charm",
+    "known_for": "Indoor bocce courts, a fireplace-and-bookshelf upstairs bar, and a basement venue hosting comedy, indie bands, and dance parties nightly.",
+    "crowd": "Mid-20s to 30s Park Slope locals — laid-back and social. Not quite hipsters, more like the one successful friend of a hipster.",
+    "tip": "Grab a booth upstairs by the fireplace for drinks, then head down for the show. Saturday nights get packed — come early to snag bocce."
+  },
+  "Littlefield": {
+    "vibe": "Scrappy converted warehouse that punches way above its weight for indie comedy and music",
+    "known_for": "Brooklyn's indie comedy and live performance hub — home to Butterboy standup on Mondays, Tinder Live, and live podcast tapings.",
+    "crowd": "Creative Brooklyn types who follow comedy podcasts and know the indie scene. Friendly, artsy, and genuinely there for the show.",
+    "tip": "It gets hot and packed for popular shows — arrive early for a good spot and dress light."
+  },
+  "Pioneer Works": {
+    "vibe": "Massive industrial art warehouse with a chill garden bar — feels like a creative campus, not a museum",
+    "known_for": "Free Second Sundays open house with open studios, live music, exhibitions, and food across three floors and a garden.",
+    "crowd": "Artists, curious families, mellow hipsters, and science-meets-art types — everyone's wandering and nobody's in a rush.",
+    "tip": "Second Sundays (free, monthly) is the move but it gets packed — RSVP early and arrive right at noon to talk to artists before the crowds build."
+  },
+  "Spectacle Theater": {
+    "vibe": "A 35-seat former bodega that feels like a cinephile speakeasy — dark, cozy, covered in posters",
+    "known_for": "Volunteer-run $5 screenings of the most obscure, weird, and cult films you'll never find anywhere else. BYOB.",
+    "crowd": "Film nerds, Williamsburg art kids, and anyone who thinks mainstream indie is too mainstream — small enough that everyone's basically friends.",
+    "tip": "It's BYOB with no concessions — grab a six-pack from the bodega around the corner. Only 35 seats so showing up 15 minutes early matters."
+  },
+  "Jalopy Theatre": {
+    "vibe": "Exposed brick, skylights, and a pass-the-hat folk stage — like your cool uncle's living room concert",
+    "known_for": "Roots and folk music from around the world — blues, bluegrass, old-time, Irish, African, Mexican. Most shows are free or pass-the-hat.",
+    "crowd": "Intergenerational mix of folk music diehards, neighborhood regulars, and people who wandered in from the tavern next door.",
+    "tip": "Hit the Jalopy Tavern next door first for small plates and interesting beers, then drift into the theatre."
+  },
+  "Rockwood Music Hall": {
+    "vibe": "Intimate, no-cover, slightly gothic room where you're three feet from the next big thing",
+    "known_for": "Three stages of live music every single night with no cover on Stage 1. A legendary launching pad for emerging artists.",
+    "crowd": "Music lovers who want to discover bands before anyone else does, plus the artists' friends — unpretentious and paying attention.",
+    "tip": "Stage 1 is always free — just walk in. The tip bucket comes around, so bring cash for the artists."
+  },
+  "Caveat": {
+    "vibe": "A nerdy basement cabaret behind a nondescript door — half comedy club, half TED talk, all weird",
+    "known_for": "Brainy, offbeat programming that mixes comedy, science talks, game shows, and Nerd Nite. Where smart and funny overlap.",
+    "crowd": "Grad students, science faculty, comedy nerds, and anyone who unironically loves a good lecture — quirky and engaged.",
+    "tip": "Look for the unmarked black door on Clinton St and arrive early — it's open seating and fills fast."
+  }
+}

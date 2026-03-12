@@ -99,10 +99,10 @@ message -> checkMechanical (help + TCPA only, $0)
 **Story: The agent knows what venues feel like**
 > As a user, when I get a pick at Union Pool, I want to hear "sweaty dive bar, loud bands, cheap beer, gets packed by 9" — not just "Union Pool, Williamsburg."
 
-- [ ] Create `src/venue-knowledge.js` with structured venue profiles (vibe, known_for, crowd, tips, good_for)
-- [ ] Seed top 50 venues by frequency in event data (manual research + LLM-assisted draft, human reviewed)
-- [ ] Wire venue profiles into `serializePoolForContinuation()` — attach `venue_vibe` and `venue_tip` to each event
-- [ ] Wire venue profiles into details responses — `executeTool` for details intent looks up venue profile
+- [x] Venue profiles in `data/venue-profiles.json`, lookup via `lookupVenueProfile()` in `venues.js` (30 venues, web-researched, human-reviewed)
+- [x] `venue_vibe` one-liner wired into pool serialization (`serializePoolForContinuation`)
+- [x] Full venue profile (known_for, crowd, tip) wired into details intent (`agent-loop.js`)
+- [x] System prompt updated with `venue_vibe` and `venue_profile` guidance
 - [ ] Run scenario evals to verify agent uses venue knowledge naturally
 
 **Story: Yutori's editorial voice comes through**
@@ -269,6 +269,7 @@ message -> checkMechanical (help + TCPA only, $0)
 | "Other" Category Reduction | Mar 9 | `remapOtherCategory` rules-based remap: 11 pattern groups (sound bath→community, film→film, vinyl night→nightlife, etc.). Runs post-stamp in cache build. |
 | Editorial Note Preservation | Mar 9 | `editorial_note` field added to extraction prompt, carried through normalization→serialization→details. All 4 LLM-extracted sources benefit. |
 | Venue Learning Persistence | Mar 9 | Already implemented: `exportLearnedVenues`/`importLearnedVenues` wired to disk. 2500+ venues survive restarts. |
+| Phase 8: Venue Knowledge (partial) | Mar 12 | 30 venue profiles in `data/venue-profiles.json` (web-researched, human-reviewed). `venue_vibe` in pool serialization, full profile in details intent, prompt guidance added. |
 
 ### Prompt Hygiene — Open Items
 
