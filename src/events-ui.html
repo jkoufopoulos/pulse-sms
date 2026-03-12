@@ -471,6 +471,10 @@
       <option value="">All</option>
       <option value="free">Free only</option>
       <option value="paid">Paid only</option>
+      <option value="low">$1–20</option>
+      <option value="mid">$21–50</option>
+      <option value="high">$51+</option>
+      <option value="unknown">Unknown price</option>
     </select>
   </div>
   <div class="filter-group">
@@ -706,6 +710,10 @@ function applyFilters() {
     }
     if (price === 'free' && !e.is_free) return false;
     if (price === 'paid' && e.is_free) return false;
+    if (price === 'unknown' && (e.is_free || parsePrice(e) !== null)) return false;
+    if (price === 'low') { const p = parsePrice(e); if (e.is_free || p === null || p > 20) return false; }
+    if (price === 'mid') { const p = parsePrice(e); if (e.is_free || p === null || p <= 20 || p > 50) return false; }
+    if (price === 'high') { const p = parsePrice(e); if (e.is_free || p === null || p <= 50) return false; }
     if (source && e.source_name !== source) return false;
     return true;
   });
@@ -985,7 +993,7 @@ function computeDistribution(events, field) {
   return Object.entries(counts).sort((a, b) => b[1] - a[1]);
 }
 
-function renderBars(container, dist, total, fillClass, maxItems) {
+function renderBars(container, dist, total, fillClass, maxItems, onClick) {
   const maxVal = dist.length ? dist[0][1] : 1;
   const items = maxItems ? dist.slice(0, maxItems) : dist;
   const isFiltered = filteredEvents.length < allEvents.length;
@@ -997,7 +1005,8 @@ function renderBars(container, dist, total, fillClass, maxItems) {
     const valueText = isFiltered ? `${count} / ${total} (${sharePct}%)` : `${count} (${sharePct}%)`;
     const displayLabel = label.replace(/_/g, ' ');
     const barClass = typeof fillClass === 'function' ? fillClass(label) : fillClass;
-    html += `<div class="analytics-bar-row">
+    const clickAttr = onClick ? ` onclick="${onClick}('${label.replace(/'/g, "\\'")}')" style="cursor:pointer"` : '';
+    html += `<div class="analytics-bar-row"${clickAttr}>
       <span class="analytics-bar-label" title="${esc(displayLabel)}">${esc(displayLabel)}</span>
       <div class="analytics-bar-track"><div class="analytics-bar-fill ${barClass}" style="width:${pct}%"></div></div>
       <span class="analytics-bar-value">${valueText}</span>
@@ -1010,6 +1019,27 @@ function renderBars(container, dist, total, fillClass, maxItems) {
   }
 
   container.innerHTML = html;
+}
+
+function filterByCategory(cat) {
+  const sel = document.getElementById('f-category');
+  // Toggle off if already selected
+  if (sel.value === cat) { sel.value = ''; applyFilters(); return; }
+  // Add option if not in dropdown (e.g. trivia, film)
+  if (!sel.querySelector(`option[value="${cat}"]`)) {
+    const opt = document.createElement('option');
+    opt.value = cat;
+    opt.textContent = cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    sel.appendChild(opt);
+  }
+  sel.value = cat;
+  applyFilters();
+}
+
+function filterByNeighborhood(hood) {
+  const sel = document.getElementById('f-neighborhood');
+  sel.value = sel.value === hood ? '' : hood;
+  applyFilters();
 }
 
 function toggleHoodShowAll() {
@@ -1105,6 +1135,12 @@ function setDateFilter(date) {
   applyFilters();
 }
 
+function setPriceFilter(bucket) {
+  const sel = document.getElementById('f-price');
+  sel.value = sel.value === bucket ? '' : bucket;
+  applyFilters();
+}
+
 function parsePrice(event) {
   if (event.is_free) return 0;
   const pd = event.price_display;
@@ -1132,19 +1168,22 @@ function renderFreePaid(events) {
   }
 
   const buckets = [
-    ['Free', free, 'bar-fill-price-free'],
-    ['$1–20', low, 'bar-fill-price-low'],
-    ['$21–50', mid, 'bar-fill-price-mid'],
-    ['$51+', high, 'bar-fill-price-high'],
-    ['Unknown', unknown, 'bar-fill-price-unknown'],
+    ['Free', free, 'bar-fill-price-free', 'free'],
+    ['$1–20', low, 'bar-fill-price-low', 'low'],
+    ['$21–50', mid, 'bar-fill-price-mid', 'mid'],
+    ['$51+', high, 'bar-fill-price-high', 'high'],
+    ['Unknown', unknown, 'bar-fill-price-unknown', 'unknown'],
   ];
   const maxBucket = Math.max(...buckets.map(b => b[1]), 1);
+  const activePriceFilter = document.getElementById('f-price').value;
 
   let bucketsHtml = '';
-  for (const [label, count, cls] of buckets) {
+  for (const [label, count, cls, filterVal] of buckets) {
     const pct = ((count / maxBucket) * 100).toFixed(1);
     const sharePct = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
-    bucketsHtml += `<div class="analytics-bar-row">
+    const isActive = activePriceFilter === filterVal;
+    const style = isActive ? 'background:#1a1a2e;border-radius:4px;cursor:pointer' : 'cursor:pointer';
+    bucketsHtml += `<div class="analytics-bar-row" style="${style}" onclick="setPriceFilter('${filterVal}')">
       <span class="analytics-bar-label">${label}</span>
       <div class="analytics-bar-track"><div class="analytics-bar-fill ${cls}" style="width:${pct}%"></div></div>
       <span class="analytics-bar-value">${count} (${sharePct}%)</span>
@@ -1307,17 +1346,19 @@ function updateAnalytics() {
   renderBars(
     document.getElementById('analytics-categories'),
     catDist, total,
-    label => 'bar-fill-' + label.replace(/[^a-z_]/g, '')
+    label => 'bar-fill-' + label.replace(/[^a-z_]/g, ''),
+    null,
+    'filterByCategory'
   );
 
   // Source distribution
   const srcDist = computeDistribution(events, 'source_name');
-  renderBars(document.getElementById('analytics-sources'), srcDist, total, 'bar-fill-source');
+  renderBars(document.getElementById('analytics-sources'), srcDist, total, 'bar-fill-source', null, 'filterBySource');
 
   // Neighborhood distribution
   const hoodDist = computeDistribution(events, 'neighborhood');
   const hoodLimit = hoodShowAll ? null : 15;
-  renderBars(document.getElementById('analytics-hoods'), hoodDist, total, 'bar-fill-hood', hoodLimit);
+  renderBars(document.getElementById('analytics-hoods'), hoodDist, total, 'bar-fill-hood', hoodLimit, 'filterByNeighborhood');
 
   // Event map
   renderBoroughMap(document.getElementById('borough-map'));
