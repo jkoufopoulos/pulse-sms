@@ -19,6 +19,8 @@ const CATEGORIES = [
   { slug: 'music', categoryOverride: null },              // infer from name (live_music vs nightlife)
   { slug: 'comedy', categoryOverride: 'comedy' },
   { slug: 'theatre-art-design', categoryOverride: null },  // mix of theater + art — infer per card
+  { slug: 'film-screenings', categoryOverride: 'film' },
+  { slug: 'lgbtq', categoryOverride: null },              // mix of nightlife, community, drag — infer per card
 ];
 
 const MAX_PAGES = 3;
@@ -97,12 +99,22 @@ function parseCards($, cards, dateStr, categoryOverride) {
     if (!category) {
       const catClass = (card.attr('class') || '').match(/ds-event-category-(\S+)/);
       const cardCat = catClass ? catClass[1] : '';
-      if (cardCat === 'dj-parties') {
+      if (cardCat === 'dj-parties' || cardCat === 'dance-parties' || cardCat === 'club-nights') {
         category = 'nightlife';
-      } else if (cardCat === 'performing-arts' || cardCat === 'theatre-performing-arts') {
+      } else if (cardCat === 'performing-arts' || cardCat === 'theatre-performing-arts' || cardCat === 'theater' || cardCat === 'theatre') {
         category = 'theater';
-      } else if (cardCat === 'art') {
+      } else if (cardCat === 'art' || cardCat === 'art-design' || cardCat === 'design') {
         category = 'art';
+      } else if (cardCat === 'film' || cardCat === 'film-screenings' || cardCat === 'screenings') {
+        category = 'film';
+      } else if (cardCat === 'comedy' || cardCat === 'stand-up') {
+        category = 'comedy';
+      } else if (cardCat === 'music' || cardCat === 'concerts' || cardCat === 'live-music') {
+        category = 'live_music';
+      } else if (cardCat === 'food-drink' || cardCat === 'food' || cardCat === 'nightlife') {
+        category = cardCat === 'nightlife' ? 'nightlife' : 'food_drink';
+      } else if (cardCat === 'community' || cardCat === 'talks-lectures' || cardCat === 'workshops') {
+        category = 'community';
       } else {
         category = inferCategory(name.toLowerCase());
       }
@@ -193,11 +205,12 @@ function extractDetailsFromPage(html) {
   let price = null;
   const schemaPrice = $('[itemprop="price"]').attr('content') || $('[itemprop="price"]').text().trim();
   if (schemaPrice) {
-    const m = schemaPrice.match(/\$(\d+(?:\.\d{2})?)/);
-    if (m) price = `$${m[1]}`;
+    const m = schemaPrice.match(/\$?(\d+(?:\.\d{2})?)/);
+    if (m && parseFloat(m[1]) > 0) price = `$${m[1]}`;
+    else if (m && parseFloat(m[1]) === 0) price = 'free';
   }
   if (!price) {
-    const detailText = $('.ds-event-detail, .ds-event-description, .ds-event-details').text();
+    const detailText = $('.ds-event-detail, .ds-event-description-inner, .ds-detail-description, .ds-event-details').text();
     if (/\bfree\b/i.test(detailText)) {
       price = 'free';
     } else {
@@ -210,9 +223,11 @@ function extractDetailsFromPage(html) {
     }
   }
 
-  // Description extraction — only use .ds-event-description (detail is too noisy)
+  // Description extraction — prefer .ds-event-description-inner, fall back to .ds-detail-description
   let description = null;
-  const descEl = $('.ds-event-description').first();
+  const descEl = ($('.ds-event-description-inner').first().length
+    ? $('.ds-event-description-inner').first()
+    : $('.ds-detail-description').first());
   if (descEl.length) {
     let text = descEl.text().trim();
     // Strip leading whitespace/newlines and collapse internal whitespace

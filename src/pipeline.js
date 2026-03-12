@@ -254,6 +254,8 @@ const CATEGORY_SOFT_MAP = {
   live_music: ['jazz', 'classical'],
   jazz: ['live_music'],
   classical: ['live_music'],
+  film: ['art'],
+  art: ['film'],
 };
 
 function eventMatchesFilters(event, filters) {

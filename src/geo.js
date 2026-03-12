@@ -199,12 +199,15 @@ function getNycDateString(dayOffset = 0, refTimeMs = Date.now()) {
  */
 function inferCategory(text) {
   if (/\b(comedy|stand-?up|improv|open mic)\b/.test(text)) return 'comedy';
-  if (/\b(gallery|exhibit|art show|opening reception|installation)\b/.test(text)) return 'art';
-  if (/\b(dj|dance party|club night|rave|techno|house music)\b/.test(text)) return 'nightlife';
-  if (/\b(concert|live music|band|singer|songwriter|jazz|acoustic)\b/.test(text)) return 'live_music';
-  if (/\b(theater|theatre|musical|play|performance|broadway)\b/.test(text)) return 'theater';
-  if (/\b(food|tasting|wine|beer|cocktail|brunch|dinner)\b/.test(text)) return 'food_drink';
-  if (/\b(workshop|class|meetup|volunteer|community|market|fair|festival)\b/.test(text)) return 'community';
+  if (/\b(gallery|exhibit(?:ion)?|art show|opening reception|installation|mural|sculpture)\b/.test(text)) return 'art';
+  if (/\b(dj|dance party|club night|rave|techno|house music|disco|dj set)\b/.test(text)) return 'nightlife';
+  if (/\b(concert|live music|band|singer|songwriter|jazz|acoustic|orchestra|ensemble|quartet|trio|bluegrass|folk music|opera)\b/.test(text)) return 'live_music';
+  if (/\b(theater|theatre|musical|play|broadway|cabaret|burlesque|drag show|drag|variety show|immersive)\b/.test(text)) return 'theater';
+  if (/\b(film|movie|screening|cinema|documentary|short films)\b/.test(text)) return 'film';
+  if (/\b(trivia|quiz|game night|board game|bingo|karaoke)\b/.test(text)) return 'trivia';
+  if (/\b(poetry|spoken word|storytelling|book reading|literary|book launch|reading series)\b/.test(text)) return 'spoken_word';
+  if (/\b(food|tasting|wine|beer|cocktail|brunch|dinner|supper club)\b/.test(text)) return 'food_drink';
+  if (/\b(workshop|class|meetup|volunteer|community|market|fair|festival|flea|popup|pop-?up|sound bath|meditation|yoga|wellness|lecture|talk)\b/.test(text)) return 'community';
   return 'other';
 }
 

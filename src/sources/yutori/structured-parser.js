@@ -83,12 +83,32 @@ function parseDateTimeLine(text, fallbackDate) {
   }
   if (!dateLocal) dateLocal = fallbackDate;
 
-  // Extract time: "H:MM AM/PM" with optional end time
-  const timeMatch = text.match(/(\d{1,2}:\d{2})\s*([AP]M)\s*(?:[-–]\s*(\d{1,2}:\d{2})\s*([AP]M))?/i);
-  if (timeMatch && dateLocal) {
-    startTime = dateLocal + 'T' + parseTo24h(timeMatch[1] + ' ' + timeMatch[2]);
-    if (timeMatch[3] && timeMatch[4]) {
-      endTime = dateLocal + 'T' + parseTo24h(timeMatch[3] + ' ' + timeMatch[4]);
+  // Special time words
+  const SPECIAL_TIMES = { sunrise: '06:00', sundown: '18:00', sunset: '18:00', noon: '12:00', midnight: '00:00' };
+  const specialMatch = text.match(/\b(sunrise|sundown|sunset|noon|midnight)\b/i);
+  if (specialMatch && dateLocal) {
+    startTime = dateLocal + 'T' + SPECIAL_TIMES[specialMatch[1].toLowerCase()];
+  }
+
+  // Doors/show format: "H:MM PM doors / H:MM PM show" — use show time
+  if (!startTime) {
+    const doorsShowMatch = text.match(/(\d{1,2}(?::\d{2})?)\s*([AP]M)\s*doors\s*\/\s*(\d{1,2}(?::\d{2})?)\s*([AP]M)\s*show/i);
+    if (doorsShowMatch && dateLocal) {
+      const showTime = doorsShowMatch[3].includes(':') ? doorsShowMatch[3] : doorsShowMatch[3] + ':00';
+      startTime = dateLocal + 'T' + parseTo24h(showTime + ' ' + doorsShowMatch[4]);
+    }
+  }
+
+  // Extract time: "H:MM AM/PM" or "H AM/PM" with optional end time
+  if (!startTime) {
+    const timeMatch = text.match(/(\d{1,2}(?::\d{2})?)\s*([AP]M)\s*(?:[-–]\s*(\d{1,2}(?::\d{2})?)\s*([AP]M))?/i);
+    if (timeMatch && dateLocal) {
+      const startRaw = timeMatch[1].includes(':') ? timeMatch[1] : timeMatch[1] + ':00';
+      startTime = dateLocal + 'T' + parseTo24h(startRaw + ' ' + timeMatch[2]);
+      if (timeMatch[3] && timeMatch[4]) {
+        const endRaw = timeMatch[3].includes(':') ? timeMatch[3] : timeMatch[3] + ':00';
+        endTime = dateLocal + 'T' + parseTo24h(endRaw + ' ' + timeMatch[4]);
+      }
     }
   }
 

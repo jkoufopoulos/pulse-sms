@@ -15,17 +15,18 @@ const { checkBaseline } = require('./scrape-guard');
 // ============================================================
 
 const OTHER_REMAP_RULES = [
-  { pattern: /\b(sound bath|meditation|breathwork|yoga|wellness|healing)\b/i, category: 'community' },
-  { pattern: /\b(zine|popup market|pop-?up market|flea market|flea|vintage market|craft fair|bazaar|swap meet)\b/i, category: 'community' },
-  { pattern: /\b(workshop|class(?:es)?|seminar|lecture|talk(?:s)?)\b/i, category: 'community' },
-  { pattern: /\b(immersive|performance art|cabaret|burlesque|variety show|drag show|drag)\b/i, category: 'theater' },
-  { pattern: /\b(film|movie|screening|cinema|documentary|short films)\b/i, category: 'film' },
-  { pattern: /\b(vinyl night|dance party|disco|dj\b|dj set|club night|rave|techno night|house night)\b/i, category: 'nightlife' },
-  { pattern: /\b(jazz|acoustic|live band|songwriter|bluegrass|folk music|orchestra|ensemble|quartet|trio)\b/i, category: 'live_music' },
-  { pattern: /\b(trivia|quiz|game night|board game|bingo|karaoke)\b/i, category: 'trivia' },
-  { pattern: /\b(gallery|exhibition|art show|art opening|mural|sculpture)\b/i, category: 'art' },
-  { pattern: /\b(book reading|poetry|spoken word|storytelling|literary|book launch|reading series|open mic.*poet)\b/i, category: 'spoken_word' },
-  { pattern: /\b(wine tasting|supper club|food popup|food pop-?up|tasting|beer fest|cocktail|brunch)\b/i, category: 'food_drink' },
+  { pattern: /\b(sound bath|meditation|breathwork|yoga|wellness|healing|reiki)\b/i, category: 'community' },
+  { pattern: /\b(zine|popup market|pop-?up market|flea market|flea|vintage market|craft fair|bazaar|swap meet|sample sale|makers?\s*market)\b/i, category: 'community' },
+  { pattern: /\b(workshop|class(?:es)?|seminar|lecture|talk(?:s)?|panel|discussion|meetup|networking|open house|fundrais|benefit|gala|rally|activism)\b/i, category: 'community' },
+  { pattern: /\b(immersive|performance art|cabaret|burlesque|variety show|drag show|drag|circus|acrobat|puppet|one[- ]?(?:wo)?man show)\b/i, category: 'theater' },
+  { pattern: /\b(film|movie|screening|cinema|documentary|short films|premiere|repertory)\b/i, category: 'film' },
+  { pattern: /\b(vinyl night|dance party|disco|dj\b|dj set|club night|rave|techno night|house night|afterparty|after[- ]?party|party)\b/i, category: 'nightlife' },
+  { pattern: /\b(jazz|acoustic|live band|songwriter|bluegrass|folk music|orchestra|ensemble|quartet|trio|opera|recital|philharmonic|symphony|choir|choral)\b/i, category: 'live_music' },
+  { pattern: /\b(concert|live music|in concert)\b/i, category: 'live_music' },
+  { pattern: /\b(trivia|quiz|game night|board game|bingo|karaoke|pub quiz)\b/i, category: 'trivia' },
+  { pattern: /\b(gallery|exhibition|art show|art opening|mural|sculpture|retrospective|art walk|photo(?:graphy)?\s*(?:show|exhibit|opening))\b/i, category: 'art' },
+  { pattern: /\b(book reading|poetry|spoken word|storytelling|literary|book launch|reading series|open mic.*poet|poetry slam|author)\b/i, category: 'spoken_word' },
+  { pattern: /\b(wine tasting|supper club|food popup|food pop-?up|tasting|beer fest|cocktail|brunch|dinner party|pop-?up dinner|food festival)\b/i, category: 'food_drink' },
 ];
 
 function remapOtherCategory(event) {

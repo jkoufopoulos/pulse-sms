@@ -338,7 +338,9 @@ check('food popup → food_drink', remapOtherCategory({ category: 'other', name:
 check('comedy stays comedy', remapOtherCategory({ category: 'comedy', name: 'Stand-up Night' }).category === 'comedy');
 
 // Should leave genuinely unknown "other" alone
-check('unknown stays other', remapOtherCategory({ category: 'other', name: 'Annual Gala Fundraiser' }).category === 'other');
+check('unknown stays other', remapOtherCategory({ category: 'other', name: 'Mysterious Gathering 2026' }).category === 'other');
+// Gala fundraiser should remap to community
+check('gala remaps to community', remapOtherCategory({ category: 'other', name: 'Annual Gala Fundraiser' }).category === 'community');
 
 // Should also check description_short
 check('description match works', remapOtherCategory({ category: 'other', name: 'Special Event', description_short: 'An evening of jazz and cocktails' }).category === 'live_music');
