@@ -170,22 +170,10 @@
   .no-data { color: #555; }
 
   /* Analytics panel */
-  .analytics-toggle {
-    display: flex; align-items: center; gap: 8px; padding: 8px 20px;
-    background: #111; border-bottom: 1px solid #282828; cursor: pointer;
-    user-select: none; font-size: 13px; color: #aaa;
-  }
-  .analytics-toggle:hover { color: #ccc; }
-  .analytics-toggle .tri { display: inline-block; transition: transform 0.2s; font-size: 10px; }
-  .analytics-toggle .tri.open { transform: rotate(90deg); }
-  .analytics-toggle .filtered-badge {
-    font-size: 10px; background: #FF6B35; color: #fff; padding: 1px 6px;
-    border-radius: 8px; font-weight: 600; display: none;
-  }
-  .analytics-panel { display: none; padding: 16px 20px; background: #0f0f0f; border-bottom: 1px solid #282828; }
-  .analytics-panel.open { display: block; }
-  .analytics-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 12px; }
-  .analytics-grid-top { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 12px; }
+  .analytics-panel { padding: 16px 20px; background: #0f0f0f; border-bottom: 1px solid #282828; }
+  .analytics-row-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px; }
+  .analytics-row-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 12px; }
+  .analytics-row-full { margin-bottom: 12px; }
   .analytics-card { background: #1a1a1a; border: 1px solid #282828; border-radius: 8px; padding: 12px; }
   .analytics-card h4 { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
   .analytics-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
@@ -195,10 +183,14 @@
   .analytics-bar-value { font-size: 11px; color: #888; width: 70px; flex-shrink: 0; white-space: nowrap; }
   .analytics-more-row { font-size: 11px; color: #666; text-align: center; margin-top: 4px; cursor: pointer; }
   .analytics-more-row:hover { color: #aaa; }
+  .analytics-filtered-badge {
+    font-size: 10px; background: #FF6B35; color: #fff; padding: 1px 6px;
+    border-radius: 8px; font-weight: 600; display: none; margin-left: 8px; vertical-align: middle;
+  }
 
   /* Date chart */
-  .date-chart { display: flex; align-items: flex-end; gap: 6px; height: 90px; }
-  .date-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; height: 100%; justify-content: flex-end; }
+  .date-chart { display: flex; align-items: flex-end; gap: 4px; height: 60px; }
+  .date-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; height: 100%; justify-content: flex-end; min-width: 0; }
   .date-bar { width: 100%; border-radius: 3px 3px 0 0; min-height: 2px; background: #FF6B35; cursor: pointer; transition: opacity 0.15s; }
   .date-bar:hover { opacity: 0.8; }
   .date-bar.active { box-shadow: 0 0 0 2px #FF6B35; }
@@ -232,12 +224,9 @@
   .bar-fill-price-mid { background: linear-gradient(90deg, #2d1f4e, #a78bfa); }
   .bar-fill-price-high { background: linear-gradient(90deg, #3d1f2d, #f687b3); }
   .bar-fill-price-unknown { background: linear-gradient(90deg, #2a2a2a, #666); }
-  .bar-fill-price-coverage { background: linear-gradient(90deg, #1a3d2a, #4ade80); }
-  .bar-fill-price-nocoverage { background: linear-gradient(90deg, #2a2a2a, #555); }
 
-  /* Borough map */
-  .borough-map-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px; }
-  #borough-map { height: 320px; border-radius: 6px; background: #111; }
+  /* Event map */
+  #borough-map { height: 400px; border-radius: 6px; background: #111; }
   .leaflet-container { background: #111 !important; }
   .hood-tooltip { font-size: 11px; font-weight: 600; background: #1a1a1a !important; color: #e0e0e0 !important; border: 1px solid #444 !important; border-radius: 4px !important; padding: 4px 8px !important; }
 
@@ -249,6 +238,82 @@
   .analytics-gaps strong { color: #fbbf24; }
   .analytics-gaps ul { margin: 4px 0 0 18px; list-style: disc; }
   .analytics-gaps li { margin-bottom: 2px; }
+
+  /* Agent Eye panel */
+  .agent-eye-panel {
+    margin: 0 20px 16px; padding: 16px; border-radius: 8px;
+    background: #0f1520; border: 1px solid #1e3a5f;
+  }
+  .agent-eye-header {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;
+  }
+  .agent-eye-header h3 { font-size: 15px; font-weight: 700; color: #90cdf4; margin: 0; }
+  .agent-eye-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .agent-eye-controls select, .agent-eye-controls input {
+    padding: 5px 8px; background: #1a2a3e; border: 1px solid #2d4a6f; border-radius: 4px;
+    color: #e0e0e0; font-size: 12px;
+  }
+  .agent-eye-btn {
+    padding: 5px 14px; background: #2d4a6f; border: 1px solid #3b6998; border-radius: 4px;
+    color: #90cdf4; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.15s;
+  }
+  .agent-eye-btn:hover { background: #3b6998; }
+  .agent-eye-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .agent-eye-meta {
+    display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px;
+    padding: 8px 12px; background: #111a28; border-radius: 4px; font-size: 12px;
+  }
+  .agent-eye-meta-item { display: flex; gap: 4px; }
+  .agent-eye-meta-item .label { color: #667; }
+  .agent-eye-meta-item .value { color: #90cdf4; font-weight: 600; }
+  .agent-eye-serialized {
+    background: #0a1018; border: 1px solid #1e3a5f; border-radius: 6px;
+    padding: 12px; font-family: 'SF Mono', Monaco, monospace; font-size: 11px;
+    line-height: 1.5; white-space: pre-wrap; color: #a5d6ff;
+    max-height: 400px; overflow-y: auto; display: none;
+  }
+  .agent-eye-pool { display: none; }
+  .agent-eye-card {
+    display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
+    background: #111a28; border: 1px solid #1e3a5f; border-radius: 6px;
+    margin-bottom: 6px; cursor: pointer; transition: border-color 0.15s;
+  }
+  .agent-eye-card:hover { border-color: #3b6998; background: #152030; }
+  .agent-eye-rank { font-size: 11px; color: #667; font-weight: 600; min-width: 22px; padding-top: 2px; }
+  .agent-eye-card-body { flex: 1; min-width: 0; }
+  .agent-eye-card-name { font-size: 13px; font-weight: 600; color: #e0e0e0; margin-bottom: 3px; }
+  .agent-eye-card-venue { font-size: 11px; color: #888; margin-bottom: 4px; }
+  .agent-eye-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+  .agent-eye-tag {
+    display: inline-block; padding: 1px 6px; border-radius: 8px;
+    font-size: 10px; font-weight: 600;
+  }
+  .tag-match { background: #1a3d2d; color: #68d391; }
+  .tag-soft { background: #3d3420; color: #f6e05e; }
+  .tag-nearby { background: #2d1f4e; color: #b794f6; }
+  .tag-vibe { background: #3d2d1f; color: #f6ad55; }
+  .tag-signal { background: #1e3a5f; color: #90cdf4; }
+  .tag-warn { background: #3d1f1f; color: #fc8181; }
+  .agent-eye-card-signals { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+  .agent-eye-toggle-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .agent-eye-toggle {
+    padding: 4px 10px; background: #111a28; border: 1px solid #1e3a5f; border-radius: 4px;
+    color: #667; font-size: 11px; cursor: pointer; transition: all 0.15s;
+  }
+  .agent-eye-toggle.active { background: #1e3a5f; color: #90cdf4; border-color: #3b6998; }
+  .agent-eye-empty {
+    padding: 20px; text-align: center; color: #555; font-size: 13px;
+  }
+
+  /* Data quality flags in detail panel */
+  .dq-flag {
+    display: inline-block; padding: 1px 6px; border-radius: 8px;
+    font-size: 10px; font-weight: 600; margin-left: 6px;
+  }
+  .dq-good { background: #1a3d2d; color: #68d391; }
+  .dq-warn { background: #3d3420; color: #f6e05e; }
+  .dq-bad { background: #3d1f1f; color: #fc8181; }
+  .dq-missing { color: #fc8181; font-style: italic; font-size: 12px; }
 
   /* Showing count */
   .showing-count { font-size: 12px; color: #666; padding: 8px 20px 0; }
@@ -265,11 +330,10 @@
     .filter-group { width: 100%; }
     .filter-group select { flex: 1; }
 
-    .analytics-toggle { padding: 8px 12px; }
     .analytics-panel { padding: 12px; }
-    .analytics-grid { grid-template-columns: 1fr; }
-    .analytics-grid-top { grid-template-columns: 1fr; }
-    .borough-map-row { grid-template-columns: 1fr; }
+    .analytics-row-2col { grid-template-columns: 1fr; }
+    .analytics-row-3col { grid-template-columns: 1fr; }
+    #borough-map { height: 300px; }
 
     .table-wrap { padding: 0 8px 80px; }
     td, th { padding: 6px 6px; font-size: 12px; }
@@ -321,6 +385,10 @@
   <div class="stat">
     <span class="stat-label">Neighborhoods</span>
     <span class="stat-value" id="hood-count">--</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">"Other" %</span>
+    <span class="stat-value" id="other-pct">--</span>
   </div>
 </div>
 
@@ -381,37 +449,49 @@
   </div>
 </div>
 
-<!-- Analytics panel -->
-<div class="analytics-toggle" onclick="toggleAnalytics()">
-  <span class="tri" id="analytics-tri">&#9654;</span>
-  <span>Analytics</span>
-  <span class="filtered-badge" id="analytics-filtered-badge">filtered</span>
-</div>
+<!-- Analytics panel (always visible) -->
 <div class="analytics-panel" id="analytics-panel">
-  <div class="analytics-grid-top">
-    <div class="analytics-card"><h4>Date Distribution</h4><div id="analytics-dates"></div></div>
+  <div class="analytics-row-2col">
+    <div class="analytics-card"><h4>Date Distribution <span class="analytics-filtered-badge" id="analytics-filtered-badge">filtered</span></h4><div id="analytics-dates"></div></div>
     <div class="analytics-card"><h4>Price Distribution</h4><div id="analytics-freepaid"></div></div>
   </div>
-  <div class="analytics-grid">
+  <div class="analytics-row-3col">
     <div class="analytics-card"><h4>Category Distribution</h4><div id="analytics-categories"></div></div>
     <div class="analytics-card"><h4>Source Coverage</h4><div id="analytics-sources"></div></div>
     <div class="analytics-card"><h4>Neighborhood Coverage</h4><div id="analytics-hoods"></div></div>
   </div>
-  <div class="analytics-grid-top">
-    <div class="analytics-card"><h4>Price Coverage by Source</h4><div id="analytics-price-coverage"></div></div>
-    <div></div>
-  </div>
-  <div class="borough-map-row">
-    <div class="analytics-card">
-      <h4>Borough Distribution</h4>
-      <div id="analytics-boroughs"></div>
-    </div>
+  <div class="analytics-row-full">
     <div class="analytics-card">
       <h4>Event Map</h4>
       <div id="borough-map"></div>
     </div>
   </div>
   <div class="analytics-gaps" id="analytics-gaps" style="display:none"></div>
+</div>
+
+<!-- Agent Eye panel -->
+<div class="agent-eye-panel" id="agent-eye-panel">
+  <div class="agent-eye-header">
+    <h3>Agent Eye</h3>
+    <span style="font-size:11px;color:#667">See exactly what the model sees when a user texts a neighborhood</span>
+  </div>
+  <div class="agent-eye-controls">
+    <select id="ae-neighborhood">
+      <option value="">Pick a neighborhood...</option>
+    </select>
+    <select id="ae-category">
+      <option value="">Any category</option>
+      <option value="comedy">Comedy</option>
+      <option value="live_music">Live Music</option>
+      <option value="nightlife">Nightlife</option>
+      <option value="art">Art</option>
+      <option value="theater">Theater</option>
+      <option value="community">Community</option>
+    </select>
+    <label style="font-size:12px;color:#888"><input type="checkbox" id="ae-free"> Free only</label>
+    <button class="agent-eye-btn" id="ae-btn" onclick="simulateAgentEye()">Simulate</button>
+  </div>
+  <div id="ae-results" style="margin-top:12px"></div>
 </div>
 
 <!-- Showing count -->
@@ -469,6 +549,7 @@ async function loadEvents() {
     }
     updateSummary(data);
     populateDynamicFilters();
+    populateAgentEyeHoods();
     applyFilters();
   } catch (err) {
     console.error('Failed to load events:', err);
@@ -491,6 +572,14 @@ function updateSummary(data) {
 
   const hoods = new Set((data.events || []).map(e => e.neighborhood).filter(Boolean));
   document.getElementById('hood-count').textContent = hoods.size;
+
+  // "Other" % stat
+  const events = data.events || [];
+  const otherCount = events.filter(e => e.category === 'other' || !e.category).length;
+  const otherPct = events.length > 0 ? ((otherCount / events.length) * 100).toFixed(1) : '0';
+  const otherEl = document.getElementById('other-pct');
+  otherEl.textContent = otherPct + '%';
+  otherEl.style.color = otherPct > 20 ? '#fc8181' : otherPct > 10 ? '#f6e05e' : '#68d391';
 }
 
 // ========== Dynamic filter population ==========
@@ -771,7 +860,11 @@ function showDetail(e) {
     </div>` : ''}
     ${e.extraction_confidence != null ? `<div class="detail-meta-item">
       <span class="detail-meta-label">Confidence</span>
-      <span class="detail-meta-value">${(e.extraction_confidence * 100).toFixed(0)}%</span>
+      <span class="detail-meta-value">${(e.extraction_confidence * 100).toFixed(0)}%${dqFlag(e.extraction_confidence, 0.7, 0.5)}</span>
+    </div>` : ''}
+    ${e.completeness != null || e.extraction_confidence != null ? `<div class="detail-meta-item">
+      <span class="detail-meta-label">Data Quality</span>
+      <span class="detail-meta-value">${dataQualitySummary(e)}</span>
     </div>` : ''}
   `;
 
@@ -833,18 +926,7 @@ document.addEventListener('keydown', e => {
 // ========== Analytics ==========
 
 const CANONICAL_CATEGORIES = ['comedy', 'live_music', 'nightlife', 'art', 'theater', 'food_drink', 'community'];
-let analyticsOpen = false;
 let hoodShowAll = false;
-
-function toggleAnalytics() {
-  analyticsOpen = !analyticsOpen;
-  document.getElementById('analytics-panel').classList.toggle('open', analyticsOpen);
-  document.getElementById('analytics-tri').classList.toggle('open', analyticsOpen);
-  if (analyticsOpen) {
-    updateAnalytics();
-    if (leafletMap) setTimeout(() => leafletMap.invalidateSize(), 150);
-  }
-}
 
 function computeDistribution(events, field) {
   const counts = {};
@@ -905,6 +987,14 @@ function renderGapsCallout(catDist, hoodDist, total) {
     }
   }
 
+  // Stray (non-canonical) categories
+  const canonicalSet = new Set([...CANONICAL_CATEGORIES, 'other', 'trivia', 'spoken_word', 'film']);
+  const strayCats = catDist.filter(([cat]) => !canonicalSet.has(cat) && cat !== 'unknown');
+  if (strayCats.length > 0) {
+    const strayList = strayCats.map(([cat, count]) => `${cat} (${count})`).join(', ');
+    gaps.push(`<strong>Stray categories</strong> (non-canonical): ${strayList}`);
+  }
+
   // Neighborhoods with only 1 event
   const thinHoods = hoodDist.filter(([, c]) => c === 1).map(([h]) => h);
   if (thinHoods.length > 0) {
@@ -923,17 +1013,22 @@ function renderGapsCallout(catDist, hoodDist, total) {
 
 function renderDateChart(events) {
   const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const dateCounts = {};
   for (const e of events) {
     if (e.date_local) dateCounts[e.date_local] = (dateCounts[e.date_local] || 0) + 1;
   }
-  const dates = [...new Set(allEvents.map(e => e.date_local).filter(Boolean))].sort();
+  const allDates = [...new Set(allEvents.map(e => e.date_local).filter(Boolean))].sort();
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  // Show today + next 9 days (10 total)
+  const todayIdx = allDates.indexOf(today);
+  const startIdx = todayIdx >= 0 ? todayIdx : 0;
+  const dates = allDates.slice(startIdx, startIdx + 10);
   if (dates.length === 0) {
     document.getElementById('analytics-dates').innerHTML = '<div style="color:#555;font-size:12px">No date data</div>';
     return;
   }
   const maxCount = Math.max(...dates.map(d => dateCounts[d] || 0), 1);
-  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
   const activeDateFilter = document.getElementById('f-date').value;
 
   document.getElementById('analytics-dates').innerHTML =
@@ -941,14 +1036,17 @@ function renderDateChart(events) {
       const count = dateCounts[date] || 0;
       const d = new Date(date + 'T12:00:00');
       const dayLabel = days[d.getDay()];
+      const dateNum = d.getDate();
+      const monthLabel = months[d.getMonth()];
       const hPct = Math.max((count / maxCount) * 100, 3);
       const isToday = date === today;
       const isActive = date === activeDateFilter;
       const barCls = isActive ? 'active' : (isToday ? '' : 'muted');
-      return `<div class="date-col" onclick="setDateFilter('${date}')">
+      const bottomLabel = isToday ? 'Today' : `${dayLabel} ${dateNum}`;
+      return `<div class="date-col" onclick="setDateFilter('${date}')" title="${monthLabel} ${dateNum}: ${count} events">
         <div class="date-count">${count}</div>
         <div class="date-bar ${barCls}" style="height:${hPct}%"></div>
-        <div class="date-label${isToday ? ' today' : ''}">${dayLabel}</div>
+        <div class="date-label${isToday ? ' today' : ''}">${bottomLabel}</div>
       </div>`;
     }).join('') + '</div>';
 }
@@ -1018,37 +1116,7 @@ function renderFreePaid(events) {
     `<div style="margin-top:10px">${bucketsHtml}</div>`;
 }
 
-function renderPriceCoverage(events) {
-  const sourceCounts = {};
-  const sourceWithPrice = {};
-  for (const e of events) {
-    const src = e.source_name || 'unknown';
-    sourceCounts[src] = (sourceCounts[src] || 0) + 1;
-    if (e.price_display || e.is_free) {
-      sourceWithPrice[src] = (sourceWithPrice[src] || 0) + 1;
-    }
-  }
-
-  const sources = Object.entries(sourceCounts).sort((a, b) => b[1] - a[1]);
-  let html = '';
-  for (const [src, total] of sources) {
-    const withPrice = sourceWithPrice[src] || 0;
-    const pct = total > 0 ? ((withPrice / total) * 100) : 0;
-    const noPct = 100 - pct;
-    html += `<div class="analytics-bar-row">
-      <span class="analytics-bar-label" title="${esc(src)}">${esc(src)}</span>
-      <div class="analytics-bar-track">
-        <div class="analytics-bar-fill bar-fill-price-coverage" style="width:${pct}%"></div>
-      </div>
-      <span class="analytics-bar-value">${withPrice}/${total} (${pct.toFixed(0)}%)</span>
-    </div>`;
-  }
-  document.getElementById('analytics-price-coverage').innerHTML = html;
-}
-
 function updateAnalytics() {
-  if (!analyticsOpen) return;
-
   const isFiltered = filteredEvents.length < allEvents.length;
   const events = isFiltered ? filteredEvents : allEvents;
   const total = events.length;
@@ -1060,7 +1128,6 @@ function updateAnalytics() {
   // Date distribution + Price
   renderDateChart(events);
   renderFreePaid(events);
-  renderPriceCoverage(events);
 
   // Category distribution
   const catDist = computeDistribution(events, 'category');
@@ -1079,10 +1146,8 @@ function updateAnalytics() {
   const hoodLimit = hoodShowAll ? null : 15;
   renderBars(document.getElementById('analytics-hoods'), hoodDist, total, 'bar-fill-hood', hoodLimit);
 
-  // Borough distribution
-  const boroughDist = computeBoroughDist(events);
-  renderBoroughBars(document.getElementById('analytics-boroughs'), boroughDist, total);
-  renderBoroughMap(document.getElementById('borough-map'), boroughDist);
+  // Event map
+  renderBoroughMap(document.getElementById('borough-map'));
 
   // Gaps callout — always computed against allEvents for meaningful coverage analysis
   const allCatDist = isFiltered ? computeDistribution(allEvents, 'category') : catDist;
@@ -1122,44 +1187,6 @@ const HOOD_TO_BOROUGH = {
   'Ridgewood': 'Queens', 'Bayside': 'Queens',
 };
 
-const BOROUGH_COLORS = {
-  'Manhattan': '#FF6B35',
-  'Brooklyn': '#3b82f6',
-  'Queens': '#a855f7',
-  'unknown': '#444',
-};
-
-function getBoroughForHood(hood) {
-  if (!hood || hood === 'unknown') return 'unknown';
-  return HOOD_TO_BOROUGH[hood] || 'unknown';
-}
-
-function computeBoroughDist(events) {
-  const counts = {};
-  for (const e of events) {
-    const borough = getBoroughForHood(e.neighborhood);
-    counts[borough] = (counts[borough] || 0) + 1;
-  }
-  return Object.entries(counts).sort((a, b) => b[1] - a[1]);
-}
-
-function renderBoroughBars(container, dist, total) {
-  const maxVal = dist.length ? dist[0][1] : 1;
-  const isFiltered = filteredEvents.length < allEvents.length;
-  let html = '';
-  for (const [label, count] of dist) {
-    const pct = ((count / maxVal) * 100).toFixed(1);
-    const sharePct = ((count / total) * 100).toFixed(1);
-    const valueText = isFiltered ? `${count} / ${total} (${sharePct}%)` : `${count} (${sharePct}%)`;
-    const color = BOROUGH_COLORS[label] || BOROUGH_COLORS['unknown'];
-    html += `<div class="analytics-bar-row">
-      <span class="analytics-bar-label">${esc(label)}</span>
-      <div class="analytics-bar-track"><div class="analytics-bar-fill" style="width:${pct}%;background:linear-gradient(90deg, ${color}33, ${color})"></div></div>
-      <span class="analytics-bar-value">${valueText}</span>
-    </div>`;
-  }
-  container.innerHTML = html;
-}
 
 // Neighborhood coordinates for map circles
 const HOOD_COORDS = {
@@ -1231,7 +1258,7 @@ async function loadGeoJson() {
   return geoJsonData;
 }
 
-async function renderBoroughMap(container, boroughDist) {
+async function renderBoroughMap(container) {
   const hoodCounts = {};
   const events = filteredEvents.length < allEvents.length ? filteredEvents : allEvents;
   for (const e of events) {
@@ -1323,6 +1350,181 @@ function filterByBorough(borough) {
   hoodSelect.value = '';
   window._boroughFilter = hoodsInBorough;
   applyFilters();
+}
+
+// ========== Data Quality Helpers ==========
+
+function dqFlag(value, goodThresh, warnThresh) {
+  if (value == null) return '';
+  if (value >= goodThresh) return '<span class="dq-flag dq-good">OK</span>';
+  if (value >= warnThresh) return '<span class="dq-flag dq-warn">Low</span>';
+  return '<span class="dq-flag dq-bad">Poor</span>';
+}
+
+function dataQualitySummary(e) {
+  const missing = [];
+  if (!e.start_time_local) missing.push('time');
+  if (!e.neighborhood) missing.push('neighborhood');
+  if (!e.venue_name || e.venue_name === 'TBA') missing.push('venue');
+  if (!e.description_short && !e.description) missing.push('description');
+  if (e.category === 'other' || !e.category) missing.push('category');
+
+  if (missing.length === 0) return '<span class="dq-flag dq-good">Complete</span>';
+  return '<span class="dq-missing">Missing: ' + missing.join(', ') + '</span>';
+}
+
+// ========== Agent Eye ==========
+
+function populateAgentEyeHoods() {
+  const sel = document.getElementById('ae-neighborhood');
+  const hoods = [...new Set(allEvents.map(e => e.neighborhood).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Pick a neighborhood...</option>';
+  for (const h of hoods) {
+    const opt = document.createElement('option');
+    opt.value = h; opt.textContent = h;
+    sel.appendChild(opt);
+  }
+}
+
+async function simulateAgentEye() {
+  const hood = document.getElementById('ae-neighborhood').value;
+  const cat = document.getElementById('ae-category').value;
+  const freeOnly = document.getElementById('ae-free').checked;
+  const btn = document.getElementById('ae-btn');
+  const resultsEl = document.getElementById('ae-results');
+
+  if (!hood) {
+    resultsEl.innerHTML = '<div class="agent-eye-empty">Pick a neighborhood to simulate</div>';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Loading...';
+  resultsEl.innerHTML = '<div class="agent-eye-empty">Simulating...</div>';
+
+  try {
+    const params = new URLSearchParams({ neighborhood: hood });
+    if (cat) params.set('categories', cat);
+    if (freeOnly) params.set('free_only', 'true');
+
+    const res = await fetch('/api/agent-eye?' + params);
+    const data = await res.json();
+
+    if (data.zero_match) {
+      resultsEl.innerHTML = `<div class="agent-eye-empty">Zero results. ${esc(data.message || '')}</div>`;
+      return;
+    }
+
+    // Store raw events for click-through
+    window._agentEyeRaw = data.raw_events || {};
+
+    // Meta bar
+    const meta = data.meta || {};
+    let metaHtml = '<div class="agent-eye-meta">';
+    metaHtml += `<div class="agent-eye-meta-item"><span class="label">Candidates:</span> <span class="value">${meta.candidates || '?'}</span></div>`;
+    metaHtml += `<div class="agent-eye-meta-item"><span class="label">Sent to LLM:</span> <span class="value">${meta.sent_to_llm || 0}</span></div>`;
+    metaHtml += `<div class="agent-eye-meta-item"><span class="label">Match:</span> <span class="value">${meta.hard_count || 0}</span></div>`;
+    metaHtml += `<div class="agent-eye-meta-item"><span class="label">Soft:</span> <span class="value">${meta.soft_count || 0}</span></div>`;
+    if (meta.is_sparse) metaHtml += `<div class="agent-eye-meta-item"><span class="value" style="color:#f6e05e">SPARSE</span></div>`;
+    metaHtml += '</div>';
+
+    // Toggle buttons
+    let toggleHtml = '<div class="agent-eye-toggle-row">';
+    toggleHtml += '<button class="agent-eye-toggle active" onclick="toggleAgentEyeView(\'cards\', this)">Cards</button>';
+    toggleHtml += '<button class="agent-eye-toggle" onclick="toggleAgentEyeView(\'raw\', this)">Raw (what LLM sees)</button>';
+    toggleHtml += '</div>';
+
+    // Cards view
+    const rawEvents = data.raw_events || {};
+    const eventIds = Object.keys(rawEvents);
+    let cardsHtml = '<div class="agent-eye-pool" id="ae-cards" style="display:block">';
+
+    if (eventIds.length === 0) {
+      cardsHtml += '<div class="agent-eye-empty">No events in pool</div>';
+    } else {
+      eventIds.forEach((id, i) => {
+        const e = rawEvents[id];
+        const tags = [];
+
+        // Match type tag from serialized text
+        const serialized = data.serialized || '';
+        const nameNorm = (e.name || '').toLowerCase();
+        if (serialized.includes('[MATCH]') && serialized.toLowerCase().includes(nameNorm.slice(0, 20))) {
+          tags.push('<span class="agent-eye-tag tag-match">MATCH</span>');
+        } else if (serialized.includes('[SOFT]')) {
+          tags.push('<span class="agent-eye-tag tag-soft">SOFT</span>');
+        } else if (serialized.includes('[NEARBY]')) {
+          tags.push('<span class="agent-eye-tag tag-nearby">NEARBY</span>');
+        }
+
+        // Category
+        if (e.category) tags.push(`<span class="agent-eye-tag tag-signal">${e.category.replace(/_/g, ' ')}</span>`);
+
+        // Source vibe
+        if (e.source_vibe) tags.push(`<span class="agent-eye-tag tag-vibe">${e.source_vibe}</span>`);
+
+        // Quality warnings
+        if (!e.start_time_local) tags.push('<span class="agent-eye-tag tag-warn">no time</span>');
+        if (!e.neighborhood) tags.push('<span class="agent-eye-tag tag-warn">no hood</span>');
+        if (e.completeness != null && e.completeness < 0.5) tags.push('<span class="agent-eye-tag tag-warn">low data</span>');
+
+        const venue = e.venue_name && e.venue_name !== 'TBA' ? e.venue_name : '';
+        const time = e.start_time_local ? formatTime(e.start_time_local) : (e.date_local || '');
+        const price = e.is_free ? 'Free' : (e.price_display || '');
+        const subtitle = [venue, time, price].filter(Boolean).join(' · ');
+
+        // Signals row
+        let signalsHtml = '';
+        const signals = [];
+        if (e.venue_size) signals.push(`venue: ${e.venue_size}`);
+        if (e.scarcity) signals.push(`scarcity: ${e.scarcity}`);
+        if (e.interaction_format) signals.push(e.interaction_format);
+        if (e.interestingness != null) signals.push(`interest: ${e.interestingness.toFixed(2)}`);
+        if (signals.length > 0) {
+          signalsHtml = '<div class="agent-eye-card-signals">' +
+            signals.map(s => `<span class="agent-eye-tag tag-signal">${esc(s)}</span>`).join('') +
+            '</div>';
+        }
+
+        cardsHtml += `<div class="agent-eye-card" onclick="showAgentEyeDetail('${esc(id)}')">
+          <span class="agent-eye-rank">#${i + 1}</span>
+          <div class="agent-eye-card-body">
+            <div class="agent-eye-card-name">${esc(e.name || '--')}</div>
+            <div class="agent-eye-card-venue">${esc(subtitle)}</div>
+            <div class="agent-eye-tags">${tags.join('')}</div>
+            ${signalsHtml}
+          </div>
+        </div>`;
+      });
+    }
+    cardsHtml += '</div>';
+
+    // Raw serialized view
+    let rawHtml = `<pre class="agent-eye-serialized" id="ae-raw">${esc(data.serialized || 'No serialized data')}</pre>`;
+
+    resultsEl.innerHTML = metaHtml + toggleHtml + cardsHtml + rawHtml;
+
+  } catch (err) {
+    resultsEl.innerHTML = `<div class="agent-eye-empty" style="color:#fc8181">Error: ${esc(err.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Simulate';
+  }
+}
+
+function toggleAgentEyeView(view, btn) {
+  document.querySelectorAll('.agent-eye-toggle').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const cards = document.getElementById('ae-cards');
+  const raw = document.getElementById('ae-raw');
+  if (cards) cards.style.display = view === 'cards' ? 'block' : 'none';
+  if (raw) raw.style.display = view === 'raw' ? 'block' : 'none';
+}
+
+function showAgentEyeDetail(id) {
+  const rawEvents = window._agentEyeRaw || {};
+  const e = rawEvents[id];
+  if (e) showDetail(e);
 }
 
 // ========== Init ==========

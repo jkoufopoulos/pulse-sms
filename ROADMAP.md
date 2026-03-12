@@ -117,7 +117,7 @@ message -> checkMechanical (help + TCPA only, $0)
 
 - [x] Audit "other" category events — identify common reclassifiable types (immersive theater, sound baths, zine fairs, popup markets)
 - [x] Add rules-based category remapping at cache build time (`remapOtherCategory` in events.js)
-- [ ] Measure: reduce "other" bucket from 41% to <20%
+- [x] Measure: reduce "other" bucket from 41% to <20% (achieved 13.9%)
 
 ### Phase 9: Serendipity + Personalization (Code)
 
@@ -284,7 +284,6 @@ message -> checkMechanical (help + TCPA only, $0)
 | Issue | Why deferred |
 |-------|-------------|
 | No processing ack during slow LLM calls | Adds extra Twilio cost |
-| No horizontal scalability | Single-process fine at current traffic |
 | No structured logging or correlation IDs | Operational improvement for scale |
 | Price data gap (21% unknown) | Structurally unavailable from some sources |
 

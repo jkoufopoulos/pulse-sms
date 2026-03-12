@@ -351,6 +351,68 @@ app.get('/api/events', (req, res) => {
   const { getRawCache } = require('./events');
   res.json(getRawCache());
 });
+
+// Agent Eye — simulate what the model sees for a neighborhood/filter combo
+app.get('/api/agent-eye', async (req, res) => {
+  try {
+    const { buildSearchPool } = require('./brain-execute');
+    const { serializePoolForContinuation } = require('./brain-llm');
+    const { scoreInterestingness } = require('./events');
+
+    const params = {
+      neighborhood: req.query.neighborhood || null,
+      intent: 'new_search',
+    };
+    if (req.query.categories) {
+      params.categories = req.query.categories.split(',').filter(Boolean);
+    }
+    if (req.query.free_only === 'true') params.free_only = true;
+    if (req.query.time_after) params.time_after = req.query.time_after;
+
+    // Mock session/trace — agent eye has no prior context
+    const mockTrace = {
+      events: {}, composition: {},
+    };
+
+    const poolResult = await buildSearchPool(params, null, '+10000000000', mockTrace);
+
+    if (poolResult.zeroMatch) {
+      return res.json({
+        zero_match: true,
+        message: poolResult.zeroMatch.sms,
+        filters: poolResult.zeroMatch.activeFilters,
+      });
+    }
+
+    const serialized = serializePoolForContinuation(poolResult);
+
+    // Attach raw event data for detail views (keyed by id)
+    const rawEvents = {};
+    for (const e of (poolResult.pool || [])) {
+      rawEvents[e.id] = {
+        ...e,
+        interestingness: scoreInterestingness(e),
+      };
+    }
+
+    res.json({
+      serialized,
+      raw_events: rawEvents,
+      meta: {
+        candidates: mockTrace.events.candidates_count,
+        sent_to_llm: poolResult.pool?.length || 0,
+        match_count: poolResult.matchCount,
+        hard_count: poolResult.hardCount,
+        soft_count: poolResult.softCount,
+        is_sparse: poolResult.isSparse,
+        exclusions: mockTrace.events.exclusions,
+      },
+    });
+  } catch (err) {
+    console.error('Agent eye error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 app.get('/api/geo/neighborhoods', (req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=86400');
   res.sendFile(require('path').join(__dirname, 'public', 'nyc-neighborhoods.geojson'));
