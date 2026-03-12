@@ -215,6 +215,10 @@
   .bar-fill-theater { background: linear-gradient(90deg, #3d2d1f, #f6ad55); }
   .bar-fill-food_drink { background: linear-gradient(90deg, #1f3d2d, #68d391); }
   .bar-fill-community { background: linear-gradient(90deg, #1f3d3d, #76e4f7); }
+  .bar-fill-trivia { background: linear-gradient(90deg, #2d3420, #a3e635); }
+  .bar-fill-film { background: linear-gradient(90deg, #3d2040, #e879f9); }
+  .bar-fill-spoken_word { background: linear-gradient(90deg, #2a3030, #94a3b8); }
+  .bar-fill-music { background: linear-gradient(90deg, #3d1f2d, #fb7185); }
   .bar-fill-other { background: linear-gradient(90deg, #2a2a2a, #aaa); }
   .bar-fill-source { background: linear-gradient(90deg, #3d2200, #FF6B35); }
   .bar-fill-hood { background: linear-gradient(90deg, #1a2a4e, #3b82f6); }
@@ -304,6 +308,34 @@
   .agent-eye-empty {
     padding: 20px; text-align: center; color: #555; font-size: 13px;
   }
+
+  /* Data quality summary bar */
+  .dq-bar {
+    display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .dq-bucket {
+    display: flex; align-items: baseline; gap: 4px; font-size: 13px;
+  }
+  .dq-bucket .num { font-size: 20px; font-weight: 700; }
+  .dq-bucket .label { font-size: 11px; color: #888; }
+  .dq-stacked { display: flex; height: 8px; border-radius: 4px; overflow: hidden; width: 100%; margin-bottom: 8px; }
+  .dq-seg { height: 100%; }
+  .dq-seg-good { background: #4ade80; }
+  .dq-seg-partial { background: #f6e05e; }
+  .dq-seg-bad { background: #fc8181; }
+  .dq-missing-list { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: #aaa; }
+  .dq-missing-item { display: flex; gap: 4px; }
+  .dq-missing-item .count { color: #f6e05e; font-weight: 600; }
+  .dq-source-row {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 4px; cursor: pointer;
+    padding: 3px 6px; border-radius: 4px; transition: background 0.15s;
+  }
+  .dq-source-row:hover { background: #1a1a2e; }
+  .dq-source-name { font-size: 11px; color: #bbb; width: 100px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
+  .dq-source-bar-track { flex: 1; height: 14px; background: #222; border-radius: 3px; overflow: hidden; }
+  .dq-source-bar-fill { height: 100%; border-radius: 3px; min-width: 2px; transition: width 0.3s; }
+  .dq-source-pct { font-size: 11px; width: 80px; flex-shrink: 0; white-space: nowrap; }
 
   /* Data quality flags in detail panel */
   .dq-flag {
@@ -452,7 +484,11 @@
 <!-- Analytics panel (always visible) -->
 <div class="analytics-panel" id="analytics-panel">
   <div class="analytics-row-2col">
-    <div class="analytics-card"><h4>Date Distribution <span class="analytics-filtered-badge" id="analytics-filtered-badge">filtered</span></h4><div id="analytics-dates"></div></div>
+    <div class="analytics-card"><h4>Data Quality <span class="analytics-filtered-badge" id="dq-filtered-badge">filtered</span></h4><div id="analytics-dataquality"></div></div>
+    <div class="analytics-card"><h4>Quality by Source</h4><div id="analytics-source-quality"></div></div>
+  </div>
+  <div class="analytics-row-2col">
+    <div class="analytics-card"><h4>Date Distribution <span class="analytics-filtered-badge" id="date-filtered-badge">filtered</span></h4><div id="analytics-dates"></div></div>
     <div class="analytics-card"><h4>Price Distribution</h4><div id="analytics-freepaid"></div></div>
   </div>
   <div class="analytics-row-3col">
@@ -695,11 +731,23 @@ function applyFilters() {
   updateSortArrows();
 
   const countEl = document.getElementById('showing-count');
-  if (filteredEvents.length < allEvents.length) {
+  const isFiltered = filteredEvents.length < allEvents.length;
+  if (isFiltered) {
     countEl.textContent = `Showing ${filteredEvents.length} of ${allEvents.length} events`;
   } else {
     countEl.textContent = '';
   }
+
+  // Update header stats for filtered view
+  const activeEvents = isFiltered ? filteredEvents : allEvents;
+  document.getElementById('total-count').textContent = isFiltered
+    ? `${filteredEvents.length} / ${allEvents.length}`
+    : allEvents.length;
+  const otherCount = activeEvents.filter(e => e.category === 'other' || !e.category).length;
+  const otherPct = activeEvents.length > 0 ? ((otherCount / activeEvents.length) * 100).toFixed(1) : '0';
+  const otherEl = document.getElementById('other-pct');
+  otherEl.textContent = otherPct + '%';
+  otherEl.style.color = otherPct > 20 ? '#fc8181' : otherPct > 10 ? '#f6e05e' : '#68d391';
 
   updateAnalytics();
 }
@@ -1116,14 +1164,139 @@ function renderFreePaid(events) {
     `<div style="margin-top:10px">${bucketsHtml}</div>`;
 }
 
+function renderDataQuality(events) {
+  const total = events.length;
+  if (total === 0) {
+    document.getElementById('analytics-dataquality').innerHTML = '<div style="color:#555;font-size:12px">No events</div>';
+    return;
+  }
+
+  let good = 0, partial = 0, bad = 0;
+  let noTime = 0, noVenue = 0, noHood = 0, noPrice = 0, noDesc = 0, otherCat = 0;
+
+  for (const e of events) {
+    const c = e.completeness ?? 0;
+    if (c >= 0.7) good++;
+    else if (c >= 0.4) partial++;
+    else bad++;
+
+    if (!e.start_time_local) noTime++;
+    if (!e.venue_name || e.venue_name === 'TBA') noVenue++;
+    if (!e.neighborhood) noHood++;
+    if (!e.price_display && !e.is_free) noPrice++;
+    if (!e.description_short && !e.description) noDesc++;
+    if (e.category === 'other' || !e.category) otherCat++;
+  }
+
+  const goodPct = (good / total * 100).toFixed(0);
+  const partialPct = (partial / total * 100).toFixed(0);
+  const badPct = (bad / total * 100).toFixed(0);
+
+  let html = '';
+
+  // Stacked bar
+  html += `<div class="dq-stacked">
+    <div class="dq-seg dq-seg-good" style="width:${goodPct}%"></div>
+    <div class="dq-seg dq-seg-partial" style="width:${partialPct}%"></div>
+    <div class="dq-seg dq-seg-bad" style="width:${badPct}%"></div>
+  </div>`;
+
+  // Buckets
+  html += `<div class="dq-bar">
+    <div class="dq-bucket"><span class="num" style="color:#4ade80">${good}</span> <span class="label">complete (${goodPct}%)</span></div>
+    <div class="dq-bucket"><span class="num" style="color:#f6e05e">${partial}</span> <span class="label">partial (${partialPct}%)</span></div>
+    <div class="dq-bucket"><span class="num" style="color:#fc8181">${bad}</span> <span class="label">garbage (${badPct}%)</span></div>
+  </div>`;
+
+  // Missing fields
+  html += `<div class="dq-missing-list">
+    <div class="dq-missing-item"><span class="count">${noTime}</span> no time</div>
+    <div class="dq-missing-item"><span class="count">${noVenue}</span> no venue</div>
+    <div class="dq-missing-item"><span class="count">${noHood}</span> no neighborhood</div>
+    <div class="dq-missing-item"><span class="count">${noPrice}</span> no price</div>
+    <div class="dq-missing-item"><span class="count">${noDesc}</span> no description</div>
+    <div class="dq-missing-item"><span class="count">${otherCat}</span> "other" category</div>
+  </div>`;
+
+  document.getElementById('analytics-dataquality').innerHTML = html;
+}
+
+function renderSourceQuality(events) {
+  const total = events.length;
+  if (total === 0) {
+    document.getElementById('analytics-source-quality').innerHTML = '<div style="color:#555;font-size:12px">No events</div>';
+    return;
+  }
+
+  // Aggregate per source
+  const sources = {};
+  for (const e of events) {
+    const src = e.source_name || 'unknown';
+    if (!sources[src]) sources[src] = { count: 0, completenessSum: 0, noTime: 0, noVenue: 0, noHood: 0, noPrice: 0, otherCat: 0 };
+    const s = sources[src];
+    s.count++;
+    s.completenessSum += (e.completeness ?? 0);
+    if (!e.start_time_local) s.noTime++;
+    if (!e.venue_name || e.venue_name === 'TBA') s.noVenue++;
+    if (!e.neighborhood) s.noHood++;
+    if (!e.price_display && !e.is_free) s.noPrice++;
+    if (e.category === 'other' || !e.category) s.otherCat++;
+  }
+
+  // Sort by avg completeness ascending (worst first)
+  const sorted = Object.entries(sources).map(([name, s]) => ({
+    name,
+    count: s.count,
+    avgComp: s.completenessSum / s.count,
+    noTime: s.noTime,
+    noVenue: s.noVenue,
+    noHood: s.noHood,
+    noPrice: s.noPrice,
+    otherCat: s.otherCat,
+  })).sort((a, b) => a.avgComp - b.avgComp);
+
+  let html = '';
+  for (const s of sorted) {
+    const pct = (s.avgComp * 100).toFixed(0);
+    const barColor = s.avgComp >= 0.7 ? '#4ade80' : s.avgComp >= 0.5 ? '#f6e05e' : '#fc8181';
+    const gaps = [];
+    if (s.noTime > 0) gaps.push(`${s.noTime} no time`);
+    if (s.noVenue > 0) gaps.push(`${s.noVenue} no venue`);
+    if (s.noHood > 0) gaps.push(`${s.noHood} no hood`);
+    if (s.noPrice > 0) gaps.push(`${s.noPrice} no price`);
+    if (s.otherCat > 0) gaps.push(`${s.otherCat} "other"`);
+    const gapText = gaps.length > 0 ? gaps.join(' · ') : 'all fields present';
+
+    html += `<div class="dq-source-row" onclick="filterBySource('${esc(s.name)}')" title="${gapText}">
+      <span class="dq-source-name">${esc(s.name)}</span>
+      <div class="dq-source-bar-track"><div class="dq-source-bar-fill" style="width:${pct}%;background:${barColor}"></div></div>
+      <span class="dq-source-pct" style="color:${barColor}">${pct}% <span style="color:#666">(${s.count})</span></span>
+    </div>`;
+  }
+
+  document.getElementById('analytics-source-quality').innerHTML = html;
+}
+
+function filterBySource(name) {
+  const sel = document.getElementById('f-source');
+  sel.value = sel.value === name ? '' : name;
+  applyFilters();
+}
+
 function updateAnalytics() {
   const isFiltered = filteredEvents.length < allEvents.length;
   const events = isFiltered ? filteredEvents : allEvents;
   const total = events.length;
 
-  // Filtered badge
-  const badge = document.getElementById('analytics-filtered-badge');
-  badge.style.display = isFiltered ? 'inline' : 'none';
+  // Filtered badges
+  const dateBadge = document.getElementById('date-filtered-badge');
+  dateBadge.style.display = isFiltered ? 'inline' : 'none';
+  const dqBadge = document.getElementById('dq-filtered-badge');
+  dqBadge.style.display = isFiltered ? 'inline' : 'none';
+
+  // Data quality
+  renderDataQuality(events);
+  renderSourceQuality(events);
 
   // Date distribution + Price
   renderDateChart(events);
