@@ -543,6 +543,7 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
 
   // Set up session + history
   if (!getSession(phone)) setSession(phone, {});
+  if (!session) session = getSession(phone);
   addToHistory(phone, 'user', message);
 
   // Check if we should prompt for proactive opt-in
@@ -555,6 +556,7 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
 
   const systemPrompt = buildBrainSystemPrompt(session);
 
+  let smsSent = false;
   try {
     // Track raw results (with _ fields) for session save
     const rawResults = [];
@@ -646,6 +648,7 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
 
     const intent = deriveIntent(rawResults);
     await sendSMS(phone, smsText);
+    smsSent = true;
 
     // Send pick URLs for details
     if (intent === 'details') {
@@ -665,6 +668,14 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     }
 
   } catch (err) {
+    // If main SMS was already sent, don't send another — just log the post-send error
+    if (smsSent) {
+      console.error('Post-send error (SMS already delivered):', err.message);
+      trace.brain_error = `post_send: ${err.message}`;
+      if (!trace.output_sms) finalizeTrace(null, deriveIntent(rawResults));
+      return trace.id;
+    }
+
     console.error('Agent loop error:', err.message);
     trace.brain_error = err.message;
 
