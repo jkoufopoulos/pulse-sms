@@ -189,6 +189,9 @@ function getHealthStatus(cacheInfo) {
       last_error: h.lastError,
       last_scrape: h.lastScrapeAt,
       quarantine_reason: h.lastQuarantineReason,
+      disabled: h.disabled || false,
+      disabled_at: h.disabledAt || null,
+      last_probe: h.lastProbeAt || null,
       success_rate: h.totalScrapes > 0
         ? Math.round((h.totalSuccesses / h.totalScrapes) * 100) + '%'
         : null,

@@ -505,13 +505,13 @@ async function refreshCache() {
       if (!result) continue;
       totalRaw += result.events.length;
 
-      // Update probe timestamp for disabled sources being probed
-      if (disabledProbing.has(label)) {
-        sourceHealth[label].lastProbeAt = new Date().toISOString();
-      }
-
       // Record health BEFORE baseline check (so history accumulates)
       updateSourceHealth(label, result);
+
+      // Update probe timestamp (only if still disabled after health update)
+      if (disabledProbing.has(label) && isSourceDisabled(label)) {
+        sourceHealth[label].lastProbeAt = new Date().toISOString();
+      }
       const sourceEntry = SOURCES.find(s => s.label === label);
       if (sourceEntry?.volatile) sourceHealth[label].volatile = true;
 
@@ -774,13 +774,13 @@ async function refreshEmailSources() {
         ? settled.value
         : { events: [], durationMs: 0, status: 'error', error: settled.reason?.message || 'unknown' };
 
-      // Update probe timestamp for disabled sources
-      if (emailDisabledProbing.has(label)) {
-        sourceHealth[label].lastProbeAt = new Date().toISOString();
-      }
-
       // Update health tracking
       updateSourceHealth(label, result);
+
+      // Update probe timestamp (only if still disabled after health update)
+      if (emailDisabledProbing.has(label) && isSourceDisabled(label)) {
+        sourceHealth[label].lastProbeAt = new Date().toISOString();
+      }
 
       if (result.status === 'error' || result.status === 'timeout') {
         console.error(`[EMAIL-POLL] ${label} failed:`, result.error);

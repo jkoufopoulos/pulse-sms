@@ -284,9 +284,15 @@ async function sendDigestEmail(digest) {
 }
 
 // --- Graduated alert (yellow/red severity from digest) ---
+let lastGraduatedSent = 0;
 
 async function sendGraduatedAlert(digest) {
   if (digest.status === 'green') return;
+
+  if (Date.now() - lastGraduatedSent < DIGEST_COOLDOWN_MS) {
+    console.log('[ALERT] Graduated alert cooldown active — skipping');
+    return;
+  }
 
   const severity = digest.status; // 'yellow' or 'red'
   const prefix = severity === 'red' ? 'ACTION REQUIRED' : 'Needs attention';
@@ -367,6 +373,7 @@ async function sendGraduatedAlert(digest) {
   }
 
   logAlert(alertEntry);
+  lastGraduatedSent = Date.now();
 }
 
 module.exports = { sendHealthAlert, sendRuntimeAlert, sendDigestEmail, sendGraduatedAlert, _runtimeCooldowns, loadAlerts, getRecentAlerts };
