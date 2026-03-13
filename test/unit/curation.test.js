@@ -1,5 +1,5 @@
 const { check } = require('../helpers');
-const { filterKidsEvents, filterIncomplete } = require('../../src/curation');
+const { filterKidsEvents, filterIncomplete, hasValidNeighborhood, isGarbageVenue } = require('../../src/curation');
 
 console.log('\nfilterKidsEvents:');
 
@@ -34,4 +34,30 @@ check('removes no completeness', !compResult.find(e => e.id === 'c4'));
 const customThreshold = filterIncomplete([highComp, medComp, lowComp], 0.6);
 check('custom threshold removes medium', !customThreshold.find(e => e.id === 'c2'));
 check('custom threshold keeps high', !!customThreshold.find(e => e.id === 'c1'));
+
+console.log('\nhasValidNeighborhood:');
+
+check('accepts known neighborhood', hasValidNeighborhood({ neighborhood: 'Williamsburg' }));
+check('accepts another known neighborhood', hasValidNeighborhood({ neighborhood: 'East Village' }));
+check('rejects null neighborhood', !hasValidNeighborhood({ neighborhood: null }));
+check('rejects undefined neighborhood', !hasValidNeighborhood({}));
+check('rejects empty string', !hasValidNeighborhood({ neighborhood: '' }));
+check('rejects unknown neighborhood', !hasValidNeighborhood({ neighborhood: 'Mars' }));
+check('rejects "none"', !hasValidNeighborhood({ neighborhood: 'none' }));
+
+console.log('\nisGarbageVenue:');
+
+check('accepts normal venue', !isGarbageVenue('Film Forum'));
+check('accepts venue with special chars', !isGarbageVenue('ROSA – Agave & Wine Lounge'));
+check('accepts null venue (missing, not garbage)', !isGarbageVenue(null));
+check('accepts undefined venue', !isGarbageVenue(undefined));
+check('accepts TBA venue (missing data)', !isGarbageVenue('TBA'));
+check('rejects metadata field "Lead investor"', isGarbageVenue('Lead investor: Andreessen Horowitz'));
+check('rejects metadata field "Details"', isGarbageVenue('Details'));
+check('rejects metadata field "Platform"', isGarbageVenue('Platform'));
+check('rejects metadata field "Tier 1"', isGarbageVenue('Tier 1'));
+check('rejects tech jargon venue "LLM"', isGarbageVenue('LLM training benchmark'));
+check('rejects tech jargon venue "GPU"', isGarbageVenue('GPU center'));
+check('rejects long sentence venue', isGarbageVenue('Reteti Sanctuary in Kenya, documenting their care and rehabilitation of orphaned elephants in a changing climate'));
+check('accepts short venue name', !isGarbageVenue('BAM'));
 

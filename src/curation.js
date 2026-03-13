@@ -3,6 +3,8 @@
  * that runs before events reach Claude.
  */
 
+const { NEIGHBORHOODS } = require('./neighborhoods');
+
 const KIDS_PATTERNS = /\b(kids|children|storytime|story\s*time|family\s*day|toddler|pre-?school|youth|ages?\s*\d+-\d+|puppet|family-?friendly)\b/i;
 
 /**
@@ -44,4 +46,36 @@ function isGarbageName(name) {
   return false;
 }
 
-module.exports = { filterKidsEvents, filterIncomplete, isGarbageName };
+// ============================================================
+// Neighborhood gate — reject events without a recognized NYC neighborhood
+// ============================================================
+
+const VALID_NEIGHBORHOODS = new Set(Object.keys(NEIGHBORHOODS));
+
+function hasValidNeighborhood(event) {
+  if (!event.neighborhood) return false;
+  return VALID_NEIGHBORHOODS.has(event.neighborhood);
+}
+
+// ============================================================
+// Venue sanity — reject events with non-venue venue names
+// ============================================================
+
+// Metadata fields and non-venue strings that got extracted as venue names.
+// Does NOT include TBA/TBD — those mean "data missing" not "junk."
+const GARBAGE_VENUE_PATTERNS = [
+  /^(Event|Details|Title|Coverage|Platform|Admission|Venue|Locations|Recurring|Neighborhood|Day|Nature|Nova|Untold|Community|Lead investor|Announcement|Release date|Team size|Estimated|Why it|Weekly anchors|Monthly|Add depth|Tier \d|Primary|Secondary|Tertiary)\b/i,
+  /\b(LLM|GPU|benchmark|inference|reasoning)\b/i, // tech jargon in venue name
+];
+
+function isGarbageVenue(venueName) {
+  if (!venueName) return false; // missing venue is not "garbage" — handled by completeness gate
+  for (const pat of GARBAGE_VENUE_PATTERNS) {
+    if (pat.test(venueName)) return true;
+  }
+  // Venue name is a full sentence (>80 chars with spaces = probably a description)
+  if (venueName.length > 80 && venueName.includes(' ')) return true;
+  return false;
+}
+
+module.exports = { filterKidsEvents, filterIncomplete, isGarbageName, hasValidNeighborhood, isGarbageVenue };

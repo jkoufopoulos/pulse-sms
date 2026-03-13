@@ -870,6 +870,23 @@ function normalizeName(name) {
     .trim();
 }
 
+/**
+ * Strip date ranges, parenthetical junk, and trailing suffixes from venue names.
+ * Handles patterns like "Metrograph (Mar 21–29)", "Film at Lincoln Center through Mar 15",
+ * "Film Forum,   – Apr 2", "Bossa Nova Civic Club ( , 12–4 PM)", "IFC Center (from  )".
+ */
+function cleanVenueName(name) {
+  if (!name) return name;
+  return name
+    .replace(/\s*\([^)]*\)\s*$/, '')       // strip trailing (...) parentheticals
+    .replace(/\s*,?\s*through\s+.*/i, '')   // strip "through Mar 15" / ", through Apr 4"
+    .replace(/\s*,\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b.*/i, '') // ", Mar 27–28"
+    .replace(/\s*,\s+\s*[–—-]\s*.*/i, '')  // ",   – Apr 2"
+    .replace(/\s+shows?\s+.*/i, '')         // "Lincoln Center shows Béla Tarr's..."
+    .replace(/\s+series\s+continue.*/i, '') // "series continue through..."
+    .trim();
+}
+
 function lookupVenue(name) {
   if (!name) return null;
   const key = normalizeName(name);
@@ -882,6 +899,14 @@ function lookupVenue(name) {
     const parentKey = normalizeName(atMatch[1]);
     const parent = normalizedMap.get(parentKey);
     if (parent) return parent;
+  }
+
+  // Try cleaned venue name (strip date ranges, parenthetical junk)
+  const cleaned = cleanVenueName(name);
+  if (cleaned && cleaned !== name) {
+    const cleanedKey = normalizeName(cleaned);
+    const cleanedMatch = normalizedMap.get(cleanedKey);
+    if (cleanedMatch) return cleanedMatch;
   }
 
   return null;

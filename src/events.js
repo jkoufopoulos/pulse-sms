@@ -4,7 +4,7 @@ const { SOURCES, SOURCE_TIERS, SOURCE_LABELS, SOURCE_DB_NAMES, MERGE_ORDER, EMAI
 const { sourceHealth, saveHealthData, updateSourceHealth, updateScrapeStats, computeEventMix, getHealthStatus: _getHealthStatus, isSourceDisabled, shouldProbeDisabled } = require('./source-health');
 const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate, isEventInDateRange, parseAsNycTime } = require('./geo');
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues, lookupVenue, lookupVenueSize } = require('./venues');
-const { filterIncomplete, filterKidsEvents, isGarbageName } = require('./curation');
+const { filterIncomplete, filterKidsEvents, isGarbageName, hasValidNeighborhood, isGarbageVenue } = require('./curation');
 const { eventMatchesFilters, failsTimeGate } = require('./pipeline');
 const { computeCompleteness, backfillEvidence, backfillDateTimes } = require('./sources/shared');
 const { captureExtractionInput, getExtractionInputs, clearExtractionInputs } = require('./extraction-capture');
@@ -963,15 +963,42 @@ async function refreshSources(sourceNames, { reprocess = false } = {}) {
 /* remapOtherCategory / remapOtherCategories moved above boot code — see top of file */
 
 /**
+ * Backfill neighborhood from venue coords for events that have a known venue
+ * but no neighborhood (common with Yutori film events where venue names have
+ * date suffixes that prevented matching during scrape-time geocoding).
+ */
+function backfillNeighborhoodFromVenue(events) {
+  const { resolveNeighborhood } = require('./geo');
+  let filled = 0;
+  for (const e of events) {
+    if (e.neighborhood || !e.venue_name) continue;
+    const coords = lookupVenue(e.venue_name);
+    if (coords) {
+      const hood = resolveNeighborhood(null, coords.lat, coords.lng);
+      if (hood) {
+        e.neighborhood = hood;
+        filled++;
+      }
+    }
+  }
+  if (filled > 0) {
+    console.log(`Backfilled ${filled} neighborhoods from venue coords`);
+  }
+}
+
+/**
  * Quality-gate filter — shared between getEvents and getEventsCitywide.
  */
 function applyQualityGates(events) {
   const upcoming = filterUpcomingEvents(events);
+  backfillNeighborhoodFromVenue(upcoming);
   return filterIncomplete(
     upcoming.filter(e => {
       if (e.needs_review === true) return false;
       if (e.extraction_confidence !== null && e.extraction_confidence !== undefined && e.extraction_confidence < 0.4) return false;
       if (isGarbageName(e.name)) return false;
+      if (!hasValidNeighborhood(e)) return false;
+      if (isGarbageVenue(e.venue_name)) return false;
       return true;
     }),
     0.4

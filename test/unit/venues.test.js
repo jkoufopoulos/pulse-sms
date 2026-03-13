@@ -15,6 +15,16 @@ check('Good Room → Greenpoint coords', lookupVenue('Good Room')?.lat === 40.72
 check('Le Bain → Chelsea coords', lookupVenue('Le Bain')?.lat === 40.7408);
 check('Smalls Jazz Club found', lookupVenue('Smalls Jazz Club')?.lat === 40.7346);
 
+// ---- venue name cleaning (strips date ranges, parenthetical junk) ----
+console.log('\nlookupVenue (cleaned names):');
+check('strips parenthetical date range', lookupVenue('Metrograph (Mar 21–29)')?.lat === 40.7144);
+check('strips empty parenthetical', lookupVenue('Metrograph ( )')?.lat != null);
+check('strips "through" suffix', lookupVenue('Film at Lincoln Center through Mar 15')?.lat === 40.7725);
+check('strips comma-dash suffix', lookupVenue('Film Forum,   – Apr 2')?.lat === 40.7284);
+check('strips comma-month suffix', lookupVenue('Lincoln Center, Mar')?.lat === 40.7725);
+check('strips time parenthetical', lookupVenue('Bossa Nova Civic Club ( , 12–4 PM)')?.lat === 40.7065);
+check('unknown venue still null after cleaning', lookupVenue('Nonexistent (Mar 1–5)') === null);
+
 // ---- lookupVenueProfile ----
 console.log('\nlookupVenueProfile:');
 check('exact match returns profile', lookupVenueProfile('Mood Ring')?.vibe?.includes('astrology'));

@@ -181,6 +181,14 @@ message -> checkMechanical (help + TCPA only, $0)
 - [x] Graduated alerting: yellow at 20% drop, red at 50% drop
 - [x] Complete scrape resilience plan: volatile baseline (median not mean) for Yutori/NonsenseNYC, duplicate spike tolerance for multi-show venues
 
+**Story: Non-events never reach users**
+> As a system, when the extraction pipeline produces entries that aren't physical NYC events, I want to reject them deterministically before they enter the serving cache.
+
+- [x] Neighborhood gate in `applyQualityGates`: reject events without a recognized neighborhood (from `neighborhoods.js`)
+- [x] Venue sanity filter: reject events where venue_name is a sentence, metadata field, or known non-venue pattern
+- [ ] Golden negative eval cases: add 15 worst junk examples as extraction eval negatives
+- [ ] Yutori email filter audit: identify which newsletters produce the most junk, tighten `email-filter.js`
+
 **Story: Events are fresh when users actually text**
 > As a user texting at 8pm, I want today's data to include events posted after the 10am scrape — day-of announcements, cancellations, sold-out status.
 
@@ -199,6 +207,30 @@ message -> checkMechanical (help + TCPA only, $0)
 
 - [x] Wire `exportLearnedVenues()` to write to disk at end of scrape (already implemented)
 - [x] Wire `importLearnedVenues()` on startup to warm the cache (already implemented)
+
+**Story: Extraction pipeline hardens at the boundary**
+> As a system, I want LLM extraction cached by content hash and validated at the source boundary — not fixed downstream in the merge pipeline.
+
+Inspired by Anthropic-style "validate at ingestion, trust internal types" (P3). Three actionable improvements, assessed against current architecture:
+
+- [ ] **Content-hash extraction cache**: hash raw HTML/email content before calling LLM; if hash matches previous run, reuse cached extraction. Saves ~$0.01/day on unchanged newsletters (Skint, Yutori, ScreenSlate). Low effort, high value — the LLM calls are the slowest and most expensive part of the scrape.
+- [ ] **Validate at source boundary, not post-merge**: move `computeCompleteness` + quality gate (0.4 threshold) into each source's fetch function return path. Currently validation happens in `refreshCache()` after all sources merge — a bad extraction can interact with dedup before getting filtered. Moving it earlier means dedup only sees clean events.
+- [ ] **Venue alias table for dedup**: add `VENUE_ALIASES` map in `venues.js` (e.g., `"Birdland NYC" → "Birdland"`, `"Le Poisson Rouge LPR" → "Le Poisson Rouge"`). Apply before `makeEventId` hashing. Fixes the main dedup brittleness without embeddings or fuzzy matching. Populate from `venues-learned.json` duplicates.
+
+**Story: LLM backstop for deterministic classification**
+> As a system, when regex-based category remap and quality gates leave ambiguous residual (events stuck in "other", borderline non-events), I want an LLM to classify the residual at scrape time — deterministic first, LLM only on what regex can't resolve.
+
+Design principle: **deterministic rules handle the 86%, LLM classifies the stubborn 14%**. Runs at scrape time (not hot path), only on events that survived regex without a confident classification. Same pattern applies to junk detection — regex catches obvious garbage, LLM catches subtle non-events (newsletter headers extracted as listings, venue descriptions that look like events).
+
+- [ ] **LLM category classifier for "other" residual**: after `remapOtherCategories`, batch remaining "other" events into a single LLM call with event name + venue + description. Model returns `{ id: category }` map. Haiku, ~$0.001 for 50-100 events. Only runs during `refreshCache`, result cached with events.
+- [ ] **LLM junk filter for borderline events**: after `applyQualityGates` removes obvious junk (garbage names, low completeness), batch borderline events through a binary LLM classifier: "is this an actual attendable NYC event?" Catches non-events that have valid-looking fields but aren't real events (e.g., "Subscribe to our newsletter" with a venue and date from surrounding HTML).
+- [ ] **Classification report, not auto-promotion**: log LLM classifications to `data/classification-log.json` (event name, venue, LLM category, date). Surface in daily digest or dashboard. A human reads the report and hand-adds obvious regex patterns when they spot them. Do NOT auto-promote LLM patterns to regex rules — the cost savings are negligible (~$0.001/batch), and auto-generated rules create invisible failure modes when source distributions shift. The human is the promotion mechanism.
+
+**Not pursuing** (assessed, too costly for current scale):
+- Formal DAG pipeline framework — `refreshCache()` already does fetch→merge→dedup→stamp sequentially in ~15s. Framework overhead not justified for 22 sources running once daily.
+- Embedding-based dedup — O(n²) on 500-1000 events adds API dependency to scrape path. Venue alias table solves the actual problem (name variance) with 20 lines of code.
+- Unified extraction interface (deterministic + LLM behind same abstraction) — deterministic parsers and LLM extraction have fundamentally different failure modes, latency profiles, and costs. Hiding that behind one interface loses the ability to reason about them differently.
+- Strict TypeScript schema — project is plain Node.js. `normalizeExtractedEvent` + `computeCompleteness` + 0.4 gate already function as a runtime schema. TS adoption is a separate, larger decision.
 
 ### Phase 12: Platform Expansion (Later)
 
