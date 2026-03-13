@@ -1,7 +1,6 @@
 const { generate: llmGenerate } = require('./llm');
 const { MODELS } = require('./model-config');
-const { EXTRACTION_PROMPT, DETAILS_SYSTEM } = require('./prompts');
-const { smartTruncate, isSearchUrl } = require('./formatters');
+const { EXTRACTION_PROMPT } = require('./prompts');
 
 
 /**
@@ -145,84 +144,4 @@ function fixJsonNewlines(text) {
   return result;
 }
 
-/**
- * Compose a conversational details response about a specific venue/event.
- * Used when user asks for more info on a pick (e.g. "what is last resort").
- * Returns { sms_text }
- */
-async function composeDetails(event, pickReason, { pulseUrl } = {}) {
-  const now = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-
-  // Build a Google Maps URL as fallback
-  const venueName = event.venue_name || event.name || '';
-  const hood = event.neighborhood || '';
-  const mapsQuery = encodeURIComponent(`${venueName} ${hood} NYC`.trim());
-  const mapsUrl = `https://www.google.com/maps/search/${mapsQuery}`;
-
-  // Pick the best URL: ticket_url > source_url > Google Maps
-  // But NEVER use search pages (Yelp search, Google search, etc.)
-  let bestUrl = null;
-  for (const url of [event.ticket_url, event.source_url]) {
-    if (url && !isSearchUrl(url)) {
-      bestUrl = url;
-      break;
-    }
-  }
-  if (!bestUrl) bestUrl = mapsUrl;
-  if (pulseUrl) bestUrl = pulseUrl;
-
-  const eventData = {
-    name: event.name,
-    venue_name: event.venue_name,
-    neighborhood: event.neighborhood,
-    category: event.category,
-    description: event.description_short || event.short_detail,
-    start_time_local: event.start_time_local,
-    end_time_local: event.end_time_local,
-    is_free: event.is_free,
-    price_display: event.price_display,
-    venue_address: event.venue_address,
-    best_url: bestUrl,
-  };
-
-  const userPrompt = `Current time (NYC): ${now}
-
-<event>
-${JSON.stringify(eventData, null, 2)}
-</event>
-
-Why you recommended it: ${pickReason || 'solid pick for the neighborhood'}
-
-Write the details text. Include this URL: ${bestUrl}`;
-
-  const resolvedModel = MODELS.details;
-  let text, usage, provider;
-
-  try {
-    const result = await llmGenerate(resolvedModel, DETAILS_SYSTEM, userPrompt, {
-      maxTokens: 1024, temperature: 0.8, timeout: 15_000,
-    });
-    text = result.text; usage = result.usage; provider = result.provider;
-  } catch (err) {
-    console.warn(`composeDetails ${resolvedModel} failed, falling back to ${MODELS.fallback}: ${err.message}`);
-    const result = await llmGenerate(MODELS.fallback, DETAILS_SYSTEM, userPrompt, {
-      maxTokens: 256, timeout: 10_000,
-    });
-    text = result.text; usage = result.usage; provider = result.provider;
-  }
-
-  // Model might return JSON or plain text — handle both
-  let smsText;
-  try {
-    const parsed = JSON.parse(text);
-    console.warn(`composeDetails (${provider}): returned JSON despite plain-text instruction`);
-    smsText = parsed.sms_text || parsed.text || parsed.message || text;
-  } catch {
-    // Plain text response — use directly, strip any leading/trailing quotes
-    smsText = text.replace(/^["']|["']$/g, '').trim();
-  }
-
-  return { sms_text: smartTruncate(smsText), _raw: text, _usage: usage, _provider: provider };
-}
-
-module.exports = { composeDetails, extractEvents, parseJsonFromResponse };
+module.exports = { extractEvents, parseJsonFromResponse };

@@ -76,7 +76,8 @@ message -> checkMechanical (help + TCPA only, $0)
   - `editorial: true` → "a tastemaker picked this one out"
   - `interaction_format "interactive"` → "you're not just watching, you're in it"
 - [x] Rewrite system prompt examples from list-style to contrasting-picks style
-- [ ] Run scenario evals before/after to measure voice quality change
+- [x] Run scenario evals before/after to measure voice quality change
+- [x] Update eval golden scenarios to reflect new conversation style (fixed `exists`/`contains_any` assertion types in runner, updated 14 stale text assertions)
 
 **Story: Narrow by showing, not asking**
 > As a user, when I text a bare neighborhood, I want the agent to show me two contrasting options instead of asking me a generic vibe question.
@@ -84,13 +85,12 @@ message -> checkMechanical (help + TCPA only, $0)
 - [x] Replace "ask one vibe question" prompt guidance with "narrow by contrasting picks"
 - [x] Add mood-to-category mapping guidance: teach agent that "chill" means intimate venues + jazz/vinyl/film, "I want to dance" means dj/nightlife + medium-large venues
 - [x] Add "acknowledge and build" pattern: every response references what the user just said
-- [ ] Update eval golden scenarios to reflect new conversation style
 
 **Story: Details that build trust**
 > As a user, when I ask for details about a pick, I want the response to lead with what the venue feels like, not just event metadata.
 
 - [x] Add details structure to system prompt: venue experience → event → logistics → practical tip
-- [ ] Evaluate whether `composeDetails` in `ai.js` can be consolidated into the agent loop (agent has conversation context that `composeDetails` doesn't)
+- [x] ~~Evaluate whether `composeDetails` in `ai.js` can be consolidated into the agent loop~~ — Deleted. `composeDetails` was dead code (nothing called it). Agent loop handles details natively via `search_events({intent: "details"})`. Removed `composeDetails`, `DETAILS_SYSTEM`, and `MODELS.details`.
 
 ### Phase 8: Venue Knowledge Layer (Data + Code)
 
@@ -103,7 +103,7 @@ message -> checkMechanical (help + TCPA only, $0)
 - [x] `venue_vibe` one-liner wired into pool serialization (`serializePoolForContinuation`)
 - [x] Full venue profile (known_for, crowd, tip) wired into details intent (`agent-loop.js`)
 - [x] System prompt updated with `venue_vibe` and `venue_profile` guidance
-- [ ] Run scenario evals to verify agent uses venue knowledge naturally
+- [x] Run scenario evals to verify agent uses venue knowledge naturally (99.9% code evals, 99.5% assertions across 287 scenarios)
 
 **Story: Yutori's editorial voice comes through**
 > As a user, when I get a pick that came from Yutori's newsletter, I want the agent to reference the editorial context — "Yutori called this the best kept secret in Bushwick" — not just a generic description.
@@ -269,14 +269,16 @@ message -> checkMechanical (help + TCPA only, $0)
 | "Other" Category Reduction | Mar 9 | `remapOtherCategory` rules-based remap: 11 pattern groups (sound bath→community, film→film, vinyl night→nightlife, etc.). Runs post-stamp in cache build. |
 | Editorial Note Preservation | Mar 9 | `editorial_note` field added to extraction prompt, carried through normalization→serialization→details. All 4 LLM-extracted sources benefit. |
 | Venue Learning Persistence | Mar 9 | Already implemented: `exportLearnedVenues`/`importLearnedVenues` wired to disk. 2500+ venues survive restarts. |
-| Phase 8: Venue Knowledge (partial) | Mar 12 | 30 venue profiles in `data/venue-profiles.json` (web-researched, human-reviewed). `venue_vibe` in pool serialization, full profile in details intent, prompt guidance added. |
+| Phase 8: Venue Knowledge | Mar 12 | 30 venue profiles in `data/venue-profiles.json` (web-researched, human-reviewed). `venue_vibe` in pool serialization, full profile in details intent, prompt guidance added. Scenario evals: 99.9% code evals, 99.5% assertions (287 scenarios). |
+| Phase 7+8: Eval golden scenario update | Mar 13 | Fixed `exists`/`contains_any` assertion types in eval runner (were silently failing). Updated 14 stale text assertions for new tastemaker voice. |
+| Time-aware filtering | Mar 13 | Tightened `filterUpcomingEvents` grace window from 2hr to 30min for events without `end_time_local` (fixed-start shows). Events with end times still shown while ongoing. Added prompt hint for in-progress events ("started at 7 but goes til midnight") and wired `end_time_local` into pool serialization. |
 
 ### Prompt Hygiene — Open Items
 
 | # | Action | Risk | Effort |
 |---|--------|------|--------|
-| 5 | Move filter_intent to deterministic code (derive from tool params) | Medium | Medium |
-| 6 | Add deterministic post-processing for price/day labels | Low | Small |
+| ~~5~~ | ~~Move filter_intent to deterministic code~~ — Won't do. Intent drives filter merge/replace logic (`new_search`/`pivot` = replace, `refine` = merge). This is a semantic decision that depends on conversational context, not derivable from params alone. Already a structured tool param (P1-safe). | — | — |
+| ~~6~~ | ~~Add deterministic post-processing for price/day labels~~ — Already done. `dayLabel` computed deterministically in `serializePoolForContinuation`. Price passed as structured `is_free` + `price_display`. | — | — |
 
 ---
 

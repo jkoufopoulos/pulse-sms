@@ -96,7 +96,7 @@ Daily scrape (10am ET)              Incoming SMS
 | `brain-llm.js` | Tool definitions (`BRAIN_TOOLS`), system prompt (`buildBrainSystemPrompt`), event serialization (`serializePoolForContinuation`) |
 | `brain-execute.js` | Pure tool implementations: `buildSearchPool`, `executeMore`, `executeDetails`, `validatePicks` |
 | `pipeline.js` | `buildTaggedPool`, `eventMatchesFilters`, `saveResponseFrame` (atomic session writes) |
-| `ai.js` | `extractEvents` (scrape-time), `composeDetails` (event detail composition). Uses `llm.generate()` |
+| `ai.js` | `extractEvents` (scrape-time). Uses `llm.generate()` |
 | `prompts.js` | System prompts: `DETAILS_SYSTEM`, `EXTRACTION_PROMPT` |
 | `session.js` | Per-phone session store, 2hr TTL, 12 fields |
 | `events.js` | Daily event cache + disk persistence, cross-source dedup, quality gates, source vibe stamping |
@@ -124,7 +124,7 @@ Required: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `ANT
 
 Optional: `PORT` (default 3000), `PULSE_TEST_MODE=true` (enables simulator), `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`/`GMAIL_REFRESH_TOKEN` (newsletter scrapers), `RESEND_API_KEY`/`ALERT_EMAIL` (email alerts), `PULSE_NO_RATE_LIMIT=true`.
 
-Model config (all optional, defaults in `src/model-config.js`): `PULSE_MODEL_BRAIN` (agent loop, default `gemini-2.5-flash-lite`), `PULSE_MODEL_EXTRACT` (event extraction, default `claude-haiku-4-5-20251001`), `PULSE_MODEL_DETAILS` (detail composition, default `gemini-2.5-flash`), `PULSE_MODEL_FALLBACK` (fallback for all roles, default `claude-haiku-4-5-20251001`). Provider auto-detected from model name prefix (`gemini-*` → Gemini, `claude-*` → Anthropic).
+Model config (all optional, defaults in `src/model-config.js`): `PULSE_MODEL_BRAIN` (agent loop, default `claude-haiku-4-5-20251001`), `PULSE_MODEL_EXTRACT` (event extraction, default `claude-haiku-4-5-20251001`), `PULSE_MODEL_FALLBACK` (fallback for all roles, default `gemini-2.5-flash`). Provider auto-detected from model name prefix (`gemini-*` → Gemini, `claude-*` → Anthropic).
 
 ## Running
 
