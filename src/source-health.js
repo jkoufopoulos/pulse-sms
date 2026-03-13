@@ -1,11 +1,12 @@
 const fs = require('fs');
 const path = require('path');
 const { SOURCE_LABELS } = require('./source-registry');
-const { sendHealthAlert } = require('./alerts');
 const { getNycDateString } = require('./geo');
 
 const HEALTH_WARN_THRESHOLD = 3;
 const HISTORY_MAX = 7;
+const AUTO_DISABLE_THRESHOLD = 7;
+const PROBE_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // --- Source health tracking (expanded) ---
 function makeHealthEntry() {
@@ -20,6 +21,9 @@ function makeHealthEntry() {
     totalSuccesses: 0,      // lifetime success count (events > 0)
     history: [],            // last 7 entries: { timestamp, count, durationMs, status }
     lastQuarantineReason: null,
+    disabled: false,        // auto-disabled after AUTO_DISABLE_THRESHOLD consecutive zeros
+    disabledAt: null,       // ISO timestamp when disabled
+    lastProbeAt: null,      // ISO timestamp of last probe attempt while disabled
   };
 }
 
@@ -90,10 +94,20 @@ function updateSourceHealth(label, { events, durationMs, status, error }) {
   if (events.length > 0) {
     health.totalSuccesses++;
     health.consecutiveZeros = 0;
+    if (health.disabled) {
+      console.log(`[HEALTH] ${label} auto-recovered — ${events.length} events returned`);
+      health.disabled = false;
+      health.disabledAt = null;
+    }
   } else {
     health.consecutiveZeros++;
     if (health.consecutiveZeros >= HEALTH_WARN_THRESHOLD) {
       console.warn(`[HEALTH] ${label} has returned 0 events for ${health.consecutiveZeros} consecutive refreshes`);
+    }
+    if (health.consecutiveZeros >= AUTO_DISABLE_THRESHOLD && !health.disabled) {
+      health.disabled = true;
+      health.disabledAt = new Date().toISOString();
+      console.warn(`[HEALTH] ${label} auto-disabled after ${health.consecutiveZeros} consecutive failures`);
     }
   }
 
@@ -109,17 +123,20 @@ function updateScrapeStats(stats) {
   lastScrapeStats = stats;
 }
 
-function alertOnFailingSources() {
-  const alertable = Object.entries(sourceHealth)
-    .filter(([_, h]) => h.consecutiveZeros >= HEALTH_WARN_THRESHOLD)
-    .map(([label, h]) => ({ label, consecutiveZeros: h.consecutiveZeros, lastError: h.lastError, lastStatus: h.lastStatus }));
-  if (alertable.length > 0) {
-    sendHealthAlert(alertable, lastScrapeStats).catch(err =>
-      console.error('[ALERT] Failed:', err.message)
-    );
-  }
+// ============================================================
+// Disable / probe helpers
+// ============================================================
+
+function isSourceDisabled(label) {
+  return sourceHealth[label]?.disabled === true;
 }
 
+function shouldProbeDisabled(label) {
+  const health = sourceHealth[label];
+  if (!health || !health.disabled) return false;
+  if (!health.lastProbeAt) return true;
+  return Date.now() - new Date(health.lastProbeAt).getTime() > PROBE_INTERVAL_MS;
+}
 
 // ============================================================
 // Event mix computation — takes cache as parameter
@@ -202,9 +219,11 @@ module.exports = {
   saveHealthData,
   updateSourceHealth,
   updateScrapeStats,
-  alertOnFailingSources,
   computeEventMix,
   getHealthStatus,
   computeFieldCoverage,
+  isSourceDisabled,
+  shouldProbeDisabled,
   HEALTH_WARN_THRESHOLD,
+  AUTO_DISABLE_THRESHOLD,
 };

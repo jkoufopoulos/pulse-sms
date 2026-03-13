@@ -283,4 +283,90 @@ async function sendDigestEmail(digest) {
   lastDigestSent = Date.now();
 }
 
-module.exports = { sendHealthAlert, sendRuntimeAlert, sendDigestEmail, _runtimeCooldowns, loadAlerts, getRecentAlerts };
+// --- Graduated alert (yellow/red severity from digest) ---
+
+async function sendGraduatedAlert(digest) {
+  if (digest.status === 'green') return;
+
+  const severity = digest.status; // 'yellow' or 'red'
+  const prefix = severity === 'red' ? 'ACTION REQUIRED' : 'Needs attention';
+  const subject = `Pulse: ${prefix} — ${digest.needs_attention.length} source issue(s)`;
+
+  const lines = [];
+  lines.push(`Severity: ${severity.toUpperCase()}`);
+  lines.push(`Date: ${digest.id}`);
+  lines.push('');
+
+  if (digest.needs_attention.length > 0) {
+    for (const item of digest.needs_attention) {
+      const marker = item.severity === 'warn' ? '!' : 'i';
+      lines.push(`  [${marker}] ${item.source}: ${item.issue}`);
+    }
+    lines.push('');
+  }
+
+  lines.push(`Cache: ${digest.cache.total} events (${digest.cache.change_pct > 0 ? '+' : ''}${digest.cache.change_pct}% vs yesterday)`);
+
+  if (severity === 'red') {
+    lines.push('');
+    lines.push('Recommended: check source health dashboard at /health');
+  }
+
+  const body = lines.join('\n');
+
+  const alertEntry = {
+    id: crypto.randomUUID(),
+    timestamp: new Date().toISOString(),
+    type: 'graduated',
+    severity,
+    subject,
+    details: {
+      status: digest.status,
+      needs_attention: digest.needs_attention,
+      cache_total: digest.cache.total,
+      cache_change_pct: digest.cache.change_pct,
+    },
+    emailSent: false,
+    emailError: null,
+  };
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    alertEntry.emailError = 'RESEND_API_KEY not set';
+    logAlert(alertEntry);
+    console.warn(`[ALERT] Graduated alert (${severity}) logged without email`);
+    return;
+  }
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'Pulse Alerts <onboarding@resend.dev>',
+        to: ALERT_EMAIL,
+        subject,
+        text: body,
+      }),
+    });
+
+    if (res.ok) {
+      alertEntry.emailSent = true;
+      console.log(`[ALERT] Graduated alert (${severity}) sent to ${ALERT_EMAIL}`);
+    } else {
+      const err = await res.text();
+      alertEntry.emailError = `${res.status} ${err}`;
+      console.error(`[ALERT] Resend API error: ${res.status} ${err}`);
+    }
+  } catch (err) {
+    alertEntry.emailError = err.message;
+    console.error(`[ALERT] Graduated alert send failed:`, err.message);
+  }
+
+  logAlert(alertEntry);
+}
+
+module.exports = { sendHealthAlert, sendRuntimeAlert, sendDigestEmail, sendGraduatedAlert, _runtimeCooldowns, loadAlerts, getRecentAlerts };

@@ -21,6 +21,8 @@ require('./unit/model-config.test');
 require('./unit/llm.test');
 require('./unit/agent-loop.test');
 require('./unit/traces-latency.test');
+require('./unit/source-health-disable.test');
+require('./unit/graduated-alert.test');
 const misc = require('./unit/misc.test');
 const profile = require('./unit/preference-profile.test');
 

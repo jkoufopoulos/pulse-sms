@@ -1,5 +1,5 @@
 const { SOURCE_LABELS, SOURCE_EXPECTATIONS, SOURCE_CACHE_NAMES } = require('./source-registry');
-const { sourceHealth } = require('./source-health');
+const { sourceHealth, isSourceDisabled } = require('./source-health');
 const { getNycDateString } = require('./geo');
 const { getRecentAlerts } = require('./alerts');
 
@@ -30,6 +30,15 @@ function buildNeedsAttention(sourceData, dayName) {
     const isOnSchedule = !s.schedule || s.schedule.days.some(d => day.startsWith(d.toLowerCase()) || d.toLowerCase().startsWith(day));
     const belowThreshold = s.count < s.minExpected * 0.4;
     const belowAvg = s.avg7d > 5 && s.count < s.avg7d * 0.4;
+
+    if (s.isDisabled) {
+      items.push({
+        source: s.name,
+        issue: `auto-disabled (${s.consecutiveZeros} consecutive failures)`,
+        severity: 'warn',
+      });
+      continue;
+    }
 
     if (belowThreshold || belowAvg) {
       if (s.isQuarantined) {
@@ -101,6 +110,8 @@ function generateDigest(eventCache, scrapeStats) {
       status: count >= expectations.minExpected * 0.4 ? 'ok' : 'warn',
       isQuarantined,
       quarantineReason: isQuarantined ? health?.lastQuarantineReason : null,
+      isDisabled: isSourceDisabled(label),
+      consecutiveZeros: health?.consecutiveZeros || 0,
       ...expectations,
     };
   });

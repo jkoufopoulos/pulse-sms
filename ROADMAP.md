@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, planned work, and completed phases.
-> Last updated: 2026-03-08
+> Last updated: 2026-03-13
 > North star: **"Feel like a local."** See [Product Vision](docs/VISION.md) and [Architecture Review](docs/plans/2026-03-08-architecture-review-design.md).
 
 ---
@@ -172,10 +172,10 @@ message -> checkMechanical (help + TCPA only, $0)
 **Story: Scraper failures degrade gracefully**
 > As a system, when a source's markup changes, I want to detect partial degradation (not just total failure) and alert before coverage materially drops.
 
-- [ ] Source health scoring: rolling 7-day health per source (event count trend, extraction confidence avg, consecutive failures)
-- [ ] Auto-disable after 7 consecutive failures
-- [ ] Graduated alerting: yellow at 20% drop, red at 50% drop
-- [ ] Complete scrape resilience plan: volatile baseline (median not mean) for Yutori/NonsenseNYC, duplicate spike tolerance for multi-show venues
+- [x] Source health scoring: rolling 7-day health per source (event count trend, extraction confidence avg, consecutive failures)
+- [x] Auto-disable after 7 consecutive failures (with daily probe for auto-recovery)
+- [x] Graduated alerting: yellow at 20% drop, red at 50% drop
+- [x] Complete scrape resilience plan: volatile baseline (median not mean) for Yutori/NonsenseNYC, duplicate spike tolerance for multi-show venues
 
 **Story: Events are fresh when users actually text**
 > As a user texting at 8pm, I want today's data to include events posted after the 10am scrape — day-of announcements, cancellations, sold-out status.
@@ -272,6 +272,7 @@ message -> checkMechanical (help + TCPA only, $0)
 | Phase 8: Venue Knowledge | Mar 12 | 30 venue profiles in `data/venue-profiles.json` (web-researched, human-reviewed). `venue_vibe` in pool serialization, full profile in details intent, prompt guidance added. Scenario evals: 99.9% code evals, 99.5% assertions (287 scenarios). |
 | Phase 7+8: Eval golden scenario update | Mar 13 | Fixed `exists`/`contains_any` assertion types in eval runner (were silently failing). Updated 14 stale text assertions for new tastemaker voice. |
 | Time-aware filtering | Mar 13 | Tightened `filterUpcomingEvents` grace window from 2hr to 30min for events without `end_time_local` (fixed-start shows). Events with end times still shown while ongoing. Added prompt hint for in-progress events ("started at 7 but goes til midnight") and wired `end_time_local` into pool serialization. |
+| Phase 11 Story 1: Scraper Failure Resilience | Mar 13 | Auto-disable after 7 consecutive failures with daily probe for auto-recovery. Graduated alerting (yellow/red severity emails) replaces flat digest emails for non-green status. Disabled sources flagged in digest. Dead `alertOnFailingSources` removed. |
 
 ### Prompt Hygiene — Open Items
 

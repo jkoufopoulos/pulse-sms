@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { SOURCES, SOURCE_TIERS, SOURCE_LABELS, SOURCE_DB_NAMES, MERGE_ORDER, EMAIL_SOURCES } = require('./source-registry');
-const { sourceHealth, saveHealthData, updateSourceHealth, updateScrapeStats, computeEventMix, getHealthStatus: _getHealthStatus } = require('./source-health');
+const { sourceHealth, saveHealthData, updateSourceHealth, updateScrapeStats, computeEventMix, getHealthStatus: _getHealthStatus, isSourceDisabled, shouldProbeDisabled } = require('./source-health');
 const { rankEventsByProximity, filterUpcomingEvents, getNycDateString, getEventDate, isEventInDateRange, parseAsNycTime } = require('./geo');
 const { batchGeocodeEvents, exportLearnedVenues, importLearnedVenues, lookupVenue, lookupVenueSize } = require('./venues');
 const { filterIncomplete, filterKidsEvents, isGarbageName } = require('./curation');
@@ -453,19 +453,40 @@ async function refreshCache() {
     clearExtractionInputs(); // Clear for this scrape cycle
     console.log('Refreshing event cache (all sources)...');
 
+    // Determine which sources to skip (disabled, not due for probe)
+    const disabledSkipped = new Set();
+    const disabledProbing = new Set();
+    for (const s of SOURCES) {
+      if (isSourceDisabled(s.label)) {
+        if (shouldProbeDisabled(s.label)) {
+          disabledProbing.add(s.label);
+        } else {
+          disabledSkipped.add(s.label);
+        }
+      }
+    }
+    if (disabledSkipped.size > 0) {
+      console.log(`[HEALTH] Skipping ${disabledSkipped.size} disabled source(s): ${[...disabledSkipped].join(', ')}`);
+    }
+    if (disabledProbing.size > 0) {
+      console.log(`[HEALTH] Probing ${disabledProbing.size} disabled source(s): ${[...disabledProbing].join(', ')}`);
+    }
+
+    const activeSources = SOURCES.filter(s => !disabledSkipped.has(s.label));
+
     // SOURCES drives the fetch array — no positional coupling
     const fetchResults = await Promise.allSettled(
-      SOURCES.map(s => timedFetch(s.fetch, s.label, s.weight)),
+      activeSources.map(s => timedFetch(s.fetch, s.label, s.weight)),
     );
 
     const allEvents = [];
     const seen = new Set();
 
-    // Map fetch results back to labels — SOURCES[i] corresponds to fetchResults[i]
+    // Map fetch results back to labels — activeSources[i] corresponds to fetchResults[i]
     const fetchMap = {};
-    for (let i = 0; i < SOURCES.length; i++) {
+    for (let i = 0; i < activeSources.length; i++) {
       const settled = fetchResults[i];
-      fetchMap[SOURCES[i].label] = settled.status === 'fulfilled'
+      fetchMap[activeSources[i].label] = settled.status === 'fulfilled'
         ? settled.value
         : { events: [], durationMs: 0, status: 'error', error: settled.reason?.message || 'unknown' };
     }
@@ -475,8 +496,15 @@ async function refreshCache() {
 
     // Merge in priority order (highest weight first, then mergeRank)
     for (const label of MERGE_ORDER) {
+      if (disabledSkipped.has(label)) continue;
       const result = fetchMap[label];
+      if (!result) continue;
       totalRaw += result.events.length;
+
+      // Update probe timestamp for disabled sources being probed
+      if (disabledProbing.has(label)) {
+        sourceHealth[label].lastProbeAt = new Date().toISOString();
+      }
 
       // Record health BEFORE baseline check (so history accumulates)
       updateSourceHealth(label, result);
@@ -651,9 +679,9 @@ async function refreshCache() {
       console.log(`Daily digest: ${digest.status} — ${digest.summary}`);
 
       if (digest.status !== 'green') {
-        const { sendDigestEmail } = require('./alerts');
-        sendDigestEmail(digest).catch(err =>
-          console.error('[DIGEST] Email failed:', err.message)
+        const { sendGraduatedAlert } = require('./alerts');
+        sendGraduatedAlert(digest).catch(err =>
+          console.error('[ALERT] Graduated alert failed:', err.message)
         );
       }
     } catch (err) {
@@ -712,22 +740,40 @@ async function refreshEmailSources() {
   }
 
   emailRefreshPromise = (async () => {
-    console.log(`Polling ${EMAIL_SOURCES.length} email sources...`);
+    // Filter out disabled sources (probe if due)
+    const emailDisabledProbing = new Set();
+    const activeEmailSources = EMAIL_SOURCES.filter(s => {
+      if (!isSourceDisabled(s.label)) return true;
+      if (shouldProbeDisabled(s.label)) {
+        emailDisabledProbing.add(s.label);
+        console.log(`[EMAIL-POLL] Probing disabled source: ${s.label}`);
+        return true;
+      }
+      console.log(`[EMAIL-POLL] Skipping disabled source: ${s.label}`);
+      return false;
+    });
+
+    console.log(`Polling ${activeEmailSources.length} email sources...`);
     const start = Date.now();
 
     const fetchResults = await Promise.allSettled(
-      EMAIL_SOURCES.map(s => timedFetch(s.fetch, s.label, s.weight)),
+      activeEmailSources.map(s => timedFetch(s.fetch, s.label, s.weight)),
     );
 
     const existingIds = new Set(eventCache.map(e => e.id));
     let added = 0;
 
-    for (let i = 0; i < EMAIL_SOURCES.length; i++) {
-      const label = EMAIL_SOURCES[i].label;
+    for (let i = 0; i < activeEmailSources.length; i++) {
+      const label = activeEmailSources[i].label;
       const settled = fetchResults[i];
       const result = settled.status === 'fulfilled'
         ? settled.value
         : { events: [], durationMs: 0, status: 'error', error: settled.reason?.message || 'unknown' };
+
+      // Update probe timestamp for disabled sources
+      if (emailDisabledProbing.has(label)) {
+        sourceHealth[label].lastProbeAt = new Date().toISOString();
+      }
 
       // Update health tracking
       updateSourceHealth(label, result);

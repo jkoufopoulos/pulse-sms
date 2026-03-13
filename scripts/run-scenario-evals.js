@@ -178,6 +178,11 @@ function checkAssertions(scenario, actualConversation) {
       passed = actual.message === expected.message;
     } else if (expected.assert === 'contains') {
       passed = actual.message.includes(expected.message);
+    } else if (expected.assert === 'exists') {
+      passed = actual.message && actual.message.length > 0;
+    } else if (expected.assert === 'contains_any') {
+      const options = expected.match || (Array.isArray(expected.message) ? expected.message : [expected.message]);
+      passed = options.some(opt => actual.message.includes(opt));
     } else {
       passed = false;
     }
