@@ -34,8 +34,8 @@ const SOURCE_TIERS = {
 // ============================================================
 
 const SOURCES = [
-  { label: 'Skint',            fetch: fetchSkintEvents,         weight: 0.9,  mergeRank: 0, endpoint: 'https://theskint.com', minExpected: 5, dbName: 'theskint' },
-  { label: 'SkintOngoing',     fetch: fetchSkintOngoingEvents,  weight: 0.9,  mergeRank: 1, endpoint: 'https://theskint.com/ongoing-events/', minExpected: 10, dbName: 'theskint' },
+  { label: 'Skint',            fetch: fetchSkintEvents,         weight: 0.9,  mergeRank: 0, endpoint: 'https://theskint.com', minExpected: 5, volatile: true, dbName: 'theskint' },
+  { label: 'SkintOngoing',     fetch: fetchSkintOngoingEvents,  weight: 0.9,  mergeRank: 1, endpoint: 'https://theskint.com/ongoing-events/', minExpected: 10, volatile: true, dbName: 'theskint' },
   { label: 'NonsenseNYC',      fetch: fetchNonsenseNYC,         weight: 0.9,  mergeRank: 1, endpoint: 'https://nonsensenyc.com', minExpected: 10, volatile: true, channel: 'email' },
   { label: 'RA',               fetch: fetchRAEvents,            weight: 0.85, mergeRank: 0, endpoint: 'https://ra.co', minExpected: 50 },
   // OhMyRockness removed — 80% loss to dedup/quality gates, only 3 unique events surviving.

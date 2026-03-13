@@ -137,7 +137,6 @@ function normalizeDateTimeFields(e) {
  */
 const CATEGORY_CANON = {
   music: 'live_music',
-  film: 'art',
   dance: 'nightlife',
   market: 'community',
   literature: 'spoken_word',
