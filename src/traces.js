@@ -11,7 +11,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const TRACES_DIR = path.join(__dirname, '..', 'data', 'traces');
-const RING_BUFFER_SIZE = 200;
+const RING_BUFFER_SIZE = 500;
 
 // Per-token pricing by provider (shared source of truth)
 const PRICING = {

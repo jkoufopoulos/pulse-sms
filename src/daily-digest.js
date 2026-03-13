@@ -142,7 +142,7 @@ function generateDigest(eventCache, scrapeStats) {
   ).length;
 
   const { computeLatencyStats, getRecentTraces } = require('./traces');
-  const latencyStats = computeLatencyStats(getRecentTraces(200));
+  const latencyStats = computeLatencyStats(getRecentTraces(500));
   const latencyP95 = latencyStats.p95;
 
   const status = computeDigestStatus({ sourcesBelow, cacheDrop, userFacingErrors, latencyP95 });

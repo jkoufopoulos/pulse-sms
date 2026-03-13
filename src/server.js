@@ -79,7 +79,7 @@ app.get('/api/health/costs', (req, res) => {
   }
 
   const { getCostSummary } = require('./handler');
-  const traces = getRecentTraces(200);
+  const traces = getRecentTraces(500);
 
   const nycToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 
@@ -131,7 +131,7 @@ app.get('/api/health/latency', (req, res) => {
   }
 
   const { computeLatencyStats } = require('./traces');
-  const traces = getRecentTraces(200);
+  const traces = getRecentTraces(500);
 
   const nycToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
   const todayTraces = traces.filter(t => {
@@ -144,6 +144,54 @@ app.get('/api/health/latency', (req, res) => {
     today: computeLatencyStats(todayTraces),
     recent: computeLatencyStats(traces),
   });
+});
+
+// Latency history from daily digests -- trend over 14-30 days
+app.get('/api/health/latency/history', (req, res) => {
+  const authToken = process.env.HEALTH_AUTH_TOKEN;
+  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
+  const hasValidToken = authToken && req.query.token === authToken;
+  if (!isTestMode && !hasValidToken) return res.status(403).json({ error: 'Forbidden' });
+
+  const { getDigests } = require('./db');
+  const days = Math.min(parseInt(req.query.days) || 14, 60);
+  const digests = getDigests(days);
+  res.json(digests.map(d => ({
+    date: d.id,
+    status: d.status,
+    latency: d.report.latency || null,
+    cache_total: d.report.cache?.total || 0,
+    user_facing_errors: d.report.user_facing_errors || 0,
+  })).reverse());
+});
+
+// Slow traces -- return N slowest from ring buffer with full detail
+app.get('/api/health/traces/slow', (req, res) => {
+  const authToken = process.env.HEALTH_AUTH_TOKEN;
+  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
+  const hasValidToken = authToken && req.query.token === authToken;
+  if (!isTestMode && !hasValidToken) return res.status(403).json({ error: 'Forbidden' });
+
+  const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+  const traces = getRecentTraces(500);
+  const slow = traces
+    .filter(t => t.total_latency_ms > 0)
+    .sort((a, b) => b.total_latency_ms - a.total_latency_ms)
+    .slice(0, limit)
+    .map(t => ({
+      id: t.id,
+      timestamp: t.timestamp,
+      input_message: t.input_message,
+      output_intent: t.output_intent,
+      total_latency_ms: t.total_latency_ms,
+      brain_latency_ms: t.brain_latency_ms,
+      brain_iterations: t.brain_iterations,
+      brain_provider: t.brain_provider,
+      brain_error: t.brain_error,
+      output_sms_length: t.output_sms_length,
+      total_ai_cost_usd: t.total_ai_cost_usd,
+    }));
+  res.json({ count: slow.length, traces: slow });
 });
 
 // SMS webhook
