@@ -257,17 +257,17 @@ function parseAsNycTime(dtString) {
  * Filter out events that have likely already ended.
  * Keeps events that:
  * - Have no parseable start time (let Claude decide)
- * - Started within the last 2 hours (might still be going)
+ * - Have an end_time still in the future (multi-hour events fine to join late)
+ * - Started within the last 30min and have no end_time (fixed-start shows)
  * - Haven't started yet
- * - Have an end_time that's still in the future
  */
 function filterUpcomingEvents(events, { refTimeMs } = {}) {
   const now = refTimeMs || Date.now();
-  const twoHoursAgo = now - 2 * 60 * 60 * 1000;
+  const thirtyMinAgo = now - 30 * 60 * 1000;
   const todayNyc = getNycDateString(0, now);
 
   return events.filter(e => {
-    // Check end_time FIRST — late-night events that span midnight are still happening
+    // Check end_time FIRST — if we know when it ends and it's still going, keep it
     if (e.end_time_local && /T\d{2}:/.test(e.end_time_local)) {
       try {
         const endMs = parseAsNycTime(e.end_time_local);
@@ -275,13 +275,14 @@ function filterUpcomingEvents(events, { refTimeMs } = {}) {
       } catch {}
     }
 
-    // Check start_time — events within last 2 hours or in future are live
-    // 2 hours: generous enough for late starts, tight enough to not recommend past events
+    // No end_time (or end_time already passed) — use tight 30min grace window.
+    // Events without end times are typically fixed-start (concerts, talks, comedy)
+    // where showing up late is awkward or impossible.
     if (e.start_time_local && /T\d{2}:/.test(e.start_time_local)) {
       try {
         const eventMs = parseAsNycTime(e.start_time_local);
         if (!isNaN(eventMs)) {
-          if (eventMs > twoHoursAgo) return true;
+          if (eventMs > thirtyMinAgo) return true;
           return false; // has specific time and it's too old
         }
       } catch {}

@@ -118,23 +118,27 @@ function makeTime(hoursFromNow) {
 
 const timeEvents = [
   { id: 't1', start_time_local: makeTime(3) },       // future
-  { id: 't2', start_time_local: makeTime(-1) },       // 1hr ago (within window)
+  { id: 't2', start_time_local: makeTime(-1) },       // 1hr ago, no end_time (fixed-start show — too late)
   { id: 't3', start_time_local: makeTime(-5) },       // 5hrs ago (should be filtered)
   { id: 't4', start_time_local: null },                // no time
   { id: 't5', start_time_local: getNycDateString(1, REF_TIME) }, // date-only (tomorrow)
-  { id: 't6', start_time_local: makeTime(-4), end_time_local: makeTime(1) },  // ended but end in future
+  { id: 't6', start_time_local: makeTime(-4), end_time_local: makeTime(1) },  // started 4hr ago but end in future (multi-hour event)
   { id: 't7', start_time_local: '2020-01-01' },       // date-only past
+  { id: 't8', start_time_local: makeTime(-0.4) },     // 24min ago, no end_time (within 30min grace)
+  { id: 't9', start_time_local: makeTime(-1), end_time_local: makeTime(2) },  // 1hr ago but end in future (joinable)
 ];
 const upcoming = filterUpcomingEvents(timeEvents, { refTimeMs: REF_TIME });
 const upIds = upcoming.map(e => e.id);
 
 check('keeps future', upIds.includes('t1'));
-check('keeps recent (within 2hr)', upIds.includes('t2'));
+check('removes 1hr-ago show with no end_time', !upIds.includes('t2'));
 check('removes past (5hr ago)', !upIds.includes('t3'));
 check('keeps no-time', upIds.includes('t4'));
 check('keeps date-only tomorrow', upIds.includes('t5'));
-check('keeps event with future end_time', upIds.includes('t6'));
+check('keeps event with future end_time (started 4hr ago)', upIds.includes('t6'));
 check('removes date-only past', !upIds.includes('t7'));
+check('keeps 24min-ago show (within 30min grace)', upIds.includes('t8'));
+check('keeps 1hr-ago event with future end_time', upIds.includes('t9'));
 
 // ---- parseAsNycTime ----
 console.log('\nparseAsNycTime:');
