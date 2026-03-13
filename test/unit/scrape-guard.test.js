@@ -41,27 +41,30 @@ function buildHistory(count, entries, fieldCoverage = { name: 0.95, venue_name: 
   return history;
 }
 
-// --- Count drift ---
+// --- Count drift — warn only, no quarantine ---
 sh['TestGuard'] = { ...mkEntry(), history: buildHistory(100, 5) };
-const countDrift = checkBaseline('TestGuard', new Array(30).fill({ name: 'E', venue_name: 'V', date_local: '2026-03-05' }));
-check('count drift: quarantined (30 vs avg 100)', countDrift.quarantined === true);
-check('count drift: reason mentions count', countDrift.reason.includes('count'));
+const countDriftEvents = Array.from({ length: 30 }, (_, i) => ({ name: `Event ${i}`, venue_name: 'V', date_local: '2026-03-05' }));
+const countDrift = checkBaseline('TestGuard', countDriftEvents);
+check('count drift: NOT quarantined (warn only)', countDrift.quarantined === false);
 
-sh['TestGuard'] = { ...mkEntry(), history: buildHistory(100, 5) };
-const countOkEvents = [];
-for (let i = 0; i < 80; i++) countOkEvents.push({ name: `Event ${i}`, venue_name: 'V', date_local: '2026-03-05' });
-const countOk = checkBaseline('TestGuard', countOkEvents);
-check('count ok: not quarantined (80 vs avg 100)', countOk.quarantined === false);
-
-// --- Field coverage drift ---
-sh['TestFieldDrift'] = { ...mkEntry(), history: buildHistory(50, 5, { name: 0.95, venue_name: 0.90, date_local: 0.85 }) };
+// --- Field coverage drift (threshold 0.60) ---
+sh['TestFieldDrift'] = { ...mkEntry(), history: buildHistory(50, 5, { name: 0.95, venue_name: 0.90, date_local: 0.85, start_time_local: 0.80, neighborhood: 0.75 }) };
 const badVenues = [];
 for (let i = 0; i < 50; i++) {
-  badVenues.push({ name: `Event ${i}`, venue_name: i < 15 ? 'V' : null, date_local: '2026-03-05' });
+  badVenues.push({ name: `Event ${i}`, venue_name: i < 10 ? 'V' : null, date_local: '2026-03-05' });
 }
 const fieldDrift = checkBaseline('TestFieldDrift', badVenues);
-check('field drift: quarantined (venue coverage 0.30 vs avg 0.90)', fieldDrift.quarantined === true);
+check('field drift: quarantined (venue coverage 0.20 vs avg 0.90)', fieldDrift.quarantined === true);
 check('field drift: reason mentions venue_name', fieldDrift.reason.includes('venue_name'));
+
+// Moderate drop should NOT quarantine (enrichment handles it)
+sh['TestFieldModerate'] = { ...mkEntry(), history: buildHistory(50, 5, { name: 0.95, venue_name: 0.90, date_local: 0.85, start_time_local: 0.80, neighborhood: 0.75 }) };
+const moderateVenues = [];
+for (let i = 0; i < 50; i++) {
+  moderateVenues.push({ name: `Event ${i}`, venue_name: i < 25 ? 'V' : null, date_local: '2026-03-05' });
+}
+const moderateResult = checkBaseline('TestFieldModerate', moderateVenues);
+check('moderate field drop: NOT quarantined (0.50 vs 0.90, drop=0.40 < 0.60)', moderateResult.quarantined === false);
 
 // --- Duplicate spike ---
 sh['TestDupes'] = { ...mkEntry(), history: buildHistory(50, 5) };
@@ -94,15 +97,10 @@ for (const count of [3, 14, 1108, 74, 43]) {
   });
 }
 
-// 28 events: below mean*0.4 (248*0.4=99) but above median*0.4 (43*0.4=17)
-const volatileEvents = Array.from({ length: 28 }, (_, i) => ({ name: `Event ${i}`, venue_name: 'V', date_local: '2026-03-05' }));
+// Count drift no longer quarantines — volatile sources pass regardless of count
+const volatileEvents = Array.from({ length: 5 }, (_, i) => ({ name: `Event ${i}`, venue_name: 'V', date_local: '2026-03-05' }));
 const volatileResult = checkBaseline('TestVolatile', volatileEvents);
-check('volatile source: not quarantined (28 > median*0.4=17)', volatileResult.quarantined === false);
-
-// Truly low count should still quarantine
-const veryLowEvents = Array.from({ length: 5 }, (_, i) => ({ name: `Event ${i}`, venue_name: 'V', date_local: '2026-03-05' }));
-const veryLowResult = checkBaseline('TestVolatile', veryLowEvents);
-check('volatile source: quarantined when truly low (5 < median*0.4=17)', veryLowResult.quarantined === true);
+check('volatile source: not quarantined (count drift is warn-only)', volatileResult.quarantined === false);
 
 // --- Duplicate spike: legitimate multi-show venue ---
 console.log('\nduplicate spike — multi-show:');
@@ -136,7 +134,7 @@ const trueDupeResult = checkBaseline('TestTrueDupes', trueDupeEvents);
 check('true duplication: quarantined (same name+time)', trueDupeResult.quarantined === true);
 
 // Clean up
-for (const k of ['TestGuard', 'TestFieldDrift', 'TestDupes', 'TestDates', 'TestNewSource', 'TestVolatile', 'TestMultiShow', 'TestTrueDupes']) {
+for (const k of ['TestGuard', 'TestFieldDrift', 'TestFieldModerate', 'TestDupes', 'TestDates', 'TestNewSource', 'TestVolatile', 'TestMultiShow', 'TestTrueDupes']) {
   delete sh[k];
 }
 

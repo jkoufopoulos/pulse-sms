@@ -3,8 +3,7 @@ const { getNycDateString } = require('./geo');
 const { checkSourceCompleteness } = require('./evals/source-completeness');
 const { runExtractionAudit } = require('./evals/extraction-audit');
 const MIN_HISTORY = 3;
-const COUNT_DRIFT_THRESHOLD = 0.4;
-const FIELD_DRIFT_THRESHOLD = 0.25;
+const FIELD_DRIFT_THRESHOLD = 0.60;
 const DATE_SANITY_THRESHOLD = 0.2;
 const DATE_SANITY_BASELINE_MIN = 0.6;
 const DUPLICATE_THRESHOLD = 0.5;
@@ -45,16 +44,13 @@ function checkBaseline(label, events) {
   const baseline = getBaselineStats(label);
   if (!baseline) return { quarantined: false, reason: null };
 
-  // 1. Count drift
+  // 1. Count drift — warn only, don't quarantine
+  // Post-scrape LLM enrichment handles quality gaps; count alone is not a quality signal.
   const isVolatile = !!sourceHealth[label]?.volatile;
   const baselineCount = isVolatile ? baseline.medianCount : baseline.avgCount;
   const baselineLabel = isVolatile ? 'median' : 'avg';
-  if (events.length < baselineCount * COUNT_DRIFT_THRESHOLD &&
-      baselineCount >= 10) {
-    return {
-      quarantined: true,
-      reason: `count drift: ${events.length} events vs ${Math.round(baselineCount)} ${baselineLabel}`,
-    };
+  if (baselineCount >= 10 && events.length < baselineCount * 0.4) {
+    console.warn(`[SCRAPE-GUARD] ${label} count drift: ${events.length} events vs ${Math.round(baselineCount)} ${baselineLabel} (not quarantining)`);
   }
 
   if (events.length === 0) return { quarantined: false, reason: null };
