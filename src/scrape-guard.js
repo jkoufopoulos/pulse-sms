@@ -22,20 +22,20 @@ function getBaselineStats(label) {
   const mid = Math.floor(counts.length / 2);
   const medianCount = counts.length % 2 === 1 ? counts[mid] : (counts[mid - 1] + counts[mid]) / 2;
 
-  const avgCoverage = { name: 0, venue_name: 0, date_local: 0 };
+  const avgCoverage = { name: 0, venue_name: 0, date_local: 0, start_time_local: 0, neighborhood: 0 };
   let coverageEntries = 0;
   for (const h of okEntries) {
     if (h.fieldCoverage) {
-      avgCoverage.name += h.fieldCoverage.name;
-      avgCoverage.venue_name += h.fieldCoverage.venue_name;
-      avgCoverage.date_local += h.fieldCoverage.date_local;
+      for (const field of Object.keys(avgCoverage)) {
+        avgCoverage[field] += h.fieldCoverage[field] || 0;
+      }
       coverageEntries++;
     }
   }
   if (coverageEntries > 0) {
-    avgCoverage.name /= coverageEntries;
-    avgCoverage.venue_name /= coverageEntries;
-    avgCoverage.date_local /= coverageEntries;
+    for (const field of Object.keys(avgCoverage)) {
+      avgCoverage[field] /= coverageEntries;
+    }
   }
 
   return { avgCount, medianCount, avgCoverage, entries: okEntries.length };

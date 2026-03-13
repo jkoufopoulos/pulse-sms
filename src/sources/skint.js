@@ -136,6 +136,23 @@ function parseSkintParagraph(text, dateLocal) {
     modifierStr = dayTimeMatch[3] || null; // e.g., "(monthly)", "(biweekly)"
     remaining = remaining.slice(dayTimeMatch[0].length);
 
+    // 2a. If no bare time but paren contains a time, extract it
+    // Handles: "fri + sat (7pm):", "sat + sun (11am-6pm sat, ...)"
+    if (!timeStr && modifierStr) {
+      const parenContent = modifierStr.replace(/[()]/g, '').trim();
+      const parenTimeMatch = parenContent.match(/(\d{1,2}(?::\d{2})?\s*(?:am|pm)?(?:\s*[-–]\s*\d{1,2}(?::\d{2})?)?\s*(?:am|pm))/i);
+      if (parenTimeMatch) {
+        timeStr = parenTimeMatch[1];
+        // Keep modifier only if it has non-time content (e.g., "weekends 10am-5pm")
+        const withoutTime = parenContent.replace(parenTimeMatch[0], '').replace(/,.*$/, '').trim();
+        if (/monthly|biweekly|weekly|bimonthly|weekends?/.test(withoutTime)) {
+          modifierStr = `(${withoutTime})`;
+        } else {
+          modifierStr = null;
+        }
+      }
+    }
+
     const parsed = timeStr ? parseSkintTime(timeStr) : { start: null, end: null };
     startTime = parsed.start;
     endTime = parsed.end;
@@ -280,6 +297,7 @@ function parseSkintParagraph(text, dateLocal) {
   }
 
   return {
+    _rawText: text,
     name: eventName,
     description_short: description || null,
     venue_name: venue || null,
@@ -423,7 +441,7 @@ async function fetchSkintEvents() {
 
     let events;
     if (captureRate >= 0.6) {
-      // Deterministic path — skip LLM entirely
+      // Deterministic path — _rawText carried through for post-scrape enrichment
       events = parsed
         .map(e => normalizeExtractedEvent(e, 'theskint', 'curated', 0.9))
         .filter(e => e.name && e.completeness >= 0.5);
@@ -566,6 +584,7 @@ function parseOngoingParagraph(text, todayIso, refYear) {
       if (resolved) {
         eventName = eventName.slice(0, nameParenMatch.index).trim();
         return {
+          _rawText: text,
           name: eventName,
           description_short: null,
           venue_name: null,
@@ -670,6 +689,7 @@ function parseOngoingParagraph(text, todayIso, refYear) {
   let confidence = 0.4 + evidenceFields * 0.15; // 0.4 base → 0.55/0.70/0.85/1.0
 
   return {
+    _rawText: text,
     name: eventName,
     description_short: description || null,
     venue_name: venue || null,

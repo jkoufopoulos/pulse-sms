@@ -70,8 +70,8 @@ try {
 // ============================================================
 
 function computeFieldCoverage(events) {
-  if (!events.length) return { name: 0, venue_name: 0, date_local: 0 };
-  const fields = ['name', 'venue_name', 'date_local'];
+  if (!events.length) return { name: 0, venue_name: 0, date_local: 0, start_time_local: 0, neighborhood: 0 };
+  const fields = ['name', 'venue_name', 'date_local', 'start_time_local', 'neighborhood'];
   const coverage = {};
   for (const field of fields) {
     const filled = events.filter(e => e[field] != null).length;

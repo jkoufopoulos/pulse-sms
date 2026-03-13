@@ -218,6 +218,8 @@ function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
         recurrence_time: e.recurrence_time || null,
       },
     } : {}),
+    // Carry raw text for post-scrape LLM enrichment (transient, stripped before persistence)
+    ...(e._rawText ? { _rawText: e._rawText } : {}),
   };
 }
 

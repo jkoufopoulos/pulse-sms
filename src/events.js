@@ -609,6 +609,18 @@ async function refreshCache() {
       } catch (err) { console.error('Failed to persist venues:', err.message); }
     }
 
+    // Post-scrape LLM enrichment: fill missing fields using _rawText provenance
+    try {
+      const { enrichIncompleteEvents, stripRawText } = require('./enrichment');
+      const enrichStats = await enrichIncompleteEvents(validEvents);
+      if (enrichStats.enriched > 0) {
+        console.log(`[ENRICHMENT] Total: ${enrichStats.enriched}/${enrichStats.sent} events enriched`);
+      }
+      stripRawText(validEvents);
+    } catch (err) {
+      console.error('[ENRICHMENT] Post-scrape enrichment failed (non-fatal):', err.message);
+    }
+
     // Write all 30-day events to SQLite, then rebuild 7-day serving cache
     const weekOut = getNycDateString(7);
     try {

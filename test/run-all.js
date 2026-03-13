@@ -25,6 +25,7 @@ require('./unit/traces-latency.test');
 require('./unit/source-health-disable.test');
 require('./unit/graduated-alert.test');
 require('./unit/nudges.test');
+require('./unit/enrichment.test');
 const misc = require('./unit/misc.test');
 const profile = require('./unit/preference-profile.test');
 

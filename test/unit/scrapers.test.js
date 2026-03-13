@@ -254,6 +254,14 @@ if (cacheExists) {
 }
 
 
+// _rawText is stashed on parsed events
+check('_rawText is set', std && std._rawText && std._rawText.includes('tale storytelling'));
+check('_rawText preserved through normalizeExtractedEvent', (() => {
+  const { normalizeExtractedEvent } = require('../../src/sources/shared');
+  const normalized = normalizeExtractedEvent({ name: 'Test', _rawText: 'fri 7pm: test', date_local: '2026-03-13' }, 'test', 'curated', 0.9);
+  return normalized._rawText === 'fri 7pm: test';
+})());
+
 // ---- Skint ongoing: parseThruDate ----
 console.log('\nSkint ongoing parseThruDate:');
 

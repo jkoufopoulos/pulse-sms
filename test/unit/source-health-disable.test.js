@@ -1,6 +1,6 @@
 const { check } = require('../helpers');
 
-const { sourceHealth, makeHealthEntry, updateSourceHealth, isSourceDisabled, shouldProbeDisabled } = require('../../src/source-health');
+const { sourceHealth, makeHealthEntry, updateSourceHealth, isSourceDisabled, shouldProbeDisabled, computeFieldCoverage } = require('../../src/source-health');
 
 console.log('\nauto-disable after 7 consecutive zeros:');
 
@@ -57,6 +57,19 @@ check('should not probe: not disabled', shouldProbeDisabled('TestProbeOk') === f
 
 // Unknown source
 check('should not probe: unknown source', shouldProbeDisabled('NonExistent') === false);
+
+// --- computeFieldCoverage includes start_time_local and neighborhood ---
+console.log('\ncomputeFieldCoverage:');
+const coverageEvents = [
+  { name: 'A', venue_name: 'V', date_local: '2026-03-13', start_time_local: '2026-03-13T19:00:00', neighborhood: 'Williamsburg' },
+  { name: 'B', venue_name: 'V', date_local: '2026-03-13', start_time_local: null, neighborhood: 'Bushwick' },
+  { name: 'C', venue_name: null, date_local: '2026-03-13', start_time_local: '2026-03-13T20:00:00', neighborhood: null },
+];
+const coverage = computeFieldCoverage(coverageEvents);
+check('start_time_local coverage is 2/3', Math.abs(coverage.start_time_local - 0.667) < 0.01);
+check('neighborhood coverage is 2/3', Math.abs(coverage.neighborhood - 0.667) < 0.01);
+check('name coverage is 1', coverage.name === 1);
+check('empty events returns zeros', computeFieldCoverage([]).start_time_local === 0);
 
 // Clean up
 for (const k of ['TestDisable', 'TestNotYet', 'TestRecover', 'TestProbe', 'TestProbeOk']) {
