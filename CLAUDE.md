@@ -97,10 +97,11 @@ Daily scrape (10am ET)              Incoming SMS
 | `brain-execute.js` | Pure tool implementations: `buildSearchPool`, `executeMore`, `executeDetails`, `validatePicks` |
 | `pipeline.js` | `buildTaggedPool`, `eventMatchesFilters`, `saveResponseFrame` (atomic session writes) |
 | `ai.js` | `extractEvents` (scrape-time). Uses `llm.generate()` |
-| `prompts.js` | System prompts: `DETAILS_SYSTEM`, `EXTRACTION_PROMPT` |
+| `prompts.js` | System prompts: `EXTRACTION_PROMPT` |
 | `session.js` | Per-phone session store, 2hr TTL, 12 fields |
 | `events.js` | Daily event cache + disk persistence, cross-source dedup, quality gates, source vibe stamping |
 | `source-registry.js` | Single source of truth for all 22 source entries across 19 scraper modules (weights, tiers, fetch functions) |
+| `nudges.js` | Recurrence nudge system: attendance tracking via detail requests, consent flow (REMIND ME / NUDGE OFF), deterministic nudge messages, hourly scheduler. `trackRecurringDetail`, `captureConsent`, `buildNudgeMessage`, `checkAndSendNudges` |
 
 Other modules: `intent-handlers.js` (help response), `geo.js` + `neighborhoods.js` (75 NYC hoods across 5 boroughs), `venues.js` (auto-learning coords), `formatters.js` (480-char cap), `twilio.js`, `traces.js`, `alerts.js`, `preference-profile.js`, `referral.js`, `curation.js`, `source-health.js`, `db.js` (SQLite).
 
@@ -122,7 +123,7 @@ Sources: 22 entries across 19 scraper modules in `sources/` — see `source-regi
 
 Required: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`.
 
-Optional: `PORT` (default 3000), `PULSE_TEST_MODE=true` (enables simulator), `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`/`GMAIL_REFRESH_TOKEN` (newsletter scrapers), `RESEND_API_KEY`/`ALERT_EMAIL` (email alerts), `PULSE_NO_RATE_LIMIT=true`.
+Optional: `PORT` (default 3000), `PULSE_TEST_MODE=true` (enables simulator), `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`/`GMAIL_REFRESH_TOKEN` (newsletter scrapers), `RESEND_API_KEY`/`ALERT_EMAIL` (email alerts), `PULSE_NO_RATE_LIMIT=true`, `PULSE_NUDGES_ENABLED=true` (enables hourly recurrence nudge scheduler).
 
 Model config (all optional, defaults in `src/model-config.js`): `PULSE_MODEL_BRAIN` (agent loop, default `claude-haiku-4-5-20251001`), `PULSE_MODEL_EXTRACT` (event extraction, default `claude-haiku-4-5-20251001`), `PULSE_MODEL_FALLBACK` (fallback for all roles, default `gemini-2.5-flash`). Provider auto-detected from model name prefix (`gemini-*` → Gemini, `claude-*` → Anthropic).
 

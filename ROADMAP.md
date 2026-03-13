@@ -159,12 +159,15 @@ message -> checkMechanical (help + TCPA only, $0)
 - [x] TCPA compliance: NOTIFY opt-in, STOP NOTIFY opt-out (mechanical, before TCPA STOP check), opt-in CTA on session 1 and 3 (max 2 prompts)
 - [x] Session seeding: proactive SMS seeds session via saveResponseFrame for seamless reply handling
 
-**Story: Recurrence nudge**
+**Story: Recurrence nudge** ✓
 > As a user who went to trivia at Black Rabbit twice, I want Pulse to text me on Tuesday afternoon: "Black Rabbit has trivia again tonight. Want the details?"
 
-- [ ] Cross-reference recurring patterns DB with user attendance history
-- [ ] Trigger: user attended same recurring event 2+ times → eligible for nudge
-- [ ] Day/time: send 4-6 hours before event start
+- [x] Cross-reference recurring patterns DB with user attendance history (detail request = attended signal)
+- [x] Trigger: user attended same recurring event 2+ times → consent prompt ("REMIND ME")
+- [x] Day/time: hourly scheduler sends nudge on matching day_of_week with 7-day cooldown
+- [x] Consent flow: REMIND ME opt-in, NUDGE OFF global opt-out, TCPA STOP clears all subs
+- [x] `nudges.js`: `trackRecurringDetail`, `captureConsent`, `buildNudgeMessage`, `checkAndSendNudges`
+- [x] Gated behind `PULSE_NUDGES_ENABLED` env var (default off)
 
 ### Phase 11: Data Layer Resilience (Infrastructure)
 
@@ -274,6 +277,7 @@ message -> checkMechanical (help + TCPA only, $0)
 | Phase 10: Proactive Outreach | Mar 13 | Post-scrape hook scores events against user profiles (neighborhood+category+interestingness+scarcity+editorial). NOTIFY/STOP NOTIFY keywords, opt-in CTA on sessions 1+3, 7-day cooldown, 30-day churn filter, session seeding for replies, engagement tracking, pause/resume endpoints. Default off (PULSE_PROACTIVE_ENABLED). |
 | Phase 7+8: Eval golden scenario update | Mar 13 | Fixed `exists`/`contains_any` assertion types in eval runner (were silently failing). Updated 14 stale text assertions for new tastemaker voice. |
 | Time-aware filtering | Mar 13 | Tightened `filterUpcomingEvents` grace window from 2hr to 30min for events without `end_time_local` (fixed-start shows). Events with end times still shown while ongoing. Added prompt hint for in-progress events ("started at 7 but goes til midnight") and wired `end_time_local` into pool serialization. |
+| Phase 10: Recurrence Nudge | Mar 13 | Detail request = attended signal. 2nd detail → consent prompt ("REMIND ME"). Hourly scheduler sends nudge on matching day with 7-day cooldown. NUDGE OFF global opt-out, TCPA STOP clears all subs. `nudges.js` module, `nudge_subscriptions` SQLite table. Gated behind `PULSE_NUDGES_ENABLED`. |
 | Phase 11 Story 1: Scraper Failure Resilience | Mar 13 | Auto-disable after 7 consecutive failures with daily probe for auto-recovery. Graduated alerting (yellow/red severity emails) replaces flat digest emails for non-green status. Disabled sources flagged in digest. Dead `alertOnFailingSources` removed. |
 
 ### Prompt Hygiene — Open Items
