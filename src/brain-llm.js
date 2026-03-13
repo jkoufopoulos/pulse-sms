@@ -224,6 +224,7 @@ CONVERSATION HOOKS:
 
 LOGISTICS:
 - Say "tonight" for today evening, "today at [time]" for afternoon, "tomorrow" for tomorrow.
+- If an event has already started but is still going (start_time is in the past), note it naturally: "started at 7 but goes til midnight" or "already underway, runs til 2am." Don't just show the start time — the user needs to know it's in progress.
 - ALWAYS lead with events in the requested neighborhood. Only say it's quiet if there are literally zero events.
 - If search results include a nearby_highlight, tease it naturally: "Williamsburg's stacked too if you want to peek."
 - HARD LIMIT: 480 characters total. No URLs. Cut picks to stay under — never send a truncated message.
@@ -288,7 +289,7 @@ function serializePoolForContinuation(poolResult) {
     const nearbyTag = (neighborhood && e.neighborhood && e.neighborhood !== neighborhood) ? '[NEARBY]' : '';
     return {
       id: e.id, name: cleanEventName((e.name || '').slice(0, 80)), venue_name: e.venue_name,
-      neighborhood: e.neighborhood, day: dayLabel, start_time_local: e.start_time_local,
+      neighborhood: e.neighborhood, day: dayLabel, start_time_local: e.start_time_local, end_time_local: e.end_time_local || undefined,
       is_free: e.is_free, price_display: e.price_display, category: e.category,
       short_detail: (e.short_detail || e.description_short || '').slice(0, 100),
       recurring: e.is_recurring ? e.recurrence_label : undefined,
