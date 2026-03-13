@@ -9,6 +9,7 @@ const { loadProfiles } = require('./preference-profile');
 const { loadReferrals, clearReferralInterval } = require('./referral');
 const { loadSessions, flushSessions, clearSessionInterval } = require('./session');
 const { loadAlerts, getRecentAlerts } = require('./alerts');
+const { scheduleNudges, clearNudgeSchedule } = require('./nudges');
 
 // Validate required env vars — exit if critical ones are missing
 const required = ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER', 'ANTHROPIC_API_KEY', 'TAVILY_API_KEY'];
@@ -790,6 +791,7 @@ const server = app.listen(PORT, () => {
   }
   scheduleDailyScrape();
   scheduleEmailPolls();
+  scheduleNudges();
 });
 
 // Graceful shutdown — wait for in-flight requests before exiting
@@ -804,6 +806,7 @@ async function shutdown(signal) {
   // Phase 1: Stop accepting new connections + clear scheduled work
   clearSchedule();
   clearEmailSchedule();
+  clearNudgeSchedule();
   clearSmsIntervals();
   clearReferralInterval();
   clearSessionInterval();

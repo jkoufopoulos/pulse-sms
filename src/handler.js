@@ -148,6 +148,13 @@ async function handleMessage(phone, message) {
     // TCPA compliance: never respond to opt-out keywords
     if (OPT_OUT_KEYWORDS.test(message.trim())) {
       console.log(`Opt-out keyword from ${masked}, not responding`);
+      try {
+        const { setOptedOut } = require('./nudges');
+        const { hashPhone } = require('./session');
+        setOptedOut(hashPhone(phone));
+      } catch (err) {
+        console.warn('nudge opt-out on STOP failed:', err.message);
+      }
       return;
     }
 
@@ -210,6 +217,12 @@ async function dispatchPreRouterIntent(route, ctx) {
     finalizeTrace(reply, 'proactive_opt_out');
     return;
   }
+
+  if (route.intent === 'nudge_consent' || route.intent === 'nudge_optout') {
+    await sendSMS(phone, route.reply);
+    finalizeTrace(route.reply, route.intent);
+    return;
+  }
 }
 
 async function handleMessageAI(phone, message) {
@@ -266,7 +279,7 @@ async function handleMessageAI(phone, message) {
   const { checkMechanical } = require('./agent-brain');
 
   // Mechanical pre-check: help + TCPA — $0 AI cost
-  const mechanical = checkMechanical(message, session);
+  const mechanical = checkMechanical(message, session, phone);
   if (mechanical) {
     if (!getSession(phone)) setSession(phone, {});
     addToHistory(phone, 'user', message);

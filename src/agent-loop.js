@@ -382,17 +382,34 @@ function saveSessionFromToolCalls(phone, session, toolCalls, smsText) {
   // Zero match — already saved in buildSearchPool
   if (result?._zeroMatch) return;
 
-  // Details — don't change picks/neighborhood, but track engagement
+  // Details — don't change picks/neighborhood, but track engagement + nudge tracking
   if (intent === 'details') {
     try {
       const db = require('./db');
       const ph = hashPhone(phone);
-      // Mark all lastPicks as engaged — the user showed interest
       for (const pick of (session?.lastPicks || [])) {
         if (pick.event_id) db.markRecommendationEngaged(ph, pick.event_id);
       }
     } catch (err) {
       console.warn('engagement tracking failed:', err.message);
+    }
+    // Track recurring event details for nudge subscriptions
+    try {
+      const { trackRecurringDetail } = require('./nudges');
+      for (const pick of (session?.lastPicks || [])) {
+        const event = session?.lastEvents?.[pick.event_id];
+        if (event?.is_recurring) {
+          const consentPrompt = trackRecurringDetail(phone, event);
+          if (consentPrompt) {
+            const { sendSMS } = require('./twilio');
+            sendSMS(phone, consentPrompt).catch(err =>
+              console.warn('nudge consent SMS failed:', err.message)
+            );
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('nudge tracking failed:', err.message);
     }
     return;
   }
