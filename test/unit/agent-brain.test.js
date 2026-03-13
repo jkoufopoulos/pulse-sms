@@ -21,6 +21,15 @@ check('HELP (uppercase) → { intent: "help" }', JSON.stringify(checkMechanical(
 check('STOP → null', checkMechanical('STOP', emptySession) === null);
 check('unsubscribe → null', checkMechanical('unsubscribe', emptySession) === null);
 
+// NOTIFY keywords
+check('NOTIFY → proactive_opt_in', checkMechanical('NOTIFY', emptySession)?.intent === 'proactive_opt_in');
+check('notify lowercase → proactive_opt_in', checkMechanical('notify', emptySession)?.intent === 'proactive_opt_in');
+check('STOP NOTIFY → proactive_opt_out', checkMechanical('STOP NOTIFY', emptySession)?.intent === 'proactive_opt_out');
+check('stop notify lowercase → proactive_opt_out', checkMechanical('stop notify', emptySession)?.intent === 'proactive_opt_out');
+check('UNSUBSCRIBE NOTIFY → proactive_opt_out', checkMechanical('UNSUBSCRIBE NOTIFY', emptySession)?.intent === 'proactive_opt_out');
+check('STOP NOTIFY does not trigger TCPA', checkMechanical('STOP NOTIFY', emptySession)?.intent === 'proactive_opt_out');
+check('STOP alone still null (TCPA)', checkMechanical('STOP', emptySession) === null);
+
 // Bare numbers → null (fall through to agent brain)
 check('bare "1" with picks → null', checkMechanical('1', sessionWithPicks) === null);
 check('bare "3" with picks → null', checkMechanical('3', sessionWithPicks) === null);

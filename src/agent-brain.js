@@ -9,6 +9,8 @@ const { executeMore, executeDetails } = require('./brain-execute');
 function checkMechanical(message, session) {
   const lower = message.toLowerCase().trim();
   if (/^(help|\?)$/i.test(lower)) return { intent: 'help' };
+  if (/^(stop|unsubscribe)\s+notify$/i.test(lower)) return { intent: 'proactive_opt_out' };
+  if (/^notify$/i.test(lower)) return { intent: 'proactive_opt_in' };
   if (OPT_OUT_KEYWORDS.test(lower)) return null;
   return null;
 }

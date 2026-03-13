@@ -528,6 +528,14 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
   if (!getSession(phone)) setSession(phone, {});
   addToHistory(phone, 'user', message);
 
+  // Check if we should prompt for proactive opt-in
+  const { shouldPromptOptIn } = require('./proactive');
+  const { getProfile } = require('./preference-profile');
+  const profile = getProfile(phone);
+  if (shouldPromptOptIn(profile)) {
+    session._proactivePrompt = true;
+  }
+
   const systemPrompt = buildBrainSystemPrompt(session);
 
   try {
@@ -632,6 +640,12 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     }
 
     finalizeTrace(smsText, intent);
+
+    // Increment proactive prompt count if we showed the CTA
+    if (session._proactivePrompt) {
+      const { incrementProactivePromptCount } = require('./preference-profile');
+      incrementProactivePromptCount(phone);
+    }
 
   } catch (err) {
     console.error('Agent loop error:', err.message);

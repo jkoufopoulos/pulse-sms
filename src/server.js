@@ -148,6 +148,21 @@ app.get('/api/health/latency', (req, res) => {
 // SMS webhook
 app.use('/api/sms', smsRoutes);
 
+// Proactive outreach kill switches
+app.post('/api/proactive/pause', (req, res) => {
+  const { pauseProactive } = require('./proactive');
+  pauseProactive();
+  console.log('[PROACTIVE] Manually paused via API');
+  res.json({ status: 'paused' });
+});
+
+app.post('/api/proactive/resume', (req, res) => {
+  const { resumeProactive } = require('./proactive');
+  resumeProactive();
+  console.log('[PROACTIVE] Resumed via API');
+  res.json({ status: 'resumed' });
+});
+
 // Architecture explorer (read-only doc, always available)
 app.get('/architecture', (req, res) => {
   res.redirect(301, 'https://jkoufopoulos.github.io/pulse-sms/architecture.html');
@@ -413,6 +428,130 @@ app.get('/api/agent-eye', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// AI Insights — LLM-generated actionable summary of event cache health
+let insightsCache = { text: null, cacheKey: null, version: 0 };
+app.get('/api/events/insights', async (req, res) => {
+  try {
+    const { getRawCache } = require('./events');
+    const { generate } = require('./llm');
+    const { MODELS } = require('./model-config');
+
+    const data = getRawCache();
+    const events = data.events || [];
+    if (events.length === 0) return res.json({ insights: 'No events in cache.' });
+
+    // Cache key: event count + cache timestamp + prompt version (bust on prompt changes)
+    const INSIGHTS_VERSION = 2;
+    const cacheKey = `v${INSIGHTS_VERSION}-${events.length}-${data.cached_at || ''}`;
+    if (insightsCache.cacheKey === cacheKey && insightsCache.text) {
+      return res.json({ insights: insightsCache.text, cached: true });
+    }
+
+    // Aggregate stats
+    const sources = {};
+    const categories = {};
+    const neighborhoods = {};
+    const boroughs = { Manhattan: 0, Brooklyn: 0, Queens: 0, unknown: 0 };
+    let noTime = 0, noVenue = 0, noHood = 0, noPrice = 0, noDesc = 0, otherCat = 0, freeCount = 0;
+    const dateCounts = {};
+
+    for (const e of events) {
+      // Source stats
+      const src = e.source_name || 'unknown';
+      if (!sources[src]) sources[src] = { count: 0, noTime: 0, noVenue: 0, noHood: 0, noPrice: 0, otherCat: 0, completenessSum: 0 };
+      const s = sources[src];
+      s.count++;
+      s.completenessSum += (e.completeness ?? 0);
+      if (!e.start_time_local) { s.noTime++; noTime++; }
+      if (!e.venue_name || e.venue_name === 'TBA') { s.noVenue++; noVenue++; }
+      if (!e.neighborhood) { s.noHood++; noHood++; }
+      if (!e.price_display && !e.is_free) { s.noPrice++; noPrice++; }
+      if (e.category === 'other' || !e.category) { s.otherCat++; otherCat++; }
+      if (!e.description_short && !e.description) noDesc++;
+      if (e.is_free) freeCount++;
+
+      // Category
+      const cat = e.category || 'unknown';
+      categories[cat] = (categories[cat] || 0) + 1;
+
+      // Neighborhood
+      const hood = e.neighborhood || 'unknown';
+      neighborhoods[hood] = (neighborhoods[hood] || 0) + 1;
+
+      // Date
+      if (e.date_local) dateCounts[e.date_local] = (dateCounts[e.date_local] || 0) + 1;
+    }
+
+    // Format source summary (sorted by count desc)
+    const srcSummary = Object.entries(sources)
+      .sort((a, b) => b[1].count - a[1].count)
+      .map(([name, s]) => {
+        const gaps = [];
+        if (s.noTime > 0) gaps.push(`${s.noTime} no time`);
+        if (s.noHood > 0) gaps.push(`${s.noHood} no neighborhood`);
+        if (s.noPrice > 0) gaps.push(`${s.noPrice} no price`);
+        if (s.otherCat > 0) gaps.push(`${s.otherCat} "other" category`);
+        const avgComp = (s.completenessSum / s.count * 100).toFixed(0);
+        return `${name}: ${s.count} events, ${avgComp}% avg completeness${gaps.length ? ' — ' + gaps.join(', ') : ''}`;
+      }).join('\n');
+
+    // Category summary
+    const catSummary = Object.entries(categories)
+      .sort((a, b) => b[1] - a[1])
+      .map(([cat, count]) => `${cat}: ${count} (${(count / events.length * 100).toFixed(1)}%)`)
+      .join(', ');
+
+    // Neighborhood summary (top 15 + thin count)
+    const hoodEntries = Object.entries(neighborhoods).sort((a, b) => b[1] - a[1]);
+    const thinHoods = hoodEntries.filter(([, c]) => c <= 2);
+    const hoodSummary = hoodEntries.slice(0, 15)
+      .map(([h, c]) => `${h}: ${c}`)
+      .join(', ') + (thinHoods.length > 0 ? `\n${thinHoods.length} neighborhoods with ≤2 events` : '');
+
+    // Date spread (next 7 days)
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+    const dates = Object.keys(dateCounts).sort();
+    const todayIdx = dates.indexOf(today);
+    const nextDates = dates.slice(Math.max(todayIdx, 0), Math.max(todayIdx, 0) + 7);
+    const dateSummary = nextDates.map(d => `${d}: ${dateCounts[d] || 0} events`).join(', ');
+
+    const statsBlock = `PULSE EVENT CACHE — ${new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
+
+Total: ${events.length} events from ${Object.keys(sources).length} sources across ${Object.keys(neighborhoods).length} neighborhoods
+Free: ${freeCount} (${(freeCount / events.length * 100).toFixed(0)}%), No price data: ${noPrice} (${(noPrice / events.length * 100).toFixed(0)}%)
+Missing fields overall: ${noTime} no time, ${noVenue} no venue, ${noHood} no neighborhood, ${noDesc} no description, ${otherCat} "other" category
+
+SOURCE BREAKDOWN:
+${srcSummary}
+
+CATEGORIES: ${catSummary}
+
+NEIGHBORHOODS (top 15): ${hoodSummary}
+
+DATE SPREAD (next 7 days): ${dateSummary}`;
+
+    const systemPrompt = `You are a terse ops advisor for Pulse, an SMS-based NYC events product. The operator can see all the charts and numbers already — do NOT restate stats they can read.
+
+Your job: tell them the 3-5 specific ACTIONS to take this week, ranked by user-facing impact. Each action should be a concrete task, not an observation.
+
+Good: "Add price extraction to the donyc scraper — it's your biggest source but 91% lack prices, so free-filter queries miss 500+ events"
+Bad: "Missing price data affects 1262 events across all sources"
+
+Good: "Find a food/drink-focused source (Eater, Infatuation, Resy) — you have 70 food events vs 400+ comedy, and food is the #1 thing people text about after nightlife"
+Bad: "Food and drink category is underrepresented at 2.7%"
+
+Format: numbered list, one action per line, max 2 sentences each. Lead with the verb. No headers, no markdown.`;
+
+    const result = await generate(MODELS.extract, systemPrompt, statsBlock, { maxTokens: 512, temperature: 0.3, timeout: 15000 });
+
+    insightsCache = { text: result.text, cacheKey };
+    res.json({ insights: result.text, cached: false });
+  } catch (err) {
+    console.error('Insights error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/geo/neighborhoods', (req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=86400');
   res.sendFile(require('path').join(__dirname, 'public', 'nyc-neighborhoods.geojson'));

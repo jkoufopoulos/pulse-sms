@@ -11489,6 +11489,32 @@
         "Pushback gets respond instead of search_events"
       ],
       "difficulty": "must_pass"
+    },
+    {
+      "name": "Mechanical: NOTIFY opts in to proactive",
+      "category": "happy_path",
+      "turns": [
+        { "sender": "user", "message": "NOTIFY" },
+        { "sender": "pulse", "message": "You're in", "assert": "contains" }
+      ],
+      "testing": "NOTIFY keyword triggers proactive opt-in with confirmation",
+      "expected_behavior": "Mechanical response confirming opt-in",
+      "failure_modes": ["Treated as conversation instead of mechanical", "No confirmation"],
+      "difficulty": "must_pass"
+    },
+    {
+      "name": "Mechanical: STOP NOTIFY opts out without TCPA",
+      "category": "edge_case",
+      "turns": [
+        { "sender": "user", "message": "NOTIFY" },
+        { "sender": "pulse", "message": "You're in", "assert": "contains" },
+        { "sender": "user", "message": "STOP NOTIFY" },
+        { "sender": "pulse", "message": "no more proactive", "assert": "contains" }
+      ],
+      "testing": "STOP NOTIFY disables proactive without full TCPA opt-out",
+      "expected_behavior": "Proactive disabled, user can still text for picks",
+      "failure_modes": ["Full TCPA opt-out triggered", "No confirmation", "Proactive not disabled"],
+      "difficulty": "must_pass"
     }
   ]
 }

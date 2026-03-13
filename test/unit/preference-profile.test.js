@@ -5,6 +5,8 @@ const {
   deriveFiltersFromProfile,
   getTopNeighborhood,
   getTopCategories,
+  setProactiveOptIn,
+  incrementProactivePromptCount,
   exportProfiles,
   hashPhone,
   _resetForTest,
@@ -277,6 +279,25 @@ async function runAsyncTests() {
   const hasTestPhone = Object.keys(exported).some(k => k.startsWith('+1000000'));
   check('no test phones in exported data', !hasTestPhone);
 
+  // ---- proactive opt-in ----
+  console.log('\nproactive opt-in:');
+
+  _resetForTest();
+
+  check('blank profile has proactivePromptCount 0', getProfile('+12125550030').proactivePromptCount === 0);
+  check('blank profile has proactiveOptIn false', getProfile('+12125550030').proactiveOptIn === false);
+
+  setProactiveOptIn('+12125550031', true);
+  check('setProactiveOptIn sets flag', getProfile('+12125550031').proactiveOptIn === true);
+  check('setProactiveOptIn sets date', getProfile('+12125550031').proactiveOptInDate !== null);
+
+  setProactiveOptIn('+12125550031', false);
+  check('setProactiveOptIn false clears flag', getProfile('+12125550031').proactiveOptIn === false);
+
+  incrementProactivePromptCount('+12125550032');
+  incrementProactivePromptCount('+12125550032');
+  check('incrementProactivePromptCount increments', getProfile('+12125550032').proactivePromptCount === 2);
+
   // Clean up
   _resetForTest();
 }
@@ -298,7 +319,7 @@ function blankProfile() {
     createdAt: null,
     proactiveOptIn: false,
     proactiveOptInDate: null,
-    proactiveOptInPromptedAt: null,
+    proactivePromptCount: 0,
   };
 }
 

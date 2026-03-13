@@ -203,6 +203,7 @@ If the user pushes back on your picks or says you got something wrong, call sear
 
 SESSION CONTEXT:
 ${sessionContext}${historyBlock}
+${session?._proactivePrompt ? `\nPROACTIVE OPT-IN: This user hasn't opted into proactive recommendations yet. At the end of your picks response, append on a new line:\n"PS — Want me to text you when something great comes up? Reply NOTIFY to opt in."\nOnly add this to responses that include event picks, not to detail responses or conversation.` : ''}
 
 SMS VOICE — this is the most important section:
 You're texting a friend who always knows the move. Every message should feel like one half of a conversation, not a broadcast.

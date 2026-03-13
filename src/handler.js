@@ -192,6 +192,24 @@ async function dispatchPreRouterIntent(route, ctx) {
   }
 
   if (route.intent === 'help') return handleHelp(ctx);
+
+  if (route.intent === 'proactive_opt_in') {
+    const { setProactiveOptIn } = require('./preference-profile');
+    setProactiveOptIn(phone, true);
+    const reply = "You're in! I'll text you when something great comes up. Reply STOP NOTIFY anytime to turn it off.";
+    await sendSMS(phone, reply);
+    finalizeTrace(reply, 'proactive_opt_in');
+    return;
+  }
+
+  if (route.intent === 'proactive_opt_out') {
+    const { setProactiveOptIn } = require('./preference-profile');
+    setProactiveOptIn(phone, false);
+    const reply = "Got it — no more proactive texts. You can still text me anytime for picks.";
+    await sendSMS(phone, reply);
+    finalizeTrace(reply, 'proactive_opt_out');
+    return;
+  }
 }
 
 async function handleMessageAI(phone, message) {
@@ -205,6 +223,21 @@ async function handleMessageAI(phone, message) {
       lastNeighborhood: session.lastNeighborhood || null,
       lastPicks: (session.lastPicks || []).map(p => ({ event_id: p.event_id })),
     };
+
+    // Track engagement for proactive messages
+    if (session.proactiveSeeded) {
+      try {
+        const { markRecommendationEngaged } = require('./db');
+        const { hashPhone } = require('./preference-profile');
+        const lastPick = session.lastPicks?.[0];
+        if (lastPick?.event_id) {
+          markRecommendationEngaged(hashPhone(phone), lastPick.event_id);
+        }
+        session.proactiveSeeded = false;
+      } catch (err) {
+        console.error('[PROACTIVE] Engagement tracking error:', err.message);
+      }
+    }
   }
 
   function finalizeTrace(smsText, intent) {

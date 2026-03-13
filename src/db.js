@@ -153,6 +153,24 @@ function runMigrations(db) {
 
     CREATE INDEX IF NOT EXISTS idx_recs_phone ON event_recommendations(phone_hash, recommended_at);
     CREATE INDEX IF NOT EXISTS idx_recs_event ON event_recommendations(event_id);
+
+    CREATE TABLE IF NOT EXISTS nudge_subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      phone_hash TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      pattern_key TEXT NOT NULL,
+      detail_count INTEGER DEFAULT 1,
+      consent_asked INTEGER DEFAULT 0,
+      opted_in INTEGER DEFAULT 0,
+      opted_out INTEGER DEFAULT 0,
+      last_nudged TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(phone_hash, pattern_key)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_nudge_phone ON nudge_subscriptions(phone_hash);
+    CREATE INDEX IF NOT EXISTS idx_nudge_optin ON nudge_subscriptions(opted_in, opted_out);
   `);
 
   // Migration: add normalized_name column for recurrence detection

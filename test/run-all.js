@@ -16,6 +16,7 @@ require('./unit/scrapers.test');
 require('./unit/scrape-guard.test');
 require('./unit/db.test');
 require('./unit/agent-brain.test');
+require('./unit/proactive.test');
 require('./unit/digest.test');
 require('./unit/model-config.test');
 require('./unit/llm.test');

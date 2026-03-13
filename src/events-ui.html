@@ -243,6 +243,19 @@
   .analytics-gaps ul { margin: 4px 0 0 18px; list-style: disc; }
   .analytics-gaps li { margin-bottom: 2px; }
 
+  /* AI Insights */
+  .ai-insights {
+    margin-top: 12px; padding: 14px 16px; border-radius: 8px;
+    background: #0f1520; border: 1px solid #1e3a5f; font-size: 13px; color: #c4d6e8;
+  }
+  .ai-insights-header {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+    font-size: 12px; color: #90cdf4; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+  }
+  .ai-insights-body { white-space: pre-wrap; line-height: 1.6; }
+  .ai-insights-loading { color: #667; font-style: italic; }
+  .ai-insights-error { color: #fc8181; }
+
   /* Agent Eye panel */
   .agent-eye-panel {
     margin: 0 20px 16px; padding: 16px; border-radius: 8px;
@@ -507,6 +520,12 @@
     </div>
   </div>
   <div class="analytics-gaps" id="analytics-gaps" style="display:none"></div>
+  <div class="ai-insights" id="ai-insights">
+    <div class="ai-insights-header">AI Insights</div>
+    <div class="ai-insights-body" id="ai-insights-body">
+      <span class="ai-insights-loading">Analyzing event cache...</span>
+    </div>
+  </div>
 </div>
 
 <!-- Agent Eye panel -->
@@ -591,6 +610,7 @@ async function loadEvents() {
     populateDynamicFilters();
     populateAgentEyeHoods();
     applyFilters();
+    loadInsights();
   } catch (err) {
     console.error('Failed to load events:', err);
     document.getElementById('event-table').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#f87171;padding:40px">Failed to load events: ' + err.message + '</td></tr>';
@@ -1485,7 +1505,7 @@ async function renderBoroughMap(container) {
   if (!leafletMap) {
     leafletMap = L.map(container, {
       zoomControl: false, attributionControl: false,
-      scrollWheelZoom: true, dragging: true,
+      scrollWheelZoom: false, dragging: true,
     }).setView([40.730, -73.955], 12);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
@@ -1739,6 +1759,23 @@ function showAgentEyeDetail(id) {
   const rawEvents = window._agentEyeRaw || {};
   const e = rawEvents[id];
   if (e) showDetail(e);
+}
+
+// ========== AI Insights ==========
+
+async function loadInsights() {
+  const body = document.getElementById('ai-insights-body');
+  try {
+    const res = await fetch('/api/events/insights');
+    const data = await res.json();
+    if (data.error) {
+      body.innerHTML = `<span class="ai-insights-error">${esc(data.error)}</span>`;
+      return;
+    }
+    body.textContent = data.insights;
+  } catch (err) {
+    body.innerHTML = `<span class="ai-insights-error">Failed to load insights: ${esc(err.message)}</span>`;
+  }
 }
 
 // ========== Init ==========

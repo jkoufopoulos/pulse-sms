@@ -145,18 +145,19 @@ message -> checkMechanical (help + TCPA only, $0)
 - [ ] Track decision style signals: details-request rate, more-request rate, pivot rate, avg picks per session
 - [ ] Inject decision style into system prompt: "this user picks fast — be decisive, lead with one strong pick" vs. "this user explores — give more context and contrasts"
 
-### Phase 10: Proactive Outreach (Product)
+### Phase 10: Proactive Outreach (Product) ✓
 
 *Pulse texts you when something matches — the retention mechanism that makes SMS the right channel.*
 
 **Story: "There's a thing tonight you'd love"**
 > As an opted-in user, I want Pulse to text me once a week when there's a high-match event for my taste, without me having to initiate.
 
-- [ ] Proactive message scheduler: scan daily event cache against user profiles, identify high-confidence matches (>0.8)
-- [ ] Conservative cadence: 1 proactive message per week max
-- [ ] Track per-user response rate. Stop sending after 4 non-responses (don't wait for STOP).
-- [ ] Kill switch: pause feature if opt-out rate exceeds 3% for any cohort
-- [ ] TCPA compliance: explicit opt-in, immediate STOP processing
+- [x] Proactive message scheduler: post-scrape hook scans opted-in users, scores events (neighborhood+category+interestingness+scarcity+editorial), threshold 5
+- [x] Conservative cadence: 7-day cooldown per user, 30-day churn filter
+- [x] Track per-user engagement via event_recommendations table (user_engaged flag)
+- [x] Kill switch: PULSE_PROACTIVE_ENABLED env var (default false), /api/proactive/pause and /resume endpoints, in-memory pause flag
+- [x] TCPA compliance: NOTIFY opt-in, STOP NOTIFY opt-out (mechanical, before TCPA STOP check), opt-in CTA on session 1 and 3 (max 2 prompts)
+- [x] Session seeding: proactive SMS seeds session via saveResponseFrame for seamless reply handling
 
 **Story: Recurrence nudge**
 > As a user who went to trivia at Black Rabbit twice, I want Pulse to text me on Tuesday afternoon: "Black Rabbit has trivia again tonight. Want the details?"
@@ -270,6 +271,7 @@ message -> checkMechanical (help + TCPA only, $0)
 | Editorial Note Preservation | Mar 9 | `editorial_note` field added to extraction prompt, carried through normalization→serialization→details. All 4 LLM-extracted sources benefit. |
 | Venue Learning Persistence | Mar 9 | Already implemented: `exportLearnedVenues`/`importLearnedVenues` wired to disk. 2500+ venues survive restarts. |
 | Phase 8: Venue Knowledge | Mar 12 | 30 venue profiles in `data/venue-profiles.json` (web-researched, human-reviewed). `venue_vibe` in pool serialization, full profile in details intent, prompt guidance added. Scenario evals: 99.9% code evals, 99.5% assertions (287 scenarios). |
+| Phase 10: Proactive Outreach | Mar 13 | Post-scrape hook scores events against user profiles (neighborhood+category+interestingness+scarcity+editorial). NOTIFY/STOP NOTIFY keywords, opt-in CTA on sessions 1+3, 7-day cooldown, 30-day churn filter, session seeding for replies, engagement tracking, pause/resume endpoints. Default off (PULSE_PROACTIVE_ENABLED). |
 | Phase 7+8: Eval golden scenario update | Mar 13 | Fixed `exists`/`contains_any` assertion types in eval runner (were silently failing). Updated 14 stale text assertions for new tastemaker voice. |
 | Time-aware filtering | Mar 13 | Tightened `filterUpcomingEvents` grace window from 2hr to 30min for events without `end_time_local` (fixed-start shows). Events with end times still shown while ongoing. Added prompt hint for in-progress events ("started at 7 but goes til midnight") and wired `end_time_local` into pool serialization. |
 | Phase 11 Story 1: Scraper Failure Resilience | Mar 13 | Auto-disable after 7 consecutive failures with daily probe for auto-recovery. Graduated alerting (yellow/red severity emails) replaces flat digest emails for non-green status. Disabled sources flagged in digest. Dead `alertOnFailingSources` removed. |

@@ -82,6 +82,9 @@ function stampRecurrence(events) {
         e.is_recurring = true;
         const dayIdx = e.date_local ? new Date(e.date_local + 'T12:00:00').getDay() : null;
         e.recurrence_label = dayIdx != null ? `every ${DAY_NAMES[dayIdx].charAt(0).toUpperCase() + DAY_NAMES[dayIdx].slice(1)}` : null;
+        if (e.name && e.venue_name && dayIdx != null) {
+          e.recurrence_pattern_key = makePatternKey(e.name, e.venue_name, dayIdx);
+        }
         stamped++;
         continue;
       }
@@ -92,6 +95,7 @@ function stampRecurrence(events) {
       if (patternKeys.has(key)) {
         e.is_recurring = true;
         e.recurrence_label = `every ${DAY_NAMES[dayIdx].charAt(0).toUpperCase() + DAY_NAMES[dayIdx].slice(1)}`;
+        e.recurrence_pattern_key = key;
         stamped++;
       }
     }
@@ -1159,6 +1163,14 @@ function scheduleDailyScrape() {
   dailyTimer = setTimeout(async () => {
     try {
       await refreshCache();
+      // Post-scrape hook: proactive outreach
+      try {
+        const { processProactiveMessages } = require('./proactive');
+        const cache = getRawCache();
+        await processProactiveMessages(cache);
+      } catch (proactiveErr) {
+        console.error('[PROACTIVE] Post-scrape hook error:', proactiveErr.message);
+      }
     } catch (err) {
       console.error('Scheduled scrape failed:', err.message);
     }

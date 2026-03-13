@@ -49,7 +49,7 @@ function blankProfile() {
     createdAt: null,
     proactiveOptIn: false,
     proactiveOptInDate: null,
-    proactiveOptInPromptedAt: null,
+    proactivePromptCount: 0,
   };
 }
 
@@ -198,6 +198,25 @@ function getOptInEligibleUsers() {
   return eligible;
 }
 
+function setProactiveOptIn(phone, optIn) {
+  if (!phone) return;
+  const key = profiles.has(phone) ? phone : hashPhone(phone);
+  const profile = profiles.get(key) || blankProfile();
+  profile.proactiveOptIn = !!optIn;
+  if (optIn) profile.proactiveOptInDate = new Date().toISOString();
+  profiles.set(profiles.has(phone) ? phone : key, profile);
+  scheduleDiskWrite();
+}
+
+function incrementProactivePromptCount(phone) {
+  if (!phone) return;
+  const key = profiles.has(phone) ? phone : hashPhone(phone);
+  const profile = profiles.get(key) || blankProfile();
+  profile.proactivePromptCount = (profile.proactivePromptCount || 0) + 1;
+  profiles.set(profiles.has(phone) ? phone : key, profile);
+  scheduleDiskWrite();
+}
+
 function loadProfiles() {
   try {
     const data = JSON.parse(fs.readFileSync(PROFILES_PATH, 'utf8'));
@@ -234,6 +253,8 @@ module.exports = {
   getTopNeighborhood,
   getTopCategories,
   getOptInEligibleUsers,
+  setProactiveOptIn,
+  incrementProactivePromptCount,
   loadProfiles,
   exportProfiles,
   hashPhone,
