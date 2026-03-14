@@ -217,6 +217,16 @@
       font-size: 0.85rem;
       color: var(--text-muted);
     }
+    .hero-disclosure {
+      margin-top: 20px;
+      max-width: 420px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+    .hero-disclosure strong { color: var(--text-dim); font-weight: 600; }
+    .hero-disclosure a { color: var(--coral); text-decoration: none; }
+    .hero-disclosure a:hover { text-decoration: underline; }
 
     /* Phone mockup */
     .hero-phone-wrap {
@@ -675,6 +685,7 @@
       .hero .subtitle { margin-left: auto; margin-right: auto; }
       .hero-proof { justify-content: center; }
       .hero-actions { justify-content: center; }
+      .hero-disclosure { margin-left: auto; margin-right: auto; }
       .basics-grid { grid-template-columns: 1fr; }
       .basics-item.wide { flex-direction: column; gap: 20px; }
       .basics-item.wide .hood-tags { max-width: 100%; }
@@ -752,7 +763,10 @@
       <p class="subtitle">Text a neighborhood name and get tonight's best events back in seconds. Works on any phone. No app, no account.</p>
       <div class="hero-actions">
         <a href="sms:+16467226926" class="phone-badge">(646) 722-6926</a>
-        <span class="hero-hint">Text any neighborhood to start</span>
+        <span class="hero-hint">Text START or any neighborhood to begin</span>
+      </div>
+      <div class="hero-disclosure">
+        By texting <strong>Pulse</strong> at (646) 722-6926, you consent to receive SMS event recommendations. Message frequency varies based on your requests. Msg &amp; data rates may apply. Consent is not a condition of purchase. Reply <strong>STOP</strong> to opt out. Reply <strong>HELP</strong> for help. <a href="privacy.html">Privacy Policy</a> · <a href="terms.html">Terms of Service</a>
       </div>
     </div>
 
@@ -871,7 +885,7 @@
     <p class="subtitle">Text any NYC neighborhood to get started</p>
     <a href="sms:+16467226926" class="cta-phone">(646) 722-6926</a>
     <div class="opt-in-disclosure">
-      By texting this number, you agree to receive event recommendation text messages from Pulse. Message frequency varies based on your requests. Message and data rates may apply. Reply <strong>STOP</strong> at any time to opt out. Reply <strong>HELP</strong> for support. <a href="privacy.html">Privacy Policy</a> &middot; <a href="terms.html">Terms of Service</a>
+      By texting <strong>START</strong> or any message to <strong>Pulse</strong> at (646) 722-6926, you consent to receive SMS event recommendation messages from Pulse. Message frequency varies based on your requests. Msg &amp; data rates may apply. Consent is not a condition of purchase. Reply <strong>STOP</strong> to opt out anytime. Reply <strong>HELP</strong> for help. <a href="privacy.html">Privacy Policy</a> &middot; <a href="terms.html">Terms of Service</a>
     </div>
   </div>
 </section>
