@@ -37,15 +37,12 @@ check('null for unknown venue', lookupVenueProfile('Nonexistent Venue') === null
 check('null for null input', lookupVenueProfile(null) === null);
 check('null for empty string', lookupVenueProfile('') === null);
 
-// ---- venue_vibe in pool serialization ----
-console.log('\nvenue_vibe in pool serialization:');
+// ---- venue_vibe removed from pool serialization (cost optimization) ----
+console.log('\nvenue_vibe removed from pool serialization:');
 const { serializePoolForContinuation } = require('../../src/brain-llm');
 const testPool = [{ id: 'vp1', name: 'Test Event', venue_name: 'Mood Ring', neighborhood: 'Bushwick', category: 'dj' }];
 const serialized = serializePoolForContinuation({ pool: testPool, hood: 'Bushwick', activeFilters: {}, matchCount: 1 });
-check('venue_vibe present for profiled venue', serialized.events[0].venue_vibe?.includes('astrology'));
-const noProfilePool = [{ id: 'vp2', name: 'Other Event', venue_name: 'Unknown Place', neighborhood: 'Bushwick', category: 'dj' }];
-const serialized2 = serializePoolForContinuation({ pool: noProfilePool, hood: 'Bushwick', activeFilters: {}, matchCount: 1 });
-check('venue_vibe undefined for unknown venue', serialized2.events[0].venue_vibe === undefined);
+check('venue_vibe not serialized (cost trim)', serialized.events[0].venue_vibe === undefined);
 
 // ---- venue persistence exports ----
 console.log('\nvenue persistence:');

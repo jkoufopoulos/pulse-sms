@@ -568,7 +568,7 @@ function computeNearbyHighlight(requestedEvents, nearbyEvents, requestedHood) {
   };
 }
 
-const DEFAULT_POOL_SIZE = 10;
+const DEFAULT_POOL_SIZE = 8;
 
 /**
  * Score every event by interestingness, then select top N with category diversity.

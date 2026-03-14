@@ -150,6 +150,25 @@ function toAnthropicTools(neutralTools) {
   }));
 }
 
+/**
+ * Convert neutral tools to Anthropic format with prompt caching.
+ * Marks the last tool with cache_control so Anthropic caches the entire
+ * static prefix (system prompt + all tool definitions).
+ */
+function toAnthropicToolsCached(neutralTools) {
+  return neutralTools.map((tool, i) => {
+    const converted = {
+      name: tool.name,
+      description: tool.description,
+      input_schema: tool.parameters,
+    };
+    if (i === neutralTools.length - 1) {
+      converted.cache_control = { type: 'ephemeral' };
+    }
+    return converted;
+  });
+}
+
 // --- Usage extraction ---
 
 function extractGeminiUsage(response) {
@@ -299,13 +318,15 @@ async function callWithTools(model, systemPrompt, message, tools, options = {}) 
 
   if (provider === 'anthropic') {
     const client = getAnthropicClient();
+    const cachedSystem = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }];
+    const cachedTools = toAnthropicToolsCached(tools);
 
     const response = await withTimeout(
       client.messages.create({
         model,
         max_tokens: maxTokens,
-        system: systemPrompt,
-        tools: toAnthropicTools(tools),
+        system: cachedSystem,
+        tools: cachedTools,
         messages: [{ role: 'user', content: message }],
       }, { timeout }),
       timeout + 2000, `callWithTools(${model})`
@@ -324,7 +345,7 @@ async function callWithTools(model, systemPrompt, message, tools, options = {}) 
         chat: {
           _type: 'anthropic',
           _model: model,
-          _system: systemPrompt,
+          _system: cachedSystem,
           _messages: [{ role: 'user', content: message }],
           _response: response,
           _toolBlock: toolBlock,
@@ -399,6 +420,7 @@ async function continueChat(chatSession, toolName, toolResult, options = {}) {
       },
     ];
 
+    // _system is already in cached array format from callWithTools
     const response = await withTimeout(
       client.messages.create({
         model: chatSession._model,
@@ -522,6 +544,8 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
 
   if (provider === 'anthropic') {
     const client = getAnthropicClient();
+    const cachedSystem = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }];
+    const cachedTools = toAnthropicToolsCached(tools);
     const messages = [{ role: 'user', content: message }];
 
     for (let i = 0; i <= maxIterations; i++) {
@@ -529,14 +553,24 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
         client.messages.create({
           model,
           max_tokens: 1024,
-          system: systemPrompt,
-          tools: toAnthropicTools(tools),
+          system: cachedSystem,
+          tools: cachedTools,
           messages,
         }, { timeout: remainingTimeout() }),
         remainingTimeout() + 2000, `agentLoop(${model}) turn ${i + 1}`
       );
 
       addUsage(response.usage);
+
+      // Track cache performance
+      if (response.usage) {
+        if (response.usage.cache_creation_input_tokens) {
+          totalUsage.cache_creation_input_tokens = (totalUsage.cache_creation_input_tokens || 0) + response.usage.cache_creation_input_tokens;
+        }
+        if (response.usage.cache_read_input_tokens) {
+          totalUsage.cache_read_input_tokens = (totalUsage.cache_read_input_tokens || 0) + response.usage.cache_read_input_tokens;
+        }
+      }
 
       const toolBlock = response.content.find(b => b.type === 'tool_use');
 
@@ -584,6 +618,7 @@ module.exports = {
   // Tool format converters
   toGeminiTools,
   toAnthropicTools,
+  toAnthropicToolsCached,
   convertSchemaToGemini,
 
   // Utilities

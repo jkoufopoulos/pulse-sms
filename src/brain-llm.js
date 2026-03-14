@@ -5,7 +5,6 @@
 const { NEIGHBORHOODS } = require('./neighborhoods');
 const { getNycDateString } = require('./geo');
 const { describeFilters } = require('./pipeline');
-const { lookupVenueProfile } = require('./venues');
 
 // --- Neighborhood list for system prompt ---
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
@@ -292,15 +291,13 @@ function serializePoolForContinuation(poolResult) {
       id: e.id, name: cleanEventName((e.name || '').slice(0, 80)), venue_name: e.venue_name,
       neighborhood: e.neighborhood, day: dayLabel, start_time_local: e.start_time_local, end_time_local: e.end_time_local || undefined,
       is_free: e.is_free, price_display: e.price_display, category: e.category,
-      short_detail: (e.short_detail || e.description_short || '').slice(0, 100),
+      short_detail: (e.short_detail || e.description_short || '').slice(0, 60),
       recurring: e.is_recurring ? e.recurrence_label : undefined,
       venue_size: e.venue_size || undefined,
       interaction_format: e.interaction_format || undefined,
       source_vibe: e.source_vibe || undefined,
       editorial: e.editorial_signal || undefined,
       scarcity: e.scarcity || undefined,
-      editorial_note: e.editorial_note || undefined,
-      venue_vibe: lookupVenueProfile(e.venue_name)?.vibe || undefined,
       tags: [tag, nearbyTag].filter(Boolean).join(' ') || undefined,
     };
   });
