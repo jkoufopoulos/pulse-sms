@@ -76,7 +76,7 @@ const BRAIN_TOOLS = [
     parameters: {
       type: 'object',
       properties: {
-        message: { type: 'string', description: 'SMS response text, max 480 chars. Be warm, brief. ALWAYS end with a redirect to events (e.g. "Drop a neighborhood or tell me what you are in the mood for!" or "Text me a neighborhood to get started!")' },
+        message: { type: 'string', description: 'SMS response text, max 480 chars. Be warm, brief. For greetings and off-topic, end with a redirect to events. For thanks/farewells, just be warm and close — do NOT redirect or ask what they want next.' },
         intent: {
           type: 'string',
           enum: ['greeting', 'thanks', 'farewell', 'off_topic', 'clarify', 'acknowledge'],
