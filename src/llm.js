@@ -318,7 +318,7 @@ async function callWithTools(model, systemPrompt, message, tools, options = {}) 
 
   if (provider === 'anthropic') {
     const client = getAnthropicClient();
-    const cachedSystem = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }];
+    const cachedSystem = [{ type: 'text', text: systemPrompt }];
     const cachedTools = toAnthropicToolsCached(tools);
 
     const response = await withTimeout(
@@ -544,7 +544,7 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
 
   if (provider === 'anthropic') {
     const client = getAnthropicClient();
-    const cachedSystem = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }];
+    const cachedSystem = [{ type: 'text', text: systemPrompt }];
     const cachedTools = toAnthropicToolsCached(tools);
     const messages = [{ role: 'user', content: message }];
 
