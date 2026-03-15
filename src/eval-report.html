@@ -1898,7 +1898,7 @@ function renderTraceSummary(traceSummary, traceDebug) {
   html += '<button class="trace-copy-btn" onclick="navigator.clipboard.writeText(document.getElementById(\'' + copyId + '\').dataset.copy).then(function(){var b=event.target;b.textContent=\'Copied!\';setTimeout(function(){b.textContent=\'Copy\'},1200)})">Copy</button>';
   html += '<div id="' + copyId + '" data-copy="' + escHtml(copyLines).replace(/"/g, '&quot;') + '">';
   html += '<div class="trace-pool-scroll"><table class="trace-pool-table">';
-  html += '<tr><th></th><th>Event</th><th>Venue</th><th>Hood</th><th>Cat</th><th>Time</th><th>Price</th><th>Link</th></tr>';
+  html += '<tr><th></th><th>Event</th><th>Venue</th><th>Hood</th><th>Cat</th><th>Source</th><th>Time</th><th>Price</th><th>Link</th></tr>';
 
   for (var i = 0; i < pool.length; i++) {
     var e = pool[i];
@@ -1923,6 +1923,7 @@ function renderTraceSummary(traceSummary, traceDebug) {
     html += '<td class="venue-col" title="' + escHtml(e.venue_name || '') + '">' + escHtml(e.venue_name || '--') + '</td>';
     html += '<td>' + escHtml(e.neighborhood || '--') + '</td>';
     html += '<td>' + escHtml(e.category || '--') + '</td>';
+    html += '<td>' + escHtml(e.source_name || '--') + '</td>';
     html += '<td>' + escHtml(time || '--') + '</td>';
     html += '<td>' + escHtml(price) + '</td>';
     html += '<td>' + link + '</td>';

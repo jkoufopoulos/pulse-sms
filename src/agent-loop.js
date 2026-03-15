@@ -247,6 +247,7 @@ async function executeTool(toolName, params, session, phone, trace) {
           id: e.id, name: e.name, venue_name: e.venue_name,
           neighborhood: e.neighborhood, category: e.category,
           is_free: e.is_free, price_display: e.price_display,
+          source_name: e.source_name,
         }));
       }
 
