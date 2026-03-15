@@ -737,8 +737,17 @@ function applyFilters() {
   const source = document.getElementById('f-source').value;
 
   const boroughFilter = window._boroughFilter || null;
+  const gapFilter = window._gapFilter || null;
 
   filteredEvents = allEvents.filter(e => {
+    if (gapFilter) {
+      if (gapFilter === 'tba' && !(e.venue_name === 'TBA' || e.venue_name === 'tba')) return false;
+      if (gapFilter === 'noVenue' && e.venue_name) return false;
+      if (gapFilter === 'noHood' && e.neighborhood) return false;
+      if (gapFilter === 'noDesc' && (e.description_short || e.description)) return false;
+      if (gapFilter === 'noTime' && e.start_time_local) return false;
+      if (gapFilter === 'noUrl' && (e.ticket_url || e.source_url)) return false;
+    }
     if (search) {
       const haystack = [e.name, e.venue_name, e.description].filter(Boolean).join(' ').toLowerCase();
       if (!haystack.includes(search)) return false;
@@ -1397,11 +1406,16 @@ function renderDataGaps(events) {
 
   let html = '';
 
-  // Legend
+  // Legend (clickable to filter)
   html += '<div class="gaps-legend">';
   for (const g of GAP_TYPES) {
     const total = events.filter(g.test).length;
-    html += `<span class="gaps-legend-item"><span class="gaps-legend-swatch" style="background:${g.color}"></span>${g.label} (${total})</span>`;
+    if (total === 0) continue;
+    const isActive = window._gapFilter === g.key;
+    html += `<span class="gaps-legend-item${isActive ? ' active' : ''}" onclick="filterByGap('${g.key}')" style="cursor:pointer"><span class="gaps-legend-swatch" style="background:${g.color}"></span>${g.label} (${total})</span>`;
+  }
+  if (window._gapFilter) {
+    html += `<span class="gaps-legend-item" onclick="filterByGap(null)" style="cursor:pointer;color:#FF6B35">✕ clear</span>`;
   }
   html += '</div>';
 
@@ -1438,6 +1452,11 @@ function renderDataGaps(events) {
   html += '</table></details>';
 
   el.innerHTML = html;
+}
+
+function filterByGap(key) {
+  window._gapFilter = window._gapFilter === key ? null : key;
+  applyFilters();
 }
 
 function filterBySource(name) {
