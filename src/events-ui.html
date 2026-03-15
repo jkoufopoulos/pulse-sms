@@ -519,10 +519,6 @@
 <!-- Analytics panel (always visible) -->
 <div class="analytics-panel" id="analytics-panel">
   <div class="analytics-row-2col">
-    <div class="analytics-card"><h4>Data Quality <span class="analytics-filtered-badge" id="dq-filtered-badge">filtered</span></h4><div id="analytics-dataquality"></div></div>
-    <div class="analytics-card"><h4>Quality by Source</h4><div id="analytics-source-quality"></div></div>
-  </div>
-  <div class="analytics-row-2col">
     <div class="analytics-card"><h4>Date Distribution <span class="analytics-filtered-badge" id="date-filtered-badge">filtered</span></h4><div id="analytics-dates"></div></div>
     <div class="analytics-card"><h4>Price Distribution</h4><div id="analytics-freepaid"></div></div>
   </div>
@@ -543,39 +539,7 @@
       <div id="analytics-data-gaps"></div>
     </div>
   </div>
-  <div class="analytics-gaps" id="analytics-gaps" style="display:none"></div>
-  <div class="ai-insights" id="ai-insights">
-    <div class="ai-insights-header">AI Insights</div>
-    <div class="ai-insights-body" id="ai-insights-body">
-      <span class="ai-insights-loading">Analyzing event cache...</span>
-    </div>
   </div>
-</div>
-
-<!-- Agent Eye panel -->
-<div class="agent-eye-panel" id="agent-eye-panel">
-  <div class="agent-eye-header">
-    <h3>Agent Eye</h3>
-    <span style="font-size:11px;color:#667">See exactly what the model sees when a user texts a neighborhood</span>
-  </div>
-  <div class="agent-eye-controls">
-    <select id="ae-neighborhood">
-      <option value="">Pick a neighborhood...</option>
-    </select>
-    <select id="ae-category">
-      <option value="">Any category</option>
-      <option value="comedy">Comedy</option>
-      <option value="live_music">Live Music</option>
-      <option value="nightlife">Nightlife</option>
-      <option value="art">Art</option>
-      <option value="theater">Theater</option>
-      <option value="community">Community</option>
-    </select>
-    <label style="font-size:12px;color:#888"><input type="checkbox" id="ae-free"> Free only</label>
-    <button class="agent-eye-btn" id="ae-btn" onclick="simulateAgentEye()">Simulate</button>
-  </div>
-  <div id="ae-results" style="margin-top:12px"></div>
-</div>
 
 <!-- Showing count -->
 <div class="showing-count" id="showing-count"></div>
@@ -632,9 +596,7 @@ async function loadEvents() {
     }
     updateSummary(data);
     populateDynamicFilters();
-    populateAgentEyeHoods();
     applyFilters();
-    loadInsights();
   } catch (err) {
     console.error('Failed to load events:', err);
     document.getElementById('event-table').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#f87171;padding:40px">Failed to load events: ' + err.message + '</td></tr>';
@@ -1100,48 +1062,6 @@ function toggleHoodShowAll() {
   updateAnalytics();
 }
 
-function renderGapsCallout(catDist, hoodDist, total) {
-  const el = document.getElementById('analytics-gaps');
-  const gaps = [];
-
-  // Categories with < 5% share or < 5 events
-  const catMap = Object.fromEntries(catDist);
-  for (const cat of CANONICAL_CATEGORIES) {
-    const count = catMap[cat] || 0;
-    const pct = total > 0 ? (count / total) * 100 : 0;
-    if (count === 0) {
-      gaps.push(`<strong>${cat.replace(/_/g, ' ')}</strong>: 0 events (missing)`);
-    } else if (count < 5) {
-      gaps.push(`<strong>${cat.replace(/_/g, ' ')}</strong>: only ${count} event${count > 1 ? 's' : ''}`);
-    } else if (pct < 5) {
-      gaps.push(`<strong>${cat.replace(/_/g, ' ')}</strong>: ${count} events (${pct.toFixed(1)}% — under 5%)`);
-    }
-  }
-
-  // Stray (non-canonical) categories
-  const canonicalSet = new Set([...CANONICAL_CATEGORIES, 'other', 'trivia', 'spoken_word', 'film']);
-  const strayCats = catDist.filter(([cat]) => !canonicalSet.has(cat) && cat !== 'unknown');
-  if (strayCats.length > 0) {
-    const strayList = strayCats.map(([cat, count]) => `${cat} (${count})`).join(', ');
-    gaps.push(`<strong>Stray categories</strong> (non-canonical): ${strayList}`);
-  }
-
-  // Neighborhoods with only 1 event
-  const thinHoods = hoodDist.filter(([, c]) => c === 1).map(([h]) => h);
-  if (thinHoods.length > 0) {
-    const list = thinHoods.slice(0, 5).join(', ');
-    const extra = thinHoods.length > 5 ? ` +${thinHoods.length - 5} more` : '';
-    gaps.push(`<strong>Thin neighborhoods</strong> (1 event): ${list}${extra}`);
-  }
-
-  if (gaps.length === 0) {
-    el.style.display = 'none';
-    return;
-  }
-  el.style.display = 'block';
-  el.innerHTML = `<strong>Coverage gaps</strong><ul>${gaps.map(g => `<li>${g}</li>`).join('')}</ul>`;
-}
-
 function renderDateChart(events) {
   const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -1256,119 +1176,6 @@ function renderFreePaid(events) {
     `<div style="margin-top:10px">${bucketsHtml}</div>`;
 }
 
-function renderDataQuality(events) {
-  const total = events.length;
-  if (total === 0) {
-    document.getElementById('analytics-dataquality').innerHTML = '<div style="color:#555;font-size:12px">No events</div>';
-    return;
-  }
-
-  let good = 0, partial = 0, bad = 0;
-  let noTime = 0, noVenue = 0, noHood = 0, noPrice = 0, noDesc = 0, otherCat = 0;
-
-  for (const e of events) {
-    const c = e.completeness ?? 0;
-    if (c >= 0.7) good++;
-    else if (c >= 0.4) partial++;
-    else bad++;
-
-    if (!e.start_time_local) noTime++;
-    if (!e.venue_name || e.venue_name === 'TBA') noVenue++;
-    if (!e.neighborhood) noHood++;
-    if (!e.price_display && !e.is_free) noPrice++;
-    if (!e.description_short && !e.description) noDesc++;
-    if (e.category === 'other' || !e.category) otherCat++;
-  }
-
-  const goodPct = (good / total * 100).toFixed(0);
-  const partialPct = (partial / total * 100).toFixed(0);
-  const badPct = (bad / total * 100).toFixed(0);
-
-  let html = '';
-
-  // Stacked bar
-  html += `<div class="dq-stacked">
-    <div class="dq-seg dq-seg-good" style="width:${goodPct}%"></div>
-    <div class="dq-seg dq-seg-partial" style="width:${partialPct}%"></div>
-    <div class="dq-seg dq-seg-bad" style="width:${badPct}%"></div>
-  </div>`;
-
-  // Buckets
-  html += `<div class="dq-bar">
-    <div class="dq-bucket"><span class="num" style="color:#4ade80">${good}</span> <span class="label">complete (${goodPct}%)</span></div>
-    <div class="dq-bucket"><span class="num" style="color:#f6e05e">${partial}</span> <span class="label">partial (${partialPct}%)</span></div>
-    <div class="dq-bucket"><span class="num" style="color:#fc8181">${bad}</span> <span class="label">garbage (${badPct}%)</span></div>
-  </div>`;
-
-  // Missing fields
-  html += `<div class="dq-missing-list">
-    <div class="dq-missing-item"><span class="count">${noTime}</span> no time</div>
-    <div class="dq-missing-item"><span class="count">${noVenue}</span> no venue</div>
-    <div class="dq-missing-item"><span class="count">${noHood}</span> no neighborhood</div>
-    <div class="dq-missing-item"><span class="count">${noPrice}</span> no price</div>
-    <div class="dq-missing-item"><span class="count">${noDesc}</span> no description</div>
-    <div class="dq-missing-item"><span class="count">${otherCat}</span> "other" category</div>
-  </div>`;
-
-  document.getElementById('analytics-dataquality').innerHTML = html;
-}
-
-function renderSourceQuality(events) {
-  const total = events.length;
-  if (total === 0) {
-    document.getElementById('analytics-source-quality').innerHTML = '<div style="color:#555;font-size:12px">No events</div>';
-    return;
-  }
-
-  // Aggregate per source
-  const sources = {};
-  for (const e of events) {
-    const src = e.source_name || 'unknown';
-    if (!sources[src]) sources[src] = { count: 0, completenessSum: 0, noTime: 0, noVenue: 0, noHood: 0, noPrice: 0, otherCat: 0 };
-    const s = sources[src];
-    s.count++;
-    s.completenessSum += (e.completeness ?? 0);
-    if (!e.start_time_local) s.noTime++;
-    if (!e.venue_name || e.venue_name === 'TBA') s.noVenue++;
-    if (!e.neighborhood) s.noHood++;
-    if (!e.price_display && !e.is_free) s.noPrice++;
-    if (e.category === 'other' || !e.category) s.otherCat++;
-  }
-
-  // Sort by avg completeness ascending (worst first)
-  const sorted = Object.entries(sources).map(([name, s]) => ({
-    name,
-    count: s.count,
-    avgComp: s.completenessSum / s.count,
-    noTime: s.noTime,
-    noVenue: s.noVenue,
-    noHood: s.noHood,
-    noPrice: s.noPrice,
-    otherCat: s.otherCat,
-  })).sort((a, b) => a.avgComp - b.avgComp);
-
-  let html = '';
-  for (const s of sorted) {
-    const pct = (s.avgComp * 100).toFixed(0);
-    const barColor = s.avgComp >= 0.7 ? '#4ade80' : s.avgComp >= 0.5 ? '#f6e05e' : '#fc8181';
-    const gaps = [];
-    if (s.noTime > 0) gaps.push(`${s.noTime} no time`);
-    if (s.noVenue > 0) gaps.push(`${s.noVenue} no venue`);
-    if (s.noHood > 0) gaps.push(`${s.noHood} no hood`);
-    if (s.noPrice > 0) gaps.push(`${s.noPrice} no price`);
-    if (s.otherCat > 0) gaps.push(`${s.otherCat} "other"`);
-    const gapText = gaps.length > 0 ? gaps.join(' · ') : 'all fields present';
-
-    html += `<div class="dq-source-row" onclick="filterBySource('${esc(s.name)}')" title="${gapText}">
-      <span class="dq-source-name">${esc(s.name)}</span>
-      <div class="dq-source-bar-track"><div class="dq-source-bar-fill" style="width:${pct}%;background:${barColor}"></div></div>
-      <span class="dq-source-pct" style="color:${barColor}">${pct}% <span style="color:#666">(${s.count})</span></span>
-    </div>`;
-  }
-
-  document.getElementById('analytics-source-quality').innerHTML = html;
-}
-
 function renderDataGaps(events) {
   const el = document.getElementById('analytics-data-gaps');
   if (!events.length) { el.innerHTML = '<div style="color:#555;font-size:12px">No events</div>'; return; }
@@ -1473,12 +1280,7 @@ function updateAnalytics() {
   // Filtered badges
   const dateBadge = document.getElementById('date-filtered-badge');
   dateBadge.style.display = isFiltered ? 'inline' : 'none';
-  const dqBadge = document.getElementById('dq-filtered-badge');
-  dqBadge.style.display = isFiltered ? 'inline' : 'none';
-
-  // Data quality
-  renderDataQuality(events);
-  renderSourceQuality(events);
+  // Data gaps
   renderDataGaps(events);
 
   // Date distribution + Price
@@ -1508,9 +1310,6 @@ function updateAnalytics() {
   renderBoroughMap(document.getElementById('borough-map'));
 
   // Gaps callout — always computed against allEvents for meaningful coverage analysis
-  const allCatDist = isFiltered ? computeDistribution(allEvents, 'category') : catDist;
-  const allHoodDist = isFiltered ? computeDistribution(allEvents, 'neighborhood') : hoodDist;
-  renderGapsCallout(allCatDist, allHoodDist, allEvents.length);
 }
 
 // ========== Borough mapping ==========
@@ -1732,175 +1531,6 @@ function dataQualitySummary(e) {
 }
 
 // ========== Agent Eye ==========
-
-function populateAgentEyeHoods() {
-  const sel = document.getElementById('ae-neighborhood');
-  const hoods = [...new Set(allEvents.map(e => e.neighborhood).filter(Boolean))].sort();
-  sel.innerHTML = '<option value="">Pick a neighborhood...</option>';
-  for (const h of hoods) {
-    const opt = document.createElement('option');
-    opt.value = h; opt.textContent = h;
-    sel.appendChild(opt);
-  }
-}
-
-async function simulateAgentEye() {
-  const hood = document.getElementById('ae-neighborhood').value;
-  const cat = document.getElementById('ae-category').value;
-  const freeOnly = document.getElementById('ae-free').checked;
-  const btn = document.getElementById('ae-btn');
-  const resultsEl = document.getElementById('ae-results');
-
-  if (!hood) {
-    resultsEl.innerHTML = '<div class="agent-eye-empty">Pick a neighborhood to simulate</div>';
-    return;
-  }
-
-  btn.disabled = true;
-  btn.textContent = 'Loading...';
-  resultsEl.innerHTML = '<div class="agent-eye-empty">Simulating...</div>';
-
-  try {
-    const params = new URLSearchParams({ neighborhood: hood });
-    if (cat) params.set('categories', cat);
-    if (freeOnly) params.set('free_only', 'true');
-
-    const res = await fetch('/api/agent-eye?' + params);
-    const data = await res.json();
-
-    if (data.zero_match) {
-      resultsEl.innerHTML = `<div class="agent-eye-empty">Zero results. ${esc(data.message || '')}</div>`;
-      return;
-    }
-
-    // Store raw events for click-through
-    window._agentEyeRaw = data.raw_events || {};
-
-    // Meta bar
-    const meta = data.meta || {};
-    let metaHtml = '<div class="agent-eye-meta">';
-    metaHtml += `<div class="agent-eye-meta-item"><span class="label">Candidates:</span> <span class="value">${meta.candidates || '?'}</span></div>`;
-    metaHtml += `<div class="agent-eye-meta-item"><span class="label">Sent to LLM:</span> <span class="value">${meta.sent_to_llm || 0}</span></div>`;
-    metaHtml += `<div class="agent-eye-meta-item"><span class="label">Match:</span> <span class="value">${meta.hard_count || 0}</span></div>`;
-    metaHtml += `<div class="agent-eye-meta-item"><span class="label">Soft:</span> <span class="value">${meta.soft_count || 0}</span></div>`;
-    if (meta.is_sparse) metaHtml += `<div class="agent-eye-meta-item"><span class="value" style="color:#f6e05e">SPARSE</span></div>`;
-    metaHtml += '</div>';
-
-    // Toggle buttons
-    let toggleHtml = '<div class="agent-eye-toggle-row">';
-    toggleHtml += '<button class="agent-eye-toggle active" onclick="toggleAgentEyeView(\'cards\', this)">Cards</button>';
-    toggleHtml += '<button class="agent-eye-toggle" onclick="toggleAgentEyeView(\'raw\', this)">Raw (what LLM sees)</button>';
-    toggleHtml += '</div>';
-
-    // Cards view
-    const rawEvents = data.raw_events || {};
-    const eventIds = Object.keys(rawEvents);
-    let cardsHtml = '<div class="agent-eye-pool" id="ae-cards" style="display:block">';
-
-    if (eventIds.length === 0) {
-      cardsHtml += '<div class="agent-eye-empty">No events in pool</div>';
-    } else {
-      eventIds.forEach((id, i) => {
-        const e = rawEvents[id];
-        const tags = [];
-
-        // Match type tag from serialized text
-        const serialized = data.serialized || '';
-        const nameNorm = (e.name || '').toLowerCase();
-        if (serialized.includes('[MATCH]') && serialized.toLowerCase().includes(nameNorm.slice(0, 20))) {
-          tags.push('<span class="agent-eye-tag tag-match">MATCH</span>');
-        } else if (serialized.includes('[SOFT]')) {
-          tags.push('<span class="agent-eye-tag tag-soft">SOFT</span>');
-        } else if (serialized.includes('[NEARBY]')) {
-          tags.push('<span class="agent-eye-tag tag-nearby">NEARBY</span>');
-        }
-
-        // Category
-        if (e.category) tags.push(`<span class="agent-eye-tag tag-signal">${e.category.replace(/_/g, ' ')}</span>`);
-
-        // Source vibe
-        if (e.source_vibe) tags.push(`<span class="agent-eye-tag tag-vibe">${e.source_vibe}</span>`);
-
-        // Quality warnings
-        if (!e.start_time_local) tags.push('<span class="agent-eye-tag tag-warn">no time</span>');
-        if (!e.neighborhood) tags.push('<span class="agent-eye-tag tag-warn">no hood</span>');
-        if (e.completeness != null && e.completeness < 0.5) tags.push('<span class="agent-eye-tag tag-warn">low data</span>');
-
-        const venue = e.venue_name && e.venue_name !== 'TBA' ? e.venue_name : '';
-        const time = e.start_time_local ? formatTime(e.start_time_local) : (e.date_local || '');
-        const price = e.is_free ? 'Free' : (e.price_display || '');
-        const subtitle = [venue, time, price].filter(Boolean).join(' · ');
-
-        // Signals row
-        let signalsHtml = '';
-        const signals = [];
-        if (e.venue_size) signals.push(`venue: ${e.venue_size}`);
-        if (e.scarcity) signals.push(`scarcity: ${e.scarcity}`);
-        if (e.interaction_format) signals.push(e.interaction_format);
-        if (e.interestingness != null) signals.push(`interest: ${e.interestingness.toFixed(2)}`);
-        if (signals.length > 0) {
-          signalsHtml = '<div class="agent-eye-card-signals">' +
-            signals.map(s => `<span class="agent-eye-tag tag-signal">${esc(s)}</span>`).join('') +
-            '</div>';
-        }
-
-        cardsHtml += `<div class="agent-eye-card" onclick="showAgentEyeDetail('${esc(id)}')">
-          <span class="agent-eye-rank">#${i + 1}</span>
-          <div class="agent-eye-card-body">
-            <div class="agent-eye-card-name">${esc(e.name || '--')}</div>
-            <div class="agent-eye-card-venue">${esc(subtitle)}</div>
-            <div class="agent-eye-tags">${tags.join('')}</div>
-            ${signalsHtml}
-          </div>
-        </div>`;
-      });
-    }
-    cardsHtml += '</div>';
-
-    // Raw serialized view
-    let rawHtml = `<pre class="agent-eye-serialized" id="ae-raw">${esc(data.serialized || 'No serialized data')}</pre>`;
-
-    resultsEl.innerHTML = metaHtml + toggleHtml + cardsHtml + rawHtml;
-
-  } catch (err) {
-    resultsEl.innerHTML = `<div class="agent-eye-empty" style="color:#fc8181">Error: ${esc(err.message)}</div>`;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Simulate';
-  }
-}
-
-function toggleAgentEyeView(view, btn) {
-  document.querySelectorAll('.agent-eye-toggle').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const cards = document.getElementById('ae-cards');
-  const raw = document.getElementById('ae-raw');
-  if (cards) cards.style.display = view === 'cards' ? 'block' : 'none';
-  if (raw) raw.style.display = view === 'raw' ? 'block' : 'none';
-}
-
-function showAgentEyeDetail(id) {
-  const rawEvents = window._agentEyeRaw || {};
-  const e = rawEvents[id];
-  if (e) showDetail(e);
-}
-
-// ========== AI Insights ==========
-
-async function loadInsights() {
-  const body = document.getElementById('ai-insights-body');
-  try {
-    const res = await fetch('/api/events/insights');
-    const data = await res.json();
-    if (data.error) {
-      body.innerHTML = `<span class="ai-insights-error">${esc(data.error)}</span>`;
-      return;
-    }
-    body.textContent = data.insights;
-  } catch (err) {
-    body.innerHTML = `<span class="ai-insights-error">Failed to load insights: ${esc(err.message)}</span>`;
-  }
-}
 
 // ========== Init ==========
 loadEvents();
