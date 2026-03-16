@@ -4,18 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>Pulse — What's happening in NYC tonight</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
       --bg: #0d0d0d;
       --bg-sidebar: #0d0d0d;
-      --bg-main: #141414;
+      --bg-main: #131313;
       --bg-input: #1e1e1e;
-      --bg-hover: #1a1a1a;
+      --bg-hover: #1c1c1c;
       --bg-card: #1a1a1a;
+      --bg-pill: #1e1e1e;
       --border: rgba(255,255,255,0.08);
-      --text: #ececec;
+      --text: #e8e8e8;
       --text-secondary: #a0a0a0;
       --text-muted: #666;
       --coral: #ff6b42;
@@ -31,18 +32,14 @@
     /* SIDEBAR */
     .sidebar {
       width: var(--sidebar-w); flex-shrink: 0; background: var(--bg-sidebar);
-      display: flex; flex-direction: column; border-right: 1px solid var(--border);
-      height: 100%;
+      display: flex; flex-direction: column; border-right: 1px solid var(--border); height: 100%;
     }
-    .sidebar-header {
-      padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;
-    }
+    .sidebar-header { padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; }
     .sidebar-logo { font-weight: 600; font-size: 1rem; color: var(--text); display: flex; align-items: center; gap: 8px; }
     .sidebar-logo .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--coral); }
     .new-chat-btn {
       background: none; border: 1px solid var(--border); color: var(--text-secondary);
-      padding: 6px 12px; border-radius: 8px; font: 500 0.78rem var(--font); cursor: pointer;
-      transition: all 0.15s;
+      padding: 6px 12px; border-radius: 8px; font: 500 0.78rem var(--font); cursor: pointer; transition: all 0.15s;
     }
     .new-chat-btn:hover { background: var(--bg-hover); color: var(--text); }
     .sidebar-section { padding: 8px 12px; }
@@ -75,39 +72,63 @@
     .sidebar-cta .success { color: var(--green); font-size: 0.78rem; display: none; }
 
     /* MAIN */
-    .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .main { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100%; }
 
-    /* CONVERSATION */
+    /* CONVERSATION AREA */
     .conversation { flex: 1; overflow-y: auto; }
-    .messages-container { max-width: 680px; margin: 0 auto; padding: 32px 24px 140px; }
+    .messages-container { max-width: 680px; margin: 0 auto; padding: 24px 24px 100px; }
 
-    /* WELCOME (centered, before first message) */
+    /* WELCOME — Gemini-style: greeting, input, pills */
     .welcome {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      min-height: 50vh; text-align: center; padding: 40px 20px;
+      min-height: calc(100vh - 60px); padding: 40px 24px;
     }
-    .welcome h1 { font-size: 1.6rem; font-weight: 600; margin-bottom: 8px; }
-    .welcome h1 span { color: var(--coral); }
-    .welcome p { color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 32px; max-width: 460px; }
-    .welcome-suggestions {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 480px; width: 100%;
-    }
-    .welcome-suggestion {
-      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
-      padding: 14px 16px; text-align: left; cursor: pointer; transition: all 0.15s;
-    }
-    .welcome-suggestion:hover { border-color: rgba(255,255,255,0.15); background: var(--bg-hover); }
-    .welcome-suggestion .ws-title { font-size: 0.85rem; font-weight: 500; margin-bottom: 2px; }
-    .welcome-suggestion .ws-desc { font-size: 0.75rem; color: var(--text-muted); }
+    .welcome-greeting { color: var(--coral); font-size: 1.1rem; font-weight: 500; margin-bottom: 8px; }
+    .welcome-heading { font-size: 2rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 36px; }
+    .welcome-heading em { font-style: normal; color: var(--text); }
 
-    /* MESSAGE TURNS (Claude-style: flat, no bubbles) */
+    /* WELCOME INPUT (large, prominent) */
+    .welcome-input-wrap {
+      width: 100%; max-width: 600px; background: var(--bg-input);
+      border: 1px solid var(--border); border-radius: 20px;
+      margin-bottom: 28px; transition: border-color 0.15s;
+    }
+    .welcome-input-wrap:focus-within { border-color: rgba(255,255,255,0.15); }
+    .welcome-input-wrap textarea {
+      width: 100%; background: transparent; border: none; color: var(--text);
+      font: 0.95rem var(--font); line-height: 1.5; padding: 18px 20px 8px;
+      resize: none; outline: none; min-height: 48px; max-height: 120px;
+    }
+    .welcome-input-wrap textarea::placeholder { color: var(--text-muted); }
+    .welcome-input-bar {
+      display: flex; align-items: center; justify-content: flex-end;
+      padding: 6px 12px 12px;
+    }
+    .welcome-input-bar .send-btn {
+      width: 34px; height: 34px; border-radius: 10px; background: var(--coral);
+      border: none; color: #fff; font-size: 1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; transition: opacity 0.12s;
+    }
+    .welcome-input-bar .send-btn:hover { opacity: 0.85; }
+    .welcome-input-bar .send-btn:disabled { opacity: 0.3; }
+
+    /* PILLS (Gemini-style: below input) */
+    .pills { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 600px; }
+    .pill {
+      background: var(--bg-pill); border: 1px solid var(--border); border-radius: 24px;
+      padding: 10px 20px; color: var(--text-secondary); font: 500 0.88rem var(--font);
+      cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    }
+    .pill:hover { background: var(--bg-hover); border-color: rgba(255,255,255,0.15); color: var(--text); }
+
+    /* MESSAGE TURNS (Claude-style: flat, avatars) */
     .turn { padding: 24px 0; }
     .turn + .turn { border-top: 1px solid var(--border); }
     .turn-inner { display: flex; gap: 16px; align-items: flex-start; }
     .avatar {
       width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600;
-      margin-top: 2px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.72rem; font-weight: 600; margin-top: 2px;
     }
     .avatar-user { background: #565656; color: #ddd; }
     .avatar-bot { background: var(--coral); color: #fff; }
@@ -115,7 +136,7 @@
     .turn-name { font-size: 0.78rem; font-weight: 600; margin-bottom: 6px; color: var(--text); }
     .turn-text { font-size: 0.92rem; line-height: 1.7; color: var(--text); white-space: pre-wrap; word-wrap: break-word; }
 
-    /* EVENT CARDS (inline, wider) */
+    /* EVENT CARDS */
     .event-cards { display: flex; gap: 10px; overflow-x: auto; margin-top: 14px; padding-bottom: 4px; scrollbar-width: none; }
     .event-cards::-webkit-scrollbar { display: none; }
     .ecard {
@@ -130,12 +151,11 @@
     .ecard-meta .free { color: var(--green); font-weight: 600; }
     .ecard-why { color: var(--purple); font-size: 0.75rem; font-style: italic; margin-top: 6px; }
 
-    /* SUGGESTIONS */
+    /* SUGGESTIONS (in conversation) */
     .suggestions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
     .suggestion {
       background: transparent; border: 1px solid var(--border); color: var(--text-secondary);
-      padding: 7px 14px; border-radius: 20px; font: 500 0.8rem var(--font); cursor: pointer;
-      transition: all 0.12s;
+      padding: 7px 14px; border-radius: 20px; font: 500 0.8rem var(--font); cursor: pointer; transition: all 0.12s;
     }
     .suggestion:hover { border-color: var(--coral); color: var(--coral); }
 
@@ -146,16 +166,16 @@
     .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
     @keyframes tdot { 0%,80%,100% { opacity: 0.3; } 40% { opacity: 1; } }
 
-    /* INPUT */
+    /* CONVERSATION INPUT (bottom bar, shown after first message) */
     .input-area {
-      flex-shrink: 0; padding: 16px 24px 20px;
-      background: linear-gradient(transparent, var(--bg-main) 20%);
-      position: relative;
+      display: none; flex-shrink: 0; padding: 14px 24px 18px;
+      background: linear-gradient(transparent, var(--bg-main) 30%);
     }
+    .input-area.visible { display: block; }
     .input-box {
       max-width: 680px; margin: 0 auto; position: relative;
-      background: var(--bg-input); border: 1px solid var(--border);
-      border-radius: 16px; transition: border-color 0.15s;
+      background: var(--bg-input); border: 1px solid var(--border); border-radius: 16px;
+      transition: border-color 0.15s;
     }
     .input-box:focus-within { border-color: rgba(255,255,255,0.15); }
     .input-box textarea {
@@ -173,17 +193,19 @@
     }
     .input-box .send-btn:hover { opacity: 0.85; }
     .input-box .send-btn:disabled { opacity: 0.3; cursor: default; }
-    .input-hint { text-align: center; font-size: 0.7rem; color: var(--text-muted); margin-top: 8px; max-width: 680px; margin-left: auto; margin-right: auto; }
 
     /* MOBILE */
     .sidebar-toggle { display: none; background: none; border: none; color: var(--text-secondary); font-size: 1.2rem; cursor: pointer; padding: 4px; }
+    .mobile-header { display: none; padding: 10px 16px; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); }
+    .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 199; }
     @media (max-width: 768px) {
       .sidebar { position: fixed; left: -280px; z-index: 200; transition: left 0.25s; width: 280px; }
       .sidebar.open { left: 0; }
-      .sidebar-toggle { display: block; }
-      .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 199; }
       .sidebar-overlay.show { display: block; }
-      .welcome-suggestions { grid-template-columns: 1fr; }
+      .mobile-header { display: flex; }
+      .welcome-heading { font-size: 1.5rem; }
+      .pills { gap: 8px; }
+      .pill { padding: 8px 16px; font-size: 0.82rem; }
     }
   </style>
 </head>
@@ -195,7 +217,7 @@
     <button class="new-chat-btn" onclick="newChat()">New chat</button>
   </div>
   <div class="sidebar-section">
-    <div class="sidebar-label">Popular neighborhoods</div>
+    <div class="sidebar-label">Neighborhoods</div>
     <div class="sidebar-item" onclick="send('williamsburg')">Williamsburg</div>
     <div class="sidebar-item" onclick="send('bushwick')">Bushwick</div>
     <div class="sidebar-item" onclick="send('LES')">Lower East Side</div>
@@ -208,7 +230,7 @@
   <div class="sidebar-spacer"></div>
   <div class="sidebar-cta" id="sidebar-cta">
     <div class="sidebar-cta-title">Get picks via SMS</div>
-    <div class="sidebar-cta-desc">Same conversation, texted to you. Pulse sends proactive picks when something great comes up.</div>
+    <div class="sidebar-cta-desc">Same conversation, texted to you. Pulse sends proactive picks for your neighborhood.</div>
     <button class="sidebar-cta-btn" id="cta-btn" onclick="showPhoneInput()">Text me picks</button>
     <div class="sidebar-cta-form" id="cta-form">
       <input type="tel" id="cta-phone" placeholder="Your phone number" onkeydown="if(event.key==='Enter')submitPhone()">
@@ -220,55 +242,47 @@
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 
 <div class="main">
-  <!-- Mobile header -->
-  <div style="padding:10px 16px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--border);">
-    <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()">&#9776;</button>
+  <div class="mobile-header">
+    <button class="sidebar-toggle" onclick="toggleSidebar()">&#9776;</button>
     <span style="font-weight:600; font-size:0.9rem;">Pulse</span>
   </div>
 
   <div class="conversation" id="conversation">
     <div class="messages-container" id="messages">
-      <!-- Welcome screen -->
+
+      <!-- WELCOME SCREEN (Gemini-style) -->
       <div class="welcome" id="welcome">
-        <h1>What's happening in <span>NYC</span> tonight?</h1>
-        <p>I know every event, bar, and restaurant worth your time. Ask me anything — or pick a starting point.</p>
-        <div class="welcome-suggestions">
-          <div class="welcome-suggestion" onclick="send('williamsburg')">
-            <div class="ws-title">Williamsburg tonight</div>
-            <div class="ws-desc">Events, bars, and more</div>
-          </div>
-          <div class="welcome-suggestion" onclick="send('something chill in LES')">
-            <div class="ws-title">Something chill</div>
-            <div class="ws-desc">Jazz, film, art, low-key vibes</div>
-          </div>
-          <div class="welcome-suggestion" onclick="send('best comedy tonight')">
-            <div class="ws-title">Comedy tonight</div>
-            <div class="ws-desc">Stand-up, open mics, improv</div>
-          </div>
-          <div class="welcome-suggestion" onclick="send('dinner and a show in east village')">
-            <div class="ws-title">Dinner + show</div>
-            <div class="ws-desc">Restaurant and event pairing</div>
-          </div>
-          <div class="welcome-suggestion" onclick="send('free stuff this weekend')">
-            <div class="ws-title">Free this weekend</div>
-            <div class="ws-desc">No cover, no ticket, no excuses</div>
-          </div>
-          <div class="welcome-suggestion" onclick="send('surprise me')">
-            <div class="ws-title">Surprise me</div>
-            <div class="ws-desc">One-offs, underground, weird stuff</div>
+        <div class="welcome-greeting">Pulse</div>
+        <div class="welcome-heading"><em>Where should we go</em> tonight?</div>
+
+        <div class="welcome-input-wrap">
+          <textarea id="welcome-input" rows="1" placeholder="Ask about a neighborhood, vibe, or type of night..."
+            oninput="autoResize(this)" onkeydown="handleWelcomeKey(event)"></textarea>
+          <div class="welcome-input-bar">
+            <button class="send-btn" onclick="sendWelcomeInput()">&#8593;</button>
           </div>
         </div>
+
+        <div class="pills">
+          <div class="pill" onclick="send('what\'s happening in williamsburg tonight')">Williamsburg tonight</div>
+          <div class="pill" onclick="send('something chill in LES')">Something chill</div>
+          <div class="pill" onclick="send('best comedy shows tonight')">Comedy</div>
+          <div class="pill" onclick="send('dinner and a show in east village')">Dinner + show</div>
+          <div class="pill" onclick="send('free stuff this weekend')">Free this weekend</div>
+          <div class="pill" onclick="send('surprise me with something weird')">Surprise me</div>
+        </div>
       </div>
+
     </div>
   </div>
 
-  <div class="input-area">
+  <!-- CONVERSATION INPUT (hidden until first message) -->
+  <div class="input-area" id="input-area">
     <div class="input-box">
       <textarea id="input" rows="1" placeholder="Ask about neighborhoods, vibes, events, bars..."
         oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
       <button class="send-btn" id="send-btn" onclick="sendInput()">&#8593;</button>
     </div>
-    <div class="input-hint">Pulse has data from 22 sources across 75 NYC neighborhoods. Try "bushwick" or "something weird tonight."</div>
   </div>
 </div>
 
@@ -276,6 +290,7 @@
 const chatPhone = '+1555' + Math.floor(Math.random() * 9000000 + 1000000);
 let messageCount = 0;
 let sending = false;
+let inConversation = false;
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 function formatTime(iso) {
@@ -285,18 +300,21 @@ function formatTime(iso) {
 }
 function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 150) + 'px'; }
 function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendInput(); } }
+function handleWelcomeKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendWelcomeInput(); } }
 function scrollToBottom() { const c = document.getElementById('conversation'); requestAnimationFrame(() => c.scrollTop = c.scrollHeight); }
-
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('sidebar-overlay').classList.toggle('show'); }
 function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebar-overlay').classList.remove('show'); }
 
-function hideWelcome() {
+function enterConversation() {
+  if (inConversation) return;
+  inConversation = true;
   const w = document.getElementById('welcome');
   if (w) w.remove();
+  document.getElementById('input-area').classList.add('visible');
 }
 
 function addTurn(role, name, content) {
-  hideWelcome();
+  enterConversation();
   const messages = document.getElementById('messages');
   const turn = document.createElement('div');
   turn.className = 'turn';
@@ -306,18 +324,15 @@ function addTurn(role, name, content) {
       <div class="avatar ${isUser ? 'avatar-user' : 'avatar-bot'}">${isUser ? 'Y' : 'P'}</div>
       <div class="turn-content">
         <div class="turn-name">${esc(name)}</div>
-        <div id="${turn.id}" class="turn-body">${content}</div>
+        <div class="turn-body">${content}</div>
       </div>
-    </div>
-  `;
+    </div>`;
   messages.appendChild(turn);
   scrollToBottom();
   return turn;
 }
 
-function addUserMessage(text) {
-  addTurn('user', 'You', `<div class="turn-text">${esc(text)}</div>`);
-}
+function addUserMessage(text) { addTurn('user', 'You', `<div class="turn-text">${esc(text)}</div>`); }
 
 function addTypingIndicator() {
   const turn = addTurn('bot', 'Pulse', `<div class="typing-dots"><span></span><span></span><span></span></div>`);
@@ -362,7 +377,8 @@ function addBotMessage(text, events) {
 async function send(text) {
   if (sending || !text.trim()) return;
   sending = true;
-  document.getElementById('send-btn').disabled = true;
+  const btn = document.getElementById('send-btn');
+  if (btn) btn.disabled = true;
   closeSidebar();
   addUserMessage(text);
   addTypingIndicator();
@@ -375,16 +391,17 @@ async function send(text) {
     });
     const data = await r.json();
     removeTypingIndicator();
-    const reply = data.messages?.[0]?.body || 'Something went wrong — try again!';
+    const reply = data.messages?.[0]?.body || 'Something went wrong -- try again!';
     const events = data.trace?.events?.sent_pool || null;
     addBotMessage(reply, events);
   } catch {
     removeTypingIndicator();
-    addBotMessage('Hit a snag — try that again?');
+    addBotMessage('Hit a snag -- try that again?');
   }
   sending = false;
-  document.getElementById('send-btn').disabled = false;
-  document.getElementById('input').focus();
+  if (btn) btn.disabled = false;
+  const input = document.getElementById('input');
+  if (input) input.focus();
 }
 
 function sendInput() {
@@ -396,22 +413,40 @@ function sendInput() {
   send(text);
 }
 
+function sendWelcomeInput() {
+  const input = document.getElementById('welcome-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  send(text);
+}
+
 function newChat() {
+  inConversation = false;
+  messageCount = 0;
+  document.getElementById('input-area').classList.remove('visible');
   document.getElementById('messages').innerHTML = `
     <div class="welcome" id="welcome">
-      <h1>What's happening in <span style="color:var(--coral)">NYC</span> tonight?</h1>
-      <p>I know every event, bar, and restaurant worth your time. Ask me anything — or pick a starting point.</p>
-      <div class="welcome-suggestions">
-        <div class="welcome-suggestion" onclick="send('williamsburg')"><div class="ws-title">Williamsburg tonight</div><div class="ws-desc">Events, bars, and more</div></div>
-        <div class="welcome-suggestion" onclick="send('something chill in LES')"><div class="ws-title">Something chill</div><div class="ws-desc">Jazz, film, art, low-key vibes</div></div>
-        <div class="welcome-suggestion" onclick="send('best comedy tonight')"><div class="ws-title">Comedy tonight</div><div class="ws-desc">Stand-up, open mics, improv</div></div>
-        <div class="welcome-suggestion" onclick="send('dinner and a show in east village')"><div class="ws-title">Dinner + show</div><div class="ws-desc">Restaurant and event pairing</div></div>
-        <div class="welcome-suggestion" onclick="send('free stuff this weekend')"><div class="ws-title">Free this weekend</div><div class="ws-desc">No cover, no ticket, no excuses</div></div>
-        <div class="welcome-suggestion" onclick="send('surprise me')"><div class="ws-title">Surprise me</div><div class="ws-desc">One-offs, underground, weird stuff</div></div>
+      <div class="welcome-greeting">Pulse</div>
+      <div class="welcome-heading"><em>Where should we go</em> tonight?</div>
+      <div class="welcome-input-wrap">
+        <textarea id="welcome-input" rows="1" placeholder="Ask about a neighborhood, vibe, or type of night..."
+          oninput="autoResize(this)" onkeydown="handleWelcomeKey(event)"></textarea>
+        <div class="welcome-input-bar">
+          <button class="send-btn" onclick="sendWelcomeInput()">&#8593;</button>
+        </div>
+      </div>
+      <div class="pills">
+        <div class="pill" onclick="send('what\\'s happening in williamsburg tonight')">Williamsburg tonight</div>
+        <div class="pill" onclick="send('something chill in LES')">Something chill</div>
+        <div class="pill" onclick="send('best comedy shows tonight')">Comedy</div>
+        <div class="pill" onclick="send('dinner and a show in east village')">Dinner + show</div>
+        <div class="pill" onclick="send('free stuff this weekend')">Free this weekend</div>
+        <div class="pill" onclick="send('surprise me with something weird')">Surprise me</div>
       </div>
     </div>`;
-  messageCount = 0;
   closeSidebar();
+  setTimeout(() => { const wi = document.getElementById('welcome-input'); if (wi) wi.focus(); }, 100);
 }
 
 function showPhoneInput() {
@@ -431,7 +466,8 @@ async function submitPhone() {
   } catch { input.style.borderColor = '#ef4444'; }
 }
 
-document.getElementById('input').focus();
+// Focus welcome input on load
+setTimeout(() => { const wi = document.getElementById('welcome-input'); if (wi) wi.focus(); }, 200);
 </script>
 </body>
 </html>
