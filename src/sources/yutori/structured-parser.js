@@ -100,8 +100,9 @@ function parseDateTimeLine(text, fallbackDate) {
   }
 
   // Extract time: "H:MM AM/PM" or "H AM/PM" with optional end time
+  // Supports cross-day end times like "10:00 PM – Sun Mar 15, 4:00 AM"
   if (!startTime) {
-    const timeMatch = text.match(/(\d{1,2}(?::\d{2})?)\s*([AP]M)\s*(?:[-–]\s*(\d{1,2}(?::\d{2})?)\s*([AP]M))?/i);
+    const timeMatch = text.match(/(\d{1,2}(?::\d{2})?)\s*([AP]M)\s*(?:[-–]\s*(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*\s+)?(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2},?\s*)?(\d{1,2}(?::\d{2})?)\s*([AP]M))?/i);
     if (timeMatch && dateLocal) {
       const startRaw = timeMatch[1].includes(':') ? timeMatch[1] : timeMatch[1] + ':00';
       startTime = dateLocal + 'T' + parseTo24h(startRaw + ' ' + timeMatch[2]);
@@ -124,6 +125,15 @@ function parsePrice(text) {
 
   if (/\bfree\b/i.test(text) && !/price not/i.test(text)) {
     return { price_display: 'Free', is_free: true };
+  }
+  if (/\bno cover\b/i.test(text)) {
+    return { price_display: 'No Cover', is_free: true };
+  }
+  if (/\bprice\s+varies\b/i.test(text)) {
+    return { price_display: 'Price varies', is_free: false };
+  }
+  if (/\bbuy tickets?\b/i.test(text)) {
+    return { price_display: 'Buy Tickets', is_free: false };
   }
   return { price_display: null, is_free: false };
 }
@@ -167,7 +177,7 @@ function parseInlineLi(liHtml, fallbackDate) {
   if (text.length < 20) return null;
 
   // Skip non-event commentary lines and email preamble
-  if (/^(?:All prices|Many screenings|Several films|Most events|Don't Miss|Note:)/i.test(text)) return null;
+  if (/^(?:All prices|Many screenings|Several films|Most events|Don't Miss|Note:|Free\/low-cost:|Late-night:|Weeknight)/i.test(text)) return null;
   if (/\[object Object\]|Here.?s a summary|I'm prioritizing|I'm flagging/i.test(text)) return null;
 
   // Extract quoted name
@@ -377,7 +387,7 @@ function parseBrSeparatedBlock(blockHtml, fallbackDate) {
     }
 
     // Price line
-    if (/^(?:\$|Free|Price\s+not|Pay)/i.test(line)) {
+    if (/^(?:\$|Free|Price\s|Pay|No Cover|Buy Tickets|Donation|Sliding|PWYC|Name your)/i.test(line)) {
       priceText = line;
       continue;
     }

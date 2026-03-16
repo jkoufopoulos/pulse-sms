@@ -10,6 +10,7 @@ function getGmailService() {
   const refreshToken = process.env.GMAIL_REFRESH_TOKEN;
 
   if (!clientId || !clientSecret || !refreshToken) {
+    console.warn('[GMAIL] Missing credentials — GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, or GMAIL_REFRESH_TOKEN not set');
     return null;
   }
 
@@ -28,6 +29,7 @@ function getGmailService() {
 async function fetchYutoriEmails(sinceHours = 48) {
   const gmail = getGmailService();
   if (!gmail) {
+    console.error('[GMAIL] Cannot fetch Yutori emails — Gmail service unavailable (check credentials)');
     return [];
   }
 
@@ -66,7 +68,21 @@ async function fetchYutoriEmails(sinceHours = 48) {
 
     return results;
   } catch (err) {
-    console.error('Gmail fetch error:', err.message);
+    const isAuthError = /invalid_grant|token.*expired|token.*revoked|unauthorized/i.test(err.message);
+    if (isAuthError) {
+      console.error('[GMAIL] AUTH FAILURE — refresh token is expired or revoked. Re-run: node scripts/gmail-auth.js');
+      console.error('[GMAIL] No Yutori emails will be ingested until credentials are refreshed.');
+      try {
+        const { sendRuntimeAlert } = require('./alerts');
+        sendRuntimeAlert('gmail-auth-failure', {
+          error: err.message,
+          impact: 'Yutori email ingestion is completely stalled — no new events will be cached until credentials are refreshed',
+          fix: 'Run: node scripts/gmail-auth.js',
+        }).catch(() => {});
+      } catch {}
+    } else {
+      console.error('[GMAIL] Fetch error:', err.message);
+    }
     return [];
   }
 }
@@ -126,6 +142,7 @@ function decodeBase64(data) {
 async function fetchEmails(query, maxResults = 10) {
   const gmail = getGmailService();
   if (!gmail) {
+    console.error('[GMAIL] Cannot fetch emails — Gmail service unavailable (check credentials)');
     return [];
   }
 
@@ -161,7 +178,20 @@ async function fetchEmails(query, maxResults = 10) {
 
     return results;
   } catch (err) {
-    console.error('Gmail fetch error:', err.message);
+    const isAuthError = /invalid_grant|token.*expired|token.*revoked|unauthorized/i.test(err.message);
+    if (isAuthError) {
+      console.error('[GMAIL] AUTH FAILURE — refresh token is expired or revoked. Re-run: node scripts/gmail-auth.js');
+      try {
+        const { sendRuntimeAlert } = require('./alerts');
+        sendRuntimeAlert('gmail-auth-failure', {
+          error: err.message,
+          impact: 'Email ingestion is stalled until credentials are refreshed',
+          fix: 'Run: node scripts/gmail-auth.js',
+        }).catch(() => {});
+      } catch {}
+    } else {
+      console.error('[GMAIL] Fetch error:', err.message);
+    }
     return [];
   }
 }
