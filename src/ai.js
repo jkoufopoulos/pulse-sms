@@ -171,13 +171,13 @@ Extract all events into the JSON format specified in your instructions.`;
 
   try {
     const result = await llmGenerate(model, YUTORI_EXTRACTION_PROMPT, userPrompt, {
-      maxTokens: 8192, temperature: 0, json: true, timeout: 90_000,
+      maxTokens: 16384, temperature: 0, json: true, timeout: 90_000,
     });
     text = result.text; usage = result.usage; provider = result.provider;
   } catch (err) {
     console.warn(`extractYutoriEvents ${model} failed, falling back to ${MODELS.fallback}: ${err.message}`);
     const result = await llmGenerate(MODELS.fallback, YUTORI_EXTRACTION_PROMPT, userPrompt, {
-      maxTokens: 8192, temperature: 0, json: true, timeout: 90_000,
+      maxTokens: 16384, temperature: 0, json: true, timeout: 90_000,
     });
     text = result.text; usage = result.usage; provider = result.provider;
   }
