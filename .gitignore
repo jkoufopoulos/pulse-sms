@@ -13,3 +13,4 @@ scripts/export-p1-failures.js
 scripts/split-reports.js
 scripts/tavily-impact.js
 scripts/trim-reports.js
+*.png
