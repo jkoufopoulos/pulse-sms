@@ -4,248 +4,271 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>Pulse — What's happening in NYC tonight</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
-      --bg: #0a0a0f;
-      --bg-surface: #111118;
-      --bg-hover: #1a1a24;
-      --border: rgba(255,255,255,0.07);
-      --text: #ededeb;
-      --text-secondary: #8e8e8a;
-      --text-muted: #555550;
+      --bg: #0d0d0d;
+      --bg-sidebar: #0d0d0d;
+      --bg-main: #141414;
+      --bg-input: #1e1e1e;
+      --bg-hover: #1a1a1a;
+      --bg-card: #1a1a1a;
+      --border: rgba(255,255,255,0.08);
+      --text: #ececec;
+      --text-secondary: #a0a0a0;
+      --text-muted: #666;
       --coral: #ff6b42;
-      --coral-dim: rgba(255,107,66,0.12);
+      --coral-dim: rgba(255,107,66,0.1);
       --green: #3fb950;
       --purple: #c4a1ff;
-      --font: 'DM Sans', system-ui, -apple-system, sans-serif;
-      --mono: 'DM Mono', ui-monospace, monospace;
+      --font: 'Inter', -apple-system, system-ui, sans-serif;
+      --sidebar-w: 260px;
     }
-    html, body { height: 100%; }
-    body { font-family: var(--font); background: var(--bg); color: var(--text); display: flex; flex-direction: column; overflow: hidden; }
+    html, body { height: 100%; overflow: hidden; }
+    body { font-family: var(--font); background: var(--bg-main); color: var(--text); display: flex; }
 
-    /* TOP BAR */
-    header {
-      flex-shrink: 0;
-      border-bottom: 1px solid var(--border);
-      padding: 12px 20px;
-      display: flex; align-items: center; justify-content: space-between;
-      background: var(--bg);
+    /* SIDEBAR */
+    .sidebar {
+      width: var(--sidebar-w); flex-shrink: 0; background: var(--bg-sidebar);
+      display: flex; flex-direction: column; border-right: 1px solid var(--border);
+      height: 100%;
     }
-    .logo { font-weight: 700; font-size: 1.15rem; color: var(--coral); }
-    .logo span { color: var(--text-secondary); font-weight: 400; font-size: 0.85rem; margin-left: 8px; }
-    .header-right { display: flex; align-items: center; gap: 12px; }
-    .sms-link { color: var(--coral); font-size: 0.82rem; font-weight: 500; text-decoration: none; padding: 6px 14px; border: 1px solid rgba(255,107,66,0.3); border-radius: 8px; transition: all 0.2s; }
-    .sms-link:hover { background: var(--coral-dim); }
-
-    /* CONVERSATION AREA */
-    .conversation {
-      flex: 1;
-      overflow-y: auto;
-      padding: 0;
-      scroll-behavior: smooth;
+    .sidebar-header {
+      padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;
     }
-    .messages {
-      max-width: 720px;
-      margin: 0 auto;
-      padding: 24px 20px 120px;
-      display: flex; flex-direction: column; gap: 20px;
-    }
-
-    /* MESSAGE BUBBLES */
-    .turn { display: flex; flex-direction: column; gap: 6px; }
-    .turn-user { align-items: flex-end; }
-    .turn-bot { align-items: flex-start; }
-
-    .bubble {
-      max-width: 560px;
-      padding: 14px 18px;
-      border-radius: 20px;
-      font-size: 0.92rem;
-      line-height: 1.65;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-    }
-    .bubble-user {
-      background: var(--coral);
-      color: #fff;
-      border-bottom-right-radius: 6px;
-    }
-    .bubble-bot {
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      color: var(--text);
-      border-bottom-left-radius: 6px;
-    }
-    .bubble-bot a { color: var(--coral); }
-
-    /* SENDER LABEL */
-    .sender { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); margin-bottom: 2px; padding: 0 4px; }
-
-    /* EVENT CARDS (inline in conversation) */
-    .event-cards {
-      display: flex; gap: 10px; overflow-x: auto; padding: 4px 0 8px;
-      -webkit-overflow-scrolling: touch; scrollbar-width: none;
-      max-width: 560px;
-    }
-    .event-cards::-webkit-scrollbar { display: none; }
-    .ecard {
-      flex-shrink: 0;
-      width: 260px;
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .ecard:hover { border-color: rgba(255,255,255,0.15); background: var(--bg-hover); }
-    .ecard-name { font-weight: 700; font-size: 0.88rem; margin-bottom: 4px; line-height: 1.3; }
-    .ecard-venue { color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 8px; }
-    .ecard-meta { display: flex; gap: 8px; align-items: center; font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 8px; }
-    .ecard-meta .cat { color: var(--coral); font-family: var(--mono); font-weight: 500; font-size: 0.68rem; background: var(--coral-dim); padding: 2px 6px; border-radius: 4px; }
-    .ecard-meta .free { color: var(--green); font-weight: 600; }
-    .ecard-meta .time { font-family: var(--mono); }
-    .ecard-why { color: var(--purple); font-size: 0.75rem; font-style: italic; line-height: 1.4; }
-    .ecard-detail { color: var(--text-muted); font-size: 0.75rem; margin-bottom: 6px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-
-    /* TYPING INDICATOR */
-    .typing-indicator {
-      display: flex; gap: 5px; padding: 14px 18px;
-      background: var(--bg-surface); border: 1px solid var(--border);
-      border-radius: 20px; border-bottom-left-radius: 6px;
-      max-width: 80px; align-self: flex-start;
-    }
-    .typing-indicator span {
-      width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted);
-      animation: pulse-dot 1.4s ease-in-out infinite;
-    }
-    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
-    @keyframes pulse-dot { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }
-
-    /* SUGGESTIONS */
-    .suggestions {
-      display: flex; gap: 8px; flex-wrap: wrap; padding: 4px 0;
-      max-width: 560px;
-    }
-    .suggestion {
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      color: var(--text-secondary);
-      padding: 8px 16px;
-      border-radius: 20px;
-      font: 500 0.82rem var(--font);
-      cursor: pointer;
+    .sidebar-logo { font-weight: 600; font-size: 1rem; color: var(--text); display: flex; align-items: center; gap: 8px; }
+    .sidebar-logo .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--coral); }
+    .new-chat-btn {
+      background: none; border: 1px solid var(--border); color: var(--text-secondary);
+      padding: 6px 12px; border-radius: 8px; font: 500 0.78rem var(--font); cursor: pointer;
       transition: all 0.15s;
     }
-    .suggestion:hover { border-color: var(--coral); color: var(--coral); background: var(--coral-dim); }
+    .new-chat-btn:hover { background: var(--bg-hover); color: var(--text); }
+    .sidebar-section { padding: 8px 12px; }
+    .sidebar-label { font-size: 0.68rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; padding: 8px 4px 6px; }
+    .sidebar-item {
+      display: block; padding: 8px 12px; border-radius: 8px; color: var(--text-secondary);
+      font-size: 0.85rem; cursor: pointer; transition: all 0.12s; text-decoration: none;
+      text-overflow: ellipsis; overflow: hidden; white-space: nowrap;
+    }
+    .sidebar-item:hover { background: var(--bg-hover); color: var(--text); }
+    .sidebar-spacer { flex: 1; }
+    .sidebar-cta {
+      margin: 12px; padding: 14px; border-radius: 12px;
+      background: var(--coral-dim); border: 1px solid rgba(255,107,66,0.15);
+    }
+    .sidebar-cta-title { font-size: 0.82rem; font-weight: 600; margin-bottom: 4px; }
+    .sidebar-cta-desc { font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 10px; }
+    .sidebar-cta-btn {
+      display: block; width: 100%; padding: 8px; border-radius: 8px;
+      background: var(--coral); border: none; color: #fff; font: 600 0.78rem var(--font);
+      cursor: pointer; text-align: center; transition: opacity 0.15s;
+    }
+    .sidebar-cta-btn:hover { opacity: 0.85; }
+    .sidebar-cta-form { display: none; flex-direction: column; gap: 8px; }
+    .sidebar-cta-form input {
+      padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+      background: rgba(255,255,255,0.06); color: var(--text); font: 0.8rem var(--font); outline: none;
+    }
+    .sidebar-cta-form input::placeholder { color: var(--text-muted); }
+    .sidebar-cta .success { color: var(--green); font-size: 0.78rem; display: none; }
 
-    /* INPUT BAR */
-    .input-bar {
-      flex-shrink: 0;
-      border-top: 1px solid var(--border);
-      background: var(--bg);
-      padding: 14px 20px;
-    }
-    .input-inner {
-      max-width: 720px;
-      margin: 0 auto;
-      display: flex; gap: 10px; align-items: flex-end;
-    }
-    .input-inner textarea {
-      flex: 1;
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 12px 18px;
-      color: var(--text);
-      font: 0.92rem var(--font);
-      line-height: 1.5;
-      resize: none;
-      outline: none;
-      max-height: 120px;
-      min-height: 46px;
-      overflow-y: auto;
-    }
-    .input-inner textarea::placeholder { color: var(--text-muted); }
-    .input-inner textarea:focus { border-color: rgba(255,255,255,0.15); }
-    .send-btn {
-      width: 46px; height: 46px;
-      border-radius: 14px;
-      background: var(--coral);
-      border: none; color: #fff;
-      font-size: 1.2rem;
-      cursor: pointer;
-      transition: opacity 0.15s;
-      flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .send-btn:hover { opacity: 0.85; }
-    .send-btn:disabled { opacity: 0.4; cursor: default; }
+    /* MAIN */
+    .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 
-    /* SMS CTA (inline in conversation) */
-    .sms-cta {
-      background: linear-gradient(135deg, rgba(255,107,66,0.1), rgba(255,107,66,0.04));
-      border: 1px solid rgba(255,107,66,0.2);
-      border-radius: 16px;
-      padding: 20px;
-      max-width: 400px;
-    }
-    .sms-cta h3 { font-size: 0.92rem; margin-bottom: 6px; }
-    .sms-cta p { color: var(--text-secondary); font-size: 0.82rem; margin-bottom: 14px; line-height: 1.5; }
-    .sms-cta-form { display: flex; gap: 8px; }
-    .sms-cta-form input {
-      flex: 1; background: rgba(255,255,255,0.06); border: 1px solid var(--border);
-      border-radius: 10px; padding: 10px 14px; color: var(--text); font: 0.85rem var(--font); outline: none;
-    }
-    .sms-cta-form input::placeholder { color: var(--text-muted); }
-    .sms-cta-form button {
-      background: var(--coral); border: none; color: #fff; padding: 10px 18px;
-      border-radius: 10px; font: 600 0.82rem var(--font); cursor: pointer; white-space: nowrap;
-    }
-    .sms-cta .success { color: var(--green); font-size: 0.82rem; font-weight: 500; display: none; margin-top: 8px; }
+    /* CONVERSATION */
+    .conversation { flex: 1; overflow-y: auto; }
+    .messages-container { max-width: 680px; margin: 0 auto; padding: 32px 24px 140px; }
 
-    /* RESPONSIVE */
-    @media (max-width: 600px) {
-      .ecard { width: 220px; }
-      .header-right .sms-link span.desktop { display: none; }
+    /* WELCOME (centered, before first message) */
+    .welcome {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 50vh; text-align: center; padding: 40px 20px;
+    }
+    .welcome h1 { font-size: 1.6rem; font-weight: 600; margin-bottom: 8px; }
+    .welcome h1 span { color: var(--coral); }
+    .welcome p { color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 32px; max-width: 460px; }
+    .welcome-suggestions {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 480px; width: 100%;
+    }
+    .welcome-suggestion {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 14px 16px; text-align: left; cursor: pointer; transition: all 0.15s;
+    }
+    .welcome-suggestion:hover { border-color: rgba(255,255,255,0.15); background: var(--bg-hover); }
+    .welcome-suggestion .ws-title { font-size: 0.85rem; font-weight: 500; margin-bottom: 2px; }
+    .welcome-suggestion .ws-desc { font-size: 0.75rem; color: var(--text-muted); }
+
+    /* MESSAGE TURNS (Claude-style: flat, no bubbles) */
+    .turn { padding: 24px 0; }
+    .turn + .turn { border-top: 1px solid var(--border); }
+    .turn-inner { display: flex; gap: 16px; align-items: flex-start; }
+    .avatar {
+      width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600;
+      margin-top: 2px;
+    }
+    .avatar-user { background: #565656; color: #ddd; }
+    .avatar-bot { background: var(--coral); color: #fff; }
+    .turn-content { flex: 1; min-width: 0; }
+    .turn-name { font-size: 0.78rem; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+    .turn-text { font-size: 0.92rem; line-height: 1.7; color: var(--text); white-space: pre-wrap; word-wrap: break-word; }
+
+    /* EVENT CARDS (inline, wider) */
+    .event-cards { display: flex; gap: 10px; overflow-x: auto; margin-top: 14px; padding-bottom: 4px; scrollbar-width: none; }
+    .event-cards::-webkit-scrollbar { display: none; }
+    .ecard {
+      flex-shrink: 0; width: 280px; background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.15s;
+    }
+    .ecard:hover { border-color: rgba(255,255,255,0.15); background: var(--bg-hover); }
+    .ecard-name { font-weight: 600; font-size: 0.88rem; margin-bottom: 4px; line-height: 1.3; }
+    .ecard-venue { color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 8px; }
+    .ecard-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 6px; }
+    .ecard-meta .cat { color: var(--coral); font-weight: 500; font-size: 0.7rem; background: var(--coral-dim); padding: 2px 7px; border-radius: 4px; }
+    .ecard-meta .free { color: var(--green); font-weight: 600; }
+    .ecard-why { color: var(--purple); font-size: 0.75rem; font-style: italic; margin-top: 6px; }
+
+    /* SUGGESTIONS */
+    .suggestions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+    .suggestion {
+      background: transparent; border: 1px solid var(--border); color: var(--text-secondary);
+      padding: 7px 14px; border-radius: 20px; font: 500 0.8rem var(--font); cursor: pointer;
+      transition: all 0.12s;
+    }
+    .suggestion:hover { border-color: var(--coral); color: var(--coral); }
+
+    /* TYPING */
+    .typing-dots { display: flex; gap: 5px; padding: 4px 0; }
+    .typing-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); animation: tdot 1.4s ease-in-out infinite; }
+    .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes tdot { 0%,80%,100% { opacity: 0.3; } 40% { opacity: 1; } }
+
+    /* INPUT */
+    .input-area {
+      flex-shrink: 0; padding: 16px 24px 20px;
+      background: linear-gradient(transparent, var(--bg-main) 20%);
+      position: relative;
+    }
+    .input-box {
+      max-width: 680px; margin: 0 auto; position: relative;
+      background: var(--bg-input); border: 1px solid var(--border);
+      border-radius: 16px; transition: border-color 0.15s;
+    }
+    .input-box:focus-within { border-color: rgba(255,255,255,0.15); }
+    .input-box textarea {
+      width: 100%; background: transparent; border: none; color: var(--text);
+      font: 0.92rem var(--font); line-height: 1.5; padding: 14px 52px 14px 18px;
+      resize: none; outline: none; max-height: 150px; min-height: 48px;
+    }
+    .input-box textarea::placeholder { color: var(--text-muted); }
+    .input-box .send-btn {
+      position: absolute; right: 10px; bottom: 8px;
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--coral); border: none; color: #fff;
+      font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: opacity 0.12s;
+    }
+    .input-box .send-btn:hover { opacity: 0.85; }
+    .input-box .send-btn:disabled { opacity: 0.3; cursor: default; }
+    .input-hint { text-align: center; font-size: 0.7rem; color: var(--text-muted); margin-top: 8px; max-width: 680px; margin-left: auto; margin-right: auto; }
+
+    /* MOBILE */
+    .sidebar-toggle { display: none; background: none; border: none; color: var(--text-secondary); font-size: 1.2rem; cursor: pointer; padding: 4px; }
+    @media (max-width: 768px) {
+      .sidebar { position: fixed; left: -280px; z-index: 200; transition: left 0.25s; width: 280px; }
+      .sidebar.open { left: 0; }
+      .sidebar-toggle { display: block; }
+      .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 199; }
+      .sidebar-overlay.show { display: block; }
+      .welcome-suggestions { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
 
-<header>
-  <div class="logo">Pulse <span>NYC tonight</span></div>
-  <div class="header-right">
-    <a class="sms-link" href="#sms" onclick="showSmsCta()">Get this via SMS</a>
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo"><div class="dot"></div> Pulse</div>
+    <button class="new-chat-btn" onclick="newChat()">New chat</button>
   </div>
-</header>
+  <div class="sidebar-section">
+    <div class="sidebar-label">Popular neighborhoods</div>
+    <div class="sidebar-item" onclick="send('williamsburg')">Williamsburg</div>
+    <div class="sidebar-item" onclick="send('bushwick')">Bushwick</div>
+    <div class="sidebar-item" onclick="send('LES')">Lower East Side</div>
+    <div class="sidebar-item" onclick="send('east village')">East Village</div>
+    <div class="sidebar-item" onclick="send('greenpoint')">Greenpoint</div>
+    <div class="sidebar-item" onclick="send('park slope')">Park Slope</div>
+    <div class="sidebar-item" onclick="send('bed-stuy')">Bed-Stuy</div>
+    <div class="sidebar-item" onclick="send('harlem')">Harlem</div>
+  </div>
+  <div class="sidebar-spacer"></div>
+  <div class="sidebar-cta" id="sidebar-cta">
+    <div class="sidebar-cta-title">Get picks via SMS</div>
+    <div class="sidebar-cta-desc">Same conversation, texted to you. Pulse sends proactive picks when something great comes up.</div>
+    <button class="sidebar-cta-btn" id="cta-btn" onclick="showPhoneInput()">Text me picks</button>
+    <div class="sidebar-cta-form" id="cta-form">
+      <input type="tel" id="cta-phone" placeholder="Your phone number" onkeydown="if(event.key==='Enter')submitPhone()">
+      <button class="sidebar-cta-btn" onclick="submitPhone()">Send welcome text</button>
+    </div>
+    <div class="success" id="cta-success">Check your texts!</div>
+  </div>
+</div>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 
-<div class="conversation" id="conversation">
-  <div class="messages" id="messages">
-    <!-- Welcome turn -->
-    <div class="turn turn-bot">
-      <div class="sender">Pulse</div>
-      <div class="bubble bubble-bot">Hey! I'm Pulse — I know what's happening in NYC tonight. Drop a neighborhood, a vibe, or just ask me anything.</div>
-      <div class="suggestions" id="initial-suggestions">
-        <div class="suggestion" onclick="send('williamsburg')">Williamsburg</div>
-        <div class="suggestion" onclick="send('something chill in LES')">Something chill</div>
-        <div class="suggestion" onclick="send('best comedy tonight')">Comedy tonight</div>
-        <div class="suggestion" onclick="send('bushwick')">Bushwick</div>
-        <div class="suggestion" onclick="send('free stuff this weekend')">Free this weekend</div>
-        <div class="suggestion" onclick="send('dinner and a show')">Dinner + show</div>
+<div class="main">
+  <!-- Mobile header -->
+  <div style="padding:10px 16px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--border);">
+    <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()">&#9776;</button>
+    <span style="font-weight:600; font-size:0.9rem;">Pulse</span>
+  </div>
+
+  <div class="conversation" id="conversation">
+    <div class="messages-container" id="messages">
+      <!-- Welcome screen -->
+      <div class="welcome" id="welcome">
+        <h1>What's happening in <span>NYC</span> tonight?</h1>
+        <p>I know every event, bar, and restaurant worth your time. Ask me anything — or pick a starting point.</p>
+        <div class="welcome-suggestions">
+          <div class="welcome-suggestion" onclick="send('williamsburg')">
+            <div class="ws-title">Williamsburg tonight</div>
+            <div class="ws-desc">Events, bars, and more</div>
+          </div>
+          <div class="welcome-suggestion" onclick="send('something chill in LES')">
+            <div class="ws-title">Something chill</div>
+            <div class="ws-desc">Jazz, film, art, low-key vibes</div>
+          </div>
+          <div class="welcome-suggestion" onclick="send('best comedy tonight')">
+            <div class="ws-title">Comedy tonight</div>
+            <div class="ws-desc">Stand-up, open mics, improv</div>
+          </div>
+          <div class="welcome-suggestion" onclick="send('dinner and a show in east village')">
+            <div class="ws-title">Dinner + show</div>
+            <div class="ws-desc">Restaurant and event pairing</div>
+          </div>
+          <div class="welcome-suggestion" onclick="send('free stuff this weekend')">
+            <div class="ws-title">Free this weekend</div>
+            <div class="ws-desc">No cover, no ticket, no excuses</div>
+          </div>
+          <div class="welcome-suggestion" onclick="send('surprise me')">
+            <div class="ws-title">Surprise me</div>
+            <div class="ws-desc">One-offs, underground, weird stuff</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
-<div class="input-bar">
-  <div class="input-inner">
-    <textarea id="input" rows="1" placeholder="Try &quot;williamsburg&quot; or &quot;something weird tonight&quot;..."
-      oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
-    <button class="send-btn" id="send-btn" onclick="sendInput()">&#x2191;</button>
+  <div class="input-area">
+    <div class="input-box">
+      <textarea id="input" rows="1" placeholder="Ask about neighborhoods, vibes, events, bars..."
+        oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
+      <button class="send-btn" id="send-btn" onclick="sendInput()">&#8593;</button>
+    </div>
+    <div class="input-hint">Pulse has data from 22 sources across 75 NYC neighborhoods. Try "bushwick" or "something weird tonight."</div>
   </div>
 </div>
 
@@ -255,133 +278,92 @@ let messageCount = 0;
 let sending = false;
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
-
 function formatTime(iso) {
   if (!iso) return '';
   try { return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }); }
   catch { return ''; }
 }
+function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 150) + 'px'; }
+function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendInput(); } }
+function scrollToBottom() { const c = document.getElementById('conversation'); requestAnimationFrame(() => c.scrollTop = c.scrollHeight); }
 
-function autoResize(el) {
-  el.style.height = 'auto';
-  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('sidebar-overlay').classList.toggle('show'); }
+function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebar-overlay').classList.remove('show'); }
+
+function hideWelcome() {
+  const w = document.getElementById('welcome');
+  if (w) w.remove();
 }
 
-function handleKey(e) {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendInput(); }
-}
-
-function scrollToBottom() {
-  const conv = document.getElementById('conversation');
-  requestAnimationFrame(() => { conv.scrollTop = conv.scrollHeight; });
-}
-
-function addUserMessage(text) {
-  const el = document.getElementById('initial-suggestions');
-  if (el) el.remove();
-
+function addTurn(role, name, content) {
+  hideWelcome();
   const messages = document.getElementById('messages');
   const turn = document.createElement('div');
-  turn.className = 'turn turn-user';
-  turn.innerHTML = `<div class="bubble bubble-user">${esc(text)}</div>`;
-  messages.appendChild(turn);
-  scrollToBottom();
-}
-
-function addTypingIndicator() {
-  const messages = document.getElementById('messages');
-  const turn = document.createElement('div');
-  turn.className = 'turn turn-bot';
-  turn.id = 'typing-turn';
+  turn.className = 'turn';
+  const isUser = role === 'user';
   turn.innerHTML = `
-    <div class="sender">Pulse</div>
-    <div class="typing-indicator"><span></span><span></span><span></span></div>
+    <div class="turn-inner">
+      <div class="avatar ${isUser ? 'avatar-user' : 'avatar-bot'}">${isUser ? 'Y' : 'P'}</div>
+      <div class="turn-content">
+        <div class="turn-name">${esc(name)}</div>
+        <div id="${turn.id}" class="turn-body">${content}</div>
+      </div>
+    </div>
   `;
   messages.appendChild(turn);
   scrollToBottom();
+  return turn;
 }
 
-function removeTypingIndicator() {
-  const el = document.getElementById('typing-turn');
-  if (el) el.remove();
+function addUserMessage(text) {
+  addTurn('user', 'You', `<div class="turn-text">${esc(text)}</div>`);
 }
+
+function addTypingIndicator() {
+  const turn = addTurn('bot', 'Pulse', `<div class="typing-dots"><span></span><span></span><span></span></div>`);
+  turn.id = 'typing-turn';
+}
+
+function removeTypingIndicator() { const el = document.getElementById('typing-turn'); if (el) el.remove(); }
 
 function addBotMessage(text, events) {
-  const messages = document.getElementById('messages');
-  const turn = document.createElement('div');
-  turn.className = 'turn turn-bot';
+  let html = `<div class="turn-text">${esc(text)}</div>`;
 
-  let html = `<div class="sender">Pulse</div><div class="bubble bubble-bot">${esc(text)}</div>`;
-
-  // Render inline event cards if we have event data
   if (events && events.length > 0) {
     html += `<div class="event-cards">`;
     for (const e of events) {
       html += `
         <div class="ecard" onclick="send('tell me about ${esc((e.name || '').slice(0, 30))}')">
           <div class="ecard-name">${esc(e.name)}</div>
-          <div class="ecard-venue">${esc(e.venue_name || '')}${e.neighborhood ? ' · ' + esc(e.neighborhood) : ''}</div>
+          <div class="ecard-venue">${esc(e.venue_name || '')}${e.neighborhood ? ' &middot; ' + esc(e.neighborhood) : ''}</div>
           <div class="ecard-meta">
             <span class="cat">${esc(e.category || '')}</span>
-            ${e.start_time_local ? `<span class="time">${formatTime(e.start_time_local)}</span>` : ''}
+            ${e.start_time_local ? `<span>${formatTime(e.start_time_local)}</span>` : ''}
             ${e.is_free ? '<span class="free">FREE</span>' : e.price_display ? `<span>${esc(e.price_display)}</span>` : ''}
           </div>
-          ${e.short_detail ? `<div class="ecard-detail">${esc(e.short_detail)}</div>` : ''}
           ${e.why ? `<div class="ecard-why">${esc(e.why)}</div>` : ''}
         </div>`;
     }
     html += `</div>`;
   }
 
-  // Add follow-up suggestions
-  if (messageCount <= 3) {
+  if (messageCount <= 4) {
     html += `<div class="suggestions">
       <div class="suggestion" onclick="send('more')">More picks</div>
-      <div class="suggestion" onclick="send('tell me about the first one')">Details</div>
+      <div class="suggestion" onclick="send('tell me about the first one')">Get details</div>
       <div class="suggestion" onclick="send('anything free?')">Free only</div>
     </div>`;
   }
 
-  turn.innerHTML = html;
-  messages.appendChild(turn);
-  scrollToBottom();
-
-  // Show SMS CTA after 3 messages
+  addTurn('bot', 'Pulse', html);
   messageCount++;
-  if (messageCount === 3) {
-    setTimeout(() => addSmsCta(), 800);
-  }
-}
-
-function addSmsCta() {
-  const messages = document.getElementById('messages');
-  const turn = document.createElement('div');
-  turn.className = 'turn turn-bot';
-  turn.innerHTML = `
-    <div class="sms-cta" id="sms-cta">
-      <h3>Like this? Get it via text.</h3>
-      <p>Same conversation, delivered by SMS. Pulse can text you proactively when something great comes up in your neighborhood.</p>
-      <div class="sms-cta-form" id="sms-cta-form">
-        <input type="tel" id="sms-phone" placeholder="Phone number">
-        <button onclick="submitPhone()">Text me</button>
-      </div>
-      <div class="success" id="sms-success">Check your texts!</div>
-    </div>
-  `;
-  messages.appendChild(turn);
-  scrollToBottom();
-}
-
-function showSmsCta() {
-  if (!document.getElementById('sms-cta')) addSmsCta();
-  else document.getElementById('sms-cta').scrollIntoView({ behavior: 'smooth' });
 }
 
 async function send(text) {
   if (sending || !text.trim()) return;
   sending = true;
   document.getElementById('send-btn').disabled = true;
-
+  closeSidebar();
   addUserMessage(text);
   addTypingIndicator();
 
@@ -393,15 +375,13 @@ async function send(text) {
     });
     const data = await r.json();
     removeTypingIndicator();
-
     const reply = data.messages?.[0]?.body || 'Something went wrong — try again!';
     const events = data.trace?.events?.sent_pool || null;
     addBotMessage(reply, events);
-  } catch (err) {
+  } catch {
     removeTypingIndicator();
     addBotMessage('Hit a snag — try that again?');
   }
-
   sending = false;
   document.getElementById('send-btn').disabled = false;
   document.getElementById('input').focus();
@@ -416,22 +396,41 @@ function sendInput() {
   send(text);
 }
 
+function newChat() {
+  document.getElementById('messages').innerHTML = `
+    <div class="welcome" id="welcome">
+      <h1>What's happening in <span style="color:var(--coral)">NYC</span> tonight?</h1>
+      <p>I know every event, bar, and restaurant worth your time. Ask me anything — or pick a starting point.</p>
+      <div class="welcome-suggestions">
+        <div class="welcome-suggestion" onclick="send('williamsburg')"><div class="ws-title">Williamsburg tonight</div><div class="ws-desc">Events, bars, and more</div></div>
+        <div class="welcome-suggestion" onclick="send('something chill in LES')"><div class="ws-title">Something chill</div><div class="ws-desc">Jazz, film, art, low-key vibes</div></div>
+        <div class="welcome-suggestion" onclick="send('best comedy tonight')"><div class="ws-title">Comedy tonight</div><div class="ws-desc">Stand-up, open mics, improv</div></div>
+        <div class="welcome-suggestion" onclick="send('dinner and a show in east village')"><div class="ws-title">Dinner + show</div><div class="ws-desc">Restaurant and event pairing</div></div>
+        <div class="welcome-suggestion" onclick="send('free stuff this weekend')"><div class="ws-title">Free this weekend</div><div class="ws-desc">No cover, no ticket, no excuses</div></div>
+        <div class="welcome-suggestion" onclick="send('surprise me')"><div class="ws-title">Surprise me</div><div class="ws-desc">One-offs, underground, weird stuff</div></div>
+      </div>
+    </div>`;
+  messageCount = 0;
+  closeSidebar();
+}
+
+function showPhoneInput() {
+  document.getElementById('cta-btn').style.display = 'none';
+  document.getElementById('cta-form').style.display = 'flex';
+  document.getElementById('cta-phone').focus();
+}
 async function submitPhone() {
-  const input = document.getElementById('sms-phone');
+  const input = document.getElementById('cta-phone');
   const phone = input.value.trim();
   if (!phone || phone.length < 10) { input.style.borderColor = '#ef4444'; return; }
   try {
-    await fetch('/api/sms/test', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ Body: 'hey', From: phone }),
-    });
-    document.getElementById('sms-cta-form').style.display = 'none';
-    document.getElementById('sms-success').style.display = 'block';
+    await fetch('/api/sms/test', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ Body: 'hey', From: phone }) });
+    document.getElementById('cta-form').style.display = 'none';
+    document.getElementById('cta-success').style.display = 'block';
   } catch { input.style.borderColor = '#ef4444'; }
 }
 
-// Focus input on load
 document.getElementById('input').focus();
 </script>
 </body>
