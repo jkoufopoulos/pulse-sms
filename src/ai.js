@@ -23,18 +23,18 @@ ${rawText}
 Extract all events and venues into the JSON format specified in your instructions.`;
 
   const resolvedModel = model || MODELS.extract;
-  const timeout = sourceName === 'yutori' ? 90_000 : 60_000;
+  const timeout = 90_000;
   let text, usage, provider;
 
   try {
     const result = await llmGenerate(resolvedModel, EXTRACTION_PROMPT, userPrompt, {
-      maxTokens: 8192, temperature: 0, json: true, timeout,
+      maxTokens: 16384, temperature: 0, json: true, timeout,
     });
     text = result.text; usage = result.usage; provider = result.provider;
   } catch (err) {
     console.warn(`extractEvents ${resolvedModel} failed, falling back to ${MODELS.fallback}: ${err.message}`);
     const result = await llmGenerate(MODELS.fallback, EXTRACTION_PROMPT, userPrompt, {
-      maxTokens: 8192, temperature: 0, json: true, timeout,
+      maxTokens: 16384, temperature: 0, json: true, timeout,
     });
     text = result.text; usage = result.usage; provider = result.provider;
   }
