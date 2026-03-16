@@ -88,8 +88,8 @@ function splitByVenue(text) {
  */
 function isVenueHeader(line) {
   if (!line || line.length < 3 || line.length > 60) return false;
-  // Must be all uppercase letters, spaces, hyphens, ampersands, apostrophes, periods
-  if (!/^[A-Z\s\-&''.]+$/.test(line)) return false;
+  // Must be all uppercase letters/digits, spaces, hyphens, ampersands, apostrophes, periods, slashes, colons
+  if (!/^[A-Z0-9\s\-&''./:]+$/.test(line)) return false;
   // Must have at least 2 letter characters
   if ((line.match(/[A-Z]/g) || []).length < 2) return false;
   // Exclude credit lines: "DIRECTOR, YEAR, RUNTIME, FORMAT"
@@ -104,8 +104,8 @@ function isVenueHeader(line) {
 async function fetchScreenSlateEvents() {
   console.log('Fetching Screen Slate...');
   try {
-    // Fetch newsletter emails from Gmail (daily, look back 2 days)
-    const emails = await fetchEmails('from:jon@screenslate.com newer_than:2d', 3);
+    // Fetch newsletter emails from Gmail (daily, look back 5 days to cover weekends)
+    const emails = await fetchEmails('from:jon@screenslate.com newer_than:5d', 3);
     const cached = loadCachedEvents();
 
     if (emails.length === 0) {

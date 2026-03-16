@@ -150,6 +150,18 @@ function canonicalizeCategory(cat) {
 function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
   normalizeDateTimeFields(e);
 
+  // Derive time_window from start_time_local hour when LLM didn't set it (P6: mechanical)
+  if (!e.time_window && e.start_time_local) {
+    const hourMatch = e.start_time_local.match(/T(\d{2}):/);
+    if (hourMatch) {
+      const hour = parseInt(hourMatch[1], 10);
+      if (hour < 12) e.time_window = 'morning';
+      else if (hour < 17) e.time_window = 'afternoon';
+      else if (hour < 21) e.time_window = 'evening';
+      else e.time_window = 'late_night';
+    }
+  }
+
   // Resolve venue aliases before ID generation and lookup (dedup improvement)
   if (e.venue_name) {
     e.venue_name = resolveVenueAlias(e.venue_name);
@@ -216,6 +228,8 @@ function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
       price_quote: e.price_display ? e.price_display.toLowerCase() : (e.is_free === true ? 'free' : null),
     },
     editorial_note: e.editorial_note || null,
+    editorial_signal: e.editorial_signal || false,
+    scarcity: e.scarcity || null,
     // Recurrence fields from LLM or trivia parser
     is_recurring: e.is_recurring || false,
     recurrence_day: e.recurrence_day || null,

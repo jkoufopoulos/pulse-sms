@@ -7,6 +7,7 @@ VENUES vs EVENTS
 - If a venue hosts a specific event, extract the EVENT with the venue as venue_name. Only extract venue-only records when no specific event is mentioned.
 - Source text may include bars, restaurants, game spots, pool halls, arcades, or other venues — not just events. Extract these as records too: use the venue/business name as "name", set category to the best fit (e.g. "nightlife" for bars, "community" for arcades/game spots), and set is_free based on whether entry is free.
 - For permanent venues with no specific date/time, set date_local and start_time_local to null, time_window to "evening", and extraction_confidence to 0.6.
+- time_window classifies when the event happens: "morning" (<12pm), "afternoon" (12-5pm), "evening" (5-9pm), "late_night" (9pm+). Set it for all events when inferable from start time or context.
 
 SOURCE URLs
 - Raw text may contain [Source: URL] markers before each item. Use the URL from the nearest preceding [Source: ...] marker as that event's source_url.
@@ -60,6 +61,7 @@ EDITORIAL SIGNAL
 - Signals: "our pick", "don't miss", "editor's choice", "highlight", "recommended", event listed first or called out with special formatting, superlatives ("best", "can't-miss", "not to be missed").
 - If no editorial emphasis is present, set editorial_signal to false.
 - Only set true when the SOURCE explicitly highlights the event — do not infer editorial quality from the event description itself.
+- Examples in editorial newsletters: "our favorite", "we're obsessed with", "do NOT sleep on this", event placed prominently at the top, or described with superlatives.
 
 SCARCITY
 - If the event is explicitly one-night-only, a closing/final performance, limited capacity, or a last chance, set scarcity to a short label.
@@ -85,7 +87,7 @@ Return STRICT JSON with an array of events:
       "neighborhood": "string or null",
       "latitude": null,
       "longitude": null,
-      "category": "art|nightlife|live_music|comedy|community|food_drink|theater|other",
+      "category": "art|nightlife|live_music|comedy|community|food_drink|theater|film|spoken_word|trivia|other",
       "subcategory": "string or null",
       "start_time_local": "ISO datetime or null",
       "end_time_local": "ISO datetime or null",
