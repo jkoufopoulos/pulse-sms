@@ -9,8 +9,7 @@ const { isEventEmail, isTriviaEmail } = require('./email-filter');
 const { isGarbageName } = require('../../curation');
 const { preprocessYutoriHtml } = require('./html-preprocess');
 const { parseTriviaEvents } = require('./trivia-parser');
-const { parseNonTriviaEvents, resolveDayOfWeekDate } = require('./general-parser');
-const { parseStructuredYutoriHtml } = require('./structured-parser');
+const { resolveDayOfWeekDate } = require('./general-parser');
 const {
   YUTORI_DIR, PROCESSED_DIR, CACHE_FILE,
   loadCachedEvents, saveCachedEvents,
@@ -109,9 +108,7 @@ async function fetchYutoriEvents({ reprocess = false } = {}) {
         if (processed.length > 0) {
           const latest = processed[processed.length - 1];
           console.log(`Yutori: bootstrapping cache from processed/${latest}`);
-          // Move latest back to main dir for processing
           fs.renameSync(path.join(PROCESSED_DIR, latest), path.join(YUTORI_DIR, latest));
-          // Re-run — will find the file, process it, cache, and move back
           return fetchYutoriEvents({ reprocess: false });
         }
       }
@@ -120,9 +117,10 @@ async function fetchYutoriEvents({ reprocess = false } = {}) {
       return [];
     }
 
-    // Process each file individually to stay within extraction limits
-    const fileContents = [];
+    // --- Extraction pipeline: trivia parser → LLM (Haiku on raw HTML) ---
+    const llmFiles = [];
     const triviaEvents = [];
+
     for (const file of files) {
       const raw = fs.readFileSync(path.join(YUTORI_DIR, file), 'utf8');
 
@@ -132,12 +130,13 @@ async function fetchYutoriEvents({ reprocess = false } = {}) {
         continue;
       }
 
-      // Trivia emails: deterministic parse (P6), skip LLM
+      // Trivia emails: try deterministic parse first (handles 80+ event bulk emails
+      // that overflow LLM output tokens)
       if (/\.html?$/i.test(file) && isTriviaEmail(file, raw)) {
         const content = preprocessYutoriHtml(raw);
         const parsed = parseTriviaEvents(content, file);
         if (parsed.length > 0) {
-          console.log(`Yutori: deterministic trivia parse → ${parsed.length} events from ${file}`);
+          console.log(`Yutori: trivia parse → ${parsed.length} events from ${file}`);
           captureExtractionInput('yutori', content, null);
           const normalized = parsed
             .map(e => normalizeExtractedEvent(e, 'yutori', 'aggregator', 0.8))
@@ -145,50 +144,31 @@ async function fetchYutoriEvents({ reprocess = false } = {}) {
           triviaEvents.push(...normalized);
           continue;
         }
-        // Fall through to LLM if deterministic parse found nothing
+        // Fall through to LLM if trivia parse found nothing
       }
 
-      // Non-trivia event emails: try structured HTML parse first (P6)
-      if (/\.html?$/i.test(file)) {
-        const dateMatch = file.match(/^(\d{4}-\d{2}-\d{2})/);
-        const parsed = parseStructuredYutoriHtml(raw, dateMatch ? dateMatch[1] : null);
-        if (parsed.length > 0) {
-          console.log(`Yutori: structured parse → ${parsed.length} events from ${file}`);
-          captureExtractionInput('yutori', raw.slice(0, 2000), null);
-          const normalized = parsed
-            .map(e => normalizeExtractedEvent(e, 'yutori', 'aggregator', 0.85))
-            .filter(e => e.name && e.completeness >= 0.25);
-          // Fix day-of-week mismatches
-          normalized.forEach(resolveDayOfWeekDate);
-          triviaEvents.push(...normalized);
-          continue;
-        }
-        // Fall through to LLM if structured parse found nothing
-      }
-
-      // Pass raw HTML to LLM — preserves badge links and event names
-      // that the preprocessor strips
+      // Everything else → LLM on raw HTML
       if (raw.length >= 50) {
-        fileContents.push({ file, content: raw });
+        llmFiles.push({ file, content: raw });
       }
     }
 
-    if (fileContents.length === 0 && triviaEvents.length === 0) {
+    if (llmFiles.length === 0 && triviaEvents.length === 0) {
       console.log('Yutori: all briefing files too short or empty, skipping');
       return [];
     }
 
-    console.log(`Yutori: processing ${fileContents.length} files + ${triviaEvents.length} trivia-parsed events`);
+    console.log(`Yutori: ${llmFiles.length} files → LLM, ${triviaEvents.length} trivia-parsed events`);
     const events = [...triviaEvents];
 
     // Process files in parallel (max 3 concurrent to avoid rate limits)
     const CONCURRENCY = 3;
-    for (let i = 0; i < fileContents.length; i += CONCURRENCY) {
-      const batch = fileContents.slice(i, i + CONCURRENCY);
+    for (let i = 0; i < llmFiles.length; i += CONCURRENCY) {
+      const batch = llmFiles.slice(i, i + CONCURRENCY);
       const results = await Promise.allSettled(
         batch.map(async ({ file, content }) => {
-          console.log(`Yutori: LLM extracting ${file} (${content.length} chars)`);
-          captureExtractionInput('yutori', content, null);
+          console.log(`Yutori: LLM extracting ${file} (${Math.round(content.length/1024)}KB)`);
+          captureExtractionInput('yutori', content.slice(0, 2000), null);
           const cacheKey = `yutori-llm:${file}`;
           const cachedFile = getCachedExtraction(cacheKey, content);
           if (cachedFile) return cachedFile;
@@ -197,9 +177,6 @@ async function fetchYutoriEvents({ reprocess = false } = {}) {
           const normalized = raw.map(e => normalizeExtractedEvent(e, 'yutori', 'aggregator', 0.8));
           const passed = normalized.filter(e => e.name && e.completeness >= 0.25);
           // Drop prose advice/commentary with no structural event signals.
-          // date_local alone doesn't count — the LLM assigns today's date to everything.
-          // Require at least one of: specific time, real venue, or URL.
-          // A venue that's a substring of the event name (or vice versa) is fabricated.
           const contentFiltered = passed.filter(e => {
             const hasTime = !!e.start_time_local;
             const hasUrl = !!e.ticket_url || !!e.source_url;
@@ -215,7 +192,6 @@ async function fetchYutoriEvents({ reprocess = false } = {}) {
             if (isGarbageName(e.name)) return false;
             return true;
           });
-          // Fix day-of-week mismatches (e.g. "Trivia Thursdays" assigned to Friday)
           contentFiltered.forEach(resolveDayOfWeekDate);
           const dropped = raw.length - contentFiltered.length;
           if (dropped > 0) {
