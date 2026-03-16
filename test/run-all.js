@@ -25,7 +25,6 @@ require('./unit/traces-latency.test');
 require('./unit/source-health-disable.test');
 require('./unit/graduated-alert.test');
 require('./unit/nudges.test');
-require('./unit/enrichment.test');
 require('./unit/extraction-cache.test');
 require('./unit/classify-other.test');
 require('./unit/venue-aliases.test');

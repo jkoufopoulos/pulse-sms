@@ -40,12 +40,7 @@ if (cacheExists) {
   check('cached data has events array', Array.isArray(cached.events));
 }
 
-// _rawText preserved through normalizeExtractedEvent
-check('_rawText preserved through normalizeExtractedEvent', (() => {
-  const { normalizeExtractedEvent } = require('../../src/sources/shared');
-  const normalized = normalizeExtractedEvent({ name: 'Test', _rawText: 'fri 7pm: test', date_local: '2026-03-13' }, 'test', 'curated', 0.9);
-  return normalized._rawText === 'fri 7pm: test';
-})());
+// _rawText no longer carried through (enrichment layer removed)
 
 // ---- Sofar Sounds: neighborhood extraction ----
 console.log('\nSofar Sounds scraper:');
