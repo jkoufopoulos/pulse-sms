@@ -29,6 +29,7 @@ require('./unit/enrichment.test');
 require('./unit/extraction-cache.test');
 require('./unit/classify-other.test');
 require('./unit/venue-aliases.test');
+require('./unit/places.test');
 const misc = require('./unit/misc.test');
 const profile = require('./unit/preference-profile.test');
 

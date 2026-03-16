@@ -9,59 +9,60 @@ const { describeFilters } = require('./pipeline');
 // --- Neighborhood list for system prompt ---
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
 
-// --- Shared curation taste block (used in system prompt) ---
-const CURATION_TASTE_COMMON = `CURATION TASTE — how to pick from the pool:
-- PICK HIERARCHY: one-off > limited run > weekly recurring > daily recurring. A one-night-only event is almost always more interesting than something that happens every week.
-- SOURCE PRIORITY: Lead with "discovery" and "niche" source_vibe events. Use "platform"/"mainstream" only to fill gaps or when they're genuinely the best pick.
-- VENUE PRIORITY: Favor "intimate" and "medium" venue_size. Large/massive venues are usually well-known acts — skip unless the user asked.
-- EDITORIAL: editorial:true events are pre-vetted by tastemakers. Strong include signal.
-- SCARCITY: one-night-only, closing, limited — these won't be around next week. Favor them.
-- SKIP: big-name touring acts, generic DJ nights at mega-clubs, recurring bar trivia at chain venues — unless specifically requested. This is the filler everyone already knows about.`;
-
-const CURATION_DIVERSITY_DEFAULT = `- CONTRAST: default to picks from different categories or vibes. If the user asked for something specific ("comedy"), go deep — give comedy picks, don't force variety.`;
-const CURATION_INTERACTIVE = `- INTERACTIVE: interaction_format "interactive" (open mics, workshops, game nights) is gold for people looking to DO something. Favor these when available.`;
-
-function curationTasteBlock(diversityLine) {
-  return `${CURATION_TASTE_COMMON}\n${diversityLine}\n${CURATION_INTERACTIVE}`;
-}
+// Curation taste constants kept for potential external use
+const CURATION_TASTE_COMMON = '';
+const CURATION_DIVERSITY_DEFAULT = '';
+const CURATION_INTERACTIVE = '';
 
 // --- Tool definitions (neutral format — lowercase JSON Schema types, flat array) ---
 
 const BRAIN_TOOLS = [
   {
-    name: 'search_events',
-    description: 'Search for event recommendations. Use when the user wants to see events, asks about a neighborhood, mentions a category, or requests any kind of activity. Also use when the user asks about a specific pick you already showed ("tell me about that", "what\'s the free one", "more about #2") — set intent to "details".',
+    name: 'search',
+    description: 'Search for things to do in NYC — events, bars, restaurants, or all of the above. Returns a curated pool. Write your SMS as plain text after seeing results. Also use for details ("tell me about that", "more about #2") and more picks ("more").',
     parameters: {
       type: 'object',
       properties: {
-        neighborhood: { type: 'string', description: 'NYC neighborhood name, or empty string for citywide', nullable: true },
-        category: {
-          type: 'string', description: 'Primary event category filter. Use for single-category requests.',
+        neighborhood: { type: 'string', description: 'NYC neighborhood name, or omit for citywide', nullable: true },
+        types: {
+          type: 'array',
+          items: { type: 'string', enum: ['events', 'bars', 'restaurants'] },
+          description: 'What to search for. Defaults to events if omitted. Use multiple for mixed requests like "dinner and a show".',
           nullable: true,
-          enum: ['comedy', 'jazz', 'live_music', 'dj', 'trivia', 'film', 'theater',
-            'art', 'dance', 'community', 'food_drink', 'spoken_word', 'classical', 'nightlife'],
         },
-        categories: {
-          type: 'array', description: 'Multiple category filters — use when user wants more than one type (e.g. "music and trivia", "comedy or art"). Events matching ANY category are included. Only use this OR category, not both.',
-          nullable: true,
-          items: {
-            type: 'string',
-            enum: ['comedy', 'jazz', 'live_music', 'dj', 'trivia', 'film', 'theater',
-              'art', 'dance', 'community', 'food_drink', 'spoken_word', 'classical', 'nightlife'],
+        filters: {
+          type: 'object', nullable: true,
+          properties: {
+            categories: {
+              type: 'array', nullable: true,
+              items: {
+                type: 'string',
+                enum: ['comedy', 'jazz', 'live_music', 'dj', 'trivia', 'film', 'theater',
+                  'art', 'dance', 'community', 'food_drink', 'spoken_word', 'classical', 'nightlife'],
+              },
+              description: 'Event category filters. Events matching ANY category are included.',
+            },
+            free_only: { type: 'boolean', description: 'Only show free events' },
+            time_after: { type: 'string', description: 'Only events after this time, HH:MM 24hr format (e.g. "22:00")', nullable: true },
+            date_range: {
+              type: 'string', description: 'Date scope for the search',
+              nullable: true,
+              enum: ['today', 'tomorrow', 'this_weekend', 'this_week', 'next_week'],
+            },
+            vibe: {
+              type: 'string', nullable: true,
+              enum: ['dive', 'cocktail', 'wine', 'rooftop', 'date_night',
+                     'group_friendly', 'outdoor', 'live_music', 'casual', 'upscale'],
+              description: 'Vibe filter for bars/restaurants',
+            },
           },
         },
-        free_only: { type: 'boolean', description: 'Only show free events' },
-        time_after: { type: 'string', description: 'Only events after this time, HH:MM 24hr format (e.g. "22:00")', nullable: true },
-        date_range: {
-          type: 'string', description: 'Date scope for the search',
-          nullable: true,
-          enum: ['today', 'tomorrow', 'this_weekend', 'this_week', 'next_week'],
-        },
         intent: {
-          type: 'string', description: 'What the user is doing: new_search (first request or starting over), refine (adding/tightening a filter), pivot (changing topic/category), more (show additional picks from same search), details (get details about a specific pick)',
-          enum: ['new_search', 'refine', 'pivot', 'more', 'details'],
+          type: 'string',
+          enum: ['discover', 'more', 'details'],
+          description: 'discover = new or refined search, more = additional picks from same pool, details = info about a specific pick',
         },
-        pick_reference: {
+        reference: {
           type: 'string',
           description: 'How the user referenced a previously shown pick. Can be a number ("2"), event name ("the comedy one"), or venue name ("Elsewhere"). Only used with intent: "details".',
           nullable: true,
@@ -72,7 +73,7 @@ const BRAIN_TOOLS = [
   },
   {
     name: 'respond',
-    description: 'Respond conversationally when no event search is needed. Use for greetings, thanks, farewells, off-topic chat, or when the user asks how Pulse works. Do NOT use when the user asks about a specific event or pick — use search_events with intent "details" instead.',
+    description: 'Respond conversationally when no search is needed. Use for greetings, thanks, farewells, off-topic chat, or when the user asks how Pulse works. Do NOT use when the user asks about a specific pick — use search with intent "details" instead.',
     parameters: {
       type: 'object',
       properties: {
@@ -85,31 +86,6 @@ const BRAIN_TOOLS = [
       required: ['message', 'intent'],
     },
   },
-  {
-    name: 'compose_sms',
-    description: 'Write the final SMS after seeing search results. Call this after search_events returns events. Do NOT call after respond — use respond for conversational messages.',
-    parameters: {
-      type: 'object',
-      properties: {
-        sms_text: { type: 'string', description: 'The complete SMS to send. MUST be under 480 characters. Pick 1-3 events max — be opinionated, not comprehensive. Each pick on its own line: Event Name — Venue, time. Add a brief description if the name is unclear. No prices in picks.' },
-        picks: {
-          type: 'array',
-          description: 'Event IDs of the 1-3 events you recommended, in the order shown in sms_text',
-          items: { type: 'string' },
-          maxItems: 3,
-        },
-      },
-      required: ['sms_text', 'picks'],
-    },
-  },
-  {
-    name: 'show_welcome',
-    description: 'Show tonight\'s top picks as a welcome message. ONLY for RETURNING users who have conversation history. Do NOT use for first-time users — use respond to introduce yourself and ask what they\'re looking for instead.',
-    parameters: {
-      type: 'object',
-      properties: {},
-    },
-  },
 ];
 
 // --- System prompt for the brain ---
@@ -120,7 +96,7 @@ function buildBrainSystemPrompt(session) {
   const sessionContext = session
     ? [
       `Current time in NYC: ${nycNow}`,
-      isFirstMessage ? 'First message — new user, no history. Use respond to introduce yourself and ask what they want. Do NOT use show_welcome.' : null,
+      isFirstMessage ? 'First message — new user, no history. Use respond to introduce yourself and ask what they want.' : null,
       session.lastNeighborhood ? `Current neighborhood: ${session.lastNeighborhood}` : null,
       session.lastFilters && Object.values(session.lastFilters).some(Boolean)
         ? `Active filters: ${JSON.stringify(session.lastFilters)}`
@@ -130,6 +106,12 @@ function buildBrainSystemPrompt(session) {
           const evt = session.lastEvents?.[p.event_id];
           return evt ? `"${evt.name}" at ${evt.venue_name || 'unknown venue'}` : p.event_id;
         }).join(', ')}`
+        : null,
+      session.lastResultType === 'places' && session.lastPlaces?.length
+        ? `Last result: PLACES. Shown: ${session.lastPlaces.map(p => {
+            const place = session.lastPlaceMap?.[p.place_id];
+            return place ? `"${place.name}"` : p.place_id;
+          }).join(', ')}. Use search with intent "details" or "more" for follow-ups.`
         : null,
       session.pendingNearby
         ? `Pending suggestion: "${session.pendingNearby}" (user was asked if they want picks there)`
@@ -158,100 +140,48 @@ function buildBrainSystemPrompt(session) {
         const picks = (h.meta.picks || []).map(p => `${p.name} (${p.category})`).join(', ');
         return `> ${h.meta.match_count} matches${h.meta.neighborhood ? ' in ' + h.meta.neighborhood : ''}${picks ? '. Showed: ' + picks : ''}`;
       }
+      if (h.role === 'search_summary' && h.meta) {
+        const rt = h.meta.result_type === 'places' ? 'places' : 'events';
+        return `> Found ${h.meta.match_count || 0} ${rt}${h.meta.neighborhood ? ' in ' + h.meta.neighborhood : ''}`;
+      }
       if (h.role === 'assistant') return `Pulse: "${h.content.slice(0, 150)}"`;
       return null;
     }).filter(Boolean).join('\n')
     : '';
 
-  return `You are Pulse, an NYC nightlife and events SMS bot. You text like a plugged-in friend who always knows the move — warm, opinionated, concise.
+  return `You are Pulse, an NYC nightlife SMS bot. You text like a plugged-in friend — warm, opinionated, max 480 chars.
 
-NEIGHBORHOODS you cover: ${NEIGHBORHOOD_NAMES.join(', ')}. When a user mentions one of these (or a close variant), treat it as a neighborhood search.
+TIME: ${nycNow}
+NEIGHBORHOODS: ${NEIGHBORHOOD_NAMES.join(', ')}
 
-TOOL FLOW:
-- First message + casual greeting (new user): call respond. Introduce yourself as Pulse and ask what neighborhood they're in or what they're in the mood for. Do NOT show events yet.
-- First message + casual greeting (returning user with history): call show_welcome (shows tonight's top picks).
-- Bare neighborhood (e.g. "bushwick"): call search_events directly. You'll get a pool back. Then compose_sms with TWO CONTRASTING picks that let the user self-select: "Mood Ring has a vinyl night — low-key, good speakers. Or there's a comedy open mic at Houdini Kitchen if you want something more interactive. Which sounds better?" The contrast IS the narrowing question.
-- Specific request (neighborhood + category, neighborhood + time, clear vibe): call search_events directly, then compose_sms. Skip questions.
-- Mood-based request ("something chill", "I want to dance", "weird stuff"): call search_events with categories that match the mood. Don't ask clarifying questions — interpret the mood:
-  * "chill" / "low-key" / "mellow" → jazz, film, art, dj (vinyl nights) — prefer intimate/medium venues
-  * "dance" / "go out out" / "party" → dj, nightlife, live_music — prefer medium/large venues
-  * "weird" / "adventurous" / "surprise me" → search broad, lead with discovery/niche source_vibe events
-  * "something to do" / "active" / "participatory" → prefer interaction_format "interactive" — open mics, workshops, game nights, trivia
-- Conversational messages (questions, thanks, farewells): call respond.
-- User asks about a pick you showed: call search_events({intent: "details", pick_reference: "the puma thing"}). You'll get back the full event data for your recent picks. Figure out which one the user means and write a rich details response. If you can't tell which one, ask them to clarify.
-- If you can't call compose_sms, write the SMS as plain text — that works too.
-
-WHEN TO ASK vs RECOMMEND:
-- ALMOST ALWAYS RECOMMEND. Searching and showing contrasting picks is better than asking a question. The contrast IS the question.
-- Only ask when you truly have nothing to go on: no neighborhood, no mood, no time. Even then, one question max, and make it specific: "What neighborhood are you in tonight?" not "What's the vibe?"
-- If search returns zero or sparse results, THEN ask: "Not much going on in DUMBO tonight — Fort Greene is next door and has stuff. Want picks from there?"
-
-Example — user says "greenpoint":
-→ search_events({neighborhood: "greenpoint", intent: "new_search"})
-Then compose_sms with two contrasting picks: one active/social, one chill/intimate. End with "Which sounds more like your night?"
-
-Example — user says "something chill in bushwick":
-→ search_events({neighborhood: "bushwick", categories: ["jazz", "dj", "film", "art"], intent: "new_search"})
-Then compose_sms favoring intimate/medium venue_size events from the pool.
-
-Example — user says "tell me about the puma thing" after you showed Puma Blue and Salon Open Stage:
-→ search_events({intent: "details", pick_reference: "the puma thing"})
-You'll see event data for both picks — identify Puma Blue as the match and compose details.
-NOT respond — that loses the event context.
-
-If search returns zero results, you can try again with broader filters or nearby neighborhoods.
-If the user pushes back on your picks or says you got something wrong, call search_events again — don't just apologize with respond.
+RULES:
+- Search first, ask later. Contrasting picks > clarifying questions. Only ask when you truly have nothing to go on.
+- 1-2 picks, woven into natural prose. Lead with WHY it's good — trust "recommended" and "why" from results.
+- Events and places mix naturally: "Grab a drink at [bar] then catch [show] around the corner."
+- Mood mapping: "chill" → jazz/film/art, "dance" → dj/nightlife, "weird" → search broad, "bars"/"dinner" → types: ["bars"]/["restaurants"].
+- For details: venue feel first ("dark room, loud sound, cheap tall boys"), then event, then logistics (time, price, when to arrive). Use venue_profile if present.
+- "more" = different results, "2" or name = details. After details, the system sends URLs automatically.
+- Under 480 chars. No URLs in SMS. No prices in initial picks. Never write "price not listed".
+- Write SMS as plain text after search results. End with a natural hook ("Want details?" "More of a music person?").
+- New user greeting: call respond, introduce yourself, ask what they want. Returning user: call search({intent: "discover"}).
 
 SESSION CONTEXT:
 ${sessionContext}${historyBlock}
 ${session?._proactivePrompt ? `\nPROACTIVE OPT-IN: This user hasn't opted into proactive recommendations yet. At the end of your picks response, append on a new line:\n"PS — Want me to text you when something great comes up? Reply NOTIFY to opt in."\nOnly add this to responses that include event picks, not to detail responses or conversation.` : ''}
 
-SMS VOICE — this is the most important section:
-You're texting a friend who always knows the move. Every message should feel like one half of a conversation, not a broadcast.
+EXAMPLES:
 
-TONE:
-- ACKNOWLEDGE first. "Park Slope tonight —" or "Gotcha, something mellower..." or "OK not the loud stuff —". Show you heard them before you recommend.
-- Match their energy. Short casual message → short casual response. Specific request → specific answer.
-- Never sound like a listing. "Alison Leiby at Union Hall, 7:30 — she's genuinely funny, wrote for Maisel" beats "Alison Leiby: For This? — Union Hall, 7:30pm. Stand-up from the Marvelous Mrs. Maisel writer."
+User: "bushwick"
+→ search({neighborhood: "bushwick", intent: "discover"})
+SMS: "Bushwick tonight — there's a one-off noise show at Alphaville, tiny room, gonna be loud and weird in the best way. Or Mood Ring has a vinyl DJ set if you want something mellower. Which sounds more like your night?"
 
-PICKS:
-- 1-2 picks, woven into natural prose. A third only if it's a genuinely different vibe. Never 4+.
-- CONTRAST over similarity. Two picks should feel like a choice: one active and one chill, one well-known and one underground, one free and one worth paying for.
-- Lead with your top pick and say WHY in a few words. Use the metadata — source_vibe, venue_size, scarcity, editorial signals. "This one's a one-off at a tiny room" is better than listing the event name and time.
-- Don't include price in initial picks. Never write "price not listed" or "TBA".
+User: "tell me more about the vinyl thing"
+→ search({intent: "details", reference: "the vinyl thing"})
+SMS: "Mood Ring is one of those places that looks like nothing from outside but has this perfect dark room with a great sound system. Tonight's a local DJ spinning funk and soul on vinyl, no cover. Starts at 9, but it doesn't really fill up til 10:30."
 
-CONVERSATION HOOKS:
-- ALWAYS end with a hook that makes them want to reply. "Want details on either?" "I've got weirder stuff if that's too tame." "More of a music person or a hang person?"
-- The hook should feel natural, not like a CTA. It's what a friend would say.
-
-LOGISTICS:
-- Say "tonight" for today evening, "today at [time]" for afternoon, "tomorrow" for tomorrow.
-- If an event has already started but is still going (start_time is in the past), note it naturally: "started at 7 but goes til midnight" or "already underway, runs til 2am." Don't just show the start time — the user needs to know it's in progress.
-- ALWAYS lead with events in the requested neighborhood. Only say it's quiet if there are literally zero events.
-- If search results include a nearby_highlight, tease it naturally: "Williamsburg's stacked too if you want to peek."
-- HARD LIMIT: 480 characters total. No URLs. Cut picks to stay under — never send a truncated message.
-
-DETAILS RESPONSES:
-- Lead with the VENUE — what it feels like, what to expect. "Union Pool's a proper Williamsburg dive — dark room, loud sound, cheap tall boys."
-- Then the EVENT — who/what and why it's interesting. "Gun Outfit is a scuzzy post-punk duo from LA touring a new record, perfect fit for this room."
-- Then LOGISTICS — time, price, when to arrive. "Free, doors 8, music at 8:30."
-- End with a PRACTICAL TIP if you have one. "Gets packed early on free show nights — I'd aim for 8."
-- If the event has venue_profile (known_for, crowd, tip), USE IT. Lead with what the venue feels like. The profile tip is the insider knowledge — "gets packed early on free show nights, aim for 8" is gold.
-- For more with is_last_batch=true: mention these are the last picks, suggest a different neighborhood.
-
-HOW TO TALK ABOUT PICKS — turn metadata into natural language:
-When you see these fields on events in the pool, USE them in your SMS. Don't just pick events — tell the user why they're interesting.
-- source_vibe "discovery" → this came from the underground radar, a tastemaker newsletter. Say so: "this popped up on the underground radar" or "a tastemaker flagged this one."
-- source_vibe "niche" → community-driven, local scene. "This is a neighborhood spot" or "local scene pick."
-- venue_size "intimate" → paint the picture: "tiny room, maybe 50 people, you'll be right up front." Don't say "intimate venue."
-- venue_size "massive" → set expectations: "big production, arena show."
-- scarcity "one-night-only" → create urgency naturally: "this is a one-off, not coming back." Never ignore scarcity signals.
-- editorial: true → "a tastemaker picked this one out" or "editorially curated." Strong trust signal.
-- interaction_format "interactive" → sell the experience: "you're not just watching — open mic, game night, workshop. You're in it."
-- recurring → normalize it: "they do this every Tuesday, it's a reliable spot" or "weekly thing, always good."
-- venue_vibe → use it directly. "dark cocktail bar with a killer sound system" is better than anything you'd make up. Trust the profile and weave it into your pick description.
-
-${curationTasteBlock(CURATION_DIVERSITY_DEFAULT)}`;
+User: "best bars in williamsburg"
+→ search({neighborhood: "williamsburg", types: ["bars"], intent: "discover"})
+SMS: "Williamsburg bars — The Commodore's a proper neighborhood spot, fried chicken and cheap tall boys, always a scene. Or Maison Premiere if you want the opposite — oysters, craft cocktails, feels like old New Orleans. Which vibe?"`;
 }
 
 
@@ -273,7 +203,26 @@ function cleanEventName(name) {
 }
 
 /**
- * Serialize event pool into compact format for Gemini functionResponse.
+ * Build a natural language reason for why an event is interesting.
+ * Converts metadata signals into a short phrase the model can trust and echo.
+ */
+function buildRecommendationReason(e) {
+  const parts = [];
+  if (e.scarcity === 'one-night-only') parts.push('one-off, won\'t happen again');
+  else if (e.scarcity) parts.push(e.scarcity);
+  if (e.editorial_signal) parts.push('tastemaker pick');
+  if (e.source_vibe === 'discovery') parts.push('underground radar');
+  else if (e.source_vibe === 'niche') parts.push('local scene');
+  if (e.venue_size === 'intimate') parts.push('tiny room');
+  else if (e.venue_size === 'massive') parts.push('big production');
+  if (e.interaction_format === 'interactive') parts.push('you\'re in it, not just watching');
+  if (e.is_free) parts.push('free');
+  return parts.join(', ') || undefined;
+}
+
+/**
+ * Serialize event pool into compact format for LLM.
+ * Top items are annotated with recommended:true and a why field.
  */
 function serializePoolForContinuation(poolResult) {
   const todayNyc = getNycDateString(0);
@@ -285,10 +234,11 @@ function serializePoolForContinuation(poolResult) {
   const hoodLabel = isBorough ? `${borough} (borough-wide)` : isCitywide ? 'citywide' : neighborhood || 'NYC';
   const filterDesc = activeFilters && Object.values(activeFilters).some(Boolean) ? describeFilters(activeFilters) : '';
 
-  const events = pool.map(e => {
+  const events = pool.map((e, i) => {
     const dayLabel = e.date_local === todayNyc ? 'TODAY' : e.date_local === tomorrowNyc ? 'TOMORROW' : e.date_local;
     const tag = e.filter_match === 'hard' ? '[MATCH]' : e.filter_match === 'soft' ? '[SOFT]' : '';
     const nearbyTag = (neighborhood && e.neighborhood && e.neighborhood !== neighborhood) ? '[NEARBY]' : '';
+    const why = buildRecommendationReason(e);
     return {
       id: e.id, name: cleanEventName((e.name || '').slice(0, 80)), venue_name: e.venue_name,
       neighborhood: e.neighborhood, day: dayLabel, start_time_local: e.start_time_local, end_time_local: e.end_time_local || undefined,
@@ -297,9 +247,8 @@ function serializePoolForContinuation(poolResult) {
       recurring: e.is_recurring ? e.recurrence_label : undefined,
       venue_size: e.venue_size || undefined,
       interaction_format: e.interaction_format || undefined,
-      source_vibe: e.source_vibe || undefined,
-      editorial: e.editorial_signal || undefined,
-      scarcity: e.scarcity || undefined,
+      recommended: i < 5 ? true : undefined,
+      why: i < 5 ? why : undefined,
       tags: [tag, nearbyTag].filter(Boolean).join(' ') || undefined,
     };
   });
@@ -330,6 +279,7 @@ module.exports = {
   BRAIN_TOOLS,
   buildBrainSystemPrompt,
   serializePoolForContinuation,
+  buildRecommendationReason,
   cleanEventName,
   stripCodeFences,
   NEIGHBORHOOD_NAMES,

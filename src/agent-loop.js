@@ -7,14 +7,17 @@
  *
  * Design:
  *   - respond tool: SMS text comes from params.message (model writes it in tool call)
- *   - search_events tool: SMS text comes from loopResult.text (model writes after seeing results)
- *   - Internal data (_poolResult, _moreResult, _detailsResult) attached to tool results for session save
+ *   - search tool: SMS text comes from loopResult.text (model writes after seeing results)
+ *   - Internal data (_poolResult, _placePoolResult, _moreResult, _welcomeResult) attached to tool results for session save
  *   - sanitizeForLLM strips _ prefixed keys before data goes to the model
  */
 
 const { runAgentLoop, generate } = require('./llm');
 const { MODELS } = require('./model-config');
 const { BRAIN_TOOLS, buildBrainSystemPrompt, serializePoolForContinuation, cleanEventName } = require('./brain-llm');
+const { serializePlacePoolForContinuation } = require('./places');
+const { searchPlaces } = require('./places');
+const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || '';
 const { buildSearchPool, executeMore, executeWelcome } = require('./brain-execute');
 const { buildEventMap, saveResponseFrame, buildExhaustionMessage, sendPickUrls } = require('./pipeline');
 const { sendSMS, maskPhone } = require('./twilio');
@@ -22,7 +25,7 @@ const { recordAICost } = require('./traces');
 const { getSession, setSession, addToHistory, hashPhone } = require('./session');
 const { trackAICost } = require('./request-guard');
 const { updateProfile } = require('./preference-profile');
-const { smartTruncate, injectMissingPrices } = require('./formatters');
+const { smartTruncate } = require('./formatters');
 const { lookupVenueProfile } = require('./venues');
 const { sendRuntimeAlert } = require('./alerts');
 const { getAdjacentNeighborhoods, getNycDateString } = require('./geo');
@@ -122,31 +125,63 @@ function extractPicksFromSms(smsText, events) {
 }
 
 /**
+ * Match place names in SMS text against the place pool to determine
+ * which places the LLM mentioned. Returns [{ rank, place_id }].
+ */
+function extractPlacePicksFromSms(smsText, places) {
+  if (!smsText || !places?.length) return [];
+  const lower = smsText.toLowerCase();
+  const picks = [];
+  const usedIds = new Set();
+
+  for (const place of places) {
+    if (usedIds.has(place.place_id)) continue;
+    const name = (place.name || '').toLowerCase().slice(0, 30);
+    if (name.length >= 3 && lower.includes(name)) {
+      usedIds.add(place.place_id);
+      picks.push({ rank: picks.length + 1, place_id: place.place_id });
+    }
+  }
+  return picks;
+}
+
+/**
+ * Infer search types from a natural language query.
+ * Returns array of types: 'events', 'bars', 'restaurants'.
+ */
+function inferTypesFromQuery(query) {
+  if (!query) return ['events'];
+  const lower = query.toLowerCase();
+  const types = [];
+  if (/\b(bar|bars|drink|drinks|cocktail|cocktails|dive|pub|pubs|beer|beers|speakeasy)\b/.test(lower)) types.push('bars');
+  if (/\b(restaurant|restaurants|dinner|eat|eating|food|brunch|lunch|pizza|sushi|tacos)\b/.test(lower)) types.push('restaurants');
+  if (/\b(event|events|show|shows|concert|concerts|music|comedy|jazz|dj|theater|art|film|trivia|dance|nightlife|open mic)\b/.test(lower)) types.push('events');
+  if (types.length === 0 && /\b(happening|going on|to do|tonight|weekend|what's up)\b/.test(lower)) types.push('events');
+  return types.length > 0 ? types : ['events'];
+}
+
+/**
  * Derive the response intent from the tool calls made during the loop.
  * Used for tracing.
  */
 function deriveIntent(toolCalls) {
   if (!toolCalls?.length) return 'conversational';
 
-  const hasWelcome = toolCalls.find(tc => tc.name === 'show_welcome');
-  if (hasWelcome) return 'welcome';
-
-  // Last search_events call determines intent
-  const lastSearch = [...toolCalls].reverse().find(tc => tc.name === 'search_events');
+  const lastSearch = [...toolCalls].reverse().find(tc => tc.name === 'search');
   if (lastSearch) {
     const intent = lastSearch.params?.intent;
     if (intent === 'more') return 'more';
     if (intent === 'details') return 'details';
+    // Check if it was a welcome (no neighborhood, no types)
+    if (!lastSearch.params?.neighborhood && !lastSearch.params?.types) return 'welcome';
+    // Check if places-only
+    const types = lastSearch.params?.types || [];
+    if (types.length > 0 && !types.includes('events')) return 'places';
     return 'events';
   }
 
-  // Only respond or compose_sms calls
   const lastRespond = [...toolCalls].reverse().find(tc => tc.name === 'respond');
   if (lastRespond) return 'conversational';
-
-  // compose_sms without search_events — shouldn't happen but handle it
-  const lastCompose = [...toolCalls].reverse().find(tc => tc.name === 'compose_sms');
-  if (lastCompose) return 'events';
 
   return 'conversational';
 }
@@ -165,100 +200,42 @@ async function executeTool(toolName, params, session, phone, trace) {
     return { ok: true, intent: params.intent };
   }
 
-  if (toolName === 'compose_sms') {
-    return { ok: true };
-  }
+  if (toolName === 'search') {
+    const { intent, neighborhood, types, filters, reference } = params;
+    const searchTypes = types || inferTypesFromQuery(params.query);
 
-  if (toolName === 'show_welcome') {
-    const result = await executeWelcome();
-    // Return event data for the model to compose (not pre-composed SMS)
-    const events = (result.topEvents || []).map(e => ({
-      id: e.id, name: cleanEventName((e.name || '').slice(0, 80)), venue_name: e.venue_name,
-      neighborhood: e.neighborhood, start_time_local: e.start_time_local,
-      is_free: e.is_free, price_display: e.price_display, category: e.category,
-      short_detail: (e.short_detail || e.description_short || '').slice(0, 100),
-      source_vibe: e.source_vibe || undefined,
-    }));
-    const msg = events.length > 0
-      ? "Here are tonight's top picks across NYC. Introduce yourself as Pulse and recommend 1-2 of these. End with a question — ask what neighborhood they're in or what vibe they're looking for."
-      : "No events loaded yet. Introduce yourself as Pulse, say you're a plugged-in friend for NYC nightlife, and ask what neighborhood they're in or what they're looking for tonight.";
-    return {
-      ok: true,
-      message: msg,
-      events: events.length > 0 ? events : undefined,
-      _welcomeResult: result,
-    };
-  }
+    // --- Details intent ---
+    if (intent === 'details') {
+      // Place details
+      if (session?.lastResultType === 'places' && session?.lastPlaces?.length && session?.lastPlaceMap) {
+        const places = session.lastPlaces.map(p => {
+          const place = session.lastPlaceMap[p.place_id];
+          if (!place) return null;
+          return {
+            type: place.place_type || 'bar',
+            place_id: place.place_id, name: place.name, neighborhood: place.neighborhood,
+            address: place.address, place_type: place.place_type,
+            price_level: place.price_level, rating: place.rating,
+            review_count: place.user_ratings_total,
+            editorial_summary: place.editorial_summary || undefined,
+            google_maps_url: place.google_maps_url || undefined,
+            serves_cocktails: place.serves_cocktails || undefined,
+            serves_wine: place.serves_wine || undefined,
+            outdoor_seating: place.outdoor_seating || undefined,
+            good_for_groups: place.good_for_groups || undefined,
+            live_music: place.live_music || undefined,
+            open_hours: place.open_hours_json || undefined,
+          };
+        }).filter(Boolean);
 
-  if (toolName === 'search_events') {
-    // --- More intent ---
-    if (params.intent === 'more') {
-      const moreResult = executeMore(session);
-
-      if (moreResult.noContext) {
         return {
-          no_context: true,
-          message: "Tell me what you're in the mood for -- comedy, live music, something weird? Or drop a neighborhood.",
-          _moreResult: moreResult,
+          reference,
+          items: places,
+          message: `The user wants details about "${reference || 'a place'}". Here are the places you showed them. Identify which one they mean and compose a rich details response with vibe, what to expect, and logistics (address, hours, Google Maps link). If you can't tell which one, ask them to clarify.`,
         };
       }
 
-      if (moreResult.exhausted) {
-        const exhaust = buildExhaustionMessage(moreResult.neighborhood, {
-          adjacentHoods: moreResult.neighborhood ? getAdjacentNeighborhoods(moreResult.neighborhood, 4) : [],
-          visitedHoods: session?.visitedHoods || [moreResult.neighborhood].filter(Boolean),
-          filters: moreResult.activeFilters || {},
-          borough: session?.lastBorough,
-        });
-        return {
-          exhausted: true,
-          message: exhaust.message,
-          suggested_hood: exhaust.suggestedHood,
-          _moreResult: moreResult,
-          _exhaustResult: exhaust,
-        };
-      }
-
-      // Serialize events for LLM
-      const todayNyc = getNycDateString(0);
-      const tomorrowNyc = getNycDateString(1);
-      const serialized = {
-        neighborhood: moreResult.neighborhood || 'NYC',
-        match_count: moreResult.events.length,
-        is_last_batch: moreResult.isLastBatch || false,
-        suggestions: moreResult.suggestions,
-        events: moreResult.events.map(e => ({
-          id: e.id, name: cleanEventName((e.name || '').slice(0, 80)), venue_name: e.venue_name,
-          neighborhood: e.neighborhood,
-          day: e.date_local === todayNyc ? 'TODAY' : e.date_local === tomorrowNyc ? 'TOMORROW' : e.date_local,
-          start_time_local: e.start_time_local,
-          is_free: e.is_free, price_display: e.price_display, category: e.category,
-          short_detail: (e.short_detail || e.description_short || '').slice(0, 100),
-          recurring: e.is_recurring ? e.recurrence_label : undefined,
-          venue_size: e.venue_size || undefined,
-          source_vibe: e.source_vibe || undefined,
-        })),
-      };
-
-      // Populate trace
-      if (moreResult.events?.length) {
-        trace.events.sent_ids = moreResult.events.map(e => e.id);
-        trace.events.sent_pool = moreResult.events.map(e => ({
-          id: e.id, name: e.name, venue_name: e.venue_name,
-          neighborhood: e.neighborhood, category: e.category,
-          is_free: e.is_free, price_display: e.price_display,
-          source_name: e.source_name,
-        }));
-      }
-
-      return {
-        ...serialized,
-        _moreResult: moreResult,
-      };
-    }
-
-    // --- Details intent: return event data for model to compose ---
-    if (params.intent === 'details') {
+      // Event details
       if (!session?.lastPicks?.length || !session?.lastEvents) {
         return {
           not_found: true,
@@ -276,11 +253,11 @@ async function executeTool(toolName, params, session, phone, trace) {
         };
       }
 
-      // Return full event data for all lastPicks — model resolves the reference
       const events = session.lastPicks.map(p => {
         const e = session.lastEvents[p.event_id];
         if (!e) return null;
         return {
+          type: 'event',
           id: e.id, name: cleanEventName((e.name || '').slice(0, 80)),
           venue_name: e.venue_name, neighborhood: e.neighborhood,
           start_time_local: e.start_time_local, category: e.category,
@@ -293,30 +270,242 @@ async function executeTool(toolName, params, session, phone, trace) {
       }).filter(Boolean);
 
       return {
-        pick_reference: params.pick_reference,
-        events,
-        message: `The user wants details about "${params.pick_reference || 'a pick'}". Here are the picks you showed them. Identify which one they mean and compose a rich details response with venue, time, price, and description. If you can't tell which one, ask them to clarify.`,
+        reference,
+        items: events,
+        message: `The user wants details about "${reference || 'a pick'}". Here are the picks you showed them. Identify which one they mean and compose a rich details response with venue, time, price, and description. If you can't tell which one, ask them to clarify.`,
       };
     }
 
-    // --- Regular search (new_search, refine, pivot) ---
-    const poolResult = await buildSearchPool(params, session, phone, trace);
+    // --- More intent ---
+    if (intent === 'more') {
+      // Place more
+      if (session?.lastResultType === 'places') {
+        if (!session?.lastPlaceMap) {
+          return { no_context: true, message: "Tell me what neighborhood you're looking for bars or restaurants in!" };
+        }
+        const hood = neighborhood || session.lastNeighborhood;
+        // Infer place type from session
+        const firstPlace = Object.values(session.lastPlaceMap)[0];
+        const placeType = (searchTypes.includes('restaurants') ? 'restaurant' : searchTypes.includes('bars') ? 'bar' : null)
+          || firstPlace?.place_type || 'bar';
+        if (!hood) {
+          return { no_context: true, message: "What neighborhood are you looking in?" };
+        }
+        const pool = await searchPlaces(hood, placeType, { vibe: filters?.vibe });
+        const shownIds = new Set((session.lastPlaces || []).map(p => p.place_id));
+        const fresh = pool.filter(p => !shownIds.has(p.place_id));
+        if (fresh.length === 0) {
+          return { exhausted: true, message: `That's all the ${placeType}s I've got in ${hood}! Try a different neighborhood or vibe.` };
+        }
+        const serialized = serializePlacePoolForContinuation(fresh, hood, placeType, filters?.vibe);
+        const items = (serialized.places || []).map(p => ({ type: placeType, ...p }));
+        return {
+          neighborhood: serialized.neighborhood,
+          count: items.length,
+          items,
+          _placePoolResult: { places: fresh, neighborhood: hood, placeType, vibe: filters?.vibe },
+        };
+      }
 
-    if (poolResult.zeroMatch) {
+      // Event more
+      const moreResult = executeMore(session);
+      if (moreResult.noContext) {
+        return {
+          no_context: true,
+          message: "Tell me what you're in the mood for -- comedy, live music, something weird? Or drop a neighborhood.",
+          _moreResult: moreResult,
+        };
+      }
+      if (moreResult.exhausted) {
+        const exhaust = buildExhaustionMessage(moreResult.neighborhood, {
+          adjacentHoods: moreResult.neighborhood ? getAdjacentNeighborhoods(moreResult.neighborhood, 4) : [],
+          visitedHoods: session?.visitedHoods || [moreResult.neighborhood].filter(Boolean),
+          filters: moreResult.activeFilters || {},
+          borough: session?.lastBorough,
+        });
+        return {
+          exhausted: true,
+          message: exhaust.message,
+          suggested_hood: exhaust.suggestedHood,
+          _moreResult: moreResult,
+          _exhaustResult: exhaust,
+        };
+      }
+
+      const todayNyc = getNycDateString(0);
+      const tomorrowNyc = getNycDateString(1);
+      const items = moreResult.events.map(e => ({
+        type: 'event',
+        id: e.id, name: cleanEventName((e.name || '').slice(0, 80)), venue_name: e.venue_name,
+        neighborhood: e.neighborhood,
+        day: e.date_local === todayNyc ? 'TODAY' : e.date_local === tomorrowNyc ? 'TOMORROW' : e.date_local,
+        start_time_local: e.start_time_local,
+        is_free: e.is_free, price_display: e.price_display, category: e.category,
+        short_detail: (e.short_detail || e.description_short || '').slice(0, 100),
+        recurring: e.is_recurring ? e.recurrence_label : undefined,
+        venue_size: e.venue_size || undefined,
+        source_vibe: e.source_vibe || undefined,
+      }));
+
+      if (moreResult.events?.length) {
+        trace.events.sent_ids = moreResult.events.map(e => e.id);
+        trace.events.sent_pool = moreResult.events.map(e => ({
+          id: e.id, name: e.name, venue_name: e.venue_name,
+          neighborhood: e.neighborhood, category: e.category,
+          is_free: e.is_free, price_display: e.price_display,
+          source_name: e.source_name,
+        }));
+      }
+
+      return {
+        neighborhood: moreResult.neighborhood || 'NYC',
+        count: items.length,
+        is_last_batch: moreResult.isLastBatch || false,
+        suggestions: moreResult.suggestions,
+        items,
+        _moreResult: moreResult,
+      };
+    }
+
+    // --- Discover intent ---
+    const wantsEvents = searchTypes.includes('events');
+    const wantsPlaces = searchTypes.includes('bars') || searchTypes.includes('restaurants');
+
+    // Welcome case: no neighborhood, no types, returning user
+    if (!neighborhood && !wantsPlaces && !filters && session?.conversationHistory?.length) {
+      const result = await executeWelcome();
+      const events = (result.topEvents || []).map(e => ({
+        type: 'event',
+        id: e.id, name: cleanEventName((e.name || '').slice(0, 80)), venue_name: e.venue_name,
+        neighborhood: e.neighborhood, start_time_local: e.start_time_local,
+        is_free: e.is_free, price_display: e.price_display, category: e.category,
+        short_detail: (e.short_detail || e.description_short || '').slice(0, 100),
+        source_vibe: e.source_vibe || undefined,
+      }));
+      const msg = events.length > 0
+        ? "Here are tonight's top picks across NYC. Introduce yourself as Pulse and recommend 1-2 of these. End with a question — ask what neighborhood they're in or what vibe they're looking for."
+        : "No events loaded yet. Introduce yourself as Pulse, say you're a plugged-in friend for NYC nightlife, and ask what neighborhood they're in or what they're looking for tonight.";
+      return {
+        ok: true,
+        neighborhood: 'citywide',
+        count: events.length,
+        message: msg,
+        items: events.length > 0 ? events : undefined,
+        _welcomeResult: result,
+      };
+    }
+
+    // Fan out event + place searches in parallel
+    const results = {};
+    const promises = [];
+
+    if (wantsEvents) {
+      const eventParams = {
+        neighborhood,
+        intent: 'new_search',
+      };
+      if (filters) {
+        if (filters.categories?.length === 1) eventParams.category = filters.categories[0];
+        else if (filters.categories?.length > 1) eventParams.categories = filters.categories;
+        if (filters.free_only) eventParams.free_only = true;
+        if (filters.time_after) eventParams.time_after = filters.time_after;
+        if (filters.date_range) eventParams.date_range = filters.date_range;
+      }
+      promises.push(
+        buildSearchPool(eventParams, session, phone, trace)
+          .then(r => { results.eventPool = r; })
+      );
+    }
+
+    if (wantsPlaces) {
+      const hood = neighborhood || session?.lastNeighborhood;
+      const placeType = searchTypes.includes('restaurants') ? 'restaurant' : 'bar';
+      if (hood) {
+        promises.push(
+          searchPlaces(hood, placeType, { vibe: filters?.vibe })
+            .then(pool => {
+              if (pool.length > 0) {
+                results.placePool = { places: pool, neighborhood: hood, placeType, vibe: filters?.vibe };
+              }
+            })
+            .catch(err => { console.warn('Place search failed:', err.message); })
+        );
+      } else if (!wantsEvents) {
+        // Places-only with no neighborhood
+        return {
+          no_neighborhood: true,
+          message: "What neighborhood are you looking in? Drop a name like Williamsburg, Bushwick, or LES.",
+        };
+      }
+    }
+
+    await Promise.all(promises);
+
+    // Handle zero-match for events-only search
+    if (wantsEvents && !wantsPlaces && results.eventPool?.zeroMatch) {
       return {
         zero_match: true,
-        message: poolResult.zeroMatch.sms,
+        message: results.eventPool.zeroMatch.sms,
         _poolResult: null,
-        _zeroMatch: poolResult.zeroMatch,
+        _zeroMatch: results.eventPool.zeroMatch,
       };
     }
 
-    // Serialize pool for LLM
-    const serialized = serializePoolForContinuation(poolResult);
+    // Build unified result
+    const items = [];
+    let resultNeighborhood = neighborhood || 'NYC';
+    let meta = {};
+
+    if (results.eventPool && !results.eventPool.zeroMatch) {
+      const eventSerialized = serializePoolForContinuation(results.eventPool);
+      resultNeighborhood = eventSerialized.neighborhood;
+      meta = {
+        filter: eventSerialized.filter,
+        sparse: eventSerialized.sparse,
+        nearby_hoods: eventSerialized.nearby_hoods,
+        suggested_neighborhood: eventSerialized.suggested_neighborhood,
+        nearby_highlight: eventSerialized.nearby_highlight,
+      };
+      for (const e of (eventSerialized.events || [])) {
+        items.push({ type: 'event', ...e });
+      }
+    }
+
+    if (results.placePool) {
+      const placeSerialized = serializePlacePoolForContinuation(
+        results.placePool.places, results.placePool.neighborhood,
+        results.placePool.placeType, results.placePool.vibe
+      );
+      if (!results.eventPool || results.eventPool.zeroMatch) {
+        resultNeighborhood = placeSerialized.neighborhood;
+      }
+      for (const p of (placeSerialized.places || [])) {
+        items.push({ type: results.placePool.placeType || 'bar', ...p });
+      }
+    }
+
+    // Place-only with no results and no API key
+    if (wantsPlaces && !wantsEvents && items.length === 0) {
+      if (!GOOGLE_MAPS_API_KEY) {
+        return {
+          not_available: true,
+          message: "Place search isn't available right now — but I can find you events! What are you in the mood for?",
+        };
+      }
+      const placeType = searchTypes.includes('restaurants') ? 'restaurant' : 'bar';
+      return {
+        zero_match: true,
+        message: `I couldn't find any ${placeType}s in ${neighborhood || 'that area'}. Try a different neighborhood or type!`,
+      };
+    }
 
     return {
-      ...serialized,
-      _poolResult: poolResult,
+      neighborhood: resultNeighborhood,
+      count: items.length,
+      ...meta,
+      items,
+      _poolResult: results.eventPool?.zeroMatch ? null : results.eventPool || null,
+      _placePoolResult: results.placePool || null,
     };
   }
 
@@ -331,18 +520,13 @@ async function executeTool(toolName, params, session, phone, trace) {
 /**
  * Save session state based on which tools were called during the loop.
  * Uses saveResponseFrame (P4: one save path).
+ * Picks are derived from pool event IDs (not fuzzy SMS text matching).
  */
 function saveSessionFromToolCalls(phone, session, toolCalls, smsText) {
   if (!toolCalls?.length) return;
 
-  const lastSearch = [...toolCalls].reverse().find(tc => tc.name === 'search_events');
+  const lastSearch = [...toolCalls].reverse().find(tc => tc.name === 'search');
   const lastRespond = [...toolCalls].reverse().find(tc => tc.name === 'respond');
-  const lastCompose = [...toolCalls].reverse().find(tc => tc.name === 'compose_sms');
-  const lastWelcome = [...toolCalls].reverse().find(tc => tc.name === 'show_welcome');
-
-  // Build picks: prefer compose_sms (structured), fall back to extractPicksFromSms (fuzzy)
-  const composePickIds = lastCompose?.params?.picks || [];
-  let composePicks = composePickIds.map((id, i) => ({ rank: i + 1, event_id: id }));
 
   // respond only (no search) — preserve existing session
   if (!lastSearch && lastRespond) {
@@ -359,31 +543,28 @@ function saveSessionFromToolCalls(phone, session, toolCalls, smsText) {
     return;
   }
 
-  // show_welcome — save welcome picks as initial session state
-  if (lastWelcome) {
-    const wr = lastWelcome.result?._welcomeResult;
-    if (wr) {
-      saveResponseFrame(phone, {
-        picks: wr.picks || [],
-        eventMap: wr.eventMap || {},
-        neighborhood: 'citywide',
-        filters: null,
-        offeredIds: (wr.picks || []).map(p => p.event_id),
-        visitedHoods: ['citywide'],
-      });
-    }
-    return;
-  }
-
   if (!lastSearch) return;
 
   const { params, result } = lastSearch;
   const intent = params.intent;
 
+  // Welcome
+  if (result?._welcomeResult) {
+    const wr = result._welcomeResult;
+    saveResponseFrame(phone, {
+      picks: wr.picks || [],
+      eventMap: wr.eventMap || {},
+      neighborhood: 'citywide',
+      offeredIds: (wr.picks || []).map(p => p.event_id),
+      visitedHoods: ['citywide'],
+    });
+    return;
+  }
+
   // Zero match — already saved in buildSearchPool
   if (result?._zeroMatch) return;
 
-  // Details — don't change picks/neighborhood, but track engagement + nudge tracking
+  // Details — track engagement only, don't change session state
   if (intent === 'details') {
     try {
       const db = require('./db');
@@ -394,7 +575,6 @@ function saveSessionFromToolCalls(phone, session, toolCalls, smsText) {
     } catch (err) {
       console.warn('engagement tracking failed:', err.message);
     }
-    // Track recurring event details for nudge subscriptions
     try {
       const { trackRecurringDetail } = require('./nudges');
       for (const pick of (session?.lastPicks || [])) {
@@ -402,7 +582,6 @@ function saveSessionFromToolCalls(phone, session, toolCalls, smsText) {
         if (event?.is_recurring) {
           const consentPrompt = trackRecurringDetail(phone, event);
           if (consentPrompt) {
-            const { sendSMS } = require('./twilio');
             sendSMS(phone, consentPrompt).catch(err =>
               console.warn('nudge consent SMS failed:', err.message)
             );
@@ -415,124 +594,105 @@ function saveSessionFromToolCalls(phone, session, toolCalls, smsText) {
     return;
   }
 
-  // More — update pool with more batch
+  // More
   if (intent === 'more') {
+    if (result?._placePoolResult) {
+      const pr = result._placePoolResult;
+      const placeMap = {};
+      for (const p of pr.places) placeMap[p.place_id] = p;
+      const placePicks = pr.places.slice(0, 5).map((p, i) => ({ rank: i + 1, place_id: p.place_id }));
+      saveResponseFrame(phone, {
+        picks: [], eventMap: {}, neighborhood: pr.neighborhood,
+        offeredIds: [],
+        visitedHoods: [...new Set([...(session?.visitedHoods || []), pr.neighborhood])],
+        lastResponseHadPicks: false, placePicks, placeMap, resultType: 'places',
+      });
+      return;
+    }
     const moreResult = result?._moreResult;
     if (!moreResult) return;
-
     if (moreResult.exhausted) {
       const exhaust = result._exhaustResult || {};
       saveResponseFrame(phone, {
-        mode: 'more',
-        picks: [],
-        prevSession: session,
-        eventMap: session?.lastEvents || {},
-        neighborhood: moreResult.neighborhood,
-        filters: moreResult.activeFilters || {},
-        offeredIds: [],
+        mode: 'more', picks: [], prevSession: session,
+        eventMap: session?.lastEvents || {}, neighborhood: moreResult.neighborhood,
+        filters: moreResult.activeFilters || {}, offeredIds: [],
         pending: exhaust.suggestedHood ? { neighborhood: exhaust.suggestedHood, filters: moreResult.activeFilters || {} } : null,
       });
       return;
     }
-
     const eventMap = buildEventMap(moreResult.events || []);
-    const morePicks = composePicks.length > 0 ? composePicks : extractPicksFromSms(smsText, moreResult.events || []);
-
+    // Use pool order as picks (no fuzzy SMS matching needed)
+    const morePicks = moreResult.events.slice(0, 5).map((e, i) => ({ rank: i + 1, event_id: e.id }));
     saveResponseFrame(phone, {
-      mode: 'more',
-      picks: morePicks,
-      prevSession: session,
-      eventMap: session?.lastEvents || eventMap,
-      neighborhood: moreResult.neighborhood,
+      mode: 'more', picks: morePicks, prevSession: session,
+      eventMap: session?.lastEvents || eventMap, neighborhood: moreResult.neighborhood,
       filters: moreResult.activeFilters || {},
       offeredIds: (moreResult.events || []).map(e => e.id),
       pending: (moreResult.isLastBatch && moreResult.suggestions?.length)
-        ? { neighborhood: moreResult.suggestions[0], filters: moreResult.activeFilters || {} }
-        : null,
+        ? { neighborhood: moreResult.suggestions[0], filters: moreResult.activeFilters || {} } : null,
     });
-
-    // Track more recommendations
-    const morePickIds = morePicks.map(p => p.event_id).filter(Boolean);
-    if (morePickIds.length > 0) {
-      try {
-        const db = require('./db');
-        db.insertRecommendations(hashPhone(phone), morePickIds);
-      } catch (err) {
-        console.warn('recommendation tracking (more) failed:', err.message);
-      }
-    }
+    trackRecommendations(phone, morePicks.map(p => p.event_id));
     return;
   }
 
-  // Regular search (new_search, refine, pivot)
+  // --- Discover ---
   const poolResult = result?._poolResult;
+  const placeResult = result?._placePoolResult;
+
+  // Build place state if present
+  const placeMap = {};
+  let placePicks = [];
+  if (placeResult?.places?.length > 0) {
+    for (const p of placeResult.places) placeMap[p.place_id] = p;
+    placePicks = placeResult.places.slice(0, 5).map((p, i) => ({ rank: i + 1, place_id: p.place_id }));
+  }
+
+  // Places-only
+  if (!poolResult && placeResult) {
+    saveResponseFrame(phone, {
+      picks: [], eventMap: {}, neighborhood: placeResult.neighborhood,
+      offeredIds: [],
+      visitedHoods: [...new Set([...(session?.visitedHoods || []), placeResult.neighborhood])],
+      lastResponseHadPicks: false, placePicks, placeMap, resultType: 'places',
+    });
+    return;
+  }
+
   if (!poolResult) return;
 
+  // Events (possibly mixed with places)
   const eventMap = buildEventMap(poolResult.curated || []);
   for (const e of (poolResult.pool || [])) eventMap[e.id] = e;
-
-  const allEvents = [...(poolResult.curated || []), ...(poolResult.pool || [])];
-  const searchPicks = composePicks.length > 0 ? composePicks : extractPicksFromSms(smsText, allEvents);
+  // Use pool order as picks — these are the events the model saw
+  const allPoolEvents = [...(poolResult.curated || []), ...(poolResult.pool || [])];
+  const picks = allPoolEvents.slice(0, 5).map((e, i) => ({ rank: i + 1, event_id: e.id }));
 
   saveResponseFrame(phone, {
-    picks: searchPicks,
-    eventMap,
-    neighborhood: poolResult.hood,
-    borough: poolResult.borough,
+    picks, eventMap,
+    neighborhood: poolResult.hood, borough: poolResult.borough,
     filters: poolResult.activeFilters,
-    offeredIds: searchPicks.map(p => p.event_id),
+    offeredIds: picks.map(p => p.event_id),
     visitedHoods: [...new Set([...(session?.visitedHoods || []), poolResult.hood || poolResult.borough || 'citywide'])],
     pending: poolResult.suggestedHood ? { neighborhood: poolResult.suggestedHood, filters: poolResult.activeFilters } : null,
+    placePicks, placeMap, resultType: placeResult ? 'mixed' : 'events',
   });
 
   updateProfile(phone, { neighborhood: poolResult.hood, filters: poolResult.activeFilters, responseType: 'event_picks' })
     .catch(err => console.error('profile update failed:', err.message));
-
-  // Track recommendations in SQLite (append-only, non-blocking)
-  const pickEventIds = searchPicks.map(p => p.event_id).filter(Boolean);
-  if (pickEventIds.length > 0) {
-    try {
-      const db = require('./db');
-      db.insertRecommendations(hashPhone(phone), pickEventIds);
-    } catch (err) {
-      console.warn('recommendation tracking failed:', err.message);
-    }
-  }
+  trackRecommendations(phone, picks.map(p => p.event_id));
 }
 
-// ---------------------------------------------------------------------------
-// Validate compose_sms output
-// ---------------------------------------------------------------------------
-
-/**
- * Validate compose_sms output. If sms_text > 480 chars or picks outside 1-3,
- * rebuild from pool events. Model owns editorial voice; this is the safety net.
- */
-function validateComposeSms(smsText, pickIds, pool) {
-  const valid = smsText && smsText.length <= 480 && pickIds.length >= 1 && pickIds.length <= 3;
-  if (valid) return { smsText, picks: pickIds, rebuilt: false };
-
-  console.warn(`[agent-loop] compose_sms validation failed: ${smsText?.length || 0} chars, ${pickIds.length} picks — rebuilding`);
-
-  const useIds = pickIds.slice(0, 3);
-  const poolMap = new Map(pool.map(e => [e.id, e]));
-  let events = useIds.map(id => poolMap.get(id)).filter(Boolean);
-  if (events.length === 0) events = pool.slice(0, 3);
-
-  const lines = events.map(e => {
-    const time = e.start_time_local
-      ? new Date(e.start_time_local).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })
-      : 'tonight';
-    return `${e.name} — ${e.venue_name}, ${time}`;
-  });
-  const hood = events[0]?.neighborhood || 'NYC';
-  const rebuilt = `Tonight in ${hood}:\n\n${lines.join('\n')}\n\nReply a number for details or "more" for more picks`;
-
-  return {
-    smsText: smartTruncate(rebuilt),
-    picks: events.map(e => e.id),
-    rebuilt: true,
-  };
+/** Track recommendation IDs in SQLite (non-blocking). */
+function trackRecommendations(phone, eventIds) {
+  const ids = eventIds.filter(Boolean);
+  if (ids.length === 0) return;
+  try {
+    const db = require('./db');
+    db.insertRecommendations(hashPhone(phone), ids);
+  } catch (err) {
+    console.warn('recommendation tracking failed:', err.message);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -570,7 +730,7 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     const loopResult = await runAgentLoop(
       MODELS.brain, systemPrompt, message, BRAIN_TOOLS,
       executeAndTrack,
-      { maxIterations: 3, timeout: 12000, stopTools: ['respond', 'compose_sms'] }
+      { maxIterations: 3, timeout: 12000, stopTools: ['respond'] }
     );
 
     // Record costs
@@ -585,27 +745,17 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     trace.routing.pre_routed = false;
     trace.routing.provider = loopResult.provider;
 
-    // Determine SMS: compose_sms > respond > loopResult.text (model-composed)
-    let smsText;
-    const lastCompose = [...rawResults].reverse().find(tc => tc.name === 'compose_sms');
+    // Determine SMS: respond > loopResult.text (model-composed)
     const lastRespond = [...rawResults].reverse().find(tc => tc.name === 'respond');
-    if (lastCompose) {
-      const lastSearch = [...rawResults].reverse().find(tc => tc.name === 'search_events');
-      const pool = lastSearch?.result?._poolResult?.pool || [];
-      const validated = validateComposeSms(lastCompose.params.sms_text, lastCompose.params.picks || [], pool);
-      smsText = validated.smsText;
-      if (validated.rebuilt) {
-        trace.composition.rebuilt = true;
-        lastCompose.params.picks = validated.picks;
-      }
-    } else if (lastRespond) {
+    let smsText;
+    if (lastRespond) {
       smsText = lastRespond.params.message;
     } else {
       smsText = loopResult.text;
     }
     // Fallback: if model failed to compose (MALFORMED_FUNCTION_CALL), build SMS from pool
     if (!smsText) {
-      const lastSearchFb = [...rawResults].reverse().find(tc => tc.name === 'search_events');
+      const lastSearchFb = [...rawResults].reverse().find(tc => tc.name === 'search');
       const pool = lastSearchFb?.result?._poolResult?.pool;
       if (pool?.length > 0) {
         const top3 = pool.slice(0, 3);
@@ -624,28 +774,27 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     smsText = await rewriteIfTooLong(smsText, trace);
     smsText = smartTruncate(smsText); // final safety net
 
-    // History
+    // History — save tool calls + search summaries
     for (const tc of rawResults) {
       addToHistory(phone, 'tool_call', '', { name: tc.name, params: tc.params });
+      // Save search summary for richer conversation context
+      if (tc.name === 'search' && tc.result && !tc.result.not_found && !tc.result.stale) {
+        const r = tc.result;
+        const hood = r._poolResult?.hood || r._placePoolResult?.neighborhood || r._welcomeResult ? 'citywide' : null;
+        const count = (r.items || []).length || r._moreResult?.events?.length || 0;
+        const resultType = r._placePoolResult && !r._poolResult ? 'places' : r._poolResult ? 'events' : null;
+        if (hood || count) {
+          addToHistory(phone, 'search_summary', '', {
+            neighborhood: hood,
+            match_count: count,
+            result_type: resultType,
+          });
+        }
+      }
     }
 
     // Session save
     saveSessionFromToolCalls(phone, session, rawResults, smsText);
-
-    // Price injection for search results
-    const lastSearch = [...rawResults].reverse().find(tc => tc.name === 'search_events');
-    if (lastSearch?.result?._poolResult) {
-      const poolResult = lastSearch.result._poolResult;
-      const eventMap = buildEventMap(poolResult.curated || []);
-      for (const e of (poolResult.pool || [])) eventMap[e.id] = e;
-      const allEvents = [...(poolResult.curated || []), ...(poolResult.pool || [])];
-      const pricePicks = lastCompose
-        ? (lastCompose.params.picks || []).map((id, i) => ({ rank: i + 1, event_id: id }))
-        : extractPicksFromSms(smsText, allEvents);
-      if (pricePicks.length > 0) {
-        smsText = injectMissingPrices(smsText, pricePicks, eventMap);
-      }
-    }
 
     const intent = deriveIntent(rawResults);
     await sendSMS(phone, smsText);
@@ -657,6 +806,18 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
       const detailPicks = extractPicksFromSms(smsText, detailEvents);
       if (detailPicks.length > 0) {
         await sendPickUrls(phone, detailPicks.slice(0, 1), session?.lastEvents || {});
+      }
+
+      // Place URL sending (Google Maps link)
+      if (detailPicks.length === 0 && session?.lastResultType === 'places') {
+        const placePool = Object.values(session?.lastPlaceMap || {});
+        const placePicks = extractPlacePicksFromSms(smsText, placePool);
+        if (placePicks.length > 0) {
+          const place = session.lastPlaceMap[placePicks[0].place_id];
+          if (place?.google_maps_url) {
+            await sendSMS(phone, place.google_maps_url);
+          }
+        }
       }
     }
 
@@ -687,7 +848,7 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
         const fallbackResult = await runAgentLoop(
           MODELS.fallback, systemPrompt, message, BRAIN_TOOLS,
           async (toolName, params) => sanitizeForLLM(await executeTool(toolName, params, session, phone, trace)),
-          { maxIterations: 2, timeout: 12000, stopTools: ['respond', 'compose_sms'] }
+          { maxIterations: 2, timeout: 12000, stopTools: ['respond'] }
         );
 
         recordAICost(trace, 'brain_fallback', fallbackResult.totalUsage, fallbackResult.provider);
@@ -695,9 +856,8 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
         trace.brain_latency_ms = (trace.brain_latency_ms || 0) + (fallbackResult.elapsed_ms || 0);
         trace.brain_iterations = [...(trace.brain_iterations || []), ...(fallbackResult.iterations || [])];
 
-        const fbCompose = [...fallbackResult.toolCalls].reverse().find(tc => tc.name === 'compose_sms');
         const fbRespond = [...fallbackResult.toolCalls].reverse().find(tc => tc.name === 'respond');
-        let fbSmsText = fbCompose ? fbCompose.params.sms_text : fbRespond ? fbRespond.params.message : fallbackResult.text;
+        let fbSmsText = fbRespond ? fbRespond.params.message : fallbackResult.text;
         fbSmsText = smartTruncate(fbSmsText || "Tell me what you're in the mood for!");
 
         await sendSMS(phone, fbSmsText);
@@ -729,6 +889,7 @@ module.exports = {
   sanitizeForLLM,
   saveSessionFromToolCalls,
   extractPicksFromSms,
+  extractPlacePicksFromSms,
   deriveIntent,
-  validateComposeSms,
+  inferTypesFromQuery,
 };

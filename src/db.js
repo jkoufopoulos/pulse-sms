@@ -171,6 +171,32 @@ function runMigrations(db) {
 
     CREATE INDEX IF NOT EXISTS idx_nudge_phone ON nudge_subscriptions(phone_hash);
     CREATE INDEX IF NOT EXISTS idx_nudge_optin ON nudge_subscriptions(opted_in, opted_out);
+
+    CREATE TABLE IF NOT EXISTS places (
+      place_id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      address TEXT,
+      neighborhood TEXT,
+      lat REAL,
+      lng REAL,
+      place_type TEXT,
+      price_level INTEGER,
+      rating REAL,
+      user_ratings_total INTEGER,
+      google_maps_url TEXT,
+      editorial_summary TEXT,
+      serves_beer INTEGER DEFAULT 0,
+      serves_wine INTEGER DEFAULT 0,
+      serves_cocktails INTEGER DEFAULT 0,
+      outdoor_seating INTEGER DEFAULT 0,
+      good_for_groups INTEGER DEFAULT 0,
+      live_music INTEGER DEFAULT 0,
+      open_hours_json TEXT,
+      cached_at TEXT NOT NULL,
+      neighborhood_key TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_places_hood ON places(neighborhood);
+    CREATE INDEX IF NOT EXISTS idx_places_cache_key ON places(neighborhood_key, cached_at);
   `);
 
   // Migration: add normalized_name column for recurrence detection

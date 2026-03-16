@@ -1,5 +1,5 @@
 const { check } = require('../helpers');
-const { sanitizeForLLM, extractPicksFromSms, deriveIntent, validateComposeSms } = require('../../src/agent-loop');
+const { sanitizeForLLM, extractPicksFromSms, deriveIntent, inferTypesFromQuery } = require('../../src/agent-loop');
 
 // ---- sanitizeForLLM ----
 console.log('\nsanitizeForLLM:');
@@ -40,22 +40,29 @@ console.log('\nderiveIntent:');
 check('no tool calls -> conversational', deriveIntent([]) === 'conversational');
 check('null -> conversational', deriveIntent(null) === 'conversational');
 check('respond -> conversational', deriveIntent([{ name: 'respond', params: { intent: 'greeting' } }]) === 'conversational');
-check('search new_search -> events', deriveIntent([{ name: 'search_events', params: { intent: 'new_search' } }]) === 'events');
-check('search details -> details', deriveIntent([{ name: 'search_events', params: { intent: 'details' } }]) === 'details');
-check('search more -> more', deriveIntent([{ name: 'search_events', params: { intent: 'more' } }]) === 'more');
-check('search refine -> events', deriveIntent([{ name: 'search_events', params: { intent: 'refine' } }]) === 'events');
+check('search discover -> welcome (no hood/types)', deriveIntent([{ name: 'search', params: { intent: 'discover' } }]) === 'welcome');
+check('search discover with hood -> events', deriveIntent([{ name: 'search', params: { intent: 'discover', neighborhood: 'bushwick' } }]) === 'events');
+check('search details -> details', deriveIntent([{ name: 'search', params: { intent: 'details' } }]) === 'details');
+check('search more -> more', deriveIntent([{ name: 'search', params: { intent: 'more' } }]) === 'more');
+check('search bars-only -> places', deriveIntent([{ name: 'search', params: { intent: 'discover', types: ['bars'] } }]) === 'places');
+check('search events+bars -> events', deriveIntent([{ name: 'search', params: { intent: 'discover', neighborhood: 'les', types: ['events', 'bars'] } }]) === 'events');
 check('multi-call: last search wins', deriveIntent([
-  { name: 'search_events', params: { intent: 'new_search' } },
-  { name: 'search_events', params: { intent: 'refine' } },
+  { name: 'search', params: { intent: 'discover', neighborhood: 'bushwick' } },
+  { name: 'search', params: { intent: 'discover', neighborhood: 'les' } },
 ]) === 'events');
 
-// ---- show_welcome in BRAIN_TOOLS ----
-console.log('\nshow_welcome tool:');
+// ---- search tool in BRAIN_TOOLS ----
+console.log('\nsearch tool:');
 
 const { BRAIN_TOOLS } = require('../../src/brain-llm');
-const welcomeTool = BRAIN_TOOLS.find(t => t.name === 'show_welcome');
-check('show_welcome tool exists in BRAIN_TOOLS', !!welcomeTool);
-check('show_welcome has no required params', !welcomeTool.parameters.required || welcomeTool.parameters.required.length === 0);
+const searchTool = BRAIN_TOOLS.find(t => t.name === 'search');
+check('search tool exists in BRAIN_TOOLS', !!searchTool);
+check('search tool has intent required', searchTool.parameters.required.includes('intent'));
+check('search tool has types param', !!searchTool.parameters.properties.types);
+check('search tool has filters param', !!searchTool.parameters.properties.filters);
+check('no show_welcome tool', !BRAIN_TOOLS.find(t => t.name === 'show_welcome'));
+check('no search_events tool', !BRAIN_TOOLS.find(t => t.name === 'search_events'));
+check('no search_places tool', !BRAIN_TOOLS.find(t => t.name === 'search_places'));
 
 // ---- buildBrainSystemPrompt first-session indicator ----
 console.log('\nbuildBrainSystemPrompt first-session:');
@@ -70,49 +77,49 @@ const returningSession = { conversationHistory: [{ role: 'user', content: 'hey' 
 const returningPrompt = buildBrainSystemPrompt(returningSession);
 check('returning session prompt does NOT contain first-message indicator', !returningPrompt.includes('First message — new session'));
 
-// ---- buildBrainSystemPrompt metadata translation guide ----
-console.log('\nbuildBrainSystemPrompt metadata translation:');
+// ---- buildBrainSystemPrompt slim prompt structure ----
+console.log('\nbuildBrainSystemPrompt slim prompt:');
 
 const anyPrompt = buildBrainSystemPrompt({});
-check('prompt contains metadata translation guide', anyPrompt.includes('HOW TO TALK ABOUT PICKS'));
-check('prompt teaches source_vibe language', anyPrompt.includes('underground radar') || anyPrompt.includes('tastemaker'));
-check('prompt teaches venue_size language', anyPrompt.includes('tiny room') || anyPrompt.includes('intimate'));
-check('prompt teaches scarcity language', anyPrompt.includes('one-off') || anyPrompt.includes('not coming back'));
+check('prompt has RULES section', anyPrompt.includes('RULES:'));
+check('prompt has EXAMPLES section', anyPrompt.includes('EXAMPLES:'));
+check('prompt has 480 char limit', anyPrompt.includes('480'));
+check('prompt teaches recommended/why', anyPrompt.includes('recommended') && anyPrompt.includes('why'));
+check('prompt has mood mapping', anyPrompt.includes('chill') && anyPrompt.includes('jazz'));
+check('prompt does NOT have verbose curation block', !anyPrompt.includes('CURATION TASTE'));
+check('prompt does NOT have verbose HOW TO TALK block', !anyPrompt.includes('HOW TO TALK ABOUT PICKS'));
+check('prompt has few-shot example with SMS output', anyPrompt.includes('SMS: "Bushwick tonight'));
 
-// ---- buildBrainSystemPrompt contrasting picks pattern ----
-console.log('\nbuildBrainSystemPrompt contrasting picks:');
+// ---- buildRecommendationReason ----
+console.log('\nbuildRecommendationReason:');
 
-check('prompt contains contrasting picks guidance', anyPrompt.includes('contrasting') || anyPrompt.includes('contrast'));
-check('prompt does NOT tell agent to ask date-night-friends-solo', !anyPrompt.includes('date night, friends, solo'));
-check('prompt teaches mood vocabulary mapping', anyPrompt.includes('chill') || anyPrompt.includes('mood'));
+const { buildRecommendationReason } = require('../../src/brain-llm');
+check('one-night-only event', buildRecommendationReason({ scarcity: 'one-night-only' }).includes('one-off'));
+check('discovery source', buildRecommendationReason({ source_vibe: 'discovery' }).includes('underground'));
+check('intimate venue', buildRecommendationReason({ venue_size: 'intimate' }).includes('tiny room'));
+check('free event', buildRecommendationReason({ is_free: true }).includes('free'));
+check('editorial pick', buildRecommendationReason({ editorial_signal: true }).includes('tastemaker'));
+check('interactive format', buildRecommendationReason({ interaction_format: 'interactive' }).includes('not just watching'));
+check('multiple signals combined', (() => {
+  const r = buildRecommendationReason({ scarcity: 'one-night-only', source_vibe: 'discovery', is_free: true });
+  return r.includes('one-off') && r.includes('underground') && r.includes('free');
+})());
+check('no signals returns undefined', buildRecommendationReason({}) === undefined);
 
-// ---- deriveIntent with show_welcome ----
-console.log('\nderiveIntent with show_welcome:');
+// ---- inferTypesFromQuery ----
+console.log('\ninferTypesFromQuery:');
 
-check('show_welcome -> welcome', deriveIntent([{ name: 'show_welcome', params: {} }]) === 'welcome');
-check('show_welcome + respond -> welcome (welcome wins)', deriveIntent([
-  { name: 'show_welcome', params: {} },
-  { name: 'respond', params: { intent: 'greeting' } },
-]) === 'welcome');
-
-// ---- validateComposeSms ----
-console.log('\nvalidateComposeSms:');
-
-const goodPool = [
-  { id: 'e1', name: 'Jazz Night', venue_name: 'Blue Note', neighborhood: 'Greenwich Village', start_time_local: '2026-03-07T22:00:00' },
-  { id: 'e2', name: 'Comedy Hour', venue_name: 'Tiny Cupboard', neighborhood: 'LES', start_time_local: '2026-03-07T21:00:00' },
-  { id: 'e3', name: 'Art Opening', venue_name: 'Pioneer Works', neighborhood: 'Red Hook', start_time_local: '2026-03-07T19:00:00' },
-];
-
-const good = validateComposeSms('Tonight:\n\nJazz Night — Blue Note, 10pm\nComedy Hour — Tiny Cupboard, 9pm', ['e1', 'e2'], goodPool);
-check('valid SMS passes through', good.smsText.includes('Jazz Night'));
-check('valid SMS not rebuilt', good.rebuilt === false);
-
-const rebuilt = validateComposeSms('x'.repeat(500), ['e1', 'e2', 'e3'], goodPool);
-check('over 480 triggers rebuild', rebuilt.rebuilt === true);
-
-check('>3 picks triggers rebuild', validateComposeSms('picks', ['e1','e2','e3','e4'], goodPool).rebuilt === true);
-check('0 picks triggers rebuild', validateComposeSms('no picks', [], goodPool).rebuilt === true);
+check('null query -> events', inferTypesFromQuery(null).includes('events'));
+check('empty query -> events', inferTypesFromQuery('').includes('events'));
+check('"best bars" -> bars', inferTypesFromQuery('best bars').includes('bars'));
+check('"dinner spot" -> restaurants', inferTypesFromQuery('dinner spot').includes('restaurants'));
+check('"comedy show" -> events', inferTypesFromQuery('comedy show').includes('events'));
+check('"dinner and a show" -> restaurants + events', (() => {
+  const t = inferTypesFromQuery('dinner and a show');
+  return t.includes('restaurants') && t.includes('events');
+})());
+check('"cocktail bar" -> bars', inferTypesFromQuery('cocktail bar').includes('bars'));
+check('"what\'s happening tonight" -> events', inferTypesFromQuery("what's happening tonight").includes('events'));
 
 // ---- executeTool details returns event data for model ----
 console.log('\nexecuteTool details returns event data:');
@@ -132,19 +139,19 @@ const detailsSession = {
 const dummyTrace = { events: {}, composition: {} };
 
 (async () => {
-  // Returns event data (not _smsText)
-  const detResult = await executeTool('search_events', { intent: 'details', pick_reference: 'jazz' }, detailsSession, '+1234', dummyTrace);
-  check('details returns events array', Array.isArray(detResult.events));
-  check('details returns pick_reference', detResult.pick_reference === 'jazz');
-  check('details events have description', detResult.events[0].description_short !== undefined);
-  check('details does NOT return _smsText', detResult._smsText === undefined);
+  // Returns event data via unified search tool
+  const detResult = await executeTool('search', { intent: 'details', reference: 'jazz' }, detailsSession, '+1234', dummyTrace);
+  check('details returns items array', Array.isArray(detResult.items));
+  check('details returns reference', detResult.reference === 'jazz');
+  check('details items have description', detResult.items[0].description_short !== undefined);
+  check('details items have type tag', detResult.items[0].type === 'event');
 
   // No picks returns not_found
-  const noPickResult = await executeTool('search_events', { intent: 'details', pick_reference: '1' }, { lastPicks: [] }, '+1234', dummyTrace);
+  const noPickResult = await executeTool('search', { intent: 'details', reference: '1' }, { lastPicks: [] }, '+1234', dummyTrace);
   check('details no picks returns not_found', noPickResult.not_found === true);
 
   // Stale picks returns stale
   const staleSession2 = { ...detailsSession, lastResponseHadPicks: false, lastNeighborhood: 'Bushwick' };
-  const staleResult = await executeTool('search_events', { intent: 'details', pick_reference: '1' }, staleSession2, '+1234', dummyTrace);
+  const staleResult = await executeTool('search', { intent: 'details', reference: '1' }, staleSession2, '+1234', dummyTrace);
   check('details stale returns stale', staleResult.stale === true);
 })();

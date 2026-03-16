@@ -79,6 +79,10 @@ function setResponseState(phone, frame) {
     pendingFilters: frame.pendingFilters ?? null,
     pendingMessage: frame.pendingMessage ?? null,
     lastResponseHadPicks: frame.lastResponseHadPicks ?? false,
+    // Place state — frame values override, else preserved from existing
+    lastPlaces: frame.placePicks ?? existing?.lastPlaces ?? [],
+    lastPlaceMap: frame.placeMap ?? existing?.lastPlaceMap ?? {},
+    lastResultType: frame.resultType ?? existing?.lastResultType ?? null,
     timestamp: Date.now(),
   });
   scheduleDiskWrite();
@@ -133,6 +137,9 @@ function scheduleDiskWrite() {
           pendingNearby: session.pendingNearby || null,
           pendingFilters: session.pendingFilters || null,
           pendingMessage: session.pendingMessage || null,
+          lastPlaces: session.lastPlaces || [],
+          lastPlaceMap: session.lastPlaceMap || {},
+          lastResultType: session.lastResultType || null,
           timestamp: session.timestamp,
         };
       }
@@ -195,6 +202,9 @@ function flushSessions() {
         pendingNearbyEvents: session.pendingNearbyEvents || null,
         pendingFilters: session.pendingFilters || null,
         pendingMessage: session.pendingMessage || null,
+        lastPlaces: session.lastPlaces || [],
+        lastPlaceMap: session.lastPlaceMap || {},
+        lastResultType: session.lastResultType || null,
         timestamp: session.timestamp,
       };
     }

@@ -56,7 +56,8 @@ function buildEventMap(events) {
  * Every field is explicitly set to prevent stale state from persisting.
  */
 function saveResponseFrame(phone, { mode = 'fresh', picks = [], prevSession,
-    eventMap = {}, neighborhood, borough, filters, offeredIds = [], visitedHoods, pending, pendingMessage, lastResponseHadPicks } = {}) {
+    eventMap = {}, neighborhood, borough, filters, offeredIds = [], visitedHoods, pending, pendingMessage, lastResponseHadPicks,
+    placePicks, placeMap, resultType } = {}) {
   const isMore = mode === 'more';
   setResponseState(phone, {
     picks,
@@ -73,6 +74,9 @@ function saveResponseFrame(phone, { mode = 'fresh', picks = [], prevSession,
     pendingFilters: pending?.filters || null,
     pendingMessage: pendingMessage || null,
     lastResponseHadPicks: lastResponseHadPicks ?? (picks.length > 0),
+    placePicks: placePicks ?? undefined,
+    placeMap: placeMap ?? undefined,
+    resultType: resultType ?? undefined,
   });
 }
 

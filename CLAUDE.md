@@ -27,20 +27,20 @@ Pulse turns a simple text message into a curated night out. A user texts a neigh
 
 Pulse routes every incoming message through `checkMechanical` (help + TCPA only, $0) then the agent brain (Gemini tool calling). Session state is derived from the agent's structured tool call parameters — never parsed from free-text output.
 
-**Agent loop (sole path, ~$0.001/call)** — True agent loop via `runAgentLoop` in `llm.js`. `checkMechanical` handles only "help"/"?" and TCPA opt-out at $0. Everything else goes through `handleAgentRequest` in `agent-loop.js`, which runs a multi-turn tool calling loop (max 3 iterations): model calls a tool → code executes it → result fed back → model decides next action or writes SMS. 2 tools: `search_events` (all event intents) and `respond` (conversation). The model writes the SMS as plain text when it's ready. Falls back to Anthropic Haiku on Gemini failure. 2-5s typical latency.
+**Agent loop (sole path, ~$0.001/call)** — True agent loop via `runAgentLoop` in `llm.js`. `checkMechanical` handles only "help"/"?" and TCPA opt-out at $0. Everything else goes through `handleAgentRequest` in `agent-loop.js`, which runs a multi-turn tool calling loop (max 3 iterations): model calls a tool → code executes it → result fed back → model decides next action or writes SMS. 2 tools: `search` (unified — events, bars, restaurants, details, more, welcome) and `respond` (conversation). The model writes the SMS as plain text when it's ready. Falls back to Anthropic Haiku on Gemini failure. 2-5s typical latency.
 
 A typical multi-turn conversation:
 ```
-User: "williamsburg"           → agent brain: search_events({neighborhood: "williamsburg"}) ($0.0005)
-User: "how about comedy"       → agent brain: search_events({neighborhood: "williamsburg", categories: ["comedy"]}) ($0.0005)
-User: "2"                      → agent brain: search_events({intent: "details", pick_reference: "2"}) ($0.0005)
-User: "try bushwick"           → agent brain: search_events({neighborhood: "bushwick", categories: ["comedy"]}) ($0.0005)
-User: "later tonight"          → agent brain: search_events({neighborhood: "bushwick", categories: ["comedy"], time_filter: "late_night"}) ($0.0005)
-User: "forget the comedy"      → agent brain: search_events({neighborhood: "bushwick"}) ($0.0005)
-User: "more"                   → agent brain: search_events({intent: "more"}) ($0.0005)
+User: "williamsburg"           → agent brain: search({neighborhood: "williamsburg", intent: "discover"}) ($0.0005)
+User: "how about comedy"       → agent brain: search({neighborhood: "williamsburg", filters: {categories: ["comedy"]}, intent: "discover"}) ($0.0005)
+User: "2"                      → agent brain: search({intent: "details", reference: "2"}) ($0.0005)
+User: "try bushwick"           → agent brain: search({neighborhood: "bushwick", filters: {categories: ["comedy"]}, intent: "discover"}) ($0.0005)
+User: "later tonight"          → agent brain: search({neighborhood: "bushwick", filters: {categories: ["comedy"], time_after: "22:00"}, intent: "discover"}) ($0.0005)
+User: "forget the comedy"      → agent brain: search({neighborhood: "bushwick", intent: "discover"}) ($0.0005)
+User: "more"                   → agent brain: search({intent: "more"}) ($0.0005)
 ```
 
-**Filter state flow:** The handler reads filter state from the agent brain's `search_events` tool call params (categories, time_filter, free_only, date_range). These are structured and validated — safe state sources. After the response, the handler saves `activeFilters` as `lastFilters` via `saveResponseFrame`.
+**Filter state flow:** The handler reads filter state from the agent brain's `search` tool call params (filters.categories, filters.free_only, filters.time_after, filters.date_range). These are structured and validated — safe state sources. After the response, the handler saves `activeFilters` as `lastFilters` via `saveResponseFrame`. Conversation history includes `search_summary` entries for richer model context.
 
 Session state (neighborhood, last picks, active filters) persists for 2 hours per phone number.
 
@@ -67,9 +67,9 @@ Daily scrape (10am ET)              Incoming SMS
         │                           │
         │                    ┌──────┴──────┐
         │                    ▼             ▼
-        │              search_events    respond
-        │              (search, refine, (greetings,
-        └─►             more, details)   thanks, bye)
+        │                search         respond
+        │              (events, bars,  (greetings,
+        └─►             more, details)  thanks, bye)
                              │
                         agent loop (max 3 turns)   ~$0.001
                         model writes plain text SMS
@@ -109,7 +109,7 @@ Sources: 22 entries across 19 scraper modules in `sources/` — see `source-regi
 
 ## Design Principles (do not violate)
 
-- **P1: Structured tool calls own state, free-text owns language** — Session state is derived from the agent brain's tool call params (`search_events` args), never parsed from free-text LLM output. Tool params are structured and validated — the sole source of truth for filters and intent.
+- **P1: Structured tool calls own state, free-text owns language** — Session state is derived from the agent brain's tool call params (`search` args) and pool results, never parsed from free-text LLM output. Picks are saved from pool order (top events shown to model), not fuzzy-matched from SMS text.
 - **P4: One save path** — Every SMS-sending path must end with `saveResponseFrame`. No `setSession` terminal writes.
 - **P6: Mechanical shortcuts for $0 operations, LLM for everything else** — `checkMechanical` handles "help"/"?" and TCPA opt-out at $0. Everything else (including bare numbers, "more", greetings) goes to the agent brain's tool calling.
 - **480-char SMS limit** — All responses capped at 480 chars.
