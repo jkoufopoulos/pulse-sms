@@ -715,7 +715,7 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     session._proactivePrompt = true;
   }
 
-  const systemPrompt = buildBrainSystemPrompt(session);
+  const systemPrompt = buildBrainSystemPrompt(session, profile);
 
   let smsSent = false;
   try {

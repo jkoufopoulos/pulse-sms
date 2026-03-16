@@ -197,6 +197,28 @@ function runMigrations(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_places_hood ON places(neighborhood);
     CREATE INDEX IF NOT EXISTS idx_places_cache_key ON places(neighborhood_key, cached_at);
+
+    CREATE TABLE IF NOT EXISTS user_profiles (
+      phone_hash TEXT PRIMARY KEY,
+      phone TEXT,
+      neighborhoods_json TEXT NOT NULL DEFAULT '{}',
+      categories_json TEXT NOT NULL DEFAULT '{}',
+      subcategories_json TEXT NOT NULL DEFAULT '{}',
+      session_count INTEGER NOT NULL DEFAULT 0,
+      price_preference TEXT NOT NULL DEFAULT 'any',
+      time_preference TEXT NOT NULL DEFAULT 'any',
+      free_session_count INTEGER NOT NULL DEFAULT 0,
+      total_picks_session_count INTEGER NOT NULL DEFAULT 0,
+      late_time_count INTEGER NOT NULL DEFAULT 0,
+      early_time_count INTEGER NOT NULL DEFAULT 0,
+      timed_session_count INTEGER NOT NULL DEFAULT 0,
+      last_active_date TEXT,
+      created_at TEXT,
+      proactive_opt_in INTEGER NOT NULL DEFAULT 0,
+      proactive_opt_in_date TEXT,
+      proactive_prompt_count INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL DEFAULT ''
+    );
   `);
 
   // Migration: add normalized_name column for recurrence detection

@@ -8,9 +8,11 @@ const {
   setProactiveOptIn,
   incrementProactivePromptCount,
   exportProfiles,
+  loadProfiles,
   hashPhone,
   _resetForTest,
 } = require('../../src/preference-profile');
+const { buildProfileSummary, buildBrainSystemPrompt } = require('../../src/brain-llm');
 
 // Reset state before tests
 _resetForTest();
@@ -297,6 +299,63 @@ async function runAsyncTests() {
   incrementProactivePromptCount('+12125550032');
   incrementProactivePromptCount('+12125550032');
   check('incrementProactivePromptCount increments', getProfile('+12125550032').proactivePromptCount === 2);
+
+  // ---- JSON migration ----
+  console.log('\nJSON migration:');
+
+  _resetForTest();
+  // loadProfiles() on empty table with no JSON file should be a no-op
+  loadProfiles();
+  const postLoad = exportProfiles();
+  check('loadProfiles on empty table with no JSON → empty', Object.keys(postLoad).length === 0);
+
+  // ---- buildProfileSummary ----
+  console.log('\nbuildProfileSummary:');
+
+  check('null profile → null summary', buildProfileSummary(null) === null);
+  check('blank profile → null summary', buildProfileSummary(blankProfile()) === null);
+
+  const newUserProfile = { ...blankProfile(), sessionCount: 1, createdAt: '2025-01-01' };
+  const newSummary = buildProfileSummary(newUserProfile);
+  check('new user summary is not null', newSummary !== null);
+  check('new user summary mentions 1st session', newSummary.includes('1st session'));
+
+  const returningProfile = {
+    ...blankProfile(),
+    sessionCount: 12,
+    neighborhoods: { bushwick: 5, williamsburg: 3 },
+    categories: { jazz: 4, comedy: 2 },
+    subcategories: {},
+    timePreference: 'late',
+    pricePreference: 'any',
+  };
+  const returnSummary = buildProfileSummary(returningProfile);
+  check('returning user summary mentions sessions', returnSummary.includes('12 sessions'));
+  check('returning user summary mentions bushwick', returnSummary.includes('bushwick'));
+  check('returning user summary mentions jazz', returnSummary.includes('jazz'));
+  check('returning user summary mentions night owl', returnSummary.includes('Night owl'));
+
+  const freeProfile = {
+    ...blankProfile(),
+    sessionCount: 5,
+    pricePreference: 'free',
+  };
+  const freeSummary = buildProfileSummary(freeProfile);
+  check('free preference summary mentions free', freeSummary.includes('free'));
+
+  // ---- buildBrainSystemPrompt with profile ----
+  console.log('\nbuildBrainSystemPrompt with profile:');
+
+  const session = { conversationHistory: [], lastNeighborhood: null };
+  const promptWithProfile = buildBrainSystemPrompt(session, returningProfile);
+  check('system prompt includes USER PROFILE', promptWithProfile.includes('USER PROFILE:'));
+  check('system prompt includes profile data', promptWithProfile.includes('bushwick'));
+
+  const promptNoProfile = buildBrainSystemPrompt(session, null);
+  check('system prompt without profile has no USER PROFILE line', !promptNoProfile.includes('USER PROFILE:'));
+
+  const promptBlankProfile = buildBrainSystemPrompt(session, blankProfile());
+  check('system prompt with blank profile has no USER PROFILE line', !promptBlankProfile.includes('USER PROFILE:'));
 
   // Clean up
   _resetForTest();

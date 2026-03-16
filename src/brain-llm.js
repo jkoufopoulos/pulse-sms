@@ -5,6 +5,7 @@
 const { NEIGHBORHOODS } = require('./neighborhoods');
 const { getNycDateString } = require('./geo');
 const { describeFilters } = require('./pipeline');
+const { getTopNeighborhood, getTopCategories } = require('./preference-profile');
 
 // --- Neighborhood list for system prompt ---
 const NEIGHBORHOOD_NAMES = Object.keys(NEIGHBORHOODS);
@@ -88,14 +89,59 @@ const BRAIN_TOOLS = [
   },
 ];
 
+// --- Profile summary for system prompt ---
+
+/**
+ * Build a concise profile summary string (~30-40 tokens) for the system prompt.
+ * Returns null for blank/new profiles.
+ */
+function buildProfileSummary(profile) {
+  if (!profile || profile.sessionCount === 0) return null;
+
+  const parts = [];
+
+  if (profile.sessionCount >= 2) {
+    parts.push(`Returning user (${profile.sessionCount} sessions)`);
+  } else {
+    parts.push('New user (1st session)');
+  }
+
+  const topHood = getTopNeighborhood(profile);
+  const topCats = getTopCategories(profile, 3);
+
+  if (topHood) {
+    const entries = Object.entries(profile.neighborhoods || {});
+    const topHoods = entries.sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k]) => k);
+    parts.push(`Favorite areas: ${topHoods.join(', ')}`);
+  }
+
+  if (topCats.length > 0) {
+    parts.push(`Into: ${topCats.join(', ')}`);
+  }
+
+  if (profile.timePreference === 'late') {
+    parts.push('Night owl');
+  } else if (profile.timePreference === 'early') {
+    parts.push('Early evening person');
+  }
+
+  if (profile.pricePreference === 'free') {
+    parts.push('Prefers free events');
+  }
+
+  return parts.join('. ') + '.';
+}
+
 // --- System prompt for the brain ---
 
-function buildBrainSystemPrompt(session) {
+function buildBrainSystemPrompt(session, profile) {
   const isFirstMessage = !session?.conversationHistory?.length && !session?.lastNeighborhood;
   const nycNow = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', weekday: 'short', month: 'short', day: 'numeric' });
+  const profileSummary = profile ? buildProfileSummary(profile) : null;
   const sessionContext = session
     ? [
       `Current time in NYC: ${nycNow}`,
+      profileSummary ? `USER PROFILE: ${profileSummary}` : null,
       isFirstMessage ? 'First message — new user, no history. Use respond to introduce yourself and ask what they want.' : null,
       session.lastNeighborhood ? `Current neighborhood: ${session.lastNeighborhood}` : null,
       session.lastFilters && Object.values(session.lastFilters).some(Boolean)
@@ -278,6 +324,7 @@ function stripCodeFences(text) {
 module.exports = {
   BRAIN_TOOLS,
   buildBrainSystemPrompt,
+  buildProfileSummary,
   serializePoolForContinuation,
   buildRecommendationReason,
   cleanEventName,
