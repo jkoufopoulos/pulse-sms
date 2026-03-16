@@ -27,7 +27,8 @@ function resolveNeighborhood(locality, lat, lng) {
 
   // Direct locality match against neighborhood names and aliases
   if (locality) {
-    const lower = locality.toLowerCase();
+    // Normalize smart quotes (Cheerio converts &#8217; to U+2019)
+    const lower = locality.toLowerCase().replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"');
     for (const [name, data] of Object.entries(NEIGHBORHOODS)) {
       if (name.toLowerCase() === lower) return name;
       for (const alias of data.aliases) {

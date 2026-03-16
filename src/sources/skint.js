@@ -530,10 +530,10 @@ async function fetchSkintEvents() {
     skipSection = false;
     groupSeriesEnd = null;
 
-    // Find the <h2> heading for this entry block to anchor date resolution.
-    // WordPress structure: <article><header><h2>THURS-MON, 3/13-16: ...</h2></header><div class="entry-content">...</div></article>
+    // Find the heading for this entry block to anchor date resolution.
+    // WordPress structure: <article><header><h1 class="entry-title">THURS-MON, 3/13-16: ...</h1></header><div class="entry-content">...</div></article>
     let entryResolveDate = resolveDate; // default fallback
-    const heading = entry.closest('article').find('h2').first();
+    const heading = entry.closest('article').find('.entry-title, h1, h2').first();
     if (heading.length) {
       const headingText = heading.text().trim();
       const dateRange = parsePostDateRange(headingText, refYear);
