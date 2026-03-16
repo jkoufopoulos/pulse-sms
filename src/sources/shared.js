@@ -216,14 +216,10 @@ function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
       price_quote: e.price_display ? e.price_display.toLowerCase() : (e.is_free === true ? 'free' : null),
     },
     editorial_note: e.editorial_note || null,
-    // Carry raw recurrence fields for downstream pattern detection (transient, not persisted to DB)
-    ...((e.is_recurring || e.recurrence_day || e.recurrence_time) ? {
-      _raw: {
-        is_recurring: e.is_recurring || false,
-        recurrence_day: e.recurrence_day || null,
-        recurrence_time: e.recurrence_time || null,
-      },
-    } : {}),
+    // Recurrence fields from LLM or trivia parser
+    is_recurring: e.is_recurring || false,
+    recurrence_day: e.recurrence_day || null,
+    recurrence_time: e.recurrence_time || null,
     // Carry raw text for post-scrape LLM enrichment (transient, stripped before persistence)
     ...(e._rawText ? { _rawText: e._rawText } : {}),
   };
