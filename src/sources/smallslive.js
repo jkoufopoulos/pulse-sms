@@ -1,37 +1,8 @@
-const cheerio = require('cheerio');
-const { makeEventId, FETCH_HEADERS } = require('./shared');
-const { getNycDateString, getNycUtcOffset } = require('../geo');
-
-const VENUE_ADDRESSES = {
-  'Smalls': '183 W 10th St, New York, NY',
-  'Mezzrow': '163 W 10th St, New York, NY',
-};
-
-function parseDate(dataDate) {
-  // data-date="Feb. 17, 2026" → "2026-02-17"
-  if (!dataDate) return null;
-  const d = new Date(dataDate.replace(/\./g, ''));
-  if (isNaN(d.getTime())) return null;
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-function parseFirstTime(timeText, dateLocal) {
-  // "6:00 PM & 7:30 PM" → ISO string for 6:00 PM
-  // "11:45 PM - 4:00 AM" → ISO string for 11:45 PM
-  if (!timeText || !dateLocal) return null;
-  const first = timeText.split(/[&\-–]/)[0].trim();
-  const match = first.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-  if (!match) return null;
-  let hours = parseInt(match[1], 10);
-  const mins = parseInt(match[2], 10);
-  const ampm = match[3].toUpperCase();
-  if (ampm === 'PM' && hours !== 12) hours += 12;
-  if (ampm === 'AM' && hours === 12) hours = 0;
-  return `${dateLocal}T${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00${getNycUtcOffset()}`;
-}
+const { extractEvents } = require('../ai');
+const { FETCH_HEADERS, normalizeExtractedEvent } = require('./shared');
+const { getNycDateString } = require('../geo');
+const { captureExtractionInput } = require('../extraction-capture');
+const { getCachedExtraction, setCachedExtraction } = require('../extraction-cache');
 
 async function fetchSmallsLiveEvents() {
   console.log('Fetching SmallsLIVE...');
@@ -56,63 +27,55 @@ async function fetchSmallsLiveEvents() {
       return [];
     }
 
+    // Extract text from HTML template (79KB raw — need to trim)
+    const cheerio = require('cheerio');
     const $ = cheerio.load(html);
-    const events = [];
-    const seen = new Set();
+    const preamble = 'SmallsLIVE upcoming jazz events. Venues: Smalls Jazz Club (183 W 10th St, West Village) and Mezzrow (163 W 10th St, West Village). All events are live jazz.';
+    const paragraphs = [preamble];
 
-    $('.flex-column.day-list').each((i, dayGroup) => {
-      const $day = $(dayGroup);
-      const dateHeader = $day.find('.title1[data-date]').attr('data-date');
-      const dateLocal = parseDate(dateHeader);
-
-
-      $day.find('.flex-column.day-event').each((j, eventEl) => {
-        const $event = $(eventEl);
-        const $link = $event.find('a');
-
-        const name = $link.find('.day_event_title').text().trim();
+    $('.flex-column.day-list').each((_, dayGroup) => {
+      const dateHeader = $(dayGroup).find('.title1[data-date]').attr('data-date') || '';
+      paragraphs.push(`\n--- ${dateHeader} ---`);
+      $(dayGroup).find('.flex-column.day-event').each((_, evt) => {
+        const name = $(evt).find('.day_event_title').text().trim();
+        const venue = $(evt).find('div:first-child').text().trim();
+        const time = $(evt).find('.text-grey').text().trim();
+        const href = $(evt).find('a').attr('href');
+        const url = href ? `https://www.smallslive.com${href}` : null;
         if (!name) return;
-
-        const venueName = $link.find('div:first-child').text().trim() || 'Smalls';
-        const timeText = $link.find('.text-grey').text().trim();
-        const href = $link.attr('href');
-        const sourceUrl = href ? `https://www.smallslive.com${href}` : null;
-
-        const startTime = parseFirstTime(timeText, dateLocal);
-        const venueAddress = VENUE_ADDRESSES[venueName] || VENUE_ADDRESSES['Smalls'];
-
-        const id = makeEventId(name, venueName === 'Mezzrow' ? 'Mezzrow' : 'Smalls Jazz Club', dateLocal, 'smallslive', null, startTime);
-        if (seen.has(id)) return;
-        seen.add(id);
-
-        events.push({
-          id,
-          source_name: 'smallslive',
-          source_type: 'venue_calendar',
-          name,
-          description_short: `Live jazz at ${venueName}`,
-          short_detail: timeText ? `${timeText} at ${venueName}` : `Live jazz at ${venueName}`,
-          venue_name: venueName === 'Mezzrow' ? 'Mezzrow' : 'Smalls Jazz Club',
-          venue_address: venueAddress,
-          neighborhood: 'West Village',
-          start_time_local: startTime,
-          end_time_local: null,
-          date_local: dateLocal || today,
-          time_window: null,
-          is_free: false,
-          price_display: 'Cover charge',
-          category: 'live_music',
-          subcategory: 'jazz',
-          ticket_url: sourceUrl,
-          source_url: sourceUrl,
-          map_url: null,
-          map_hint: venueAddress,
-        });
+        const line = [name, venue, time].filter(Boolean).join(' | ');
+        paragraphs.push(url ? `${line} [Source: ${url}]` : line);
       });
     });
 
-    console.log(`SmallsLIVE: ${events.length} events`);
-    return events;
+    if (paragraphs.length <= 1) {
+      console.log('SmallsLIVE: no events in template');
+      return [];
+    }
+
+    // Chunk by 20 events
+    const MAX_PARAGRAPHS = 20;
+    const allEvents = [];
+
+    for (let i = 0; i < paragraphs.length; i += MAX_PARAGRAPHS) {
+      const chunk = paragraphs.slice(i, i + MAX_PARAGRAPHS).join('\n');
+      const cacheKey = `smallslive:chunk${Math.floor(i / MAX_PARAGRAPHS)}`;
+
+      const cached = getCachedExtraction(cacheKey, chunk);
+      if (cached) { allEvents.push(...cached); continue; }
+
+      captureExtractionInput('smallslive', chunk, 'https://www.smallslive.com');
+      const result = await extractEvents(chunk, 'smallslive', 'https://www.smallslive.com');
+      const events = (result.events || [])
+        .map(e => normalizeExtractedEvent(e, 'smallslive', 'venue_calendar', 0.9))
+        .filter(e => e.name && e.completeness >= 0.5);
+
+      setCachedExtraction(cacheKey, chunk, events);
+      allEvents.push(...events);
+    }
+
+    console.log(`SmallsLIVE: ${allEvents.length} events (LLM)`);
+    return allEvents;
   } catch (err) {
     console.error('SmallsLIVE error:', err.message);
     return [];

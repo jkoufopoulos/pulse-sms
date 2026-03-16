@@ -1,110 +1,34 @@
 const cheerio = require('cheerio');
-const { makeEventId, FETCH_HEADERS } = require('./shared');
-const { resolveNeighborhood, getNycDateString } = require('../geo');
+const { extractEvents } = require('../ai');
+const { FETCH_HEADERS, normalizeExtractedEvent } = require('./shared');
+const { captureExtractionInput } = require('../extraction-capture');
+const { getCachedExtraction, setCachedExtraction } = require('../extraction-cache');
 
 const VENUE_URL = 'https://donyc.com/venues/sofar-sounds-secret-location';
-const MAX_PAGES = 3;
 
 /**
  * Extract neighborhood from Sofar event name.
  * "Sofar Sounds - Meatpacking District" → "Meatpacking District"
- * "Sofar Sounds - Lower Manhattan" → "Lower Manhattan"
  */
 function extractNeighborhood(name) {
   const m = name.match(/^Sofar Sounds\s*[-–—]\s*(.+)$/i);
   return m ? m[1].trim() : null;
 }
 
-function parseCards($, cards) {
-  const today = getNycDateString(0);
-  const maxDate = getNycDateString(14);
-  const parsed = [];
-
-  cards.each((_, el) => {
-    const card = $(el);
-    const name = card.find('.ds-listing-event-title-text').text().trim();
-    if (!name) return;
-
-    const eventPath = card.find('a[itemprop="url"]').attr('href');
-    const sourceUrl = eventPath ? `https://donyc.com${eventPath}` : null;
-
-    const startDate = card.find('meta[itemprop="startDate"]').attr('content') || null;
-    let dateLocal = null;
-    if (startDate) {
-      const dm = startDate.match(/^(\d{4}-\d{2}-\d{2})/);
-      if (dm) dateLocal = dm[1];
-    }
-    if (!dateLocal) return;
-    if (dateLocal < today || dateLocal > maxDate) return;
-
-    const hoodName = extractNeighborhood(name);
-    const neighborhood = hoodName ? resolveNeighborhood(hoodName, null, null) : null;
-
-    const cardText = card.text();
-    const isFree = /\bfree\b/i.test(cardText) || /\$0(?:\.00)?/.test(cardText);
-    let priceDisplay = isFree ? 'free' : null;
-    if (!isFree) {
-      const rangeMatch = cardText.match(/\$(\d+(?:\.\d{2})?)\s*[-–]\s*\$?(\d+(?:\.\d{2})?)/);
-      if (rangeMatch) {
-        priceDisplay = `$${rangeMatch[1]}-$${rangeMatch[2]}`;
-      } else {
-        const priceMatch = cardText.match(/\$(\d+)/);
-        if (priceMatch) priceDisplay = `$${priceMatch[1]}`;
-      }
-    }
-
-    let ticketUrl = sourceUrl;
-    const buyLink = card.find('a[href*="sofarsounds"]').attr('href') ||
-                    card.find('a[href*="sofar"]').attr('href');
-    if (buyLink) ticketUrl = buyLink;
-
-    const id = makeEventId(name, 'Sofar Sounds', dateLocal, 'sofarsounds', sourceUrl, startDate);
-
-    parsed.push({
-      id,
-      source_name: 'SofarSounds',
-      source_type: 'venue',
-      name,
-      description_short: 'Intimate secret concert featuring 3 diverse acts at a surprise venue',
-      short_detail: 'Intimate secret concert featuring 3 diverse acts at a surprise venue',
-      venue_name: 'Sofar Sounds - Secret Location',
-      venue_address: null,
-      neighborhood,
-      start_time_local: startDate || null,
-      end_time_local: null,
-      date_local: dateLocal,
-      time_window: null,
-      is_free: isFree,
-      price_display: priceDisplay,
-      category: 'live_music',
-      subcategory: null,
-      ticket_url: ticketUrl,
-      source_url: sourceUrl,
-      map_url: null,
-      map_hint: hoodName || null,
-    });
-  });
-
-  return parsed;
-}
-
 async function fetchSofarSoundsEvents() {
   console.log('Fetching Sofar Sounds...');
   try {
-    const allEvents = [];
-    const seen = new Set();
+    // Fetch up to 3 pages from DoNYC venue page
+    const paragraphs = ['Sofar Sounds secret concerts in NYC. Venues are revealed day-of.'];
 
-    for (let page = 1; page <= MAX_PAGES; page++) {
+    for (let page = 1; page <= 3; page++) {
       const url = page === 1 ? VENUE_URL : `${VENUE_URL}?page=${page}`;
       const res = await fetch(url, {
         headers: FETCH_HEADERS,
         signal: AbortSignal.timeout(10000),
       });
 
-      if (!res.ok) {
-        console.error(`SofarSounds: page ${page} failed (${res.status})`);
-        break;
-      }
+      if (!res.ok) break;
 
       const html = await res.text();
       const $ = cheerio.load(html);
@@ -112,11 +36,14 @@ async function fetchSofarSoundsEvents() {
 
       if (cards.length === 0) break;
 
-      for (const evt of parseCards($, cards)) {
-        if (seen.has(evt.id)) continue;
-        seen.add(evt.id);
-        allEvents.push(evt);
-      }
+      cards.each((_, el) => {
+        const text = $(el).text().replace(/\s+/g, ' ').trim();
+        const link = $(el).find('a[itemprop="url"]').attr('href');
+        const sourceUrl = link ? `https://donyc.com${link}` : null;
+        if (text && text.length > 10) {
+          paragraphs.push(sourceUrl ? `${text} [Source: ${sourceUrl}]` : text);
+        }
+      });
 
       const hasNext = $('a[href*="page="]').filter((_, a) =>
         /next\s*page/i.test($(a).text())
@@ -124,8 +51,28 @@ async function fetchSofarSoundsEvents() {
       if (!hasNext) break;
     }
 
-    console.log(`SofarSounds: ${allEvents.length} events`);
-    return allEvents;
+    if (paragraphs.length <= 1) {
+      console.log('SofarSounds: no events found');
+      return [];
+    }
+
+    const content = paragraphs.join('\n\n');
+    captureExtractionInput('sofarsounds', content, VENUE_URL);
+
+    const cached = getCachedExtraction('sofarsounds', content);
+    if (cached) {
+      console.log(`SofarSounds: ${cached.length} events (cached)`);
+      return cached;
+    }
+
+    const result = await extractEvents(content, 'SofarSounds', VENUE_URL);
+    const events = (result.events || [])
+      .map(e => normalizeExtractedEvent(e, 'SofarSounds', 'venue', 0.9))
+      .filter(e => e.name && e.completeness >= 0.5);
+
+    setCachedExtraction('sofarsounds', content, events);
+    console.log(`SofarSounds: ${events.length} events (LLM)`);
+    return events;
   } catch (err) {
     console.error('SofarSounds error:', err.message);
     return [];
