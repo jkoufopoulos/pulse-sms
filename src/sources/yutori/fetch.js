@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { extractEvents } = require('../../ai');
+const { extractYutoriEvents } = require('../../ai');
 const { fetchYutoriEmails } = require('../../gmail');
 const { normalizeExtractedEvent } = require('../shared');
 const { captureExtractionInput } = require('../../extraction-capture');
@@ -186,14 +186,12 @@ async function fetchYutoriEvents({ reprocess = false } = {}) {
       const batch = fileContents.slice(i, i + CONCURRENCY);
       const results = await Promise.allSettled(
         batch.map(async ({ file, content }) => {
-          console.log(`Yutori: extracting ${file} (${content.length} chars)`);
-          const preamble = `[YUTORI CONTEXT]\nThis is a curated Yutori agent briefing about NYC events.\nEach event typically has: name, description, date/time, venue, address, price, source URL.\nExtract events that a person could physically attend in NYC — shows, screenings, openings, comedy, trivia, concerts, workshops, and social gatherings.\n\nDO NOT extract:\n- Movie/TV release dates or streaming announcements\n- Product launches or tech announcements\n- Academic papers, research summaries, or industry analysis\n- Personal advice, productivity tips, or career coaching\n- News articles or opinion pieces about events (extract the event itself, not the article)\n\nRECURRENCE DETECTION:\nMany Yutori events are recurring weekly. Look for:\n- "every [day]", "weekly", "[day]s at [time]"\n- "Next: [date]" with a day-of-week pattern\n- Trivia nights, open mics, DJ residencies are often recurring\nSet is_recurring=true, recurrence_day, and recurrence_time when detected.\n\nSERIES / DATE RANGE EVENTS:\nFor events running on multiple specific dates (e.g., "Mar 3-8 @ 7pm", "runs through March 15"), extract ONE event per date in the range. Each gets the same name, venue, time, but a different date_local.\nDo NOT create 20+ events for long-running exhibitions — cap at 7 dates max.\n\nCATEGORY GUIDANCE:\n- "nightlife" — DJ sets, dance parties, raves, club nights, bar events\n- "live_music" — concerts, live bands, album release shows, jazz, open mics with music\n- "comedy" — stand-up, improv, sketch, roasts, comedy open mics\n- "art" — gallery openings, exhibitions, art installations, visual art\n- "film" — movie screenings, film festivals, repertory cinema, film series\n- "theater" — plays, musicals, dance performances, spoken word\n- "community" — meetups, workshops, classes, social gatherings, book clubs, board games\n- "food_drink" — food festivals, tastings, pop-up dinners, happy hours\n- "trivia" — pub trivia, quiz nights\nPrefer a specific category over "other". Only use "other" if the event truly fits none of the above.\n[END CONTEXT]\n\n`;
-          const enrichedContent = preamble + content;
-          captureExtractionInput('yutori', enrichedContent, null);
-          const cacheKey = `yutori:${file}`;
-          const cachedFile = getCachedExtraction(cacheKey, enrichedContent);
+          console.log(`Yutori: LLM extracting ${file} (${content.length} chars)`);
+          captureExtractionInput('yutori', content, null);
+          const cacheKey = `yutori-sonnet:${file}`;
+          const cachedFile = getCachedExtraction(cacheKey, content);
           if (cachedFile) return cachedFile;
-          const result = await extractEvents(enrichedContent, 'yutori', null);
+          const result = await extractYutoriEvents(content, file);
           const raw = result.events || [];
           const normalized = raw.map(e => normalizeExtractedEvent(e, 'yutori', 'aggregator', 0.8));
           const passed = normalized.filter(e => e.name && e.completeness >= 0.25);
@@ -222,7 +220,7 @@ async function fetchYutoriEvents({ reprocess = false } = {}) {
           if (dropped > 0) {
             console.log(`Yutori: LLM extracted ${raw.length} from ${file}, ${contentFiltered.length} passed gates (${dropped} dropped)`);
           }
-          setCachedExtraction(cacheKey, enrichedContent, contentFiltered);
+          setCachedExtraction(cacheKey, content, contentFiltered);
           return contentFiltered;
         })
       );

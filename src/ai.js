@@ -1,6 +1,6 @@
 const { generate: llmGenerate } = require('./llm');
 const { MODELS } = require('./model-config');
-const { EXTRACTION_PROMPT } = require('./prompts');
+const { EXTRACTION_PROMPT, YUTORI_EXTRACTION_PROMPT } = require('./prompts');
 
 
 /**
@@ -144,4 +144,50 @@ function fixJsonNewlines(text) {
   return result;
 }
 
-module.exports = { extractEvents, parseJsonFromResponse };
+/**
+ * Extract events from a Yutori Scout email using Claude Sonnet.
+ * Used as fallback when deterministic parsers (trivia, structured) return 0 results.
+ */
+async function extractYutoriEvents(preprocessedText, filename) {
+  const model = process.env.PULSE_MODEL_YUTORI_EXTRACT || 'claude-sonnet-4-6';
+  const dateMatch = filename.match(/^(\d{4}-\d{2}-\d{2})/);
+  const emailDate = dateMatch ? dateMatch[1] : new Date().toISOString().slice(0, 10);
+
+  const userPrompt = `<source>
+source_name: yutori
+filename: ${filename}
+email_date: ${emailDate}
+</source>
+
+<text>
+${preprocessedText}
+</text>
+
+Extract all events into the JSON format specified in your instructions.`;
+
+  let text, usage, provider;
+
+  try {
+    const result = await llmGenerate(model, YUTORI_EXTRACTION_PROMPT, userPrompt, {
+      maxTokens: 8192, temperature: 0, json: true, timeout: 90_000,
+    });
+    text = result.text; usage = result.usage; provider = result.provider;
+  } catch (err) {
+    console.warn(`extractYutoriEvents ${model} failed, falling back to ${MODELS.fallback}: ${err.message}`);
+    const result = await llmGenerate(MODELS.fallback, YUTORI_EXTRACTION_PROMPT, userPrompt, {
+      maxTokens: 8192, temperature: 0, json: true, timeout: 90_000,
+    });
+    text = result.text; usage = result.usage; provider = result.provider;
+  }
+
+  const parsed = parseJsonFromResponse(text);
+  if (!parsed) {
+    console.error(`extractYutoriEvents (${provider}): no valid JSON in response`);
+    return { events: [], _usage: usage || null, _provider: provider };
+  }
+
+  const events = Array.isArray(parsed.events) ? parsed.events : Array.isArray(parsed) ? parsed : [];
+  return { events, _usage: usage || null, _provider: provider };
+}
+
+module.exports = { extractEvents, extractYutoriEvents, parseJsonFromResponse };
