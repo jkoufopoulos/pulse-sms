@@ -166,9 +166,10 @@ async function fetchYutoriEvents({ reprocess = false } = {}) {
         // Fall through to LLM if structured parse found nothing
       }
 
-      const content = /\.html?$/i.test(file) ? preprocessYutoriHtml(raw) : raw;
-      if (content.length >= 50) {
-        fileContents.push({ file, content });
+      // Pass raw HTML to LLM — preserves badge links and event names
+      // that the preprocessor strips
+      if (raw.length >= 50) {
+        fileContents.push({ file, content: raw });
       }
     }
 
@@ -188,7 +189,7 @@ async function fetchYutoriEvents({ reprocess = false } = {}) {
         batch.map(async ({ file, content }) => {
           console.log(`Yutori: LLM extracting ${file} (${content.length} chars)`);
           captureExtractionInput('yutori', content, null);
-          const cacheKey = `yutori-sonnet:${file}`;
+          const cacheKey = `yutori-llm:${file}`;
           const cachedFile = getCachedExtraction(cacheKey, content);
           if (cachedFile) return cachedFile;
           const result = await extractYutoriEvents(content, file);

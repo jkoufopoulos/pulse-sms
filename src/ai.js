@@ -145,11 +145,13 @@ function fixJsonNewlines(text) {
 }
 
 /**
- * Extract events from a Yutori Scout email using Claude Sonnet.
+ * Extract events from a Yutori Scout email using an LLM.
  * Used as fallback when deterministic parsers (trivia, structured) return 0 results.
+ * Accepts raw HTML or preprocessed text — raw HTML preserves badge links and event names
+ * that the preprocessor strips.
  */
-async function extractYutoriEvents(preprocessedText, filename) {
-  const model = process.env.PULSE_MODEL_YUTORI_EXTRACT || 'claude-sonnet-4-6';
+async function extractYutoriEvents(content, filename) {
+  const model = process.env.PULSE_MODEL_YUTORI_EXTRACT || 'claude-haiku-4-5-20251001';
   const dateMatch = filename.match(/^(\d{4}-\d{2}-\d{2})/);
   const emailDate = dateMatch ? dateMatch[1] : new Date().toISOString().slice(0, 10);
 
@@ -160,7 +162,7 @@ email_date: ${emailDate}
 </source>
 
 <text>
-${preprocessedText}
+${content}
 </text>
 
 Extract all events into the JSON format specified in your instructions.`;
