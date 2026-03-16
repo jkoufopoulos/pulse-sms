@@ -325,6 +325,10 @@ Design principle: **deterministic rules handle the 86%, LLM classifies the stubb
 
 | Issue | Why deferred |
 |-------|-------------|
+| ~~Skint scraper date resolution wrong~~ | ~~Fixed. Now parses post `<h2>` date range (e.g., "3/13-16") and anchors day name resolution to post start date instead of today. See [audit](docs/audits/2026-03-15-skint-scraper-audit.md).~~ |
+| ~~Skint bullet sub-events not split~~ | ~~Fixed. `splitBulletParagraph` splits multi-bullet `<p>` tags (separated by `<br>`) into individual events. `parseSkintParagraph` now handles venue-only bullets (`► venue (hood). price.`).~~ |
+| ~~Skint venue extraction failures~~ | ~~Fixed. `refineVenue` trims over-long venue strings by comma and "at" boundaries. Remaining edge cases (no `(neighborhood)` paren at all) deferred to LLM enrichment.~~ |
+| ~~Skint category misclassifications~~ | ~~Fixed. Reordered trivia before film (quiz→trivia not film). Narrowed "tasting" to require food/drink context. Removed "cinema" from film (catches venue names).~~ |
 | No processing ack during slow LLM calls | Adds extra Twilio cost |
 | No structured logging or correlation IDs | Operational improvement for scale |
 | Price data gap (21% unknown) | Structurally unavailable from some sources |

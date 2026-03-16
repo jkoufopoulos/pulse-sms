@@ -40,6 +40,95 @@ function getNycDayContext() {
   return { todayDow, todayIso, resolveDate, formatDate };
 }
 
+/**
+ * Parse a post date range from a Skint heading like "THURS-MON, 3/13-16" or "TUES-THURS, 3/10-12".
+ * Returns { startDate: "YYYY-MM-DD", startDow: 0-6 } or null.
+ */
+function parsePostDateRange(headerText, refYear) {
+  // Match "M/D-D" or "M/D-M/D" patterns (e.g., "3/13-16", "12/28-1/2")
+  const match = headerText.match(/(\d{1,2})\/(\d{1,2})\s*[-–]\s*(?:(\d{1,2})\/)?(\d{1,2})/);
+  if (!match) return null;
+
+  const startMonth = parseInt(match[1], 10);
+  const startDay = parseInt(match[2], 10);
+  if (startMonth < 1 || startMonth > 12 || startDay < 1 || startDay > 31) return null;
+
+  const startDate = new Date(refYear, startMonth - 1, startDay);
+  const startDow = startDate.getDay();
+  const iso = `${refYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
+
+  return { startDate: iso, startDow };
+}
+
+/**
+ * Create a resolveDate function anchored to a post's start date.
+ * Day names resolve forward from the anchor (e.g., if anchor is Friday 3/13,
+ * "friday" → 3/13, "saturday" → 3/14, "sunday" → 3/15, "monday" → 3/16).
+ */
+function createAnchoredResolveDate(postStartDate, postStartDow) {
+  const [y, m, d] = postStartDate.split('-').map(Number);
+
+  return function resolveDate(dayName) {
+    const dayIndex = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday']
+      .indexOf(dayName.toLowerCase());
+    if (dayIndex === -1) return null;
+
+    let delta = dayIndex - postStartDow;
+    if (delta < 0) delta += 7; // always forward from anchor
+    const target = new Date(y, m - 1, d + delta);
+    const mm = String(target.getMonth() + 1).padStart(2, '0');
+    const dd = String(target.getDate()).padStart(2, '0');
+    return `${target.getFullYear()}-${mm}-${dd}`;
+  };
+}
+
+/**
+ * Refine a raw venue string that's too long (likely includes description text).
+ * Tries comma and "at" boundaries to isolate the venue name.
+ * Returns { venue, extraDescription }.
+ */
+function refineVenue(rawVenue) {
+  if (rawVenue.length <= 60) return { venue: rawVenue, extraDescription: null };
+
+  // Strategy 1: last comma — "long description, venue name"
+  const lastComma = rawVenue.lastIndexOf(',');
+  if (lastComma > 0) {
+    const afterComma = rawVenue.slice(lastComma + 1).trim();
+    if (afterComma.length >= 3 && afterComma.length <= 60) {
+      return { venue: afterComma, extraDescription: rawVenue.slice(0, lastComma).trim() };
+    }
+  }
+
+  // Strategy 2: " at " preposition — "long description at venue name"
+  const atIdx = rawVenue.lastIndexOf(' at ');
+  if (atIdx > 0) {
+    const afterAt = rawVenue.slice(atIdx + 4).trim();
+    if (afterAt.length >= 3 && afterAt.length <= 60) {
+      return { venue: afterAt, extraDescription: rawVenue.slice(0, atIdx).trim() };
+    }
+  }
+
+  return { venue: rawVenue, extraDescription: null };
+}
+
+/**
+ * Detect whether a price string indicates a free event.
+ * Catches: "free", "free admission", "free admission (rsvp required)",
+ * "free rsvp (required)", "pay-what-you-can", "pay what you wish", "pwyc", etc.
+ */
+function isFreePrice(priceStr) {
+  if (!priceStr) return false;
+  const p = priceStr.toLowerCase();
+  return /^free\b/.test(p)
+    || /\bfree admission\b/.test(p)
+    || /\bfree entry\b/.test(p)
+    || /\bfree rsvp\b/.test(p)
+    || /\bpay[- ]?what[- ]?you[- ]?(can|wish|want)\b/.test(p)
+    || /\bpwyc\b/.test(p)
+    || /\bdonation[- ]?based\b/.test(p)
+    || /\bsuggested donation\b/.test(p);
+}
+
 // === Deterministic Skint parser (P6: deterministic extraction first) ===
 
 const CATEGORY_PATTERNS = [
@@ -47,12 +136,15 @@ const CATEGORY_PATTERNS = [
   { pattern: /\b(storytelling|stories|story\s+show|tale\b|open mic)\b/i, category: 'comedy' },
   { pattern: /\b(jazz|dj\b|hip[- ]?hop|concert|live music|band\b|singer|songwriter|punk|rock\b|electronic|techno|house music|soul\b|funk|r&b|rap\b|classical|orchestra|symphony|opera)\b/i, category: 'live_music' },
   { pattern: /\b(art\s+(opening|show|exhibition)|gallery|exhibition|sculpture|installation|mural)\b/i, category: 'art' },
-  { pattern: /\b(film|movie|screening|cinema|documentary)\b/i, category: 'film' },
+  // Trivia before film — "pop quiz at cinema" should be trivia, not film
+  { pattern: /\b(trivia|quiz\b|game night|bingo)\b/i, category: 'trivia' },
+  { pattern: /\b(film|movie|screening|documentary)\b/i, category: 'film' },
   { pattern: /\b(theater|theatre|play\b|musical|broadway|drama)\b/i, category: 'theater' },
   { pattern: /\b(dance\b|ballet|salsa|swing dance|tango)\b/i, category: 'dance' },
   { pattern: /\b(tour|walking tour|trolley tour)\b/i, category: 'tours' },
-  { pattern: /\b(food|chili|tasting|cook-?off|supper club)\b/i, category: 'food' },
-  { pattern: /\b(trivia|quiz|game night|bingo)\b/i, category: 'trivia' },
+  // "tasting" requires food/drink context to avoid false positives on "wine tasting of ideas"
+  { pattern: /\b(food|chili|cook-?off|supper club)\b/i, category: 'food' },
+  { pattern: /\b((?:wine|beer|whiskey|cocktail|cheese|chocolate|food|coffee)\s+tasting)\b/i, category: 'food' },
   { pattern: /\b(book\b|reading|author|literary|poetry|spoken word)\b/i, category: 'literature' },
   { pattern: /\b(market|flea|bazaar|craft fair|vintage)\b/i, category: 'market' },
 ];
@@ -183,13 +275,17 @@ function parseSkintParagraph(text, dateLocal) {
   if (colonIdx > 0 && colonIdx < 120) {
     eventName = remaining.slice(0, colonIdx).trim();
     body = remaining.slice(colonIdx + 1).trim();
+  } else if (isBullet) {
+    // Venue-only bullet: "► venue (hood). price." — no colon, treat as body for extraction
+    eventName = null;
+    body = remaining.trim();
   } else {
     // No colon — entire remaining text is the event name
     eventName = remaining.trim();
     body = '';
   }
 
-  if (!eventName) return null;
+  if (!eventName && !isBullet) return null;
 
   // 4. Extract venue + neighborhood from body
   let venue = null;
@@ -222,7 +318,7 @@ function parseSkintParagraph(text, dateLocal) {
       const cleaned = afterHood.replace(/\.\s*$/, '').replace(/^,\s*/, '').trim();
       if (cleaned) {
         priceDisplay = cleaned.length > 100 ? cleaned.slice(0, 97) + '...' : cleaned;
-        isFree = /^free\b/i.test(priceDisplay) || /\bfree admission\b/i.test(priceDisplay);
+        isFree = isFreePrice(priceDisplay);
       }
     }
 
@@ -239,10 +335,15 @@ function parseSkintParagraph(text, dateLocal) {
         break;
       }
     }
-    venue = beforeHood.slice(venueStart).trim().replace(/,\s*$/, '');
+    const rawVenue = beforeHood.slice(venueStart).trim().replace(/,\s*$/, '');
+    const refined = refineVenue(rawVenue);
+    venue = refined.venue;
     description = venueStart > 0
       ? beforeHood.slice(0, venueStart).replace(/\.\s*$/, '').trim()
       : '';
+    if (refined.extraDescription) {
+      description = description ? description + '. ' + refined.extraDescription : refined.extraDescription;
+    }
   } else {
     // No neighborhood — try to extract price from end of body
     const priceMatch = body.match(/[,.]?\s*(\$\d+(?:\.\d{2})?[^.]*)\.\s*$/i);
@@ -251,7 +352,7 @@ function parseSkintParagraph(text, dateLocal) {
       isFree = false;
       description = body.slice(0, priceMatch.index).trim().replace(/\.\s*$/, '');
     } else {
-      const freeMatch = body.match(/[,.]?\s*(free(?:\s+(?:admission|entry|rsvp))?[^.]*)\.\s*$/i);
+      const freeMatch = body.match(/[,.]?\s*((?:free(?:\s+(?:admission|entry|rsvp))?|pay[- ]?what[- ]?you[- ]?(?:can|wish|want)|pwyc|donation[- ]?based)[^.]*)\.\s*$/i);
       if (freeMatch) {
         priceDisplay = freeMatch[1].trim();
         isFree = true;
@@ -263,6 +364,12 @@ function parseSkintParagraph(text, dateLocal) {
   // Detect free from body text if not already found
   if (!priceDisplay && /\bfree\b/i.test(body) && !/free[- ]?(form|range|style|dom|lance|wheeling)/i.test(body)) {
     isFree = true;
+  }
+
+  // 4b. For venue-only bullets (no colon, no event name), use venue as the event name
+  if (!eventName && isBullet) {
+    eventName = venue || body.replace(/\.\s*$/, '').trim();
+    if (!eventName) return null;
   }
 
   // 5. Infer category
@@ -322,6 +429,46 @@ function parseSkintParagraph(text, dateLocal) {
   };
 }
 
+/**
+ * Split a <p> element that may contain multiple ► bullet items separated by <br>.
+ * Returns an array of { text, link } objects. If the <p> has no multi-bullet structure,
+ * returns a single entry with the full text and last link.
+ */
+function splitBulletParagraph($, el, fullText) {
+  // Quick check: does the full text contain multiple ► markers?
+  const bulletCount = (fullText.match(/►/g) || []).length;
+  if (bulletCount <= 1) {
+    // Single event or no bullets — return as-is with last link
+    const lastLink = $(el).find('a').last();
+    return [{ text: fullText, link: lastLink.length ? lastLink.attr('href') : null }];
+  }
+
+  // Multiple ► in one <p>: split by <br> tags and extract text + link per segment.
+  // Replace <br> with a sentinel, then split.
+  const html = $(el).html();
+  const parts = html.split(/<br\s*\/?>/i);
+  const results = [];
+
+  for (const part of parts) {
+    const fragment = cheerio.load(`<div>${part}</div>`);
+    const segText = fragment('div').text().trim();
+    if (!segText) continue;
+
+    // Extract the last <a> href in this fragment
+    const segLink = fragment('a').last();
+    const href = segLink.length ? segLink.attr('href') : null;
+    results.push({ text: segText, link: href });
+  }
+
+  // If splitting produced nothing useful, fall back to single entry
+  if (results.length === 0) {
+    const lastLink = $(el).find('a').last();
+    return [{ text: fullText, link: lastLink.length ? lastLink.attr('href') : null }];
+  }
+
+  return results;
+}
+
 async function fetchSkintEvents() {
   console.log('Fetching The Skint...');
   try {
@@ -338,23 +485,63 @@ async function fetchSkintEvents() {
     const html = await res.text();
     const $ = cheerio.load(html);
 
-    const entry = $('.entry-content').first();
-    if (!entry.length) {
-      console.warn('Skint: .entry-content not found');
-      return [];
-    }
-
     const { todayIso, resolveDate, formatDate } = getNycDayContext();
 
     // Day header pattern — short paragraphs like "friday", "saturday", "ongoing"
     const dayHeaderPattern = /^(monday|tuesday|wednesday|thursday|friday|saturday|sunday|ongoing)$/i;
     const eventPattern = /^(mon|tue|wed|thu|fri|sat|sun|thru|today|tonight|daily|\d{1,2}\/\d{1,2}|►|•)/i;
 
+    // Find .entry-content blocks that contain day headers (skip sponsored/promo posts)
+    const allEntries = $('.entry-content');
+    if (!allEntries.length) {
+      console.warn('Skint: .entry-content not found');
+      return [];
+    }
+
+    const eventEntries = [];
+    allEntries.each((i, el) => {
+      let hasDayHeader = false;
+      $(el).find('p').each((j, p) => {
+        if (dayHeaderPattern.test($(p).text().trim())) {
+          hasDayHeader = true;
+          return false; // break
+        }
+      });
+      if (hasDayHeader) eventEntries.push($(el));
+    });
+
+    if (eventEntries.length === 0) {
+      console.warn('Skint: no .entry-content blocks with day headers (page may be all promos)');
+      return [];
+    }
+
+    console.log(`Skint: found ${eventEntries.length} event block(s), skipped ${allEntries.length - eventEntries.length} promo block(s)`);
+
     const eventParagraphs = []; // strings with day headers, for LLM fallback
     const rawParagraphs = [];   // { text, dateLocal, groupSeriesEnd } for deterministic parse
     let currentDayDate = null;
     let skipSection = false;
     let groupSeriesEnd = null; // series_end from a "thru" group header for ► sub-events
+
+    // Process all event-containing entry blocks
+    const refYear = parseInt(todayIso.slice(0, 4), 10);
+    for (const entry of eventEntries) {
+    currentDayDate = null;
+    skipSection = false;
+    groupSeriesEnd = null;
+
+    // Find the <h2> heading for this entry block to anchor date resolution.
+    // WordPress structure: <article><header><h2>THURS-MON, 3/13-16: ...</h2></header><div class="entry-content">...</div></article>
+    let entryResolveDate = resolveDate; // default fallback
+    const heading = entry.closest('article').find('h2').first();
+    if (heading.length) {
+      const headingText = heading.text().trim();
+      const dateRange = parsePostDateRange(headingText, refYear);
+      if (dateRange) {
+        entryResolveDate = createAnchoredResolveDate(dateRange.startDate, dateRange.startDow);
+        console.log(`Skint: anchored date resolution for "${headingText.slice(0, 40)}..." → start ${dateRange.startDate}`);
+      }
+    }
 
     entry.find('p').each((i, el) => {
       const text = $(el).text().trim();
@@ -369,7 +556,7 @@ async function fetchSkintEvents() {
           skipSection = false;
           eventParagraphs.push(`\n--- ONGOING ---`);
         } else {
-          currentDayDate = resolveDate(dayName);
+          currentDayDate = entryResolveDate(dayName);
           skipSection = currentDayDate && currentDayDate < todayIso;
           if (!skipSection) {
             const label = currentDayDate ? formatDate(currentDayDate) : text.toUpperCase();
@@ -379,40 +566,46 @@ async function fetchSkintEvents() {
         return;
       }
 
-      // "thru" events span multiple days — include even from past sections
-      const isThru = /^thru\b/i.test(text);
-      const isBullet = /^[►•]/.test(text);
-      if (skipSection && !isThru && !isBullet) return;
-      if (text.length < 30) return;
-      if (text.toLowerCase().startsWith('sponsored')) return;
+      // Split multi-bullet <p> tags: when a single <p> contains multiple ► items
+      // separated by <br>, split into individual { text, link } pairs.
+      const segments = splitBulletParagraph($, el, text);
 
-      // Detect group headers: "thru 3/15: three film fests" style lines
-      // that introduce ► sub-events. These have a short body after the colon.
-      if (isThru || /^(?:mon|tue|wed|thu|fri|sat|sun)\w*\s+thru\b/i.test(text)) {
-        const thruHeaderMatch = text.match(/thru\s+(\S+)/i);
-        if (thruHeaderMatch) {
-          const target = thruHeaderMatch[1].replace(/:$/, '').toLowerCase();
-          const refYear = parseInt(todayIso.slice(0, 4), 10);
-          groupSeriesEnd = parseThruDate(target, refYear, resolveDate);
+      for (const seg of segments) {
+        const segText = seg.text;
+        const segLink = seg.link;
+
+        // "thru" events span multiple days — include even from past sections
+        const isThru = /^thru\b/i.test(segText);
+        const isBullet = /^[►•]/.test(segText);
+        if (skipSection && !isThru && !isBullet) continue;
+        if (segText.length < 30) continue;
+        if (segText.toLowerCase().startsWith('sponsored')) continue;
+
+        // Detect group headers: "thru 3/15: three film fests" style lines
+        // that introduce ► sub-events. These have a short body after the colon.
+        if (isThru || /^(?:mon|tue|wed|thu|fri|sat|sun)\w*\s+thru\b/i.test(segText)) {
+          const thruHeaderMatch = segText.match(/thru\s+(\S+)/i);
+          if (thruHeaderMatch) {
+            const target = thruHeaderMatch[1].replace(/:$/, '').toLowerCase();
+            groupSeriesEnd = parseThruDate(target, refYear, resolveDate);
+          }
+        } else if (!isBullet) {
+          // Non-thru, non-bullet event resets group context
+          groupSeriesEnd = null;
         }
-      } else if (!isBullet) {
-        // Non-thru, non-bullet event resets group context
-        groupSeriesEnd = null;
-      }
 
-      if (eventPattern.test(text)) {
-        eventParagraphs.push(text);
-        // Extract the href from the >> link (last <a> in the paragraph)
-        const lastLink = $(el).find('a').last();
-        const linkHref = lastLink.length ? lastLink.attr('href') : null;
-        rawParagraphs.push({
-          text,
-          dateLocal: currentDayDate || todayIso,
-          groupSeriesEnd: isBullet ? groupSeriesEnd : null,
-          eventUrl: linkHref || null,
-        });
+        if (eventPattern.test(segText)) {
+          eventParagraphs.push(segText);
+          rawParagraphs.push({
+            text: segText,
+            dateLocal: currentDayDate || todayIso,
+            groupSeriesEnd: isBullet ? groupSeriesEnd : null,
+            eventUrl: segLink || null,
+          });
+        }
       }
     });
+    } // end for (const entry of eventEntries)
 
     if (rawParagraphs.length === 0) {
       console.warn('Skint: no upcoming events in parsed content (page may not be updated yet)');
@@ -635,7 +828,7 @@ function parseOngoingParagraph(text, todayIso, refYear) {
       const cleaned = afterHood.replace(/\.\s*$/, '').replace(/^,\s*/, '').trim();
       if (cleaned) {
         priceDisplay = cleaned.length > 100 ? cleaned.slice(0, 97) + '...' : cleaned;
-        isFree = /^free\b/i.test(priceDisplay) || /\bfree admission\b/i.test(priceDisplay);
+        isFree = isFreePrice(priceDisplay);
       }
     }
 
@@ -651,10 +844,15 @@ function parseOngoingParagraph(text, todayIso, refYear) {
         break;
       }
     }
-    venue = beforeHood.slice(venueStart).trim().replace(/,\s*$/, '');
+    const rawVenue = beforeHood.slice(venueStart).trim().replace(/,\s*$/, '');
+    const refined = refineVenue(rawVenue);
+    venue = refined.venue;
     description = venueStart > 0
       ? beforeHood.slice(0, venueStart).replace(/\.\s*$/, '').trim()
       : '';
+    if (refined.extraDescription) {
+      description = description ? description + '. ' + refined.extraDescription : refined.extraDescription;
+    }
   } else {
     // No neighborhood — try to extract price from end of body
     const priceMatch = body.match(/[,.]?\s*(\$\d+(?:\.\d{2})?[^.]*)\.\s*$/i);
@@ -663,7 +861,7 @@ function parseOngoingParagraph(text, todayIso, refYear) {
       isFree = false;
       description = body.slice(0, priceMatch.index).trim().replace(/\.\s*$/, '');
     } else {
-      const freeMatch = body.match(/[,.]?\s*(free(?:\s+(?:admission|entry|rsvp))?[^.]*)\.\s*$/i);
+      const freeMatch = body.match(/[,.]?\s*((?:free(?:\s+(?:admission|entry|rsvp))?|pay[- ]?what[- ]?you[- ]?(?:can|wish|want)|pwyc|donation[- ]?based)[^.]*)\.\s*$/i);
       if (freeMatch) {
         priceDisplay = freeMatch[1].trim();
         isFree = true;
@@ -775,4 +973,4 @@ async function fetchSkintOngoingEvents() {
   }
 }
 
-module.exports = { fetchSkintEvents, fetchSkintOngoingEvents, parseSkintParagraph, parseOngoingParagraph, parseThruDate };
+module.exports = { fetchSkintEvents, fetchSkintOngoingEvents, parseSkintParagraph, parseOngoingParagraph, parseThruDate, parsePostDateRange, createAnchoredResolveDate, splitBulletParagraph };

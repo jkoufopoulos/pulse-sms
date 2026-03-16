@@ -118,7 +118,7 @@ check('ongoing events preserved despite past-day sections', ongoingParagraphs.so
 // ---- Skint: deterministic parser ----
 console.log('\nSkint deterministic parser:');
 
-const { parseSkintParagraph } = require('../../src/sources/skint');
+const { parseSkintParagraph, parsePostDateRange, createAnchoredResolveDate, splitBulletParagraph } = require('../../src/sources/skint');
 
 // Standard event with venue + neighborhood + price
 const std = parseSkintParagraph(
@@ -261,6 +261,91 @@ check('_rawText preserved through normalizeExtractedEvent', (() => {
   const normalized = normalizeExtractedEvent({ name: 'Test', _rawText: 'fri 7pm: test', date_local: '2026-03-13' }, 'test', 'curated', 0.9);
   return normalized._rawText === 'fri 7pm: test';
 })());
+
+// ---- Skint: date anchoring (P0 fix for date resolution) ----
+console.log('\nSkint date anchoring:');
+
+// parsePostDateRange extracts start date from heading text
+check('parsePostDateRange: "THURS-MON, 3/13-16"',
+  (() => { const r = parsePostDateRange('THURS-MON, 3/13-16: SKINT WEEKEND', 2026); return r && r.startDate === '2026-03-13' && r.startDow === 5; })());
+check('parsePostDateRange: "TUES-THURS, 3/10-12"',
+  (() => { const r = parsePostDateRange('TUES-THURS, 3/10-12: KEITH HARING', 2026); return r && r.startDate === '2026-03-10' && r.startDow === 2; })());
+check('parsePostDateRange: cross-month "12/28-1/2"',
+  (() => { const r = parsePostDateRange('FRI-WED, 12/28-1/2: NEW YEARS', 2026); return r && r.startDate === '2026-12-28'; })());
+check('parsePostDateRange: en-dash separator',
+  (() => { const r = parsePostDateRange('FRI\u2013MON, 3/6\u201310', 2026); return r && r.startDate === '2026-03-06'; })());
+check('parsePostDateRange: no date → null',
+  parsePostDateRange('SKINT WEEKEND: some title', 2026) === null);
+
+// createAnchoredResolveDate maps day names forward from anchor
+// Anchor: Friday 3/13 (dow 5). Expect: fri→3/13, sat→3/14, sun→3/15, mon→3/16
+const anchoredResolve = createAnchoredResolveDate('2026-03-13', 5);
+check('anchored: friday → 3/13 (anchor day)', anchoredResolve('friday') === '2026-03-13');
+check('anchored: saturday → 3/14', anchoredResolve('saturday') === '2026-03-14');
+check('anchored: sunday → 3/15', anchoredResolve('sunday') === '2026-03-15');
+check('anchored: monday → 3/16', anchoredResolve('monday') === '2026-03-16');
+check('anchored: thursday → 3/19 (wraps forward)', anchoredResolve('thursday') === '2026-03-19');
+check('anchored: invalid day → null', anchoredResolve('notaday') === null);
+
+// Anchor: Tuesday 3/10 (dow 2). Expect: tue→3/10, wed→3/11, thu→3/12
+const anchoredResolve2 = createAnchoredResolveDate('2026-03-10', 2);
+check('anchored2: tuesday → 3/10', anchoredResolve2('tuesday') === '2026-03-10');
+check('anchored2: wednesday → 3/11', anchoredResolve2('wednesday') === '2026-03-11');
+check('anchored2: thursday → 3/12', anchoredResolve2('thursday') === '2026-03-12');
+
+// Key bug scenario: Saturday scrape with Friday post
+// Old behavior: resolveDate("friday") on Saturday → next Friday (wrong)
+// New behavior: anchored to 3/13 → this Friday 3/13 (correct)
+check('bug fix: friday on sat scrape anchored correctly', anchoredResolve('friday') === '2026-03-13');
+
+
+// ---- Skint: bullet sub-event splitting ----
+console.log('\nSkint bullet splitting:');
+
+const testCheerio = require('cheerio');
+
+// Multi-bullet <p> with <br> separators (Oscars watch parties style)
+const multiBulletHtml = `<p>
+<span>► <b>arlene's grocery</b> (les). $10 adv. </span><a href="https://example.com/1"><b>>></b></a><br />
+<span>► <b>c'mon everybody</b> (bed-stuy). free admission. </span><a href="https://example.com/2"><b>>></b></a><br />
+<span>► <b>littlefield</b> (gowanus). free admission. </span><a href="https://example.com/3"><b>>></b></a>
+</p>`;
+const $multi = testCheerio.load(multiBulletHtml);
+const multiEl = $multi('p').get(0);
+const multiText = $multi('p').text().trim();
+const multiResult = splitBulletParagraph($multi, multiEl, multiText);
+check('multi-bullet: splits into 3 segments', multiResult.length === 3);
+check('multi-bullet: first is arlenes', multiResult[0] && /arlene/i.test(multiResult[0].text));
+check('multi-bullet: second is cmon', multiResult[1] && /c.mon/i.test(multiResult[1].text));
+check('multi-bullet: third is littlefield', multiResult[2] && /littlefield/i.test(multiResult[2].text));
+check('multi-bullet: each has its own link', multiResult[0].link === 'https://example.com/1' && multiResult[2].link === 'https://example.com/3');
+
+// Single-bullet <p> (normal event) — should not split
+const singleHtml = `<p><span>► sun 1pm: <b>parade</b>: starts at park slope. </span><a href="https://example.com/4"><b>>></b></a></p>`;
+const $single = testCheerio.load(singleHtml);
+const singleEl = $single('p').get(0);
+const singleText = $single('p').text().trim();
+const singleResult = splitBulletParagraph($single, singleEl, singleText);
+check('single-bullet: returns 1 segment', singleResult.length === 1);
+check('single-bullet: preserves link', singleResult[0].link === 'https://example.com/4');
+
+// No-bullet <p> (regular event) — should not split
+const noBulletHtml = `<p><span>fri 7pm: jazz at smalls. </span><a href="https://example.com/5"><b>>></b></a></p>`;
+const $none = testCheerio.load(noBulletHtml);
+const noneEl = $none('p').get(0);
+const noneText = $none('p').text().trim();
+const noneResult = splitBulletParagraph($none, noneEl, noneText);
+check('no-bullet: returns 1 segment', noneResult.length === 1);
+check('no-bullet: preserves text', /jazz/i.test(noneResult[0].text));
+
+// Each split bullet should parse as an event
+const parsed1 = parseSkintParagraph(multiResult[0].text, '2026-03-15');
+const parsed2 = parseSkintParagraph(multiResult[2].text, '2026-03-15');
+check('split bullet parses: arlenes', parsed1 && parsed1.name === "arlene's grocery");
+check('split bullet parses: littlefield', parsed2 && parsed2.name === 'littlefield');
+check('split bullet: arlenes has neighborhood', parsed1 && parsed1.neighborhood !== null);
+check('split bullet: littlefield has neighborhood', parsed2 && parsed2.neighborhood !== null);
+
 
 // ---- Skint ongoing: parseThruDate ----
 console.log('\nSkint ongoing parseThruDate:');
