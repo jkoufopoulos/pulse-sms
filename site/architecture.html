@@ -988,7 +988,7 @@
             <span class="timeline-module">llm.js <span style="font-size:0.68rem;color:var(--text-muted)">(runAgentLoop)</span></span>
             <div class="timeline-meta"><span class="cost">~$0.001</span> <span>2-5s</span></div>
           </div>
-          <p class="timeline-desc">Multi-turn tool calling loop (max 3 iterations). Model calls <code>search_events</code> or <code>respond</code>, gets results, decides next action or writes plain text SMS.</p>
+          <p class="timeline-desc">Multi-turn tool calling loop (max 3 iterations). Model calls <code>search</code> or <code>respond</code>, gets results, decides next action or writes plain text SMS. Pool items carry <code>recommended</code> and <code>why</code> metadata.</p>
           <details>
             <summary>View system prompt &#8595;</summary>
             <p style="padding:12px 0 0; font-size:0.78rem; color:var(--text-dim);"><a href="#prompts" style="color:var(--coral); text-decoration:none;">See full prompts below &#8595;</a></p>
@@ -1004,7 +1004,7 @@
             <span class="timeline-module">brain-execute.js</span>
             <div class="timeline-meta"><span class="cost">$0</span> <span>&lt;50ms</span></div>
           </div>
-          <p class="timeline-desc">Executes search_events: builds event pool, applies filters, resolves dates. Result fed back into agent loop.</p>
+          <p class="timeline-desc">Executes unified search: builds event pool and/or place pool in parallel, applies filters, resolves dates. Result fed back into agent loop.</p>
         </div>
       </div>
 
@@ -1073,18 +1073,18 @@
       <div class="brain-panel">
         <div class="brain-panel-title">2 Tools</div>
         <div class="tool-schema">
-          <div class="tool-name">search_events</div>
+          <div class="tool-name">search</div>
           <div>&nbsp;&nbsp;<span class="prop-key">neighborhood</span> <span class="prop-type">string</span></div>
-          <div>&nbsp;&nbsp;<span class="prop-key">category</span> <span class="prop-type">enum</span></div>
-          <div style="padding-left:16px;"><span class="prop-enum">comedy, jazz, live_music, dj, trivia, film, theater, art, dance, community, food_drink, spoken_word, classical, nightlife</span></div>
-          <div>&nbsp;&nbsp;<span class="prop-key">categories</span> <span class="prop-type">array</span></div>
-          <div>&nbsp;&nbsp;<span class="prop-key">free_only</span> <span class="prop-type">boolean</span></div>
-          <div>&nbsp;&nbsp;<span class="prop-key">time_after</span> <span class="prop-type">string</span> <span class="prop-enum">HH:MM</span></div>
-          <div>&nbsp;&nbsp;<span class="prop-key">date_range</span> <span class="prop-type">enum</span></div>
-          <div style="padding-left:16px;"><span class="prop-enum">today, tomorrow, this_weekend, this_week, next_week</span></div>
+          <div>&nbsp;&nbsp;<span class="prop-key">types</span> <span class="prop-type">array</span> <span class="prop-enum">events, bars, restaurants</span></div>
+          <div>&nbsp;&nbsp;<span class="prop-key">filters</span> <span class="prop-type">object</span></div>
+          <div style="padding-left:16px;"><span class="prop-key">categories</span> <span class="prop-type">array</span> <span class="prop-enum">comedy, jazz, live_music, dj, ...</span></div>
+          <div style="padding-left:16px;"><span class="prop-key">free_only</span> <span class="prop-type">boolean</span></div>
+          <div style="padding-left:16px;"><span class="prop-key">time_after</span> <span class="prop-type">string</span> <span class="prop-enum">HH:MM</span></div>
+          <div style="padding-left:16px;"><span class="prop-key">date_range</span> <span class="prop-type">enum</span> <span class="prop-enum">today, tomorrow, this_weekend, ...</span></div>
+          <div style="padding-left:16px;"><span class="prop-key">vibe</span> <span class="prop-type">enum</span> <span class="prop-enum">dive, cocktail, wine, rooftop, ...</span></div>
           <div>&nbsp;&nbsp;<span class="prop-highlight">intent</span> <span class="prop-type">enum</span></div>
-          <div style="padding-left:16px;"><span class="prop-enum">new_search, refine, pivot, more, details</span></div>
-          <div>&nbsp;&nbsp;<span class="prop-key">pick_reference</span> <span class="prop-type">string</span></div>
+          <div style="padding-left:16px;"><span class="prop-enum">discover, more, details</span></div>
+          <div>&nbsp;&nbsp;<span class="prop-key">reference</span> <span class="prop-type">string</span></div>
 
           <hr class="tool-divider">
 
@@ -1120,74 +1120,34 @@
 
       <details class="prompt-block">
         <summary>BRAIN_SYSTEM &mdash; Agent loop system prompt (dynamic, session-aware)</summary>
-        <pre>You are the routing brain for Pulse, an NYC nightlife SMS bot.
-Your job: understand what the user wants, call the right tool, and &mdash; when you receive event results back &mdash; write a warm, opinionated SMS with picks directly as plain text.
+        <pre>You are Pulse, an NYC nightlife SMS bot. You text like a plugged-in friend &mdash; warm, opinionated, max 480 chars.
 
-CRITICAL RULE: When a user mentions ANY neighborhood name, borough name, or NYC location &mdash; ALWAYS call search_events. A bare neighborhood name like "williamsburg" or "LES" means "show me events there." This is the most common message type.
-
-TOOLS:
-- search_events: User wants events OR wants to interact with previously shown events. Call this for: neighborhoods, categories, time filters, "more" / "what else", detail requests (numbers, event names, "tell me about..."), and anything event-related. When in doubt, prefer search_events over respond.
-- respond: ONLY for pure conversational messages with zero event intent: greetings ("hey"), thanks ("thanks!"), farewells ("bye"), or clearly off-topic questions. Write a brief warm SMS (max 480 chars).
+RULES:
+- Search first, ask later. Contrasting picks &gt; clarifying questions.
+- 1-2 picks, woven into natural prose. Lead with WHY it's good &mdash; trust "recommended" and "why" from results.
+- Events and places mix naturally: "Grab a drink at [bar] then catch [show] around the corner."
+- Mood mapping: "chill" &rarr; jazz/film/art, "dance" &rarr; dj/nightlife, "bars"/"dinner" &rarr; types: ["bars"]/["restaurants"].
+- For details: venue feel first, then event, then logistics. Use venue_profile if present.
+- "more" = different results, "2" or name = details. After details, the system sends URLs automatically.
+- Under 480 chars. No URLs in SMS. No prices in initial picks.
+- Write SMS as plain text after search results. End with a natural hook.
+- New user: call respond, introduce yourself. Returning user: call search({intent: "discover"}).
 
 EXAMPLES:
-- "williamsburg" &rarr; search_events(neighborhood: "Williamsburg", intent: "new_search")
-- "bushwick" &rarr; search_events(neighborhood: "Bushwick", intent: "new_search")
-- "LES" &rarr; search_events(neighborhood: "Lower East Side", intent: "new_search")
-- "brooklyn" &rarr; search_events(neighborhood: "Brooklyn", intent: "new_search")
-- "what's happening tonight" &rarr; search_events(date_range: "today", intent: "new_search")
-- "comedy" &rarr; search_events(category: "comedy", intent: "new_search")
-- "free stuff in greenpoint" &rarr; search_events(neighborhood: "Greenpoint", free_only: true, intent: "new_search")
-- "cool stuff this weekend" &rarr; search_events(date_range: "this_weekend", intent: "new_search")
-- "music and trivia" &rarr; search_events(categories: ["live_music", "trivia"], intent: "new_search")
-- "how about comedy" &rarr; search_events(category: "comedy", intent: "refine")
-- "later in the week" &rarr; search_events(date_range: "this_week", intent: "refine")
-- "try bushwick" (with existing categories) &rarr; search_events(neighborhood: "Bushwick", intent: "refine")
-- "actually trivia in greenpoint" &rarr; search_events(neighborhood: "Greenpoint", category: "trivia", intent: "pivot")
-- "forget the comedy" &rarr; search_events(intent: "pivot")
-- "more" &rarr; search_events(intent: "more")
-- "what else" &rarr; search_events(intent: "more")
-- "2" &rarr; search_events(intent: "details", pick_reference: "2")
-- "tell me about the comedy one" &rarr; search_events(intent: "details", pick_reference: "the comedy one")
-- "thanks!" &rarr; respond(message: "Enjoy your night! Text me anytime.", intent: "thanks")
-- "hey" &rarr; respond(message: "Hey! Drop a neighborhood or tell me what you're in the mood for.", intent: "greeting")
-- "yes" / "yeah" / "sure" (with pending suggestion) &rarr; search_events with the suggested neighborhood
+- "bushwick" &rarr; search({neighborhood: "bushwick", intent: "discover"})
+- "something chill in les" &rarr; search({neighborhood: "les", filters: {categories: ["jazz","film","art"]}, intent: "discover"})
+- "best bars" &rarr; search({types: ["bars"], intent: "discover"})
+- "dinner and a show" &rarr; search({types: ["events","restaurants"], intent: "discover"})
+- "more" &rarr; search({intent: "more"})
+- "2" &rarr; search({intent: "details", reference: "2"})
+- "hey" &rarr; respond({message: "Hey! Drop a neighborhood...", intent: "greeting"})
 
-MULTI-CATEGORY: When the user mentions 2+ categories ("music and trivia", "comedy or art"), use the categories array. For single categories, use the category field. Do not use both.
-
-INTENT RULES for search_events:
-- "new_search": First message with no prior session context, or user explicitly starting over
-- "refine": Adding/changing a filter while keeping others. Includes neighborhood switches.
-- "pivot": Explicitly changing what they're looking for ("forget the comedy", "actually trivia instead")
-- "more": User wants more picks from the same search ("more", "what else", "next")
-- "details": User is asking about a specific event from the last batch. Set pick_reference to however they referenced it.
-- When switching neighborhoods, prefer "refine" so categories/time filters persist
-- When switching categories/topics, prefer "pivot" so stale filters are cleared
-
-NEIGHBORHOOD RESOLUTION:
-- Valid neighborhoods: Williamsburg, Bushwick, Greenpoint, ... and 72 more (75 total across five boroughs).
-- Common aliases: LES = Lower East Side, UES = Upper East Side, etc.
-- Borough names (Brooklyn, Queens, Manhattan, Bronx, Staten Island) &rarr; pass as neighborhood
-
-DATE RANGE:
-- "tonight" / "today" &rarr; "today"
-- "tomorrow" &rarr; "tomorrow"
-- "this weekend" &rarr; "this_weekend"
-- "this week" &rarr; "this_week"
-- "next week" &rarr; "next_week"
+NEIGHBORHOODS: Williamsburg, Bushwick, Greenpoint, ... and 72 more (75 total across five boroughs)
 
 SESSION CONTEXT:
 ${sessionContext}${historyBlock}
 
-AFTER TOOL EXECUTION:
-When you call search_events and receive event results back, write the SMS response directly as plain text.
-
-COMPOSE RULES:
-- Write natural, conversational prose &mdash; NOT a numbered list.
-- Prefer TODAY over tomorrow. Prefer soonest events.
-- Favor discovery: lead with source_vibe:"discovery" events, intimate venues, interesting one-offs.
-- EVERY pick MUST include: event name, venue name, your opinionated take, start time, and price
-- Under 480 characters total. No URLs.
-- Voice: friend texting. Opinionated, concise, warm.</pre>
+Pool items include recommended:true and why:"one-off, underground radar, tiny room" &mdash; trust and echo these signals.</pre>
       </details>
 
       <details class="prompt-block">
@@ -1487,7 +1447,7 @@ OUTPUT:
     {
       role: 'user',
       text: 'bushwick',
-      annotation: 'checkMechanical: miss\nhandleAgentRequest \u2192 search_events(\n  neighborhood: "Bushwick",\n  intent: "new_search"\n)\n47 events in pool, 3 picks composed\ncost: ~$0.001 | latency: 2.1s'
+      annotation: 'checkMechanical: miss\nhandleAgentRequest \u2192 search({\n  neighborhood: "Bushwick",\n  intent: "discover"\n)\n47 events in pool, 3 picks composed\ncost: ~$0.001 | latency: 2.1s'
     },
     {
       role: 'pulse',
@@ -1497,7 +1457,7 @@ OUTPUT:
     {
       role: 'user',
       text: '2',
-      annotation: 'handleAgentRequest \u2192 search_events(\n  intent: "details",\n  pick_reference: "2"\n)\nFuzzy match \u2192 Elsewhere DJ set\ncost: ~$0.001'
+      annotation: 'handleAgentRequest \u2192 search({\n  intent: "details",\n  reference: "2"\n)\nPool match \u2192 Elsewhere DJ set\ncost: ~$0.001'
     },
     {
       role: 'pulse',
@@ -1507,7 +1467,7 @@ OUTPUT:
     {
       role: 'user',
       text: 'how about comedy',
-      annotation: 'handleAgentRequest \u2192 search_events(\n  neighborhood: "Bushwick",\n  category: "comedy",\n  intent: "refine"\n)\nFilters persist from session (P1)'
+      annotation: 'handleAgentRequest \u2192 search({\n  neighborhood: "Bushwick",\n  category: "comedy",\n  intent: "discover"\n)\nFilters persist from session (P1)'
     },
     {
       role: 'pulse',

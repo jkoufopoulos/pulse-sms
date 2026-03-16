@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for architecture principles, planned work, and completed phases.
-> Last updated: 2026-03-13
+> Last updated: 2026-03-16
 > North star: **"Feel like a local."** See [Product Vision](docs/VISION.md) and [Architecture Review](docs/plans/2026-03-08-architecture-review-design.md).
 
 ---
@@ -12,9 +12,9 @@ These principles govern how Pulse splits work between deterministic code and LLM
 
 ### P1. Structured Tool Calls Own State, Free-Text Owns Language
 
-Session state is derived from structured, validated sources — never parsed from free-text LLM output. The LLM's tool call parameters (`search_events` args) ARE the system of record for filters and intent.
+Session state is derived from structured, validated sources — never parsed from free-text LLM output. The LLM's tool call parameters (`search` args) ARE the system of record for filters and intent. Picks are saved from pool order (top events shown to model), not fuzzy-matched from SMS text.
 
-**In practice:** The agent brain calls `search_events({ neighborhood: "bushwick", categories: ["comedy"], free_only: true })`. The handler reads these tool params to set `activeFilters` and `lastNeighborhood`.
+**In practice:** The agent brain calls `search({ neighborhood: "bushwick", filters: { categories: ["comedy"], free_only: true }, intent: "discover" })`. The handler reads these tool params to set `activeFilters` and `lastNeighborhood`.
 
 **Anti-pattern:** Parsing the LLM's free-text SMS response to extract state. We tried reading `filters_used` from LLM output (2026-02-22) and reverted it.
 
@@ -50,13 +50,13 @@ Validate structural contracts in the hot path (do pick IDs exist in the pool?). 
 message -> checkMechanical (help + TCPA only, $0)
   -> handleAgentRequest (agent-loop.js)
   -> runAgentLoop (llm.js, multi-turn tool calling, max 3 iterations)
-  -> model calls search_events or respond tools
+  -> model calls search or respond tools
   -> code executes tool, result fed back to model
   -> model writes plain text SMS when ready
   -> saveSessionFromToolCalls -> saveResponseFrame -> SMS
 ```
 
-2 core tools: `search_events` (all event intents) + `respond` (conversation). Plus `compose_sms` (structured pick validation) and `show_welcome` (returning users). Fallback chain: Gemini -> Anthropic Haiku.
+2 tools: `search` (unified — events, bars, restaurants, details, more, welcome) + `respond` (conversation). Pool items carry `recommended` and `why` fields so the model trusts pre-digested curation signals. Fallback chain: Gemini -> Anthropic Haiku.
 
 ---
 
@@ -312,6 +312,7 @@ Design principle: **deterministic rules handle the 86%, LLM classifies the stubb
 | Time-aware filtering | Mar 13 | Tightened `filterUpcomingEvents` grace window from 2hr to 30min for events without `end_time_local` (fixed-start shows). Events with end times still shown while ongoing. Added prompt hint for in-progress events ("started at 7 but goes til midnight") and wired `end_time_local` into pool serialization. |
 | Phase 10: Recurrence Nudge | Mar 13 | Detail request = attended signal. 2nd detail → consent prompt ("REMIND ME"). Hourly scheduler sends nudge on matching day with 7-day cooldown. NUDGE OFF global opt-out, TCPA STOP clears all subs. `nudges.js` module, `nudge_subscriptions` SQLite table. Gated behind `PULSE_NUDGES_ENABLED`. |
 | Phase 11 Story 1: Scraper Failure Resilience | Mar 13 | Auto-disable after 7 consecutive failures with daily probe for auto-recovery. Graduated alerting (yellow/red severity emails) replaces flat digest emails for non-green status. Disabled sources flagged in digest. Dead `alertOnFailingSources` removed. |
+| Unified Agent Architecture | Mar 16 | 4-step refactor: (1) drop compose_sms — model writes SMS directly, (2) unified `search` tool — merges search_events + search_places + show_welcome, parallel event+place fan-out, (3) simplified session save — picks from pool order not fuzzy SMS matching, search_summary in conversation history, (4) slim prompt — ~60% smaller, few-shot examples replace verbose rules, pool items carry `recommended`+`why` metadata. Net: 2 tools instead of 5, ~250 lines reduced, ~47% cost reduction per conversation. |
 
 ### Prompt Hygiene — Open Items
 

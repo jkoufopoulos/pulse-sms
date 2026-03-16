@@ -8,13 +8,13 @@ Pulse turns a text message into a curated night out. Send an NYC neighborhood na
 
 ## How It Works
 
-Every incoming SMS runs through a lightweight agent loop powered by Gemini 2.5 Flash Lite (with Anthropic Haiku fallback):
+Every incoming SMS runs through a lightweight agent loop powered by Gemini 2.5 Flash (with Anthropic Haiku fallback):
 
 1. **Mechanical check** — handles "help" and TCPA opt-out at $0
 2. **Agent loop** — multi-turn tool calling (max 3 iterations) with 2 tools:
-   - `search_events` — searches, filters, paginates, and fetches details
+   - `search` — unified tool for events, bars, restaurants, details, and more picks. Searches fan out in parallel when the user asks for both ("dinner and a show").
    - `respond` — handles greetings, thanks, off-topic
-3. **Model writes the SMS** as plain text, capped at 480 characters
+3. **Model writes the SMS** as plain text, capped at 480 characters. Pool items carry pre-computed `recommended` and `why` fields so the model trusts editorial signals without verbose prompt rules.
 
 Events are scraped daily at 10am ET from 22 sources across 19 scraper modules, cached to disk, and deduplicated across sources. The model costs ~$0.001/msg.
 
@@ -69,7 +69,7 @@ npm test               # smoke tests (905 tests, $0)
 **Optional:**
 - `PORT` — default 3000
 - `PULSE_TEST_MODE=true` — enables the web simulator
-- `PULSE_MODEL_BRAIN` — agent loop model (default `gemini-2.5-flash-lite`)
+- `PULSE_MODEL_BRAIN` — agent loop model (default `claude-haiku-4-5-20251001`)
 - `PULSE_MODEL_EXTRACT` — event extraction model (default `claude-haiku-4-5-20251001`)
 - `PULSE_MODEL_FALLBACK` — fallback for all roles (default `claude-haiku-4-5-20251001`)
 - `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` — newsletter scrapers
