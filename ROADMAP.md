@@ -58,66 +58,15 @@ message -> checkMechanical (help + TCPA only, $0)
 
 2 tools: `search` (unified — events, bars, restaurants, details, more, welcome) + `respond` (conversation). Pool items carry `recommended` and `why` fields so the model trusts pre-digested curation signals. Fallback chain: Gemini -> Anthropic Haiku.
 
+Web app at `/app` — Gemini-style conversational interface using the same backend. SMS acquisition funnel.
+
 ---
 
 ## Planned Work
 
-### Phase 7: Tastemaker Voice (Prompt)
+### Phase 8: Venue Knowledge (1 remaining item)
 
-*The agent speaks like a local, not a search engine. Highest ROI work — prompt changes only, no code.*
-
-**Story: The agent explains WHY, not just WHAT**
-> As a user, when I get a pick, I want to know why it's interesting tonight — not just the name, venue, and time.
-
-- [x] Add metadata translation guide to system prompt: teach agent to speak about `source_vibe`, `venue_size`, `scarcity`, `editorial`, `interaction_format` in natural language
-  - `source_vibe "discovery"` → "this popped up on the underground radar"
-  - `venue_size "intimate"` → "tiny room, maybe 50 people, right up front"
-  - `scarcity "one-night-only"` → "one-off, not coming back"
-  - `editorial: true` → "a tastemaker picked this one out"
-  - `interaction_format "interactive"` → "you're not just watching, you're in it"
-- [x] Rewrite system prompt examples from list-style to contrasting-picks style
-- [x] Run scenario evals before/after to measure voice quality change
-- [x] Update eval golden scenarios to reflect new conversation style (fixed `exists`/`contains_any` assertion types in runner, updated 14 stale text assertions)
-
-**Story: Narrow by showing, not asking**
-> As a user, when I text a bare neighborhood, I want the agent to show me two contrasting options instead of asking me a generic vibe question.
-
-- [x] Replace "ask one vibe question" prompt guidance with "narrow by contrasting picks"
-- [x] Add mood-to-category mapping guidance: teach agent that "chill" means intimate venues + jazz/vinyl/film, "I want to dance" means dj/nightlife + medium-large venues
-- [x] Add "acknowledge and build" pattern: every response references what the user just said
-
-**Story: Details that build trust**
-> As a user, when I ask for details about a pick, I want the response to lead with what the venue feels like, not just event metadata.
-
-- [x] Add details structure to system prompt: venue experience → event → logistics → practical tip
-- [x] ~~Evaluate whether `composeDetails` in `ai.js` can be consolidated into the agent loop~~ — Deleted. `composeDetails` was dead code (nothing called it). Agent loop handles details natively via `search_events({intent: "details"})`. Removed `composeDetails`, `DETAILS_SYSTEM`, and `MODELS.details`.
-
-### Phase 8: Venue Knowledge Layer (Data + Code)
-
-*Give the agent actual local knowledge about venues — the data that makes "feel like a local" possible.*
-
-**Story: The agent knows what venues feel like**
-> As a user, when I get a pick at Union Pool, I want to hear "sweaty dive bar, loud bands, cheap beer, gets packed by 9" — not just "Union Pool, Williamsburg."
-
-- [x] Venue profiles in `data/venue-profiles.json`, lookup via `lookupVenueProfile()` in `venues.js` (30 venues, web-researched, human-reviewed)
-- [x] `venue_vibe` one-liner wired into pool serialization (`serializePoolForContinuation`)
-- [x] Full venue profile (known_for, crowd, tip) wired into details intent (`agent-loop.js`)
-- [x] System prompt updated with `venue_vibe` and `venue_profile` guidance
-- [x] Run scenario evals to verify agent uses venue knowledge naturally (99.9% code evals, 99.5% assertions across 287 scenarios)
-
-**Story: Yutori's editorial voice comes through**
-> As a user, when I get a pick that came from Yutori's newsletter, I want the agent to reference the editorial context — "Yutori called this the best kept secret in Bushwick" — not just a generic description.
-
-- [x] Preserve source editorial blurbs through extraction as `editorial_note` field
-- [x] Pass `editorial_note` to agent in pool serialization
 - [ ] Cache raw newsletter content in `.cache.json` alongside extracted events (enables re-extraction)
-
-**Story: Events in the "other" bucket become findable**
-> As a user looking for "art" or "something weird," I want events currently categorized as "other" to be properly classified so they show up in category searches.
-
-- [x] Audit "other" category events — identify common reclassifiable types (immersive theater, sound baths, zine fairs, popup markets)
-- [x] Add rules-based category remapping at cache build time (`remapOtherCategory` in events.js)
-- [x] Measure: reduce "other" bucket from 41% to <20% (achieved 13.9%)
 
 ### Phase 9: Serendipity + Personalization (Code)
 
@@ -145,103 +94,46 @@ message -> checkMechanical (help + TCPA only, $0)
 - [ ] Track decision style signals: details-request rate, more-request rate, pivot rate, avg picks per session
 - [ ] Inject decision style into system prompt: "this user picks fast — be decisive, lead with one strong pick" vs. "this user explores — give more context and contrasts"
 
-### Phase 10: Proactive Outreach (Product) ✓
-
-*Pulse texts you when something matches — the retention mechanism that makes SMS the right channel.*
-
-**Story: "There's a thing tonight you'd love"**
-> As an opted-in user, I want Pulse to text me once a week when there's a high-match event for my taste, without me having to initiate.
-
-- [x] Proactive message scheduler: post-scrape hook scans opted-in users, scores events (neighborhood+category+interestingness+scarcity+editorial), threshold 5
-- [x] Conservative cadence: 7-day cooldown per user, 30-day churn filter
-- [x] Track per-user engagement via event_recommendations table (user_engaged flag)
-- [x] Kill switch: PULSE_PROACTIVE_ENABLED env var (default false), /api/proactive/pause and /resume endpoints, in-memory pause flag
-- [x] TCPA compliance: NOTIFY opt-in, STOP NOTIFY opt-out (mechanical, before TCPA STOP check), opt-in CTA on session 1 and 3 (max 2 prompts)
-- [x] Session seeding: proactive SMS seeds session via saveResponseFrame for seamless reply handling
-
-**Story: Recurrence nudge** ✓
-> As a user who went to trivia at Black Rabbit twice, I want Pulse to text me on Tuesday afternoon: "Black Rabbit has trivia again tonight. Want the details?"
-
-- [x] Cross-reference recurring patterns DB with user attendance history (detail request = attended signal)
-- [x] Trigger: user attended same recurring event 2+ times → consent prompt ("REMIND ME")
-- [x] Day/time: hourly scheduler sends nudge on matching day_of_week with 7-day cooldown
-- [x] Consent flow: REMIND ME opt-in, NUDGE OFF global opt-out, TCPA STOP clears all subs
-- [x] `nudges.js`: `trackRecurringDetail`, `captureConsent`, `buildNudgeMessage`, `checkAndSendNudges`
-- [x] Gated behind `PULSE_NUDGES_ENABLED` env var (default off)
-
 ### Phase 11: Data Layer Resilience (Infrastructure)
 
 *The data has to be trustworthy for the tastemaker voice to be trustworthy.*
 
-**Story: Scraper failures degrade gracefully**
-> As a system, when a source's markup changes, I want to detect partial degradation (not just total failure) and alert before coverage materially drops.
-
-- [x] Source health scoring: rolling 7-day health per source (event count trend, extraction confidence avg, consecutive failures)
-- [x] Auto-disable after 7 consecutive failures (with daily probe for auto-recovery)
-- [x] Graduated alerting: yellow at 20% drop, red at 50% drop
-- [x] Complete scrape resilience plan: volatile baseline (median not mean) for Yutori/NonsenseNYC, duplicate spike tolerance for multi-show venues
-
 **Story: Non-events never reach users**
-> As a system, when the extraction pipeline produces entries that aren't physical NYC events, I want to reject them deterministically before they enter the serving cache.
 
-- [x] Neighborhood gate in `applyQualityGates`: reject events without a recognized neighborhood (from `neighborhoods.js`)
-- [x] Venue sanity filter: reject events where venue_name is a sentence, metadata field, or known non-venue pattern
 - [ ] Golden negative eval cases: add 15 worst junk examples as extraction eval negatives
 - [ ] Yutori email filter audit: identify which newsletters produce the most junk, tighten `email-filter.js`
 
 **Story: Events are fresh when users actually text**
-> As a user texting at 8pm, I want today's data to include events posted after the 10am scrape — day-of announcements, cancellations, sold-out status.
 
 - [ ] Add 4pm ET scrape refresh for HTML sources (catches same-day updates with minimal architecture change)
 - [ ] Increase email polling frequency for newsletter sources to every 2 hours
 
 **Story: SMS quality doesn't silently degrade**
-> As a system, when a model update changes SMS composition behavior, I want to detect it before users notice.
 
 - [ ] Runtime quality sampling: async LLM judge on 5% of production SMS
 - [ ] 7-day rolling quality score with alert threshold (< 3.5/5.0)
 - [ ] Track character count distribution, pick count distribution, venue-knowledge usage rate
 
-**Story: Venue learning persists**
-> As a system, when I geocode a new venue, I want to remember it permanently instead of losing it on restart.
-
-- [x] Wire `exportLearnedVenues()` to write to disk at end of scrape (already implemented)
-- [x] Wire `importLearnedVenues()` on startup to warm the cache (already implemented)
-
 **Story: Extraction pipeline hardens at the boundary**
-> As a system, I want LLM extraction cached by content hash and validated at the source boundary — not fixed downstream in the merge pipeline.
 
-Inspired by Anthropic-style "validate at ingestion, trust internal types" (P3). Three actionable improvements, assessed against current architecture:
-
-- [x] **Content-hash extraction cache**: `extraction-cache.js` hashes raw content (with NYC date) via sha256 before LLM call; reuses cached extraction on match. Integrated into Skint LLM fallback path. Saves ~$0.01/day on unchanged content.
-- [ ] **Validate at source boundary, not post-merge**: move `computeCompleteness` + quality gate (0.4 threshold) into each source's fetch function return path. Currently validation happens in `refreshCache()` after all sources merge — a bad extraction can interact with dedup before getting filtered. Moving it earlier means dedup only sees clean events.
-- [x] **Venue alias table for dedup**: `VENUE_ALIASES` map (35 entries) in `venues.js` maps variant names to canonical (Avant Gardner→Brooklyn Mirage, LPR→(Le) Poisson Rouge, BAM variants, etc.). Applied in `normalizeExtractedEvent()` before event ID hashing and in `lookupVenue()`.
-
-**Story: LLM backstop for deterministic classification**
-> As a system, when regex-based category remap and quality gates leave ambiguous residual (events stuck in "other", borderline non-events), I want an LLM to classify the residual at scrape time — deterministic first, LLM only on what regex can't resolve.
-
-Design principle: **deterministic rules handle the 86%, LLM classifies the stubborn 14%**. Runs at scrape time (not hot path), only on events that survived regex without a confident classification. Same pattern applies to junk detection — regex catches obvious garbage, LLM catches subtle non-events (newsletter headers extracted as listings, venue descriptions that look like events).
-
-- [x] **LLM enrichment for incomplete events**: `enrichIncompleteEvents` in `enrichment.js` collects events with TBA venue, missing neighborhood, or missing time, batches them (10 per call) through `extractEvents`, and merges venue/neighborhood/time/category back. Wired into `refreshCache()` after geocoding. Non-fatal on failure.
-- [x] **LLM category classifier for "other" residual**: `classifyOtherEvents()` in `enrichment.js` batches "other" events (30 per call) through Haiku with 13 valid categories. Wired into `refreshCache()` after `remapOtherCategories()`. Non-fatal on failure.
-- [ ] **LLM junk filter for borderline events**: after `applyQualityGates` removes obvious junk (garbage names, low completeness), batch borderline events through a binary LLM classifier: "is this an actual attendable NYC event?" Catches non-events that have valid-looking fields but aren't real events (e.g., "Subscribe to our newsletter" with a venue and date from surrounding HTML).
-- [x] **Classification report**: `logClassification()` in `enrichment.js` appends to `data/classification-log.json` (capped at 5000 entries). Instrumented in both `classifyOtherEvents` (method: 'llm_classify') and `enrichIncompleteEvents` (method: 'enrichment'). Human reads log to promote patterns to regex rules.
-
-**Not pursuing** (assessed, too costly for current scale):
-- Formal DAG pipeline framework — `refreshCache()` already does fetch→merge→dedup→stamp sequentially in ~15s. Framework overhead not justified for 22 sources running once daily.
-- Embedding-based dedup — O(n²) on 500-1000 events adds API dependency to scrape path. Venue alias table solves the actual problem (name variance) with 20 lines of code.
-- Unified extraction interface (deterministic + LLM behind same abstraction) — deterministic parsers and LLM extraction have fundamentally different failure modes, latency profiles, and costs. Hiding that behind one interface loses the ability to reason about them differently.
-- Strict TypeScript schema — project is plain Node.js. `normalizeExtractedEvent` + `computeCompleteness` + 0.4 gate already function as a runtime schema. TS adoption is a separate, larger decision.
+- [ ] **Validate at source boundary, not post-merge**: move `computeCompleteness` + quality gate (0.4 threshold) into each source's fetch function return path. Currently validation happens in `refreshCache()` after all sources merge — a bad extraction can interact with dedup before getting filtered.
+- [ ] **LLM junk filter for borderline events**: after `applyQualityGates` removes obvious junk, batch borderline events through a binary LLM classifier: "is this an actual attendable NYC event?"
 
 ### Phase 12: Platform Expansion (Later)
 
 *The intelligence layer serves more surfaces and more cities.*
 
-- [ ] Web companion: browsable event page for longer sessions (SMS for discovery, web for depth)
+- [x] Web companion: `/app` — Gemini-style conversational interface, SMS acquisition funnel (Mar 16)
 - [ ] Multi-channel: WhatsApp, iMessage (same agent, different transport)
 - [ ] Multi-city: only launch when 3+ editorial sources (weight >= 0.85) identified for the city. NYC → LA → Chicago.
 - [ ] Paid tier: Stripe billing, $5-10/month for unlimited + proactive alerts
 - [ ] Group planning: multi-user coordination via shareable pick list
+
+**Not pursuing** (assessed, too costly for current scale):
+- Formal DAG pipeline framework — `refreshCache()` already does fetch→merge→dedup→stamp sequentially in ~15s
+- Embedding-based dedup — venue alias table solves name variance with 20 lines of code
+- Unified extraction interface — deterministic and LLM extraction have different failure modes; hiding that loses clarity
+- Strict TypeScript schema — `normalizeExtractedEvent` + `computeCompleteness` + 0.4 gate already function as runtime schema
 
 ---
 
@@ -287,6 +179,16 @@ Design principle: **deterministic rules handle the 86%, LLM classifies the stubb
 
 ---
 
+## Open Issues
+
+| Issue | Why deferred |
+|-------|-------------|
+| No processing ack during slow LLM calls | Adds extra Twilio cost |
+| No structured logging or correlation IDs | Operational improvement for scale |
+| Price data gap (21% unknown) | Structurally unavailable from some sources |
+
+---
+
 ## Completed Work
 
 | Phase | Date | Summary |
@@ -301,39 +203,23 @@ Design principle: **deterministic rules handle the 86%, LLM classifies the stubb
 | Community Layer Phase 2 | Mar 3 | Venue size (200+ venues), interaction format, source vibe (4 tiers), editorial lean (51% discovery/niche). |
 | Scrape Guard | Mar 5 | Baseline gates, post-scrape audit, yesterday's cache fallback. |
 | Discovery Conversation | Mar 8 | Ask before recommending for vague requests. Vibe-first CTA. |
-| Prompt Hygiene | Mar 7 | Dead prompts deleted, examples trimmed, curation taste shared constant. 4 of 6 action items done. |
+| Prompt Hygiene | Mar 7 | Dead prompts deleted, examples trimmed, curation taste shared constant. |
 | Phase 7: Tastemaker Voice | Mar 8 | Metadata translation guide, contrasting picks, mood-to-category mapping, acknowledge-and-build, details structure. Prompt-only changes. |
-| "Other" Category Reduction | Mar 9 | `remapOtherCategory` rules-based remap: 11 pattern groups (sound bath→community, film→film, vinyl night→nightlife, etc.). Runs post-stamp in cache build. |
-| Editorial Note Preservation | Mar 9 | `editorial_note` field added to extraction prompt, carried through normalization→serialization→details. All 4 LLM-extracted sources benefit. |
-| Venue Learning Persistence | Mar 9 | Already implemented: `exportLearnedVenues`/`importLearnedVenues` wired to disk. 2500+ venues survive restarts. |
-| Phase 8: Venue Knowledge | Mar 12 | 30 venue profiles in `data/venue-profiles.json` (web-researched, human-reviewed). `venue_vibe` in pool serialization, full profile in details intent, prompt guidance added. Scenario evals: 99.9% code evals, 99.5% assertions (287 scenarios). |
-| Phase 10: Proactive Outreach | Mar 13 | Post-scrape hook scores events against user profiles (neighborhood+category+interestingness+scarcity+editorial). NOTIFY/STOP NOTIFY keywords, opt-in CTA on sessions 1+3, 7-day cooldown, 30-day churn filter, session seeding for replies, engagement tracking, pause/resume endpoints. Default off (PULSE_PROACTIVE_ENABLED). |
-| Phase 7+8: Eval golden scenario update | Mar 13 | Fixed `exists`/`contains_any` assertion types in eval runner (were silently failing). Updated 14 stale text assertions for new tastemaker voice. |
-| Time-aware filtering | Mar 13 | Tightened `filterUpcomingEvents` grace window from 2hr to 30min for events without `end_time_local` (fixed-start shows). Events with end times still shown while ongoing. Added prompt hint for in-progress events ("started at 7 but goes til midnight") and wired `end_time_local` into pool serialization. |
-| Phase 10: Recurrence Nudge | Mar 13 | Detail request = attended signal. 2nd detail → consent prompt ("REMIND ME"). Hourly scheduler sends nudge on matching day with 7-day cooldown. NUDGE OFF global opt-out, TCPA STOP clears all subs. `nudges.js` module, `nudge_subscriptions` SQLite table. Gated behind `PULSE_NUDGES_ENABLED`. |
-| Phase 11 Story 1: Scraper Failure Resilience | Mar 13 | Auto-disable after 7 consecutive failures with daily probe for auto-recovery. Graduated alerting (yellow/red severity emails) replaces flat digest emails for non-green status. Disabled sources flagged in digest. Dead `alertOnFailingSources` removed. |
-| Unified Agent Architecture | Mar 16 | 4-step refactor: (1) drop compose_sms — model writes SMS directly, (2) unified `search` tool — merges search_events + search_places + show_welcome, parallel event+place fan-out, (3) simplified session save — picks from pool order not fuzzy SMS matching, search_summary in conversation history, (4) slim prompt — ~60% smaller, few-shot examples replace verbose rules, pool items carry `recommended`+`why` metadata. Net: 2 tools instead of 5, ~250 lines reduced, ~47% cost reduction per conversation. |
-
-### Prompt Hygiene — Open Items
-
-| # | Action | Risk | Effort |
-|---|--------|------|--------|
-| ~~5~~ | ~~Move filter_intent to deterministic code~~ — Won't do. Intent drives filter merge/replace logic (`new_search`/`pivot` = replace, `refine` = merge). This is a semantic decision that depends on conversational context, not derivable from params alone. Already a structured tool param (P1-safe). | — | — |
-| ~~6~~ | ~~Add deterministic post-processing for price/day labels~~ — Already done. `dayLabel` computed deterministically in `serializePoolForContinuation`. Price passed as structured `is_free` + `price_display`. | — | — |
-
----
-
-## Open Issues
-
-| Issue | Why deferred |
-|-------|-------------|
-| ~~Skint scraper date resolution wrong~~ | ~~Fixed. Now parses post `<h2>` date range (e.g., "3/13-16") and anchors day name resolution to post start date instead of today. See [audit](docs/audits/2026-03-15-skint-scraper-audit.md).~~ |
-| ~~Skint bullet sub-events not split~~ | ~~Fixed. `splitBulletParagraph` splits multi-bullet `<p>` tags (separated by `<br>`) into individual events. `parseSkintParagraph` now handles venue-only bullets (`► venue (hood). price.`).~~ |
-| ~~Skint venue extraction failures~~ | ~~Fixed. `refineVenue` trims over-long venue strings by comma and "at" boundaries. Remaining edge cases (no `(neighborhood)` paren at all) deferred to LLM enrichment.~~ |
-| ~~Skint category misclassifications~~ | ~~Fixed. Reordered trivia before film (quiz→trivia not film). Narrowed "tasting" to require food/drink context. Removed "cinema" from film (catches venue names).~~ |
-| No processing ack during slow LLM calls | Adds extra Twilio cost |
-| No structured logging or correlation IDs | Operational improvement for scale |
-| Price data gap (21% unknown) | Structurally unavailable from some sources |
+| "Other" Category Reduction | Mar 9 | `remapOtherCategory` rules-based remap: 11 pattern groups. Reduced from 41% to 13.9%. |
+| Editorial Note Preservation | Mar 9 | `editorial_note` field through normalization→serialization→details. All 4 LLM-extracted sources benefit. |
+| Venue Learning Persistence | Mar 9 | `exportLearnedVenues`/`importLearnedVenues` wired to disk. 2500+ venues survive restarts. |
+| Phase 8: Venue Knowledge | Mar 12 | 30 venue profiles (web-researched, human-reviewed). `venue_vibe` in pool, full profile in details. 99.9% code evals, 99.5% assertions (287 scenarios). |
+| Phase 10: Proactive Outreach | Mar 13 | Post-scrape scoring, NOTIFY/STOP NOTIFY, opt-in CTA, 7-day cooldown, session seeding, engagement tracking. Default off. |
+| Eval Golden Scenario Update | Mar 13 | Fixed `exists`/`contains_any` assertion types. Updated 14 stale text assertions for tastemaker voice. |
+| Time-aware Filtering | Mar 13 | Grace window 2hr→30min for fixed-start shows. In-progress hints. `end_time_local` in pool serialization. |
+| Recurrence Nudge | Mar 13 | Detail request = attended signal. Consent flow (REMIND ME / NUDGE OFF). Hourly scheduler, 7-day cooldown. `nudges.js`. |
+| Scraper Failure Resilience | Mar 13 | Auto-disable after 7 failures, daily probe, graduated alerting (yellow/red emails). |
+| Content-hash Extraction Cache | Mar 13 | `extraction-cache.js` hashes raw content via sha256. Saves ~$0.01/day on unchanged content. |
+| Venue Alias Table | Mar 13 | 35 entries mapping variant names to canonical. Applied in normalization + dedup. |
+| LLM Enrichment | Mar 13 | `enrichIncompleteEvents` + `classifyOtherEvents` in `enrichment.js`. Batched through Haiku at scrape time. |
+| Classification Report | Mar 13 | `logClassification()` appends to `data/classification-log.json`. Human reads to promote patterns to regex. |
+| Unified Agent Architecture | Mar 16 | 4-step refactor: (1) drop compose_sms, (2) unified `search` tool with parallel fan-out, (3) simplified session save with pool-order picks, (4) slim prompt with few-shot examples + `recommended`/`why` metadata. 2 tools instead of 5, ~250 lines reduced, ~47% cost reduction. |
+| Web App Prototype | Mar 16 | `/app` — Gemini-style conversational interface. Same backend, SMS acquisition funnel. Sidebar, suggestion pills, inline event cards. |
 
 ---
 
