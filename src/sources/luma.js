@@ -254,15 +254,6 @@ async function fetchLumaEvents() {
     const filtered = events.filter(e => {
       // Drop keyword-matched professional events
       if (LUMA_NOISE_RE.test(e.name)) return false;
-      // Drop weekday events starting before 5pm ET (21:00 UTC in EDT)
-      const t = e.start_time_local;
-      if (t) {
-        const dt = new Date(t);
-        const utcHour = dt.getUTCHours();
-        const day = dt.getUTCDay(); // 0=Sun, 6=Sat
-        const isWeekday = day >= 1 && day <= 5;
-        if (isWeekday && utcHour >= 7 && utcHour < 21) return false;
-      }
       return true;
     });
     console.log(`Luma: ${filtered.length} events (${beforeFilter} before editorial filter)`);
