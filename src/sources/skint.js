@@ -2,6 +2,7 @@ const cheerio = require('cheerio');
 const { extractEvents } = require('../ai');
 const { FETCH_HEADERS, normalizeExtractedEvent } = require('./shared');
 const { captureExtractionInput } = require('../extraction-capture');
+const { getCachedExtraction, setCachedExtraction } = require('../extraction-cache');
 const { resolveNeighborhood } = require('../geo');
 const { extractNeighborhood } = require('../neighborhoods');
 
@@ -645,10 +646,16 @@ async function fetchSkintEvents() {
       const content = `Published: ${today}\n\n` + eventParagraphs.slice(0, 30).join('\n\n');
       console.log(`Skint content: ${content.length} chars (${eventParagraphs.length} event paragraphs)`);
       captureExtractionInput('theskint', content, 'https://theskint.com/');
-      const result = await extractEvents(content, 'theskint', 'https://theskint.com/');
-      events = (result.events || [])
-        .map(e => normalizeExtractedEvent(e, 'theskint', 'curated', 0.9))
-        .filter(e => e.name && e.completeness >= 0.5);
+      const cached = getCachedExtraction('theskint', content);
+      if (cached) {
+        events = cached;
+      } else {
+        const result = await extractEvents(content, 'theskint', 'https://theskint.com/');
+        events = (result.events || [])
+          .map(e => normalizeExtractedEvent(e, 'theskint', 'curated', 0.9))
+          .filter(e => e.name && e.completeness >= 0.5);
+        setCachedExtraction('theskint', content, events);
+      }
       console.log(`Skint: ${events.length} events (LLM fallback, deterministic was ${Math.round(captureRate * 100)}%)`);
     }
 

@@ -4,6 +4,7 @@ const { extractEvents } = require('../ai');
 const { fetchEmails } = require('../gmail');
 const { normalizeExtractedEvent, backfillEvidence } = require('./shared');
 const { captureExtractionInput } = require('../extraction-capture');
+const { getCachedExtraction, setCachedExtraction } = require('../extraction-cache');
 const { stripHtml } = require('./shared');
 
 const SCREENSLATE_DIR = path.join(__dirname, '../../data/screenslate');
@@ -134,13 +135,20 @@ async function fetchScreenSlateEvents() {
       console.log('ScreenSlate: no venue headers found, using full content');
       const content = stripped.slice(0, 10000);
       captureExtractionInput('screenslate', content, 'https://screenslate.com');
-      const result = await extractEvents(content, 'screenslate', 'https://screenslate.com');
-      const events = (result.events || [])
-        .map(e => {
-          e.category = 'film';
-          return normalizeExtractedEvent(e, 'ScreenSlate', 'unstructured', 0.9);
-        })
-        .filter(e => e.name && e.completeness >= 0.5);
+      const cachedEvents = getCachedExtraction('screenslate', content);
+      let events;
+      if (cachedEvents) {
+        events = cachedEvents;
+      } else {
+        const result = await extractEvents(content, 'screenslate', 'https://screenslate.com');
+        events = (result.events || [])
+          .map(e => {
+            e.category = 'film';
+            return normalizeExtractedEvent(e, 'ScreenSlate', 'unstructured', 0.9);
+          })
+          .filter(e => e.name && e.completeness >= 0.5);
+        setCachedExtraction('screenslate', content, events);
+      }
 
       saveCachedEvents(latest.id, events);
       console.log(`ScreenSlate: ${events.length} events`);
@@ -166,13 +174,18 @@ async function fetchScreenSlateEvents() {
         batch.map(async ({ venue, content }) => {
           console.log(`ScreenSlate: extracting ${venue} (${content.length} chars)`);
           captureExtractionInput('screenslate', content, 'https://screenslate.com');
+          const cacheKey = `screenslate:${venue}`;
+          const cachedVenue = getCachedExtraction(cacheKey, content);
+          if (cachedVenue) return cachedVenue;
           const result = await extractEvents(content, 'screenslate', 'https://screenslate.com');
-          return (result.events || [])
+          const extracted = (result.events || [])
             .map(e => {
               e.category = 'film';
               return normalizeExtractedEvent(e, 'ScreenSlate', 'unstructured', 0.9);
             })
             .filter(e => e.name && e.completeness >= 0.5);
+          setCachedExtraction(cacheKey, content, extracted);
+          return extracted;
         })
       );
       for (const r of results) {

@@ -4,6 +4,7 @@ const { extractEvents } = require('../ai');
 const { fetchEmails } = require('../gmail');
 const { normalizeExtractedEvent, backfillEvidence } = require('./shared');
 const { captureExtractionInput } = require('../extraction-capture');
+const { getCachedExtraction, setCachedExtraction } = require('../extraction-cache');
 const { stripHtml } = require('./shared');
 
 const NONSENSE_DIR = path.join(__dirname, '../../data/nonsense');
@@ -102,10 +103,17 @@ async function fetchNonsenseNYC() {
       console.log('NonsenseNYC: no day headers found, using full content');
       const content = stripped.slice(0, 10000);
       captureExtractionInput('nonsensenyc', content, 'https://nonsensenyc.com/');
-      const result = await extractEvents(content, 'nonsensenyc', 'https://nonsensenyc.com/');
-      const events = (result.events || [])
-        .map(e => normalizeExtractedEvent(e, 'nonsensenyc', 'curated', 0.9))
-        .filter(e => e.name && e.completeness >= 0.5);
+      const cachedEvents = getCachedExtraction('nonsensenyc', content);
+      let events;
+      if (cachedEvents) {
+        events = cachedEvents;
+      } else {
+        const result = await extractEvents(content, 'nonsensenyc', 'https://nonsensenyc.com/');
+        events = (result.events || [])
+          .map(e => normalizeExtractedEvent(e, 'nonsensenyc', 'curated', 0.9))
+          .filter(e => e.name && e.completeness >= 0.5);
+        setCachedExtraction('nonsensenyc', content, events);
+      }
 
       saveCachedEvents(newsletter.id, events);
       console.log(`NonsenseNYC: ${events.length} events`);
@@ -123,10 +131,15 @@ async function fetchNonsenseNYC() {
         batch.map(async ({ day, content }) => {
           console.log(`NonsenseNYC: extracting ${day} (${content.length} chars)`);
           captureExtractionInput('nonsensenyc', content, 'https://nonsensenyc.com/');
+          const cacheKey = `nonsensenyc:${day}`;
+          const cachedDay = getCachedExtraction(cacheKey, content);
+          if (cachedDay) return cachedDay;
           const result = await extractEvents(content, 'nonsensenyc', 'https://nonsensenyc.com/');
-          return (result.events || [])
+          const extracted = (result.events || [])
             .map(e => normalizeExtractedEvent(e, 'nonsensenyc', 'curated', 0.9))
             .filter(e => e.name && e.completeness >= 0.5);
+          setCachedExtraction(cacheKey, content, extracted);
+          return extracted;
         })
       );
       for (const r of results) {

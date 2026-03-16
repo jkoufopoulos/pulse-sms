@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const { resolveNeighborhood } = require('../geo');
-const { lookupVenue } = require('../venues');
+const { lookupVenue, resolveVenueAlias } = require('../venues');
 
 // NYC bounding box — shared across scrapers that need geo filtering
 const NYC_BBOX = { minLat: 40.49, maxLat: 40.92, minLng: -74.26, maxLng: -73.70 };
@@ -149,6 +149,12 @@ function canonicalizeCategory(cat) {
 
 function normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight) {
   normalizeDateTimeFields(e);
+
+  // Resolve venue aliases before ID generation and lookup (dedup improvement)
+  if (e.venue_name) {
+    e.venue_name = resolveVenueAlias(e.venue_name);
+  }
+
   const id = makeEventId(e.name, e.venue_name, e.date_local || e.start_time_local || '', sourceName, e.source_url, e.start_time_local);
 
   // Try venue lookup for coords when Claude didn't extract lat/lng

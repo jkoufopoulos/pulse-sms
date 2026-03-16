@@ -649,6 +649,15 @@ async function refreshCache() {
       stampVenueSize(eventCache);
       stampInteractionFormat(eventCache);
       remapOtherCategories(eventCache);
+
+      // LLM classification for remaining "other" events (non-fatal)
+      try {
+        const { classifyOtherEvents } = require('./enrichment');
+        await classifyOtherEvents(eventCache);
+      } catch (err) {
+        console.warn('[LLM-CLASSIFY] Classification failed (non-fatal):', err.message);
+      }
+
       cacheTimestamp = Date.now();
       console.log(`SQLite: ${validEvents.length} events stored, serving ${eventCache.length} (${dbEvents.length} scraped + ${freshOccurrences.length} recurring)`);
     } catch (err) {

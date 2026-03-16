@@ -1,4 +1,104 @@
 /**
+ * Venue alias table for dedup — maps variant venue names to canonical names.
+ * Applied before venue lookups and event ID generation so that events at the
+ * same physical venue under different names get deduplicated correctly.
+ */
+const VENUE_ALIASES = {
+  // Avant Gardner complex
+  'avant gardner': 'Brooklyn Mirage',
+  'the brooklyn mirage': 'Brooklyn Mirage',
+
+  // Baby's All Right
+  'babys all right': "Baby's All Right",
+
+  // (Le) Poisson Rouge
+  'le poisson rouge': '(Le) Poisson Rouge',
+  'lpr': '(Le) Poisson Rouge',
+
+  // BAM
+  'bam howard gilman opera house': 'BAM',
+  'bam, howard gilman opera house': 'BAM',
+  'bam harvey theater': 'BAM',
+  'bam (brooklyn academy of music)': 'BAM',
+
+  // Lot Radio
+  'the lot radio': 'Lot Radio',
+
+  // Nitehawk Cinema
+  'nitehawk cinema williamsburg': 'Nitehawk Cinema',
+
+  // Alamo Drafthouse
+  'alamo drafthouse downtown brooklyn': 'Alamo Drafthouse',
+
+  // Friends and Lovers
+  'friends & lovers': 'Friends and Lovers',
+
+  // Roxy Cinema
+  'the roxy cinema': 'Roxy Cinema',
+
+  // Paris Theater
+  'the paris theater': 'Paris Theater',
+
+  // Smoke Jazz Club
+  'smoke jazz & supper club': 'Smoke Jazz Club',
+
+  // Bowery Ballroom
+  'the bowery ballroom': 'Bowery Ballroom',
+  'bowery ballroom': 'Bowery Ballroom',
+
+  // Green-Wood Cemetery
+  'the green-wood cemetery': 'Green-Wood Cemetery',
+
+  // BRIC
+  'bric house': 'BRIC',
+  'bric house media center': 'BRIC',
+
+  // Greenlight Bookstore
+  'greenlight bookstore fort greene': 'Greenlight Bookstore',
+  'greenlight bookstore in fort greene': 'Greenlight Bookstore',
+
+  // McNally Jackson
+  'mcnally jackson books': 'McNally Jackson',
+
+  // Housing Works Bookstore
+  'housing works bookstore cafe': 'Housing Works Bookstore',
+
+  // Strand Bookstore
+  'strand bookstore': 'Strand Book Store',
+
+  // Eris
+  'eris main stage': 'Eris',
+  'eris mainstage': 'Eris',
+  'eris deep space': 'Eris',
+
+  // Fabrik
+  'fabrik dumbo': 'Fabrik',
+  'fabrik nyc': 'Fabrik',
+
+  // Brooklyn Comedy Collective
+  'the brooklyn comedy collective': 'Brooklyn Comedy Collective',
+
+  // Schomburg Center
+  'schomburg center for research in black culture': 'Schomburg Center',
+};
+
+// Build lowercase → canonical lookup at module load
+const aliasLookup = new Map();
+for (const [variant, canonical] of Object.entries(VENUE_ALIASES)) {
+  aliasLookup.set(variant.toLowerCase(), canonical);
+}
+
+/**
+ * Resolve a venue name through the alias table.
+ * Returns the canonical name if an alias exists, otherwise returns the original unchanged.
+ */
+function resolveVenueAlias(name) {
+  if (!name) return name;
+  const canonical = aliasLookup.get(name.toLowerCase().trim());
+  return canonical || name;
+}
+
+/**
  * Shared venue coordinate map for NYC venues and parks.
  * Used by all sources (RA, Skint, Nonsense NYC, Oh My Rockness, Tavily, NYC Parks)
  * to resolve venue names → lat/lng when structured geo data is missing.
@@ -889,7 +989,10 @@ function cleanVenueName(name) {
 
 function lookupVenue(name) {
   if (!name) return null;
-  const key = normalizeName(name);
+
+  // Try alias resolution first
+  const aliased = resolveVenueAlias(name);
+  const key = normalizeName(aliased);
   const direct = normalizedMap.get(key);
   if (direct) return direct;
 
@@ -1032,4 +1135,4 @@ async function batchGeocodeEvents(events) {
   console.log(`Geocoding done: ${resolved}/${unresolved.length} resolved`);
 }
 
-module.exports = { VENUE_MAP, VENUE_SIZE, lookupVenue, lookupVenueSize, lookupVenueProfile, learnVenueCoords, geocodeVenue, batchGeocodeEvents, exportLearnedVenues, importLearnedVenues };
+module.exports = { VENUE_MAP, VENUE_SIZE, VENUE_ALIASES, resolveVenueAlias, lookupVenue, lookupVenueSize, lookupVenueProfile, learnVenueCoords, geocodeVenue, batchGeocodeEvents, exportLearnedVenues, importLearnedVenues };
