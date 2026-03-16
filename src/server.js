@@ -477,6 +477,63 @@ app.get('/api/agent-eye', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// --- Pulse Web App (acquisition funnel) ---
+app.get('/app', (req, res) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'");
+  res.sendFile(require('path').join(__dirname, 'pulse-app.html'));
+});
+
+app.get('/api/tonight', async (req, res) => {
+  try {
+    const { getTopPicks } = require('./events');
+    const { buildRecommendationReason, cleanEventName } = require('./brain-llm');
+    const events = await getTopPicks(12);
+    const picks = events.map(e => ({
+      id: e.id,
+      name: cleanEventName(e.name),
+      venue_name: e.venue_name,
+      neighborhood: e.neighborhood,
+      category: e.category,
+      start_time_local: e.start_time_local,
+      is_free: e.is_free,
+      price_display: e.price_display,
+      short_detail: (e.short_detail || e.description_short || '').slice(0, 120),
+      venue_size: e.venue_size || null,
+      source_vibe: e.source_vibe || null,
+      scarcity: e.scarcity || null,
+      recommended: true,
+      why: buildRecommendationReason(e) || null,
+    }));
+    res.json({ ok: true, picks });
+  } catch (err) {
+    console.error('Tonight API error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/hood/:name', async (req, res) => {
+  try {
+    const { buildSearchPool } = require('./brain-execute');
+    const { serializePoolForContinuation, buildRecommendationReason } = require('./brain-llm');
+    const params = { neighborhood: req.params.name, intent: 'new_search' };
+    if (req.query.category) params.category = req.query.category;
+    const mockTrace = { events: {}, composition: {} };
+    const poolResult = await buildSearchPool(params, null, null, mockTrace);
+    if (poolResult.zeroMatch) {
+      return res.json({ ok: true, picks: [], neighborhood: req.params.name, zero_match: true });
+    }
+    const serialized = serializePoolForContinuation(poolResult);
+    const picks = (serialized.events || []).slice(0, 12).map(e => ({
+      ...e,
+      why: e.why || buildRecommendationReason(e) || null,
+    }));
+    res.json({ ok: true, picks, neighborhood: serialized.neighborhood, match_count: serialized.match_count });
+  } catch (err) {
+    console.error('Hood API error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 // AI Insights — LLM-generated actionable summary of event cache health
 let insightsCache = { text: null, cacheKey: null, version: 0 };
 app.get('/api/events/insights', async (req, res) => {

@@ -58,7 +58,7 @@ function startTrace(phone_masked, input_message) {
     ai_costs: [],
     total_ai_cost_usd: 0,
     // Agent brain fields
-    brain_tool: null,       // "search_events" or "respond"
+    brain_tool: null,       // "search" or "respond"
     brain_params: null,     // the tool call parameters
     brain_latency_ms: null, // brain LLM call time
     brain_iterations: [],   // per-iteration timing [{tool, ms}]

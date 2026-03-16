@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pulse — NYC Events, One Text Away</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #08070d;
+      --bg-card: rgba(255,255,255,0.04);
+      --bg-card-hover: rgba(255,255,255,0.07);
+      --border: rgba(255,255,255,0.08);
+      --text: #ede9e3;
+      --text-dim: #7a756d;
+      --text-muted: #4a463f;
+      --coral: #ff6b42;
+      --coral-dim: rgba(255,107,66,0.15);
+      --green: #3fb950;
+      --purple: #d2a8ff;
+      --font: 'DM Sans', system-ui, sans-serif;
+      --mono: 'DM Mono', monospace;
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.6; }
+
+    /* NAV */
+    nav { position: sticky; top: 0; z-index: 100; backdrop-filter: blur(20px); background: rgba(8,7,13,0.85); border-bottom: 1px solid var(--border); }
+    .nav-inner { max-width: 800px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { font-weight: 700; font-size: 1.2rem; color: var(--coral); text-decoration: none; }
+    .nav-cta { background: var(--coral); color: #fff; border: none; padding: 8px 18px; border-radius: 20px; font: 500 0.85rem var(--font); cursor: pointer; transition: opacity 0.2s; }
+    .nav-cta:hover { opacity: 0.85; }
+
+    /* HERO */
+    .hero { max-width: 800px; margin: 0 auto; padding: 48px 20px 24px; }
+    .hero h1 { font-size: 2rem; font-weight: 700; line-height: 1.2; margin-bottom: 8px; }
+    .hero h1 span { color: var(--coral); }
+    .hero p { color: var(--text-dim); font-size: 1rem; margin-bottom: 32px; }
+
+    /* HOODS */
+    .hoods { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 36px; }
+    .hood-pill { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-dim); padding: 6px 16px; border-radius: 20px; font: 500 0.82rem var(--font); cursor: pointer; transition: all 0.2s; text-decoration: none; }
+    .hood-pill:hover, .hood-pill.active { background: var(--coral-dim); border-color: var(--coral); color: var(--coral); }
+
+    /* CARDS */
+    .section-label { font: 500 0.72rem var(--mono); text-transform: uppercase; letter-spacing: 0.12em; color: var(--coral); margin-bottom: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; max-width: 800px; margin: 0 auto; padding: 0 20px 48px; }
+    .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; cursor: pointer; transition: all 0.2s; }
+    .card:hover { background: var(--bg-card-hover); border-color: rgba(255,255,255,0.12); transform: translateY(-1px); }
+    .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .card-name { font-weight: 700; font-size: 1rem; line-height: 1.3; }
+    .card-cat { font: 500 0.68rem var(--mono); color: var(--coral); background: var(--coral-dim); padding: 3px 8px; border-radius: 8px; white-space: nowrap; }
+    .card-venue { color: var(--text-dim); font-size: 0.88rem; margin-bottom: 6px; }
+    .card-detail { color: var(--text-muted); font-size: 0.82rem; margin-bottom: 10px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .card-meta { display: flex; gap: 12px; align-items: center; font-size: 0.78rem; color: var(--text-dim); }
+    .card-meta .time { font-family: var(--mono); }
+    .card-meta .free { color: var(--green); font-weight: 600; }
+    .card-why { margin-top: 10px; font-size: 0.78rem; color: var(--purple); font-style: italic; }
+    .card-hood { font: 400 0.72rem var(--mono); color: var(--text-muted); }
+
+    /* EMPTY */
+    .empty { text-align: center; padding: 48px 20px; color: var(--text-dim); }
+
+    /* CHAT WIDGET */
+    .chat-toggle { position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px; border-radius: 28px; background: var(--coral); border: none; color: #fff; font-size: 1.5rem; cursor: pointer; box-shadow: 0 4px 20px rgba(255,107,66,0.4); z-index: 200; transition: transform 0.2s; }
+    .chat-toggle:hover { transform: scale(1.08); }
+    .chat-panel { position: fixed; bottom: 96px; right: 24px; width: 360px; max-height: 480px; background: #111018; border: 1px solid var(--border); border-radius: 20px; z-index: 200; display: none; flex-direction: column; overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.6); }
+    .chat-panel.open { display: flex; }
+    .chat-header { padding: 14px 18px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
+    .chat-header span { color: var(--text-dim); font-weight: 400; font-size: 0.78rem; }
+    .chat-messages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-height: 280px; max-height: 340px; }
+    .msg { max-width: 85%; padding: 10px 14px; border-radius: 16px; font-size: 0.85rem; line-height: 1.5; word-wrap: break-word; }
+    .msg.user { align-self: flex-end; background: var(--coral); color: #fff; border-bottom-right-radius: 4px; }
+    .msg.bot { align-self: flex-start; background: rgba(255,255,255,0.08); color: var(--text); border-bottom-left-radius: 4px; }
+    .msg.system { align-self: center; color: var(--text-muted); font-size: 0.75rem; }
+    .chat-input { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); }
+    .chat-input input { flex: 1; background: rgba(255,255,255,0.06); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; color: var(--text); font: 0.85rem var(--font); outline: none; }
+    .chat-input input::placeholder { color: var(--text-muted); }
+    .chat-input button { background: var(--coral); border: none; color: #fff; width: 38px; height: 38px; border-radius: 12px; cursor: pointer; font-size: 1rem; }
+    .typing { display: flex; gap: 4px; padding: 10px 14px; align-self: flex-start; }
+    .typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); animation: bounce 1.2s infinite; }
+    .typing span:nth-child(2) { animation-delay: 0.2s; }
+    .typing span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-6px); } }
+
+    /* CTA BANNER */
+    .cta-banner { max-width: 800px; margin: 0 auto 48px; padding: 0 20px; }
+    .cta-card { background: linear-gradient(135deg, rgba(255,107,66,0.12), rgba(255,107,66,0.04)); border: 1px solid rgba(255,107,66,0.2); border-radius: 20px; padding: 32px; text-align: center; }
+    .cta-card h2 { font-size: 1.3rem; margin-bottom: 8px; }
+    .cta-card p { color: var(--text-dim); margin-bottom: 20px; font-size: 0.9rem; }
+    .cta-form { display: flex; gap: 10px; justify-content: center; max-width: 400px; margin: 0 auto; }
+    .cta-form input { flex: 1; background: rgba(255,255,255,0.06); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; color: var(--text); font: 0.9rem var(--font); outline: none; }
+    .cta-form input::placeholder { color: var(--text-muted); }
+    .cta-form button { background: var(--coral); border: none; color: #fff; padding: 12px 24px; border-radius: 12px; font: 600 0.9rem var(--font); cursor: pointer; white-space: nowrap; }
+    .cta-success { display: none; color: var(--green); font-weight: 600; margin-top: 12px; }
+
+    /* LOADING */
+    .loading { text-align: center; padding: 48px; color: var(--text-muted); }
+
+    /* RESPONSIVE */
+    @media (max-width: 500px) {
+      .hero h1 { font-size: 1.5rem; }
+      .grid { grid-template-columns: 1fr; }
+      .chat-panel { right: 12px; left: 12px; width: auto; bottom: 88px; }
+      .cta-form { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a class="nav-logo" href="/app">Pulse</a>
+    <button class="nav-cta" onclick="document.getElementById('cta').scrollIntoView({behavior:'smooth'})">Get Picks via SMS</button>
+  </div>
+</nav>
+
+<div class="hero">
+  <h1>Tonight in <span>NYC</span></h1>
+  <p>Curated picks from 22 sources. The stuff your friends don't know about yet.</p>
+  <div class="hoods" id="hoods"></div>
+</div>
+
+<div style="max-width:800px;margin:0 auto;padding:0 20px 12px;">
+  <div class="section-label" id="section-label">Tonight's Top Picks</div>
+</div>
+<div class="grid" id="grid">
+  <div class="loading">Loading tonight's picks...</div>
+</div>
+
+<div class="cta-banner" id="cta">
+  <div class="cta-card">
+    <h2>Get picks texted to you</h2>
+    <p>Same curated picks, delivered by SMS. Reply to refine, ask for details, or say "more." No app needed.</p>
+    <div class="cta-form" id="cta-form">
+      <input type="tel" id="phone-input" placeholder="Your phone number" pattern="[0-9+\-() ]*">
+      <button onclick="submitPhone()">Text Me Picks</button>
+    </div>
+    <div class="cta-success" id="cta-success">Check your texts! Pulse just said hey.</div>
+  </div>
+</div>
+
+<!-- Chat Widget -->
+<button class="chat-toggle" id="chat-toggle" onclick="toggleChat()">&#x1f4ac;</button>
+<div class="chat-panel" id="chat-panel">
+  <div class="chat-header">
+    Try Pulse
+    <span>Text-style demo</span>
+  </div>
+  <div class="chat-messages" id="chat-messages">
+    <div class="msg system">Type a neighborhood or vibe</div>
+  </div>
+  <div class="chat-input">
+    <input id="chat-input" placeholder="bushwick, comedy, something chill..." onkeydown="if(event.key==='Enter')sendChat()">
+    <button onclick="sendChat()">&#x2191;</button>
+  </div>
+</div>
+
+<script>
+const POPULAR_HOODS = ['Williamsburg','Bushwick','LES','Greenpoint','Park Slope','East Village','Bed-Stuy','Prospect Heights','Fort Greene','Astoria','Crown Heights','Harlem'];
+let currentHood = null;
+const chatPhone = '+1555' + Math.floor(Math.random() * 9000000 + 1000000);
+
+// Render neighborhood pills
+const hoodsEl = document.getElementById('hoods');
+hoodsEl.innerHTML = `<a class="hood-pill active" onclick="loadTonight()" data-hood="">All NYC</a>` +
+  POPULAR_HOODS.map(h => `<a class="hood-pill" onclick="loadHood('${h}')" data-hood="${h}">${h}</a>`).join('');
+
+function setActiveHood(name) {
+  document.querySelectorAll('.hood-pill').forEach(p => p.classList.toggle('active', p.dataset.hood === name));
+}
+
+function formatTime(iso) {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
+  } catch { return ''; }
+}
+
+function renderCards(picks) {
+  const grid = document.getElementById('grid');
+  if (!picks || picks.length === 0) {
+    grid.innerHTML = '<div class="empty">No events found. Try a different neighborhood.</div>';
+    return;
+  }
+  grid.innerHTML = picks.map(e => `
+    <div class="card">
+      <div class="card-top">
+        <div class="card-name">${esc(e.name)}</div>
+        <div class="card-cat">${esc(e.category || '')}</div>
+      </div>
+      <div class="card-venue">${esc(e.venue_name || '')}${e.neighborhood ? ' · ' + esc(e.neighborhood) : ''}</div>
+      ${e.short_detail ? `<div class="card-detail">${esc(e.short_detail)}</div>` : ''}
+      <div class="card-meta">
+        ${e.start_time_local ? `<span class="time">${formatTime(e.start_time_local)}</span>` : ''}
+        ${e.is_free ? '<span class="free">FREE</span>' : e.price_display ? `<span>${esc(e.price_display)}</span>` : ''}
+        ${e.day && e.day !== 'TODAY' ? `<span>${esc(e.day)}</span>` : ''}
+      </div>
+      ${e.why ? `<div class="card-why">${esc(e.why)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+async function loadTonight() {
+  currentHood = null;
+  setActiveHood('');
+  document.getElementById('section-label').textContent = "Tonight's Top Picks";
+  document.getElementById('grid').innerHTML = '<div class="loading">Loading...</div>';
+  try {
+    const r = await fetch('/api/tonight');
+    const data = await r.json();
+    renderCards(data.picks || []);
+  } catch (err) {
+    document.getElementById('grid').innerHTML = '<div class="empty">Failed to load. Try refreshing.</div>';
+  }
+}
+
+async function loadHood(name) {
+  currentHood = name;
+  setActiveHood(name);
+  document.getElementById('section-label').textContent = `Tonight in ${name}`;
+  document.getElementById('grid').innerHTML = '<div class="loading">Loading...</div>';
+  try {
+    const r = await fetch(`/api/hood/${encodeURIComponent(name)}`);
+    const data = await r.json();
+    renderCards(data.picks || []);
+  } catch (err) {
+    document.getElementById('grid').innerHTML = '<div class="empty">Failed to load. Try refreshing.</div>';
+  }
+}
+
+// Chat widget
+function toggleChat() {
+  const panel = document.getElementById('chat-panel');
+  panel.classList.toggle('open');
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+
+  const messages = document.getElementById('chat-messages');
+  messages.innerHTML += `<div class="msg user">${esc(msg)}</div>`;
+  messages.innerHTML += `<div class="typing" id="typing"><span></span><span></span><span></span></div>`;
+  messages.scrollTop = messages.scrollHeight;
+
+  try {
+    const r = await fetch('/api/sms/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ Body: msg, From: chatPhone }),
+    });
+    const data = await r.json();
+    const el = document.getElementById('typing');
+    if (el) el.remove();
+
+    const reply = data.messages?.[0]?.body || 'Something went wrong. Try again!';
+    messages.innerHTML += `<div class="msg bot">${esc(reply)}</div>`;
+    messages.scrollTop = messages.scrollHeight;
+  } catch (err) {
+    const el = document.getElementById('typing');
+    if (el) el.remove();
+    messages.innerHTML += `<div class="msg bot">Hmm, hit a snag. Try again?</div>`;
+    messages.scrollTop = messages.scrollHeight;
+  }
+}
+
+async function submitPhone() {
+  const input = document.getElementById('phone-input');
+  const phone = input.value.trim();
+  if (!phone || phone.length < 10) { input.style.borderColor = '#ef4444'; return; }
+
+  try {
+    await fetch('/api/sms/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ Body: 'hey', From: phone }),
+    });
+    document.getElementById('cta-form').style.display = 'none';
+    document.getElementById('cta-success').style.display = 'block';
+  } catch {
+    input.style.borderColor = '#ef4444';
+  }
+}
+
+// Initial load
+loadTonight();
+</script>
+
+</body>
+</html>
