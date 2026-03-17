@@ -24,6 +24,7 @@ const fs = require('fs');
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
 const { runCodeEvals, runMultiTurnEvals } = require('../src/evals/code-evals');
+const { judgeTone, judgePickRelevance } = require('../src/evals/judge-evals');
 
 const args = process.argv.slice(2);
 const categoryFilter = args.find(a => a.startsWith('--category='))?.split('=')[1]
@@ -366,6 +367,28 @@ async function main() {
         };
       }
 
+      // Run per-aspect binary judges on each pulse turn (when --judge enabled)
+      let aspectJudgments = null;
+      if (!NO_JUDGE) {
+        aspectJudgments = [];
+        for (const turn of actualConversation) {
+          if (turn.sender === 'pulse' && turn.trace) {
+            try {
+              const [tone, relevance] = await Promise.all([
+                judgeTone(turn.trace),
+                judgePickRelevance(turn.trace),
+              ]);
+              aspectJudgments.push({ tone, relevance });
+              if (!tone.pass) codeEvalFailures.push(tone);
+              if (!relevance.pass) codeEvalFailures.push(relevance);
+              codeEvalTotal += 2;
+            } catch (err) {
+              aspectJudgments.push({ error: err.message });
+            }
+          }
+        }
+      }
+
       let judgment = null;
       if (assertions.allAsserted) {
         judgment = { overall_pass: true, overall_note: 'All assertions passed (deterministic)', turns: [], failure_modes_triggered: [] };
@@ -382,6 +405,7 @@ async function main() {
         user_turns: userTurnCount, actual_conversation: actualConversation,
         assertions: assertions.results.length > 0 ? assertions.results : undefined,
         judgment,
+        aspect_judgments: aspectJudgments,
         code_eval_failures: codeEvalFailures, code_eval_total: codeEvalTotal,
       };
     } catch (err) {

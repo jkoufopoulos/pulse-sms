@@ -14,7 +14,7 @@
 
 const { runAgentLoop, generate } = require('./llm');
 const { MODELS } = require('./model-config');
-const { BRAIN_TOOLS, buildBrainSystemPrompt, serializePoolForContinuation, cleanEventName } = require('./brain-llm');
+const { BRAIN_TOOLS, buildBrainSystemPrompt, buildProfileSummary, buildNativeHistory, serializePoolForContinuation, cleanEventName } = require('./brain-llm');
 const { serializePlacePoolForContinuation } = require('./places');
 const { searchPlaces } = require('./places');
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || '';
@@ -716,6 +716,7 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
   }
 
   const systemPrompt = buildBrainSystemPrompt(session, profile);
+  trace.profile_summary = buildProfileSummary(profile);
 
   let smsSent = false;
   try {
@@ -727,10 +728,11 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
       return sanitizeForLLM(result);  // LLM only sees clean version
     };
 
+    const priorMessages = buildNativeHistory(session?.conversationHistory);
     const loopResult = await runAgentLoop(
       MODELS.brain, systemPrompt, message, BRAIN_TOOLS,
       executeAndTrack,
-      { maxIterations: 3, timeout: 12000, stopTools: ['respond'] }
+      { maxIterations: 3, timeout: 12000, stopTools: ['respond'], priorMessages }
     );
 
     // Record costs
@@ -845,10 +847,11 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     if (!err.message?.includes('fallback')) {
       try {
         console.warn(`Agent loop ${MODELS.brain} failed, trying ${MODELS.fallback}: ${err.message}`);
+        const fbPriorMessages = buildNativeHistory(session?.conversationHistory);
         const fallbackResult = await runAgentLoop(
           MODELS.fallback, systemPrompt, message, BRAIN_TOOLS,
           async (toolName, params) => sanitizeForLLM(await executeTool(toolName, params, session, phone, trace)),
-          { maxIterations: 2, timeout: 12000, stopTools: ['respond'] }
+          { maxIterations: 2, timeout: 12000, stopTools: ['respond'], priorMessages: fbPriorMessages }
         );
 
         recordAICost(trace, 'brain_fallback', fallbackResult.totalUsage, fallbackResult.provider);

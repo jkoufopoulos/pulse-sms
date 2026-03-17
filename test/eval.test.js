@@ -69,7 +69,8 @@ check('picked_events_exist passes', findEval(goodResults, 'picked_events_exist')
 check('valid_urls passes', findEval(goodResults, 'valid_urls').pass === true);
 check('response_not_empty passes', findEval(goodResults, 'response_not_empty').pass === true);
 check('latency_under_10s passes', findEval(goodResults, 'latency_under_10s').pass === true);
-check('returns 6 evals', goodResults.length === 6);
+check('returns 7 evals', goodResults.length === 7);
+check('profile_context passes (no data in trace)', findEval(goodResults, 'profile_context').pass === true);
 
 // ---- Mock trace: bad trace (over char limit, hallucinated pick, broken URL) ----
 const badTrace = {
@@ -401,6 +402,28 @@ check('report sourcesBelow matches failing count checks', report.summary.sources
 const emptyReport = runScrapeAudit([], {});
 check('empty report has 0 total', emptyReport.summary.total === 0);
 check('empty report passRate is N/A', emptyReport.summary.passRate === 'N/A');
+
+// ---- profile_context eval ----
+console.log('\nprofile_context eval:');
+
+const profileTrace = { ...goodTrace, profile_summary: 'Returning user (12 sessions). Favorite areas: bushwick, williamsburg. Into: jazz, comedy. Night owl.' };
+const profileResults = runCodeEvals(profileTrace);
+const profileEval = findEval(profileResults, 'profile_context');
+check('profile_context: valid summary → pass', profileEval.pass === true);
+check('profile_context: detail mentions profile injected', profileEval.detail.includes('profile injected'));
+
+const nullProfileTrace = { ...goodTrace, profile_summary: null };
+const nullProfileResults = runCodeEvals(nullProfileTrace);
+check('profile_context: null summary → pass (new user)', findEval(nullProfileResults, 'profile_context').pass === true);
+
+const badProfileTrace = { ...goodTrace, profile_summary: 'short' };
+const badProfileResults = runCodeEvals(badProfileTrace);
+check('profile_context: too-short summary → fail', findEval(badProfileResults, 'profile_context').pass === false);
+
+const noFieldTrace = { ...goodTrace };
+delete noFieldTrace.profile_summary;
+const noFieldResults = runCodeEvals(noFieldTrace);
+check('profile_context: no field in trace → pass (n/a)', findEval(noFieldResults, 'profile_context').pass === true);
 
 // ---- Multi-turn evals: filter_state_preserved ----
 console.log('\nmulti-turn evals:');

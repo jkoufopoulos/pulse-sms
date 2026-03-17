@@ -109,6 +109,26 @@ const evals = {
       detail: hasPrice ? 'price info found in SMS' : `no price mention in SMS (${picksWithPrice.length}/${picks.length} picks have price data)`,
     };
   },
+
+  /**
+   * Profile injection: returning users (2+ sessions) should have profile context.
+   * Checks trace.profile_summary field added by agent-loop.
+   */
+  profile_context(trace) {
+    const profileSummary = trace.profile_summary;
+    if (profileSummary === undefined) {
+      return { name: 'profile_context', pass: true, detail: 'profile data not in trace (n/a)' };
+    }
+    if (profileSummary === null) {
+      return { name: 'profile_context', pass: true, detail: 'new user (no profile)' };
+    }
+    const valid = typeof profileSummary === 'string' && profileSummary.length > 10;
+    return {
+      name: 'profile_context',
+      pass: valid,
+      detail: valid ? `profile injected: "${profileSummary.slice(0, 60)}..."` : 'profile_summary present but invalid',
+    };
+  },
 };
 
 // --- Multi-turn evals (run across a conversation, not per-trace) ---
