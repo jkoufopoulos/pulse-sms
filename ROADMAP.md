@@ -176,19 +176,15 @@ Web app at `/app` — Gemini-style conversational interface using the same backe
 **Story: Place search has eval coverage**
 > Place/bar/restaurant searches are production features with zero behavioral evals.
 
-- [ ] Add 10 scenario evals for bar/restaurant queries across neighborhoods
-- [ ] Add 5 scenarios for mixed searches (`types: ["events", "bars"]`) — agent weaves events + places naturally
-- [ ] Add 3 scenarios for vibe filters (dive, cocktail, rooftop)
-- [ ] Add 2 scenarios for no-API-key fallback ("Place search isn't available right now")
+- [x] Add 10 scenario evals: bar/restaurant queries, mixed events+bars, vibe filters, more/details for places, switch from bars to events (Mar 17)
 - [ ] Add quality eval conversations for place recommendations (tone, usefulness)
 
 **Story: Nudge flow has eval coverage**
 > REMIND ME / NUDGE OFF is implemented but has zero scenario coverage.
 
-- [ ] Add 5 scenario evals: detail→detail→consent prompt→REMIND ME→acknowledgment
-- [ ] Add 3 scenarios for NUDGE OFF (global opt-out, confirmation message)
+- [x] Add 3 scenario evals: consent after detail, NUDGE OFF opt-out, REMIND ME consent (Mar 17)
+- [x] Unit tests for `buildNudgeMessage` already exist (7 checks in nudges.test.js)
 - [ ] Add 2 scenarios for nudge timing edge cases (event already started, no time data)
-- [ ] Add unit tests for `buildNudgeMessage` output format
 
 **Story: SMS rewrite loop is validated**
 > `rewriteIfTooLong()` is the 480-char safety net but has no eval coverage.
@@ -200,7 +196,7 @@ Web app at `/app` — Gemini-style conversational interface using the same backe
 **Story: Cost regression is monitored**
 > Per-trace AI cost is captured but not trended. A model switch could 10x costs silently.
 
-- [ ] Add avg cost/request to daily digest
+- [x] Add avg cost/request to daily digest + email (Mar 17)
 - [ ] Add alert if avg cost/request >2x 7-day rolling average
 - [ ] Add `--cost-report` flag to eval runners that outputs cost breakdown by request type
 
