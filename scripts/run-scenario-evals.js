@@ -60,39 +60,36 @@ let judgeCostTotal = 0;
 let budgetExceeded = false;
 
 const JUDGE_SYSTEM = `You are a QA judge for Pulse, an SMS bot that recommends NYC events.
+Pulse has 2 tools: search (events, bars, restaurants, details, more) and respond (greetings, thanks, farewells).
+Pulse writes picks as conversational prose — NOT numbered lists. It sounds like a plugged-in friend, not a bot.
 
-You will be given:
-1. A test scenario with expected behavior and failure modes
-2. The actual conversation that played out when we ran the scenario through the live system
+You will be given a test scenario (expected behavior + failure modes) and the actual conversation.
+Your job: did the actual conversation meet the expected behavior and avoid the failure modes?
 
-Your job: grade whether the actual conversation meets the expected behavior and avoids the failure modes.
+Judge the BEHAVIOR, not the specific events/venues (those vary by day). Only FAIL if the response clearly violates expected behavior or triggers a listed failure mode.
 
-GRADING RULES:
-- Events, venues, and URLs will differ from the example — that's fine. Judge the BEHAVIOR, not the specific content.
-- Focus on: correct intent handling, appropriate tone, honest responses, session continuity.
-- A response can use different words/events and still PASS if the behavior matches.
-- Only FAIL if the actual response clearly violates expected behavior or triggers a listed failure mode.
-- Response format: Pulse writes CONVERSATIONAL PROSE, NOT numbered lists. Picks are woven into natural sentences like "Mood Ring has a vinyl night — low-key, good speakers. Or there's a comedy open mic at Houdini Kitchen." This is CORRECT. Do NOT fail for missing numbered lists, missing "Reply 1-3 for details", or prose-style formatting. The example conversations in scenarios may show old numbered-list format — ignore that formatting and judge the behavior instead.
-- Detail requests: Users may ask for details by name ("tell me about the comedy one") or by number ("1", "2"). Both are valid. If Pulse doesn't recognize a number reference, that's a session state issue, not a format issue.
-- Sign-offs: A warm sign-off that CLOSES the conversation ("Enjoy tonight!", "Have fun!") is CORRECT. Only FAIL sign-offs that ignore exit intent by redirecting back to events ("What neighborhood are you thinking?") or that are robotically formal. Brief closers are preferred.
-- Nearby expansion: When a neighborhood has few or no matching events, Pulse is DESIGNED to transparently expand to nearby neighborhoods ("not much in LES, but nearby East Village has..."). This is CORRECT behavior, not a failure. Only FAIL if the system silently serves wrong-neighborhood events without acknowledging the expansion.
-- Thin coverage: If the requested neighborhood genuinely has zero events for the given filter (or zero events at all), an honest "not much here" response with alternatives is CORRECT behavior. Do not fail a scenario just because no events exist — judge the system's HANDLING of the empty state. This applies even when the user explicitly requests a neighborhood ("actually dumbo") — if there's nothing there, a transparent "not much in DUMBO, but Fort Greene is next door" with a nudge is PREFERRED over delivering zero results. It saves the user an extra message round-trip.
-- MORE numbering: Pulse restarts pick numbering at 1 after MORE (new batch = new numbers). Sequential numbering (4-6 continuing from 1-3) is NOT expected. Do not fail for restarting numbering.
-- Nudge accepts: When Pulse asks "want me to check [nearby neighborhood]?" or "want picks from there?", user responses like "sounds good thx", "sure", "yeah", "ok", "bet", "cool", "down", "yes please" are ACCEPTING the offer — NOT exit intent or sign-offs. Judge these in conversational context. "sounds good thx" after a question is agreement, not goodbye.
-- Nudge acknowledgments: After a user accepts a nearby nudge, Pulse may send a brief acknowledgment ("Got it! Checking Red Hook for you — give me a sec") before delivering picks in a follow-up message. This is CORRECT behavior. Do not fail for an acknowledgment-only response when it follows a nudge accept — the eval may not capture the follow-up SMS with actual picks.
+CORRECT BEHAVIORS (do NOT fail for these):
+- Conversational prose picks ("Mood Ring has a vinyl night — low-key, good speakers") instead of numbered lists
+- Nearby expansion when a neighborhood is thin ("not much in LES, but East Village has...")
+- Honest "not much here" with alternatives when zero events match
+- Warm brief sign-offs ("Enjoy tonight!", "Have fun!") that close the conversation
+- Details by name ("tell me about the comedy one") or by number ("2")
+- Accepting nudge offers ("sounds good", "sure", "yeah") as agreement, not goodbye
+- Brief acknowledgments before delivering picks after a nudge accept
 
-For each user turn, grade pass/fail and explain briefly.
-Then give an overall scenario verdict.
+FAILURE SIGNALS (DO fail for these):
+- Robotic/corporate tone ("We recommend", "Please visit", bullet points)
+- Ignoring exit intent by redirecting back to events ("What neighborhood are you thinking?" after "thanks bye")
+- Silently serving wrong-neighborhood events without acknowledging expansion
+- Losing conversation context (forgetting what was discussed)
+- Asking "what neighborhood?" when the user already specified one
+
+For each user turn, grade the Pulse response as pass/fail. Then give an overall verdict.
 
 Return STRICT JSON:
 {
   "turns": [
-    {
-      "turn": 1,
-      "user_message": "the user message",
-      "pass": true,
-      "note": "Brief explanation"
-    }
+    { "turn": 1, "user_message": "the user message", "pass": true, "note": "Brief explanation" }
   ],
   "overall_pass": true,
   "overall_note": "1-2 sentence summary",
@@ -346,10 +343,15 @@ async function main() {
       // Replace full trace with key fields for debuggability
       for (const turn of actualConversation) {
         if (turn.trace) {
+          // Extract filters from tool call params (agent-loop path) or composition (zero-match path)
+          const toolCalls = turn.trace.brain_tool_calls || [];
+          const lastSearch = [...toolCalls].reverse().find(tc => tc.name === 'search');
+          const toolFilters = lastSearch?.params?.filters || null;
           turn.trace_debug = {
-            active_filters: turn.trace.composition?.active_filters || null,
+            active_filters: toolFilters || turn.trace.composition?.active_filters || null,
             output_intent: turn.trace.output_intent || null,
             input_message: turn.trace.input_message || null,
+            tool_calls: toolCalls.map(tc => ({ name: tc.name, intent: tc.params?.intent, filters: tc.params?.filters })),
           };
           delete turn.trace;
         }
