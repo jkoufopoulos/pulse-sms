@@ -137,39 +137,39 @@ Web app at `/app` — Gemini-style conversational interface using the same backe
 **Story: Quality evals use binary pass/fail, not Likert**
 > Quality eval scores 6 dimensions on 1-5 Likert (tone 4.0, curation 2.6, inference 2.3). These produce trends without decisions — is 2.6 acceptable? Is a drop to 2.4 a regression? No threshold exists.
 
-- [ ] Convert each quality dimension to binary pass/fail with explicit criteria (use `write-judge-prompt` skill)
-- [ ] Keep Likert scores as secondary signal; gate decisions on binary verdicts
-- [ ] Define pass thresholds per dimension (e.g., tone: no corporate language + reads like friend = pass)
+- [x] Convert each quality dimension to binary pass/fail with explicit criteria (Mar 16)
+- [x] Keep Likert scores as secondary signal; gate decisions on binary verdicts (Mar 16)
+- [x] Define pass thresholds per dimension with clear PASS/FAIL rules in judge prompt (Mar 16)
 
 **Story: Scenario judge is rewritten for current architecture**
 > The scenario judge prompt (run-scenario-evals.js) references behaviors from the old 5-tool architecture. It patches this with "ignore old format" caveats rather than clean rules for the current 2-tool system. It's also holistic — one mega-prompt checks tone, filters, routing, and picks simultaneously.
 
-- [ ] Rewrite scenario judge prompt for current 2-tool architecture (search + respond). Remove all "ignore old format" caveats.
+- [x] Rewrite scenario judge prompt for current 2-tool architecture (search + respond). Removed all "ignore old format" caveats. (Mar 16)
 - [ ] Split holistic judge into focused per-aspect binary judges: (1) filter persistence, (2) tone, (3) pick relevance. Wire existing `judgeTone` and `judgePickRelevance` into scenario evals.
 - [ ] Re-run error analysis on 100 recent traces (data/traces/2026-03-15 + 2026-03-16) to identify new failure modes post-architecture-change.
 
 **Story: Profile personalization has eval coverage**
 > As a developer shipping personalization features, I need evals that verify the agent actually uses profile data — not over-personalizing, not ignoring it.
 
-- [ ] Add 5-10 golden conversations with returning users (sessions 3+) to `quality-conversations.json`
-- [ ] Add 10 scenario evals for profile injection: agent references preferences naturally, doesn't hallucinate preferences, handles blank profiles gracefully
+- [x] Add 5 golden conversations with returning users (sessions 3+) to `quality-conversations.json` (Mar 16)
+- [x] Add 5 scenario evals for profile injection: returning user greeting, neighborhood inference, avoid over-personalization, blank profile, category weighting (Mar 16)
 - [ ] Add regression assertions that `USER PROFILE:` appears in system prompt for 2+ session users and is absent for new users
 - [ ] Add code eval: `profile_injection_correct` — verify trace contains profile summary when sessionCount >= 2
 
 **Story: Filter persistence stops regressing**
 > Filter drift is the #1 failure category at 49.6% scenario pass rate. Dedicated eval + fix loop needed.
 
-- [ ] Add 10 dedicated filter persistence scenarios: 3-turn chains that assert filters survive across turns
-- [ ] Add code eval: `filter_state_preserved` — compare `lastFilters` in trace across consecutive turns in multi-turn evals
-- [ ] Add regression scenarios for "forget the comedy" / "drop the free filter" — assert filter actually clears
+- [x] Add 10 dedicated filter persistence scenarios: comedy/free/time/compound filter survival, explicit removal, category replacement (Mar 16)
+- [x] Add code eval: `filter_state_preserved` — deterministic multi-turn check comparing brain_tool_calls filters across turns (Mar 16)
+- [x] Add 5 regression scenarios with 16 assertions for filter persistence and explicit removal (Mar 16)
 - [ ] Target: filter_drift category pass rate from 49% → 80%
 
 **Story: Eval score regression is detected automatically**
 > Reports exist as timestamped JSON but aren't compared. A 10% pass rate drop would go unnoticed.
 
-- [ ] Add `scripts/compare-eval-reports.js` — diffs latest report against previous, outputs delta table
-- [ ] Add npm script: `npm run eval:diff` — runs compare, exits non-zero if pass rate drops >5%
-- [ ] Track per-principle pass rate in comparison (not just aggregate)
+- [x] Add `scripts/compare-eval-reports.js` — diffs latest report against previous, outputs delta table (Mar 16)
+- [x] Add npm script: `npm run eval:diff` — runs compare, exits non-zero if pass rate drops >5% (Mar 16)
+- [x] Track per-category pass rate and new failures/passes in comparison (Mar 16)
 
 **P1 — This sprint**
 
