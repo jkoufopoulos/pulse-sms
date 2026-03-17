@@ -10478,6 +10478,354 @@
         "Explicitly says \"since you like jazz\" when user did not mention jazz",
         "Ignores profile entirely — same as new user"
       ]
+    },
+    {
+      "name": "Places: bar search in williamsburg",
+      "category": "happy_path",
+      "difficulty": "should_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "best bars in williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "bar recommendations",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Standalone bar search returns place recommendations",
+      "expected_behavior": "Agent calls search with types: [\"bars\"], returns bar recommendations in Williamsburg with vibe/atmosphere details.",
+      "failure_modes": [
+        "Returns events instead of bars",
+        "Asks for neighborhood despite it being specified",
+        "Says place search unavailable"
+      ]
+    },
+    {
+      "name": "Places: restaurant search in east village",
+      "category": "happy_path",
+      "difficulty": "should_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "dinner spots in east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "restaurant recommendations",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Restaurant search returns place recommendations",
+      "expected_behavior": "Agent calls search with types: [\"restaurants\"], returns restaurant picks in EV.",
+      "failure_modes": [
+        "Returns events instead of restaurants",
+        "Ignores dinner intent"
+      ]
+    },
+    {
+      "name": "Places: mixed events + bars",
+      "category": "happy_path",
+      "difficulty": "stretch",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "dinner and a show in williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "mixed response",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Mixed search returns events + places woven naturally",
+      "expected_behavior": "Agent searches for both events and restaurants. Response weaves them: \"Grab dinner at X then catch Y around the corner.\"",
+      "failure_modes": [
+        "Only returns events",
+        "Only returns restaurants",
+        "Lists them separately without connecting"
+      ]
+    },
+    {
+      "name": "Places: bar with vibe filter — dive",
+      "category": "edge_case",
+      "difficulty": "should_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "dive bars in bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "dive bar picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Vibe filter applied to bar search",
+      "expected_behavior": "Agent searches bars with vibe: \"dive\". Results should be casual, cheap spots.",
+      "failure_modes": [
+        "Returns cocktail bars",
+        "Ignores dive vibe",
+        "No places returned"
+      ]
+    },
+    {
+      "name": "Places: cocktail bar search",
+      "category": "happy_path",
+      "difficulty": "should_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "cocktail bars in les"
+        },
+        {
+          "sender": "pulse",
+          "message": "cocktail bar picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Cocktail vibe filter for bar search",
+      "expected_behavior": "Agent searches bars with cocktail vibe. Results should be craft cocktail spots.",
+      "failure_modes": [
+        "Returns dive bars",
+        "Returns events instead of bars"
+      ]
+    },
+    {
+      "name": "Places: bars with no neighborhood",
+      "category": "edge_case",
+      "difficulty": "should_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "best bars"
+        },
+        {
+          "sender": "pulse",
+          "message": "asks for neighborhood or gives citywide",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Bar search without neighborhood asks for location or gives broad recs",
+      "expected_behavior": "Agent asks what neighborhood or gives broad suggestions. Should not error.",
+      "failure_modes": [
+        "Crashes",
+        "Returns empty response",
+        "Ignores the bar request"
+      ]
+    },
+    {
+      "name": "Places: more bars after initial search",
+      "category": "happy_path",
+      "difficulty": "should_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "bars in williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "bar picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "more bars",
+          "assert": "exists"
+        }
+      ],
+      "testing": "MORE works for place searches — returns fresh bars",
+      "expected_behavior": "First batch of bars, then different bars on MORE. No duplicates.",
+      "failure_modes": [
+        "Returns events on MORE",
+        "Returns same bars",
+        "Errors on MORE for places"
+      ]
+    },
+    {
+      "name": "Places: bar details",
+      "category": "happy_path",
+      "difficulty": "should_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "bars in east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "bar picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "tell me about the first one"
+        },
+        {
+          "sender": "pulse",
+          "message": "bar details",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Details work for place picks — returns vibe, address, hours",
+      "expected_behavior": "Rich details for the bar: atmosphere, price level, what to expect, Google Maps link.",
+      "failure_modes": [
+        "Details fail for places",
+        "Returns event details instead",
+        "No address or link"
+      ]
+    },
+    {
+      "name": "Places: rooftop bars",
+      "category": "edge_case",
+      "difficulty": "stretch",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "rooftop bars in williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "rooftop bar picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Rooftop vibe filter for outdoor/rooftop bars",
+      "expected_behavior": "Agent searches bars with rooftop/outdoor vibe. Results should have outdoor seating.",
+      "failure_modes": [
+        "Returns indoor bars",
+        "Ignores rooftop request"
+      ]
+    },
+    {
+      "name": "Places: switch from bars to events",
+      "category": "edge_case",
+      "difficulty": "should_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "bars in bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "bar picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "actually what events are happening"
+        },
+        {
+          "sender": "pulse",
+          "message": "event picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "User switches from place search to event search mid-conversation",
+      "expected_behavior": "Smoothly transitions from bars to events in Bushwick.",
+      "failure_modes": [
+        "Stuck in bar mode",
+        "Loses Bushwick context",
+        "Returns bars again"
+      ]
+    },
+    {
+      "name": "Nudge: consent prompt after second detail",
+      "category": "happy_path",
+      "difficulty": "stretch",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks response",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "tell me about the first one"
+        },
+        {
+          "sender": "pulse",
+          "message": "details",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "more picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "tell me about the first one"
+        },
+        {
+          "sender": "pulse",
+          "message": "details again",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Second detail request on recurring event triggers consent prompt",
+      "expected_behavior": "After 2 detail requests on a recurring event, system sends consent prompt (REMIND ME). May not trigger if events are not recurring.",
+      "failure_modes": [
+        "Consent prompt on first detail",
+        "System crashes on nudge check"
+      ]
+    },
+    {
+      "name": "Nudge: NUDGE OFF global opt-out",
+      "category": "happy_path",
+      "difficulty": "should_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "NUDGE OFF"
+        },
+        {
+          "sender": "pulse",
+          "message": "confirmation",
+          "assert": "exists"
+        }
+      ],
+      "testing": "NUDGE OFF keyword triggers global opt-out from nudges",
+      "expected_behavior": "System confirms: \"Done — no more reminders. You can still text me anytime for picks.\"",
+      "failure_modes": [
+        "No response",
+        "Treated as regular message",
+        "Error"
+      ]
+    },
+    {
+      "name": "Nudge: REMIND ME consent",
+      "category": "happy_path",
+      "difficulty": "stretch",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "REMIND ME"
+        },
+        {
+          "sender": "pulse",
+          "message": "response",
+          "assert": "exists"
+        }
+      ],
+      "testing": "REMIND ME keyword with pending consent triggers opt-in",
+      "expected_behavior": "If there is a pending consent, confirms opt-in. If no pending consent, falls through to agent brain.",
+      "failure_modes": [
+        "Error",
+        "No response"
+      ]
     }
   ]
 }

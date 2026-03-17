@@ -142,8 +142,14 @@ function generateDigest(eventCache, scrapeStats) {
   ).length;
 
   const { computeLatencyStats, getRecentTraces } = require('./traces');
-  const latencyStats = computeLatencyStats(getRecentTraces(500));
+  const recentTraces = getRecentTraces(500);
+  const latencyStats = computeLatencyStats(recentTraces);
   const latencyP95 = latencyStats.p95;
+
+  // AI cost stats from recent traces
+  const costs = recentTraces.map(t => t.total_ai_cost_usd).filter(Boolean);
+  const avgCost = costs.length > 0 ? costs.reduce((s, c) => s + c, 0) / costs.length : 0;
+  const totalCost = costs.reduce((s, c) => s + c, 0);
 
   const status = computeDigestStatus({ sourcesBelow, cacheDrop, userFacingErrors, latencyP95 });
   const activeSourceCount = sourceData.filter(s => s.count > 0).length;
@@ -174,6 +180,11 @@ function generateDigest(eventCache, scrapeStats) {
       p95: latencyStats.p95,
       max: latencyStats.max,
       outlier_count: latencyStats.outliers.length,
+    },
+    ai_cost: {
+      avg_per_request: parseFloat(avgCost.toFixed(4)),
+      total_recent: parseFloat(totalCost.toFixed(4)),
+      trace_count: costs.length,
     },
   };
 
@@ -211,6 +222,11 @@ function formatDigestEmail(report) {
 
   if (report.latency) {
     lines.push(`Latency: p50 ${(report.latency.p50 / 1000).toFixed(1)}s | p95 ${(report.latency.p95 / 1000).toFixed(1)}s | max ${(report.latency.max / 1000).toFixed(1)}s${report.latency.outlier_count > 0 ? ` | ${report.latency.outlier_count} outliers` : ''}`);
+    lines.push('');
+  }
+
+  if (report.ai_cost) {
+    lines.push(`AI Cost: $${report.ai_cost.avg_per_request.toFixed(4)}/request avg | $${report.ai_cost.total_recent.toFixed(2)} total (${report.ai_cost.trace_count} traces)`);
     lines.push('');
   }
 
