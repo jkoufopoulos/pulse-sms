@@ -69,7 +69,7 @@ check('picked_events_exist passes', findEval(goodResults, 'picked_events_exist')
 check('valid_urls passes', findEval(goodResults, 'valid_urls').pass === true);
 check('response_not_empty passes', findEval(goodResults, 'response_not_empty').pass === true);
 check('latency_under_10s passes', findEval(goodResults, 'latency_under_10s').pass === true);
-check('returns 7 evals', goodResults.length === 7);
+check('returns 8 evals', goodResults.length === 8);
 check('profile_context passes (no data in trace)', findEval(goodResults, 'profile_context').pass === true);
 
 // ---- Mock trace: bad trace (over char limit, hallucinated pick, broken URL) ----
@@ -402,6 +402,18 @@ check('report sourcesBelow matches failing count checks', report.summary.sources
 const emptyReport = runScrapeAudit([], {});
 check('empty report has 0 total', emptyReport.summary.total === 0);
 check('empty report passRate is N/A', emptyReport.summary.passRate === 'N/A');
+
+// ---- no_markdown eval ----
+console.log('\nno_markdown eval:');
+
+const cleanSmsTrace = { ...goodTrace, output_sms: 'Check out Jazz Night at Blue Note — killer lineup tonight at 9pm.' };
+check('no_markdown: clean SMS → pass', findEval(runCodeEvals(cleanSmsTrace), 'no_markdown').pass === true);
+
+const boldSmsTrace = { ...goodTrace, output_sms: 'Check out **Jazz Night** at Blue Note tonight.' };
+check('no_markdown: bold markdown → fail', findEval(runCodeEvals(boldSmsTrace), 'no_markdown').pass === false);
+
+const linkSmsTrace = { ...goodTrace, output_sms: 'Check out [Jazz Night](https://example.com) tonight.' };
+check('no_markdown: markdown link → fail', findEval(runCodeEvals(linkSmsTrace), 'no_markdown').pass === false);
 
 // ---- profile_context eval ----
 console.log('\nprofile_context eval:');

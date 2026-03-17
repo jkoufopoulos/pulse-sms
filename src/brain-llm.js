@@ -20,7 +20,7 @@ const CURATION_INTERACTIVE = '';
 const BRAIN_TOOLS = [
   {
     name: 'search',
-    description: 'Search for things to do in NYC — events, bars, restaurants, or all of the above. Returns a curated pool. Write your SMS as plain text after seeing results. Also use for details ("tell me about that", "more about #2") and more picks ("more").',
+    description: 'Search for things to do in NYC — events, bars, restaurants, or all of the above. Returns a curated pool ranked by quality; write your SMS as plain text after seeing results, leading with WHY each pick is good using the \'recommended\' and \'why\' fields. Also handles follow-ups: use intent \'details\' when the user references a specific pick (number, name, or description), and intent \'more\' when they want additional picks from the same pool.',
     parameters: {
       type: 'object',
       properties: {
@@ -74,7 +74,7 @@ const BRAIN_TOOLS = [
   },
   {
     name: 'respond',
-    description: 'Respond conversationally when no search is needed. Use for greetings, thanks, farewells, off-topic chat, or when the user asks how Pulse works. Do NOT use when the user asks about a specific pick — use search with intent "details" instead.',
+    description: 'Respond conversationally when no search is needed. Use for greetings (introduce yourself as Pulse and ask what they\'re into tonight), thanks, farewells, off-topic chat, or explaining how Pulse works. For greetings and off-topic, end with a redirect toward events. For thanks and farewells, just be warm and close — no redirect. Do NOT use when the user references a specific pick — use search with intent \'details\' instead.',
     parameters: {
       type: 'object',
       properties: {
@@ -140,7 +140,6 @@ function buildBrainSystemPrompt(session, profile) {
   const profileSummary = profile ? buildProfileSummary(profile) : null;
   const sessionContext = session
     ? [
-      `Current time in NYC: ${nycNow}`,
       profileSummary ? `USER PROFILE: ${profileSummary}` : null,
       isFirstMessage ? 'First message — new user, no history. Use respond to introduce yourself and ask what they want.' : null,
       session.lastNeighborhood ? `Current neighborhood: ${session.lastNeighborhood}` : null,
@@ -171,65 +170,87 @@ function buildBrainSystemPrompt(session, profile) {
     ].filter(Boolean).join('\n')
     : 'No prior session.';
 
-  const historyBlock = session?.conversationHistory?.length > 0
-    ? '\nRecent conversation:\n' + session.conversationHistory.slice(-10).map(h => {
-      if (h.role === 'user') return `User: "${h.content.slice(0, 150)}"`;
-      if (h.role === 'tool_call' && h.meta) {
-        const params = Object.entries(h.meta.params || {})
-          .filter(([, v]) => v != null && v !== '')
-          .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
-          .join(', ');
-        return `> ${h.meta.name}(${params})`;
-      }
-      if (h.role === 'tool_result' && h.meta) {
-        if (h.meta.match_count === 0) return '> No matches found';
-        const picks = (h.meta.picks || []).map(p => `${p.name} (${p.category})`).join(', ');
-        return `> ${h.meta.match_count} matches${h.meta.neighborhood ? ' in ' + h.meta.neighborhood : ''}${picks ? '. Showed: ' + picks : ''}`;
-      }
-      if (h.role === 'search_summary' && h.meta) {
-        const rt = h.meta.result_type === 'places' ? 'places' : 'events';
-        return `> Found ${h.meta.match_count || 0} ${rt}${h.meta.neighborhood ? ' in ' + h.meta.neighborhood : ''}`;
-      }
-      if (h.role === 'assistant') return `Pulse: "${h.content.slice(0, 150)}"`;
-      return null;
-    }).filter(Boolean).join('\n')
+  const proactiveSection = session?._proactivePrompt
+    ? `\n<proactive>\nThis user hasn't opted into proactive recommendations yet. At the end of your picks response, append on a new line:\n"PS — Want me to text you when something great comes up? Reply NOTIFY to opt in."\nOnly add this to responses that include event picks, not to detail responses or conversation.\n</proactive>`
     : '';
 
-  return `You are Pulse, an NYC nightlife SMS bot. You text like a plugged-in friend — warm, opinionated, max 480 chars.
-
+  return `<persona>
+You are Pulse, an NYC nightlife SMS bot. You text like a plugged-in friend — warm, opinionated, max 480 chars.
 TIME: ${nycNow}
 NEIGHBORHOODS: ${NEIGHBORHOOD_NAMES.join(', ')}
+</persona>
 
-RULES:
+<composition>
 - Search first, ask later. Contrasting picks > clarifying questions. Only ask when you truly have nothing to go on.
 - 1-2 picks, woven into natural prose. Lead with WHY it's good — trust "recommended" and "why" from results.
 - Events and places mix naturally: "Grab a drink at [bar] then catch [show] around the corner."
-- Mood mapping: "chill" → jazz/film/art, "dance" → dj/nightlife, "weird" → search broad, "bars"/"dinner" → types: ["bars"]/["restaurants"].
+- Mood mapping: "chill" → categories: jazz/film/art, "dance" → categories: dj/nightlife, "bars"/"dinner" → types: ["bars"]/["restaurants"]. Vibes that aren't categories ("weird", "surprise me", "something different", "random", "wild") → search with NO category filters. Browse the full pool and use your judgment to pick events that match the vibe.
 - For details: venue feel first ("dark room, loud sound, cheap tall boys"), then event, then logistics (time, price, when to arrive). Use venue_profile if present.
-- "more" = different results, "2" or name = details. After details, the system sends URLs automatically.
-- Under 480 chars. No URLs in SMS. No prices in initial picks. Never write "price not listed".
-- Write SMS as plain text after search results. End with a natural hook ("Want details?" "More of a music person?").
-- New user greeting: call respond, introduce yourself, ask what they want. Returning user: call search({intent: "discover"}).
+- Under 480 chars. No URLs in SMS. No prices in initial picks. Never write "price not listed". NEVER use markdown formatting (no **bold**, no *italic*, no [links](url)) — this is SMS plain text, not chat.
+- End with a natural hook ("Want details?" "More of a music person?").
+</composition>
 
-SESSION CONTEXT:
-${sessionContext}${historyBlock}
-${session?._proactivePrompt ? `\nPROACTIVE OPT-IN: This user hasn't opted into proactive recommendations yet. At the end of your picks response, append on a new line:\n"PS — Want me to text you when something great comes up? Reply NOTIFY to opt in."\nOnly add this to responses that include event picks, not to detail responses or conversation.` : ''}
-
-EXAMPLES:
-
-User: "bushwick"
-→ search({neighborhood: "bushwick", intent: "discover"})
-SMS: "Bushwick tonight — there's a one-off noise show at Alphaville, tiny room, gonna be loud and weird in the best way. Or Mood Ring has a vinyl DJ set if you want something mellower. Which sounds more like your night?"
-
-User: "tell me more about the vinyl thing"
-→ search({intent: "details", reference: "the vinyl thing"})
-SMS: "Mood Ring is one of those places that looks like nothing from outside but has this perfect dark room with a great sound system. Tonight's a local DJ spinning funk and soul on vinyl, no cover. Starts at 9, but it doesn't really fill up til 10:30."
-
-User: "best bars in williamsburg"
-→ search({neighborhood: "williamsburg", types: ["bars"], intent: "discover"})
-SMS: "Williamsburg bars — The Commodore's a proper neighborhood spot, fried chicken and cheap tall boys, always a scene. Or Maison Premiere if you want the opposite — oysters, craft cocktails, feels like old New Orleans. Which vibe?"`;
+<session>
+${sessionContext}
+</session>${proactiveSection}`;
 }
 
+
+/**
+ * Convert cross-request conversationHistory entries into native user/assistant
+ * message pairs for multi-turn context. Tool call and search summary entries
+ * fold into adjacent assistant messages as bracketed context.
+ *
+ * Returns array of { role: 'user'|'assistant', content: string }.
+ */
+function buildNativeHistory(conversationHistory) {
+  if (!conversationHistory?.length) return [];
+
+  // First pass: build raw message sequence
+  const raw = [];
+  for (const h of conversationHistory) {
+    if (h.role === 'user') {
+      raw.push({ role: 'user', content: h.content || '' });
+    } else if (h.role === 'assistant') {
+      raw.push({ role: 'assistant', content: h.content || '' });
+    } else if (h.role === 'tool_call' && h.meta) {
+      const params = Object.entries(h.meta.params || {})
+        .filter(([, v]) => v != null && v !== '')
+        .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+        .join(', ');
+      raw.push({ role: 'assistant', content: `[${h.meta.name}(${params})]` });
+    } else if (h.role === 'search_summary' && h.meta) {
+      const rt = h.meta.result_type === 'places' ? 'places' : 'events';
+      raw.push({ role: 'assistant', content: `[${h.meta.match_count || 0} ${rt}${h.meta.neighborhood ? ' in ' + h.meta.neighborhood : ''}]` });
+    }
+    // tool_result entries are skipped (search_summary replaces them)
+  }
+
+  if (raw.length === 0) return [];
+
+  // Second pass: merge consecutive same-role messages
+  const merged = [raw[0]];
+  for (let i = 1; i < raw.length; i++) {
+    const prev = merged[merged.length - 1];
+    if (raw[i].role === prev.role) {
+      prev.content += '\n' + raw[i].content;
+    } else {
+      merged.push({ ...raw[i] });
+    }
+  }
+
+  // Ensure starts with user
+  while (merged.length > 0 && merged[0].role !== 'user') {
+    merged.shift();
+  }
+
+  // Ensure ends with assistant
+  while (merged.length > 0 && merged[merged.length - 1].role !== 'assistant') {
+    merged.pop();
+  }
+
+  return merged;
+}
 
 /**
  * Strip promotional prefixes/suffixes from event names so the model
@@ -325,6 +346,7 @@ module.exports = {
   BRAIN_TOOLS,
   buildBrainSystemPrompt,
   buildProfileSummary,
+  buildNativeHistory,
   serializePoolForContinuation,
   buildRecommendationReason,
   cleanEventName,

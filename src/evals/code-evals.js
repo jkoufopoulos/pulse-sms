@@ -111,6 +111,26 @@ const evals = {
   },
 
   /**
+   * SMS must not contain markdown formatting (bold, italic, links).
+   * SMS is plain text — users see literal asterisks.
+   */
+  no_markdown(trace) {
+    const sms = trace.output_sms || '';
+    const boldMatch = sms.match(/\*\*[^*]+\*\*/g);
+    const italicMatch = sms.match(/(?<!\*)\*[^*]+\*(?!\*)/g);
+    const linkMatch = sms.match(/\[([^\]]+)\]\([^)]+\)/g);
+    const issues = [];
+    if (boldMatch) issues.push(`${boldMatch.length} bold`);
+    if (italicMatch) issues.push(`${italicMatch.length} italic`);
+    if (linkMatch) issues.push(`${linkMatch.length} markdown links`);
+    return {
+      name: 'no_markdown',
+      pass: issues.length === 0,
+      detail: issues.length > 0 ? `markdown in SMS: ${issues.join(', ')}` : 'clean plain text',
+    };
+  },
+
+  /**
    * Profile injection: returning users (2+ sessions) should have profile context.
    * Checks trace.profile_summary field added by agent-loop.
    */

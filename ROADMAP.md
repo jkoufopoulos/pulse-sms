@@ -145,7 +145,7 @@ Web app at `/app` — Gemini-style conversational interface using the same backe
 > The scenario judge prompt (run-scenario-evals.js) references behaviors from the old 5-tool architecture. It patches this with "ignore old format" caveats rather than clean rules for the current 2-tool system. It's also holistic — one mega-prompt checks tone, filters, routing, and picks simultaneously.
 
 - [x] Rewrite scenario judge prompt for current 2-tool architecture (search + respond). Removed all "ignore old format" caveats. (Mar 16)
-- [ ] Split holistic judge into focused per-aspect binary judges: (1) filter persistence, (2) tone, (3) pick relevance. Wire existing `judgeTone` and `judgePickRelevance` into scenario evals.
+- [x] Wire `judgeTone` and `judgePickRelevance` per-aspect judges into scenario eval runner (run with --judge). Filter persistence check is deterministic code eval. (Mar 16)
 - [ ] Re-run error analysis on 100 recent traces (data/traces/2026-03-15 + 2026-03-16) to identify new failure modes post-architecture-change.
 
 **Story: Profile personalization has eval coverage**
@@ -153,8 +153,8 @@ Web app at `/app` — Gemini-style conversational interface using the same backe
 
 - [x] Add 5 golden conversations with returning users (sessions 3+) to `quality-conversations.json` (Mar 16)
 - [x] Add 5 scenario evals for profile injection: returning user greeting, neighborhood inference, avoid over-personalization, blank profile, category weighting (Mar 16)
-- [ ] Add regression assertions that `USER PROFILE:` appears in system prompt for 2+ session users and is absent for new users
-- [ ] Add code eval: `profile_injection_correct` — verify trace contains profile summary when sessionCount >= 2
+- [x] Add `profile_context` code eval + trace enrichment: `profile_summary` captured in trace, validated by deterministic check (Mar 16)
+- [x] Unit tests for profile_context: valid/null/short/missing field (Mar 16)
 
 **Story: Filter persistence stops regressing**
 > Filter drift is the #1 failure category at 49.6% scenario pass rate. Dedicated eval + fix loop needed.
