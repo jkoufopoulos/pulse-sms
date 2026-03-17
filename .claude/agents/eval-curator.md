@@ -16,14 +16,19 @@ You audit and maintain the Pulse SMS eval suite. Your job is to examine all exis
 
 ## Fixture Files
 
-- **Scenario evals**: `data/fixtures/multi-turn-scenarios.json` — 262 multi-turn conversation scenarios
+- **Scenario evals**: `data/fixtures/multi-turn-scenarios.json` — 293 multi-turn conversation scenarios
   - Structure: `{ scenarios: [{ name, category, turns: [{sender, message}], testing, expected_behavior, failure_modes, difficulty }] }`
-  - Categories: happy_path (104), edge_case (69), filter_drift (43), poor_experience (31), abuse_off_topic (14), editorial (1)
-  - Difficulties: should_pass (173), stretch (53), must_pass (36)
+  - Categories: happy_path (73), edge_case (64), filter_drift (53), poor_experience (33), abuse_off_topic (13), editorial (1), regression (1)
+  - Difficulties: should_pass, stretch, must_pass
 
 - **Regression evals**: `data/fixtures/regression-scenarios.json` — 124 regression scenarios with per-turn assertions
   - Structure: `{ scenarios: [{ name, category, tests_principles, user_turns: [{turn, message}], assertions: [{after_turn, id, principle, check}] }] }`
-  - Principles tested: P1-P12
+  - Principles tested: P1-P13
+
+- **Quality conversations**: `data/fixtures/quality-conversations.json` — 15 golden multi-turn conversations
+  - Scored on 6 dimensions: tone, curation, intent_match, probing, inference, coherence (1-5)
+
+- **A/B compose cases**: `data/fixtures/ab-compose-cases.json` — 15 test cases with pre-populated event pools
 
 ## Data Sources
 
@@ -109,6 +114,18 @@ For each gap:
 1. Most impactful change first
 2. ...
 ```
+
+## Known Gaps (as of 2026-03-16)
+
+These features have zero or minimal eval coverage — prioritize recommending new evals for these:
+
+1. **Profile personalization** — `buildProfileSummary()` injected into system prompt (shipped Mar 16). No golden conversations test returning-user behavior.
+2. **Place/bar/restaurant searches** — `types: ["bars", "restaurants"]` supported but no scenario evals.
+3. **Mixed searches** — `types: ["events", "bars"]` fan-out supported but no scenario evals.
+4. **Nudge consent flow** — REMIND ME / NUDGE OFF implemented but no scenario evals.
+5. **SMS rewrite loop** — `rewriteIfTooLong()` untested.
+6. **Fallback model path** — Gemini→Haiku fallback has no quality eval.
+7. **Session expiry** — User returns after 2+ hours, profile persists but session doesn't.
 
 ## Guidelines
 

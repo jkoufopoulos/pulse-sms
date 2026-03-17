@@ -83,9 +83,10 @@ Web app at `/app` — Gemini-style conversational interface using the same backe
 **Story: Pulse remembers me across sessions**
 > As a returning user, I want Pulse to remember that I like jazz and Bushwick without me saying it every time.
 
-- [ ] Move preference data from ephemeral `preference-profile.js` to SQLite (keyed by hashed phone)
-- [ ] Store: neighborhood frequency, category frequency, time preferences, venue preferences, engagement rates
-- [ ] Inject persistent profile into `buildBrainSystemPrompt()` — agent sees lifetime patterns, not just last 2 hours
+- [x] Move preference data from `preference-profile.js` to SQLite `user_profiles` table (Mar 16)
+- [x] Store: neighborhood frequency, category frequency, time/price preferences, session counts, proactive opt-in (Mar 16)
+- [x] Inject `buildProfileSummary()` into `buildBrainSystemPrompt()` — agent sees lifetime patterns (Mar 16)
+- [x] JSON→SQLite migration on first boot, `profiles.json` renamed to `.migrated` (Mar 16)
 - [ ] Feed persistent profiles into `scoreSurprise()` for personalized serendipity
 
 **Story: The agent adapts to how I decide**
@@ -118,6 +119,152 @@ Web app at `/app` — Gemini-style conversational interface using the same backe
 
 - [ ] **Validate at source boundary, not post-merge**: move `computeCompleteness` + quality gate (0.4 threshold) into each source's fetch function return path. Currently validation happens in `refreshCache()` after all sources merge — a bad extraction can interact with dedup before getting filtered.
 - [ ] **LLM junk filter for borderline events**: after `applyQualityGates` removes obvious junk, batch borderline events through a binary LLM classifier: "is this an actual attendable NYC event?"
+
+### Phase 11b: Eval Hardening (Infrastructure)
+
+*The eval system catches structural regressions well but is weakest at catching quality regressions and behavioral correctness for newer features. Current state: 6 layers, 447 golden cases, ~$1.20/full run, ~25 min. Scenario eval pass rate: 49.6%. Code eval pass rate: 100%.*
+
+**P0 — Before next major feature**
+
+**Story: Judges are validated against human labels**
+> LLM judges run on every eval but have never been validated. Zero human-annotated traces exist. The 49.6% scenario pass rate could be misleading in either direction — judges may be too harsh or too lenient.
+
+- [ ] Annotate 100 production traces using `/eval` UI (50 judge-pass, 50 judge-fail). 1-2 hours of trace review.
+- [ ] Run `scripts/judge-alignment.js` to compute TPR/TNR against human annotations. Target: TPR > 80%, TNR > 90%.
+- [ ] For 5 of 15 quality conversations, write reference "5/5" responses as few-shot calibration examples for the quality judge.
+- [ ] Use fresh random traces (not fixture scenarios) as the test set — avoid train/test contamination.
+
+**Story: Quality evals use binary pass/fail, not Likert**
+> Quality eval scores 6 dimensions on 1-5 Likert (tone 4.0, curation 2.6, inference 2.3). These produce trends without decisions — is 2.6 acceptable? Is a drop to 2.4 a regression? No threshold exists.
+
+- [ ] Convert each quality dimension to binary pass/fail with explicit criteria (use `write-judge-prompt` skill)
+- [ ] Keep Likert scores as secondary signal; gate decisions on binary verdicts
+- [ ] Define pass thresholds per dimension (e.g., tone: no corporate language + reads like friend = pass)
+
+**Story: Scenario judge is rewritten for current architecture**
+> The scenario judge prompt (run-scenario-evals.js) references behaviors from the old 5-tool architecture. It patches this with "ignore old format" caveats rather than clean rules for the current 2-tool system. It's also holistic — one mega-prompt checks tone, filters, routing, and picks simultaneously.
+
+- [ ] Rewrite scenario judge prompt for current 2-tool architecture (search + respond). Remove all "ignore old format" caveats.
+- [ ] Split holistic judge into focused per-aspect binary judges: (1) filter persistence, (2) tone, (3) pick relevance. Wire existing `judgeTone` and `judgePickRelevance` into scenario evals.
+- [ ] Re-run error analysis on 100 recent traces (data/traces/2026-03-15 + 2026-03-16) to identify new failure modes post-architecture-change.
+
+**Story: Profile personalization has eval coverage**
+> As a developer shipping personalization features, I need evals that verify the agent actually uses profile data — not over-personalizing, not ignoring it.
+
+- [ ] Add 5-10 golden conversations with returning users (sessions 3+) to `quality-conversations.json`
+- [ ] Add 10 scenario evals for profile injection: agent references preferences naturally, doesn't hallucinate preferences, handles blank profiles gracefully
+- [ ] Add regression assertions that `USER PROFILE:` appears in system prompt for 2+ session users and is absent for new users
+- [ ] Add code eval: `profile_injection_correct` — verify trace contains profile summary when sessionCount >= 2
+
+**Story: Filter persistence stops regressing**
+> Filter drift is the #1 failure category at 49.6% scenario pass rate. Dedicated eval + fix loop needed.
+
+- [ ] Add 10 dedicated filter persistence scenarios: 3-turn chains that assert filters survive across turns
+- [ ] Add code eval: `filter_state_preserved` — compare `lastFilters` in trace across consecutive turns in multi-turn evals
+- [ ] Add regression scenarios for "forget the comedy" / "drop the free filter" — assert filter actually clears
+- [ ] Target: filter_drift category pass rate from 49% → 80%
+
+**Story: Eval score regression is detected automatically**
+> Reports exist as timestamped JSON but aren't compared. A 10% pass rate drop would go unnoticed.
+
+- [ ] Add `scripts/compare-eval-reports.js` — diffs latest report against previous, outputs delta table
+- [ ] Add npm script: `npm run eval:diff` — runs compare, exits non-zero if pass rate drops >5%
+- [ ] Track per-principle pass rate in comparison (not just aggregate)
+
+**P1 — This sprint**
+
+**Story: Place search has eval coverage**
+> Place/bar/restaurant searches are production features with zero behavioral evals.
+
+- [ ] Add 10 scenario evals for bar/restaurant queries across neighborhoods
+- [ ] Add 5 scenarios for mixed searches (`types: ["events", "bars"]`) — agent weaves events + places naturally
+- [ ] Add 3 scenarios for vibe filters (dive, cocktail, rooftop)
+- [ ] Add 2 scenarios for no-API-key fallback ("Place search isn't available right now")
+- [ ] Add quality eval conversations for place recommendations (tone, usefulness)
+
+**Story: Nudge flow has eval coverage**
+> REMIND ME / NUDGE OFF is implemented but has zero scenario coverage.
+
+- [ ] Add 5 scenario evals: detail→detail→consent prompt→REMIND ME→acknowledgment
+- [ ] Add 3 scenarios for NUDGE OFF (global opt-out, confirmation message)
+- [ ] Add 2 scenarios for nudge timing edge cases (event already started, no time data)
+- [ ] Add unit tests for `buildNudgeMessage` output format
+
+**Story: SMS rewrite loop is validated**
+> `rewriteIfTooLong()` is the 480-char safety net but has no eval coverage.
+
+- [ ] Add unit test: feed known 600-char SMS through rewriteIfTooLong, assert result <480 chars
+- [ ] Add unit test: rewrite preserves event names and venue names from original
+- [ ] Add code eval: track rewrite frequency in traces (how often does it fire?)
+
+**Story: Cost regression is monitored**
+> Per-trace AI cost is captured but not trended. A model switch could 10x costs silently.
+
+- [ ] Add avg cost/request to daily digest
+- [ ] Add alert if avg cost/request >2x 7-day rolling average
+- [ ] Add `--cost-report` flag to eval runners that outputs cost breakdown by request type
+
+**P2 — This month**
+
+**Story: Fallback model quality is baselined**
+> When Gemini fails, Haiku takes over — but we don't know if Haiku quality is acceptable.
+
+- [ ] Run A/B eval: Gemini Flash vs Claude Haiku on 15 composition cases
+- [ ] Establish minimum quality bar for fallback (tone ≥3.5, curation ≥2.5)
+- [ ] Track fallback frequency in daily digest (currently logged but not aggregated)
+
+**Story: Session expiry and edge cases have coverage**
+
+- [ ] Add 5 scenarios: user returns after 2+ hours (expired session, profile persists)
+- [ ] Add 3 scenarios: emoji-only messages, non-English input, extremely long messages
+- [ ] Add 2 scenarios: rapid-fire messages (concurrent request handling)
+- [ ] Add scenario: user asks about past events (should not hallucinate)
+
+**Story: Source degradation evals**
+
+- [ ] Add eval that simulates 50% source failure and measures response quality degradation
+- [ ] Add eval for stale cache (>24hr old) — does the agent still produce useful responses?
+- [ ] Track pool size per neighborhood in traces for sparse coverage detection
+
+### Phase 10b: Prompt Architecture (Next)
+
+*The agent brain's prompts were built iteratively as features shipped. They work, but they've drifted from how Anthropic and Google recommend structuring agent systems. This phase realigns with vendor best practices — not for theory, but because the current structure causes real bugs (e.g. "weird" query producing 2 results because vibe words become hard category filters via example pattern-matching).*
+
+**Context:** Audited all prompts against Anthropic's agent guidance ("Building Effective Agents", "Writing Tools for Agents", "Effective Context Engineering") and Google's Gemini docs (function calling, system instructions, prompting strategies). Three structural issues identified; one already caused a production bug.
+
+**Story: Remove few-shot examples from the agent brain**
+> Anthropic: few-shot examples "often backfire in agentic systems" where the model needs to work autonomously in a loop. Google: examples cause overfitting in tool-calling; improve function descriptions instead.
+
+The brain system prompt has 3 input→tool_call→SMS examples. The model anchors on these patterns instead of reasoning about novel inputs. "Surprise me with something weird" doesn't match any example, so the model force-fits it into the nearest pattern (maps "weird" to category filters, nuking the pool to 2 results).
+
+- [ ] Remove all 3 few-shot examples from `buildBrainSystemPrompt()` in `brain-llm.js`
+- [ ] Strengthen the RULES section to compensate — rules already cover tool selection logic, just need to be explicit enough to stand alone
+- [ ] Enrich `BRAIN_TOOLS` descriptions (3-4 sentences each per Anthropic guidance) so tool definitions own routing without system prompt help
+- [ ] Run quality evals before/after to measure impact. Expect: broader pools for vibe queries, no regression on direct queries
+- [ ] *Already done:* Updated mood mapping rule to separate category-mapped moods from vibe queries (Mar 16)
+
+**Story: Use native multi-turn history instead of text serialization**
+> Anthropic: use native `tool_use`/`tool_result` message blocks. Google: Gemini is stateless and expects proper native message types. Both: text serialization means the model can't distinguish context from instructions.
+
+The `historyBlock` in `buildBrainSystemPrompt()` serializes prior turns as `User: "...", Pulse: "...", > search(...)` text in the system prompt. This is lossy (truncated to 150 chars), burns system prompt tokens, and the model can't tell history from instructions.
+
+- [ ] Pass conversation history as native message turns in the `messages` array (Anthropic) or `contents` array (Gemini) instead of text in the system prompt
+- [ ] Remove `historyBlock` from `buildBrainSystemPrompt()`
+- [ ] Update `runAgentLoop` in `llm.js` to accept and forward prior turns in the provider's native format
+- [ ] Keep session context (current neighborhood, active filters, last picks) in the system prompt — that's state the model needs, not history
+- [ ] Run scenario evals to verify multi-turn coherence (filter persistence, details references) improves or holds
+
+**Story: Separate tool routing from SMS composition in the system prompt**
+> Anthropic: use XML tags to organize by concern, progressive disclosure. Google: separation improves agentic performance ~5%. Both: don't mix "when to call tools" with "how to write the response."
+
+The system prompt is a monolith mixing persona, tool routing rules, composition rules, and session context in one flat block. The model has to mentally parse which rules apply at which phase of the agent loop.
+
+- [ ] Restructure `buildBrainSystemPrompt()` into clearly labeled sections (XML tags or markdown headers): `PERSONA`, `TOOL SELECTION`, `WRITING THE SMS`, `SESSION STATE`
+- [ ] Move routing logic out of RULES and into `BRAIN_TOOLS` descriptions (tool defs own routing, system prompt owns persona + composition)
+- [ ] Remove duplicated routing rules (e.g. `"2" or name = details` in RULES when the search tool's `intent: "details"` description already says this)
+- [ ] Run quality evals before/after
+
+**Sequencing:** Do these in order. Examples removal is the highest-impact fix (addresses a live bug, lowest effort). Native history is the biggest structural change (touches `llm.js` provider abstraction). Prompt restructure is cleanup that's easier after the other two land.
 
 ### Phase 12: Platform Expansion (Later)
 
@@ -220,6 +367,7 @@ Web app at `/app` — Gemini-style conversational interface using the same backe
 | Classification Report | Mar 13 | `logClassification()` appends to `data/classification-log.json`. Human reads to promote patterns to regex. |
 | Unified Agent Architecture | Mar 16 | 4-step refactor: (1) drop compose_sms, (2) unified `search` tool with parallel fan-out, (3) simplified session save with pool-order picks, (4) slim prompt with few-shot examples + `recommended`/`why` metadata. 2 tools instead of 5, ~250 lines reduced, ~47% cost reduction. |
 | Web App Prototype | Mar 16 | `/app` — Gemini-style conversational interface. Same backend, SMS acquisition funnel. Sidebar, suggestion pills, inline event cards. |
+| Profile Persistence + Brain Injection | Mar 16 | `user_profiles` SQLite table, `buildProfileSummary()`, profile injected into system prompt. JSON→SQLite migration (7698 profiles). |
 
 ---
 

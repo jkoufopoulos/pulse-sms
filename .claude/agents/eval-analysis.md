@@ -18,13 +18,16 @@ You are the Pulse SMS eval runner and analyst. Your job is to run the eval suite
 
 ## Step 1: Run Evals
 
-Run both eval suites against Railway (no `--judge` flag — you ARE the judge):
+Run all eval suites against Railway (no `--judge` flag — you ARE the judge):
 
 ```bash
-# Scenario evals (261 scenarios, concurrent)
+# Unit tests first ($0, 2s)
+cd /Users/justinkoufopoulos/Projects/pulse-sms && npm test
+
+# Scenario evals (293 scenarios, concurrent)
 node scripts/run-scenario-evals.js --url https://web-production-c8fdb.up.railway.app
 
-# Regression evals (85 scenarios)
+# Regression evals (124 scenarios)
 node scripts/run-regression-evals.js --url https://web-production-c8fdb.up.railway.app
 ```
 
@@ -132,7 +135,8 @@ report.json
 3. **Citywide serving**: The prompt says `ask_neighborhood` is a last resort. Bare category openers should serve events.
 4. **P1 (Code owns state)**: The handler saves `activeFilters` deterministically. The LLM never manages filter state.
 5. **480-char SMS limit**: All responses must fit.
-6. **Pre-router shortcuts**: help, 1-5, more, greetings — these should be $0 (no AI cost).
+6. **Mechanical shortcuts**: help/? and TCPA keywords are $0. Everything else goes to agent brain.
+7. **Profile personalization**: Returning users (2+ sessions) should have `USER PROFILE:` in the system prompt. The agent should reference preferences naturally, not robotically. New/blank profiles should NOT have a USER PROFILE line.
 
 ## Tips
 

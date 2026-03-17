@@ -23,7 +23,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
-const { runCodeEvals } = require('../src/evals/code-evals');
+const { runCodeEvals, runMultiTurnEvals } = require('../src/evals/code-evals');
 
 const args = process.argv.slice(2);
 const categoryFilter = args.find(a => a.startsWith('--category='))?.split('=')[1]
@@ -334,6 +334,13 @@ async function main() {
             if (!r.pass) codeEvalFailures.push(r);
           }
         }
+      }
+
+      // Run multi-turn evals across the full conversation (before trace stripping)
+      const multiTurnResults = runMultiTurnEvals(actualConversation);
+      codeEvalTotal += multiTurnResults.length;
+      for (const r of multiTurnResults) {
+        if (!r.pass) codeEvalFailures.push(r);
       }
 
       // Replace full trace with key fields for debuggability

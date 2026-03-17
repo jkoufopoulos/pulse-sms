@@ -111,6 +111,74 @@ const evals = {
   },
 };
 
+// --- Multi-turn evals (run across a conversation, not per-trace) ---
+
+const multiTurnEvals = {
+  /**
+   * Filters set in one turn should persist in subsequent turns unless explicitly cleared.
+   * Checks brain_tool_calls for search params.filters across consecutive pulse turns.
+   */
+  filter_state_preserved(conversation) {
+    const pulseTurns = conversation.filter(t => t.sender === 'pulse' && (t.trace || t.trace_debug));
+    if (pulseTurns.length < 2) return { name: 'filter_state_preserved', pass: true, detail: 'single turn, n/a' };
+
+    const drops = [];
+    let prevFilters = null;
+    let prevTurnIndex = 0;
+
+    for (let i = 0; i < pulseTurns.length; i++) {
+      const turn = pulseTurns[i];
+      const trace = turn.trace || {};
+
+      // Extract filters from tool call params (agent-loop path)
+      const toolCalls = trace.brain_tool_calls || [];
+      const lastSearch = [...toolCalls].reverse().find(tc => tc.name === 'search');
+      const currentFilters = lastSearch?.params?.filters || null;
+      const intent = lastSearch?.params?.intent;
+
+      // Skip non-search turns (respond-only) and details/more
+      if (!lastSearch || intent === 'details') {
+        continue;
+      }
+
+      if (prevFilters && currentFilters) {
+        // Check: if prev had a category filter and current doesn't, that's a drop
+        const prevCats = prevFilters.categories || (prevFilters.category ? [prevFilters.category] : []);
+        const currCats = currentFilters.categories || (currentFilters.category ? [currentFilters.category] : []);
+
+        if (prevCats.length > 0 && currCats.length === 0 && intent !== 'discover') {
+          // Only flag if the user didn't explicitly start a new search
+          drops.push({
+            turn: i + 1,
+            dropped: `categories: [${prevCats.join(', ')}]`,
+            prevTurn: prevTurnIndex + 1,
+          });
+        }
+
+        // Check free_only persistence
+        if (prevFilters.free_only && !currentFilters.free_only && intent !== 'discover') {
+          drops.push({
+            turn: i + 1,
+            dropped: 'free_only',
+            prevTurn: prevTurnIndex + 1,
+          });
+        }
+      }
+
+      prevFilters = currentFilters;
+      prevTurnIndex = i;
+    }
+
+    return {
+      name: 'filter_state_preserved',
+      pass: drops.length === 0,
+      detail: drops.length > 0
+        ? `${drops.length} filter drop(s): ${drops.map(d => `turn ${d.prevTurn}→${d.turn} lost ${d.dropped}`).join('; ')}`
+        : `filters stable across ${pulseTurns.length} turns`,
+    };
+  },
+};
+
 /**
  * Run all code evals on a trace.
  * @param {Object} trace
@@ -120,4 +188,13 @@ function runCodeEvals(trace) {
   return Object.values(evals).map(fn => fn(trace));
 }
 
-module.exports = { runCodeEvals, evals };
+/**
+ * Run multi-turn evals on a full conversation.
+ * @param {Array} conversation - Array of { sender, message, trace, trace_debug }
+ * @returns {Array<{name, pass, detail}>}
+ */
+function runMultiTurnEvals(conversation) {
+  return Object.values(multiTurnEvals).map(fn => fn(conversation));
+}
+
+module.exports = { runCodeEvals, runMultiTurnEvals, evals, multiTurnEvals };

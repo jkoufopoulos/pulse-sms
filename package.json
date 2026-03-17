@@ -15,7 +15,8 @@
 
 
 
-    "eval:quality": "node scripts/run-quality-evals.js"
+    "eval:quality": "node scripts/run-quality-evals.js",
+    "eval:diff": "node scripts/compare-eval-reports.js"
   },
   "engines": {
     "node": ">=20.0.0"

@@ -3,7 +3,7 @@
  * Follows smoke.test.js pattern: no framework, node test/eval.test.js
  */
 
-const { runCodeEvals } = require('../src/evals/code-evals');
+const { runCodeEvals, runMultiTurnEvals } = require('../src/evals/code-evals');
 const { runExpectationEvals } = require('../src/evals/expectation-evals');
 
 let pass = 0;
@@ -401,6 +401,78 @@ check('report sourcesBelow matches failing count checks', report.summary.sources
 const emptyReport = runScrapeAudit([], {});
 check('empty report has 0 total', emptyReport.summary.total === 0);
 check('empty report passRate is N/A', emptyReport.summary.passRate === 'N/A');
+
+// ---- Multi-turn evals: filter_state_preserved ----
+console.log('\nmulti-turn evals:');
+
+// Filters persist across turns → pass
+const stableConversation = [
+  { sender: 'user', message: 'comedy in bushwick' },
+  { sender: 'pulse', message: 'Here are comedy picks...', trace: {
+    brain_tool_calls: [{ name: 'search', params: { neighborhood: 'bushwick', filters: { categories: ['comedy'] }, intent: 'discover' } }],
+  }},
+  { sender: 'user', message: 'more' },
+  { sender: 'pulse', message: 'More comedy...', trace: {
+    brain_tool_calls: [{ name: 'search', params: { filters: { categories: ['comedy'] }, intent: 'more' } }],
+  }},
+];
+const stableResults = runMultiTurnEvals(stableConversation);
+const filterCheck = stableResults.find(r => r.name === 'filter_state_preserved');
+check('filter_state_preserved: stable filters → pass', filterCheck.pass === true);
+
+// Filters drop between turns → fail
+const droppedConversation = [
+  { sender: 'user', message: 'comedy in bushwick' },
+  { sender: 'pulse', message: 'Here are comedy picks...', trace: {
+    brain_tool_calls: [{ name: 'search', params: { neighborhood: 'bushwick', filters: { categories: ['comedy'] }, intent: 'discover' } }],
+  }},
+  { sender: 'user', message: 'try williamsburg' },
+  { sender: 'pulse', message: 'Here are williamsburg picks...', trace: {
+    brain_tool_calls: [{ name: 'search', params: { neighborhood: 'williamsburg', filters: {}, intent: 'more' } }],
+  }},
+];
+const droppedResults = runMultiTurnEvals(droppedConversation);
+const dropCheck = droppedResults.find(r => r.name === 'filter_state_preserved');
+check('filter_state_preserved: category dropped → fail', dropCheck.pass === false);
+check('filter_state_preserved: detail mentions comedy', dropCheck.detail.includes('categories'));
+
+// Single turn → n/a
+const singleTurn = [
+  { sender: 'user', message: 'bushwick' },
+  { sender: 'pulse', message: 'picks...', trace: {
+    brain_tool_calls: [{ name: 'search', params: { neighborhood: 'bushwick', intent: 'discover' } }],
+  }},
+];
+const singleResults = runMultiTurnEvals(singleTurn);
+check('filter_state_preserved: single turn → pass (n/a)', singleResults.find(r => r.name === 'filter_state_preserved').pass === true);
+
+// New search (discover intent) is allowed to drop filters
+const newSearchConversation = [
+  { sender: 'user', message: 'comedy in bushwick' },
+  { sender: 'pulse', message: 'Comedy picks...', trace: {
+    brain_tool_calls: [{ name: 'search', params: { neighborhood: 'bushwick', filters: { categories: ['comedy'] }, intent: 'discover' } }],
+  }},
+  { sender: 'user', message: 'actually jazz' },
+  { sender: 'pulse', message: 'Jazz picks...', trace: {
+    brain_tool_calls: [{ name: 'search', params: { neighborhood: 'bushwick', filters: { categories: ['jazz'] }, intent: 'discover' } }],
+  }},
+];
+const newSearchResults = runMultiTurnEvals(newSearchConversation);
+check('filter_state_preserved: discover replaces filter → pass', newSearchResults.find(r => r.name === 'filter_state_preserved').pass === true);
+
+// free_only drop detected
+const freeDropConversation = [
+  { sender: 'user', message: 'free comedy in bushwick' },
+  { sender: 'pulse', message: 'Free comedy...', trace: {
+    brain_tool_calls: [{ name: 'search', params: { neighborhood: 'bushwick', filters: { categories: ['comedy'], free_only: true }, intent: 'discover' } }],
+  }},
+  { sender: 'user', message: 'more' },
+  { sender: 'pulse', message: 'More picks...', trace: {
+    brain_tool_calls: [{ name: 'search', params: { neighborhood: 'bushwick', filters: { categories: ['comedy'] }, intent: 'more' } }],
+  }},
+];
+const freeDropResults = runMultiTurnEvals(freeDropConversation);
+check('filter_state_preserved: free_only dropped → fail', freeDropResults.find(r => r.name === 'filter_state_preserved').pass === false);
 
 // ---- Summary ----
 console.log(`\n${pass} passed, ${fail} failed`);
