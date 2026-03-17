@@ -296,4 +296,70 @@ function stripHtml(html) {
     .trim();
 }
 
-module.exports = { FETCH_HEADERS, NYC_BBOX, isInsideNYC, makeEventId, normalizeExtractedEvent, normalizeEventName, computeCompleteness, backfillEvidence, backfillDateTimes, stripHtml };
+/**
+ * Generic email/newsletter event extraction via line-based chunking.
+ * Replaces custom splitters (splitByVenue, splitByDay) — the LLM handles structure.
+ *
+ * @param {object} opts
+ * @param {string} opts.text - Plain text content to extract from
+ * @param {string} opts.sourceName - Display name (e.g. 'ScreenSlate')
+ * @param {string} opts.sourceType - Source type (e.g. 'unstructured', 'curated')
+ * @param {number} opts.sourceWeight - Weight for dedup merging
+ * @param {string} opts.sourceUrl - Source URL for extraction context
+ * @param {string} opts.label - Cache key prefix (e.g. 'screenslate')
+ * @param {string} [opts.categoryOverride] - Force category on all events (e.g. 'film')
+ * @param {number} [opts.linesPerChunk=50] - Lines per chunk (lower = fewer events per LLM call, less truncation risk)
+ * @returns {Promise<object[]>} Normalized, quality-gated events
+ */
+async function extractEmailEvents({ text, sourceName, sourceType, sourceWeight, sourceUrl, label, categoryOverride, linesPerChunk = 50 }) {
+  const { extractEvents } = require('../ai');
+  const { captureExtractionInput } = require('../extraction-capture');
+  const { getCachedExtraction, setCachedExtraction } = require('../extraction-cache');
+
+  const lines = text.split('\n').filter(l => l.trim());
+  const LINES_PER_CHUNK = linesPerChunk;
+  const OVERLAP = 10; // repeat last N lines from previous chunk for venue/section context
+  const chunks = [];
+  for (let i = 0; i < lines.length; i += LINES_PER_CHUNK) {
+    const start = i === 0 ? 0 : i - OVERLAP;
+    chunks.push(lines.slice(start, i + LINES_PER_CHUNK).join('\n'));
+  }
+
+  console.log(`${sourceName}: ${lines.length} lines → ${chunks.length} chunks`);
+
+  const allEvents = [];
+  const CONCURRENCY = 3;
+
+  for (let i = 0; i < chunks.length; i += CONCURRENCY) {
+    const batch = chunks.slice(i, i + CONCURRENCY);
+    const results = await Promise.allSettled(
+      batch.map(async (content, j) => {
+        const chunkIndex = i + j;
+        const chunkLabel = `${label}:chunk${chunkIndex}`;
+        const cachedChunk = getCachedExtraction(chunkLabel, content);
+        if (cachedChunk) return cachedChunk;
+
+        captureExtractionInput(label, content, sourceUrl);
+        const result = await extractEvents(content, label, sourceUrl);
+        const events = (result.events || [])
+          .map(e => {
+            if (categoryOverride) e.category = categoryOverride;
+            return normalizeExtractedEvent(e, sourceName, sourceType, sourceWeight);
+          })
+          .filter(e => e.name && e.completeness >= 0.5);
+
+        setCachedExtraction(chunkLabel, content, events);
+        return events;
+      })
+    );
+
+    for (const r of results) {
+      if (r.status === 'fulfilled') allEvents.push(...r.value);
+      else console.warn(`${sourceName}: chunk extraction failed:`, r.reason?.message);
+    }
+  }
+
+  return allEvents;
+}
+
+module.exports = { FETCH_HEADERS, NYC_BBOX, isInsideNYC, makeEventId, normalizeExtractedEvent, normalizeEventName, computeCompleteness, backfillEvidence, backfillDateTimes, stripHtml, extractEmailEvents };

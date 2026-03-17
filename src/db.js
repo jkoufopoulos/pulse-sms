@@ -655,7 +655,11 @@ function detectRecurringPatterns() {
  * their events are recurring.
  */
 function processRecurrencePatterns(events, sourceName) {
-  const recurring = events.filter(e => e._raw?.is_recurring && e._raw?.recurrence_day != null);
+  const recurring = events.filter(e => {
+    const isRec = e.is_recurring || e._raw?.is_recurring;
+    const day = e.recurrence_day ?? e._raw?.recurrence_day;
+    return isRec && day != null;
+  });
   if (recurring.length === 0) return 0;
 
   let count = 0;
@@ -665,8 +669,8 @@ function processRecurrencePatterns(events, sourceName) {
       venue_name: e.venue_name || 'TBA',
       venue_address: e.venue_address || null,
       neighborhood: e.neighborhood || null,
-      day_of_week: e._raw.recurrence_day,
-      time_local: e._raw.recurrence_time || null,
+      day_of_week: e.recurrence_day ?? e._raw?.recurrence_day,
+      time_local: e.recurrence_time ?? (e._raw?.recurrence_time || null),
       end_time_local: null,
       category: e.category || null,
       subcategory: e.subcategory || null,

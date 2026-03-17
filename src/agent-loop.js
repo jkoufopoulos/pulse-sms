@@ -895,4 +895,6 @@ module.exports = {
   extractPlacePicksFromSms,
   deriveIntent,
   inferTypesFromQuery,
+  rewriteIfTooLong,
+  SMS_CHAR_LIMIT,
 };

@@ -139,30 +139,34 @@ async function auditNonsense() {
   const text = stripHtml(newsletter.body);
   console.log(`Newsletter text length: ${text.length} chars`);
 
-  // Step 3: Split by day (mirrors nonsense.js logic)
-  const { splitByDay } = require('../src/sources/nonsense');
-  const sections = splitByDay(text);
-  console.log(`Day sections: ${sections.length}`);
+  // Step 3: Split into line-based chunks (mirrors nonsense.js generic chunking)
+  const lines = text.split('\n').filter(l => l.trim());
+  const LINES_PER_CHUNK = 80;
+  const chunks = [];
+  for (let i = 0; i < lines.length; i += LINES_PER_CHUNK) {
+    chunks.push(lines.slice(i, i + LINES_PER_CHUNK).join('\n'));
+  }
+  console.log(`Line chunks: ${chunks.length} (${lines.length} lines)`);
 
-  // Step 4: Count events described per section (rough heuristic)
+  // Step 4: Count events described per chunk (rough heuristic)
   let totalDescribed = 0;
-  for (const { day, content } of sections) {
-    // Rough estimate: count entries separated by double newlines or bullet patterns
-    const chunks = content.split(/\n{2,}/).filter(c => c.trim().length > 30);
-    totalDescribed += chunks.length;
-    console.log(`  ${day}: ~${chunks.length} event descriptions (${content.length} chars)`);
+  for (let i = 0; i < chunks.length; i++) {
+    const paras = chunks[i].split(/\n{2,}/).filter(c => c.trim().length > 30);
+    totalDescribed += paras.length;
+    console.log(`  chunk${i}: ~${paras.length} event descriptions (${chunks[i].length} chars)`);
   }
 
-  // Step 5: Run extraction on each section
+  // Step 5: Run extraction on each chunk
   let totalExtracted = 0;
   let totalPassed = 0;
   let totalDropped = 0;
   const allDropReasons = [];
 
-  for (const { day, content } of sections) {
+  for (let i = 0; i < chunks.length; i++) {
+    const content = chunks[i];
     if (content.length < 100) continue;
 
-    console.log(`\nExtracting "${day}" (${content.length} chars)...`);
+    console.log(`\nExtracting chunk${i} (${content.length} chars)...`);
     const result = await extractEvents(content, 'nonsensenyc', 'https://nonsensenyc.com/');
     const rawEvents = result.events || [];
     totalExtracted += rawEvents.length;
@@ -178,7 +182,7 @@ async function auditNonsense() {
         if (!e.neighborhood) missing.push('neighborhood');
         if (!e.start_time_local) missing.push('time');
         allDropReasons.push({
-          day,
+          chunk: `chunk${i}`,
           name: e.name || '(no name)',
           completeness: completeness.toFixed(2),
           missing,
@@ -187,7 +191,7 @@ async function auditNonsense() {
         totalPassed++;
       }
     }
-    console.log(`  → ${rawEvents.length} extracted, ${rawEvents.length - (totalDropped - allDropReasons.filter(d => d.day !== day).length)} passed`);
+    console.log(`  → ${rawEvents.length} extracted`);
   }
 
   console.log(`\n--- Nonsense Summary ---`);
@@ -198,7 +202,7 @@ async function auditNonsense() {
   if (allDropReasons.length > 0) {
     console.log('\nDropped events:');
     for (const d of allDropReasons) {
-      console.log(`  - [${d.day}] "${d.name}" (completeness=${d.completeness}, missing: ${d.missing.join(', ')})`);
+      console.log(`  - [${d.chunk}] "${d.name}" (completeness=${d.completeness}, missing: ${d.missing.join(', ')})`);
     }
   }
 

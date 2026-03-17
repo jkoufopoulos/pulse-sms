@@ -222,45 +222,17 @@ Web app at `/app` — Gemini-style conversational interface using the same backe
 - [ ] Add eval for stale cache (>24hr old) — does the agent still produce useful responses?
 - [ ] Track pool size per neighborhood in traces for sparse coverage detection
 
-### Phase 10b: Prompt Architecture (Next)
+### ~~Phase 10b: Prompt Architecture~~ — Done (Mar 17)
 
-*The agent brain's prompts were built iteratively as features shipped. They work, but they've drifted from how Anthropic and Google recommend structuring agent systems. This phase realigns with vendor best practices — not for theory, but because the current structure causes real bugs (e.g. "weird" query producing 2 results because vibe words become hard category filters via example pattern-matching).*
+*Realigned prompts with Anthropic/Google agent best practices. Fixed production bug where "surprise me with something weird" produced only 2 results.*
 
-**Context:** Audited all prompts against Anthropic's agent guidance ("Building Effective Agents", "Writing Tools for Agents", "Effective Context Engineering") and Google's Gemini docs (function calling, system instructions, prompting strategies). Three structural issues identified; one already caused a production bug.
-
-**Story: Remove few-shot examples from the agent brain**
-> Anthropic: few-shot examples "often backfire in agentic systems" where the model needs to work autonomously in a loop. Google: examples cause overfitting in tool-calling; improve function descriptions instead.
-
-The brain system prompt has 3 input→tool_call→SMS examples. The model anchors on these patterns instead of reasoning about novel inputs. "Surprise me with something weird" doesn't match any example, so the model force-fits it into the nearest pattern (maps "weird" to category filters, nuking the pool to 2 results).
-
-- [ ] Remove all 3 few-shot examples from `buildBrainSystemPrompt()` in `brain-llm.js`
-- [ ] Strengthen the RULES section to compensate — rules already cover tool selection logic, just need to be explicit enough to stand alone
-- [ ] Enrich `BRAIN_TOOLS` descriptions (3-4 sentences each per Anthropic guidance) so tool definitions own routing without system prompt help
-- [ ] Run quality evals before/after to measure impact. Expect: broader pools for vibe queries, no regression on direct queries
-- [ ] *Already done:* Updated mood mapping rule to separate category-mapped moods from vibe queries (Mar 16)
-
-**Story: Use native multi-turn history instead of text serialization**
-> Anthropic: use native `tool_use`/`tool_result` message blocks. Google: Gemini is stateless and expects proper native message types. Both: text serialization means the model can't distinguish context from instructions.
-
-The `historyBlock` in `buildBrainSystemPrompt()` serializes prior turns as `User: "...", Pulse: "...", > search(...)` text in the system prompt. This is lossy (truncated to 150 chars), burns system prompt tokens, and the model can't tell history from instructions.
-
-- [ ] Pass conversation history as native message turns in the `messages` array (Anthropic) or `contents` array (Gemini) instead of text in the system prompt
-- [ ] Remove `historyBlock` from `buildBrainSystemPrompt()`
-- [ ] Update `runAgentLoop` in `llm.js` to accept and forward prior turns in the provider's native format
-- [ ] Keep session context (current neighborhood, active filters, last picks) in the system prompt — that's state the model needs, not history
-- [ ] Run scenario evals to verify multi-turn coherence (filter persistence, details references) improves or holds
-
-**Story: Separate tool routing from SMS composition in the system prompt**
-> Anthropic: use XML tags to organize by concern, progressive disclosure. Google: separation improves agentic performance ~5%. Both: don't mix "when to call tools" with "how to write the response."
-
-The system prompt is a monolith mixing persona, tool routing rules, composition rules, and session context in one flat block. The model has to mentally parse which rules apply at which phase of the agent loop.
-
-- [ ] Restructure `buildBrainSystemPrompt()` into clearly labeled sections (XML tags or markdown headers): `PERSONA`, `TOOL SELECTION`, `WRITING THE SMS`, `SESSION STATE`
-- [ ] Move routing logic out of RULES and into `BRAIN_TOOLS` descriptions (tool defs own routing, system prompt owns persona + composition)
-- [ ] Remove duplicated routing rules (e.g. `"2" or name = details` in RULES when the search tool's `intent: "details"` description already says this)
-- [ ] Run quality evals before/after
-
-**Sequencing:** Do these in order. Examples removal is the highest-impact fix (addresses a live bug, lowest effort). Native history is the biggest structural change (touches `llm.js` provider abstraction). Prompt restructure is cleanup that's easier after the other two land.
+- [x] Removed all 3 few-shot examples, enriched tool descriptions to 3-4 sentences (Mar 17)
+- [x] Restructured system prompt into `<persona>`, `<composition>`, `<session>` XML sections (Mar 17)
+- [x] Moved routing logic from RULES into BRAIN_TOOLS descriptions (Mar 17)
+- [x] Native multi-turn history: `buildNativeHistory()` converts conversation history to native user/assistant message pairs, passed via `priorMessages` to `runAgentLoop` (Mar 17)
+- [x] Removed `historyBlock` from system prompt, session content truncation 300→480 chars (Mar 17)
+- [x] Switched eval judge to provider-agnostic `generate()`, default Gemini Flash (Mar 17)
+- [x] Quality evals: 4.4/5.0, 93% pass rate. Tone 4.8 (100%), Curation 4.5 (100%), Coherence 4.8 (95%) (Mar 17)
 
 ### Phase 12: Platform Expansion (Later)
 
@@ -364,6 +336,7 @@ The system prompt is a monolith mixing persona, tool routing rules, composition 
 | Unified Agent Architecture | Mar 16 | 4-step refactor: (1) drop compose_sms, (2) unified `search` tool with parallel fan-out, (3) simplified session save with pool-order picks, (4) slim prompt with few-shot examples + `recommended`/`why` metadata. 2 tools instead of 5, ~250 lines reduced, ~47% cost reduction. |
 | Web App Prototype | Mar 16 | `/app` — Gemini-style conversational interface. Same backend, SMS acquisition funnel. Sidebar, suggestion pills, inline event cards. |
 | Profile Persistence + Brain Injection | Mar 16 | `user_profiles` SQLite table, `buildProfileSummary()`, profile injected into system prompt. JSON→SQLite migration (7698 profiles). |
+| Phase 10b: Prompt Architecture | Mar 17 | Removed few-shot examples, XML-tagged prompt sections, native multi-turn history via `buildNativeHistory()`, eval judge on Gemini. Quality: 4.4/5.0, 93% pass. |
 
 ---
 

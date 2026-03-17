@@ -131,6 +131,23 @@ const evals = {
   },
 
   /**
+   * Track SMS rewrite frequency. Not a pass/fail gate — informational.
+   * Reports whether the rewrite loop fired and the size reduction.
+   */
+  rewrite_tracking(trace) {
+    const rewrite = trace.composition?.rewrite;
+    if (!rewrite) {
+      return { name: 'rewrite_tracking', pass: true, detail: 'no rewrite needed' };
+    }
+    const reduction = rewrite.from - rewrite.to;
+    return {
+      name: 'rewrite_tracking',
+      pass: true,
+      detail: `rewrite fired: ${rewrite.from} → ${rewrite.to} chars (saved ${reduction})`,
+    };
+  },
+
+  /**
    * Profile injection: returning users (2+ sessions) should have profile context.
    * Checks trace.profile_summary field added by agent-loop.
    */

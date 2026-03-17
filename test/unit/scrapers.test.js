@@ -10,27 +10,6 @@ const CACHE_FILE = path.join(NONSENSE_DIR, 'cached-events.json');
 
 const nonsenseMod = require('../../src/sources/nonsense');
 check('nonsense module exports fetchNonsenseNYC', typeof nonsenseMod.fetchNonsenseNYC === 'function');
-check('nonsense module exports splitByDay', typeof nonsenseMod.splitByDay === 'function');
-
-const { splitByDay } = nonsenseMod;
-
-const sampleNewsletter = `
-Some intro text here.
-
-XXXXX FRIDAY, FEBRUARY 27 XXXXX
-Event 1: Jazz at Smalls, 183 W 10th St. 7pm. $20. This is a great show with wonderful musicians playing all night long.
-Event 2: Comedy at Union Hall, 702 Union St. 9pm. $10. Stand up comedy featuring NYC's best comics and special guests.
-
-XXXXX SATURDAY, FEBRUARY 28 XXXXX
-Event 3: Art Opening at some gallery in Chelsea with free drinks and snacks for everyone who shows up early enough.
-Event 4: DJ Night at Good Room, 98 Meserole Ave. 10pm. $15. Electronic music party with great sound system.
-`;
-
-const sections = splitByDay(sampleNewsletter);
-check('splitByDay finds 2 day sections', sections.length === 2);
-check('splitByDay first section is Friday', /FRIDAY/.test(sections[0].day));
-check('splitByDay second section is Saturday', /SATURDAY/.test(sections[1].day));
-check('splitByDay sections have content', sections[0].content.length >= 100);
 
 const cacheExists = fs.existsSync(CACHE_FILE);
 check('nonsense cache file exists on disk', cacheExists);

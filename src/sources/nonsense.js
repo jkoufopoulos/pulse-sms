@@ -1,11 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const { extractEvents } = require('../ai');
 const { fetchEmails } = require('../gmail');
-const { normalizeExtractedEvent, backfillEvidence } = require('./shared');
-const { captureExtractionInput } = require('../extraction-capture');
-const { getCachedExtraction, setCachedExtraction } = require('../extraction-cache');
-const { stripHtml } = require('./shared');
+const { backfillEvidence, stripHtml, extractEmailEvents } = require('./shared');
 
 const NONSENSE_DIR = path.join(__dirname, '../../data/nonsense');
 const CACHE_FILE = path.join(NONSENSE_DIR, 'cached-events.json');
@@ -39,42 +35,13 @@ function saveCachedEvents(emailId, events) {
   }
 }
 
-/**
- * Split a NonsenseNYC newsletter into day sections.
- * The newsletter uses "XXXXX FRIDAY, FEBRUARY 20 XXXXX" as day headers.
- * Returns array of { day, content } objects.
- */
-function splitByDay(text) {
-  const dayPattern = /XXXXX\s+((?:MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY|SUNDAY)[^X]*?)\s*XXXXX/gi;
-  const sections = [];
-  let match;
-  const matches = [];
-
-  while ((match = dayPattern.exec(text)) !== null) {
-    matches.push({ day: match[1].trim(), index: match.index });
-  }
-
-  for (let i = 0; i < matches.length; i++) {
-    const start = matches[i].index;
-    const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
-    const content = text.slice(start, end).trim();
-    if (content.length >= 100) {
-      sections.push({ day: matches[i].day, content });
-    }
-  }
-
-  return sections;
-}
-
 async function fetchNonsenseNYC() {
   console.log('Fetching Nonsense NYC...');
   try {
-    // Fetch newsletter emails from Gmail (weekly, look back 8 days)
     const emails = await fetchEmails('from:jstark@nonsensenyc.com subject:nonsense newer_than:8d', 3);
     const cached = loadCachedEvents();
 
     if (emails.length === 0) {
-      // Gmail auth may have failed or no recent newsletter — fall back to cache
       if (cached && cached.events.length > 0) {
         console.log(`NonsenseNYC: no emails found, returning ${cached.events.length} cached events`);
         return cached.events;
@@ -85,76 +52,26 @@ async function fetchNonsenseNYC() {
 
     const latest = emails[0];
 
-    // If the latest newsletter is already cached with events, return them
-    // (skip cache if 0 events — likely a previous extraction failure)
     if (cached && cached.id === latest.id && cached.events.length > 0) {
       console.log(`NonsenseNYC: returning ${cached.events.length} cached events from "${latest.subject}"`);
       return cached.events;
     }
 
-    const newsletter = latest;
+    console.log(`NonsenseNYC: processing "${latest.subject}" (${latest.date})`);
+    const stripped = stripHtml(latest.body);
 
-    console.log(`NonsenseNYC: processing "${newsletter.subject}" (${newsletter.date})`);
-    const stripped = stripHtml(newsletter.body);
+    const events = await extractEmailEvents({
+      text: stripped,
+      sourceName: 'nonsensenyc',
+      sourceType: 'curated',
+      sourceWeight: 0.9,
+      sourceUrl: 'https://nonsensenyc.com/',
+      label: 'nonsensenyc',
+    });
 
-    // Split into day sections for manageable extraction calls
-    const sections = splitByDay(stripped);
-    if (sections.length === 0) {
-      // Fallback: treat entire content as one section (cap at 10KB)
-      console.log('NonsenseNYC: no day headers found, using full content');
-      const content = stripped.slice(0, 10000);
-      captureExtractionInput('nonsensenyc', content, 'https://nonsensenyc.com/');
-      const cachedEvents = getCachedExtraction('nonsensenyc', content);
-      let events;
-      if (cachedEvents) {
-        events = cachedEvents;
-      } else {
-        const result = await extractEvents(content, 'nonsensenyc', 'https://nonsensenyc.com/');
-        events = (result.events || [])
-          .map(e => normalizeExtractedEvent(e, 'nonsensenyc', 'curated', 0.9))
-          .filter(e => e.name && e.completeness >= 0.5);
-        setCachedExtraction('nonsensenyc', content, events);
-      }
-
-      saveCachedEvents(newsletter.id, events);
-      console.log(`NonsenseNYC: ${events.length} events`);
-      return events;
-    }
-
-    console.log(`NonsenseNYC: ${sections.length} day sections found`);
-    const allEvents = [];
-
-    // Process day sections in parallel (max 3 concurrent)
-    const CONCURRENCY = 3;
-    for (let i = 0; i < sections.length; i += CONCURRENCY) {
-      const batch = sections.slice(i, i + CONCURRENCY);
-      const results = await Promise.allSettled(
-        batch.map(async ({ day, content }) => {
-          console.log(`NonsenseNYC: extracting ${day} (${content.length} chars)`);
-          captureExtractionInput('nonsensenyc', content, 'https://nonsensenyc.com/');
-          const cacheKey = `nonsensenyc:${day}`;
-          const cachedDay = getCachedExtraction(cacheKey, content);
-          if (cachedDay) return cachedDay;
-          const result = await extractEvents(content, 'nonsensenyc', 'https://nonsensenyc.com/');
-          const extracted = (result.events || [])
-            .map(e => normalizeExtractedEvent(e, 'nonsensenyc', 'curated', 0.9))
-            .filter(e => e.name && e.completeness >= 0.5);
-          setCachedExtraction(cacheKey, content, extracted);
-          return extracted;
-        })
-      );
-      for (const r of results) {
-        if (r.status === 'fulfilled') {
-          allEvents.push(...r.value);
-        } else {
-          console.warn('NonsenseNYC: extraction failed for day section:', r.reason?.message);
-        }
-      }
-    }
-
-    saveCachedEvents(newsletter.id, allEvents);
-    console.log(`NonsenseNYC: ${allEvents.length} events from ${sections.length} day sections`);
-    return allEvents;
+    saveCachedEvents(latest.id, events);
+    console.log(`NonsenseNYC: ${events.length} events`);
+    return events;
   } catch (err) {
     console.error('Nonsense NYC error:', err.message);
     const cached = loadCachedEvents();
@@ -166,4 +83,4 @@ async function fetchNonsenseNYC() {
   }
 }
 
-module.exports = { fetchNonsenseNYC, splitByDay };
+module.exports = { fetchNonsenseNYC };
