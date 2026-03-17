@@ -46,6 +46,11 @@ function getCachedExtraction(sourceName, rawContent) {
   const hash = computeHash(rawContent);
   const entry = cache[sourceName];
   if (entry && entry.hash === hash) {
+    // Don't reuse empty results — likely a previous extraction failure (LLM truncation)
+    if (entry.events.length === 0) {
+      console.log(`[EXTRACTION-CACHE] ${sourceName}: skipping cached 0-event result, re-extracting`);
+      return null;
+    }
     console.log(`[EXTRACTION-CACHE] ${sourceName}: content unchanged, reusing ${entry.events.length} cached events`);
     return entry.events;
   }

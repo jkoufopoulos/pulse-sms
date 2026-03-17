@@ -463,7 +463,7 @@ if (eventCache.length === 0) {
 // Timed fetch wrapper — captures duration + status per source
 // ============================================================
 
-const SCRAPER_TIMEOUT_MS = 60000;
+const SCRAPER_TIMEOUT_MS = 180000; // 3 min — email sources need time for multi-chunk LLM extraction
 
 async function timedFetch(fetchFn, label, weight) {
   const start = Date.now();

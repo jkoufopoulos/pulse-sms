@@ -348,7 +348,10 @@ async function extractEmailEvents({ text, sourceName, sourceType, sourceWeight, 
           })
           .filter(e => e.name && e.completeness >= 0.5);
 
-        setCachedExtraction(chunkLabel, content, events);
+        // Only cache non-empty results — 0 events likely means LLM truncation/failure
+        if (events.length > 0) {
+          setCachedExtraction(chunkLabel, content, events);
+        }
         return events;
       })
     );
