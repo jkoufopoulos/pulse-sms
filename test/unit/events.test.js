@@ -280,6 +280,43 @@ check('fills from best remaining when diversity exhausted', picks2.length === 3)
 
 check('empty pool returns empty', selectDiversePicks([], 3).length === 0);
 
+// ---- scoreSurprise ----
+const { scoreSurprise } = require('../../src/events');
+console.log('\nscoreSurprise:');
+
+check('discovery + one-night-only + interactive = high surprise', scoreSurprise({
+  source_vibe: 'discovery', scarcity: 'one-night-only', interaction_format: 'interactive', venue_size: 'intimate',
+}) >= 7);
+
+check('mainstream recurring passive = 0 surprise', scoreSurprise({
+  source_vibe: 'mainstream', scarcity: null, interaction_format: 'passive', venue_size: 'large',
+}) === 0);
+
+check('niche participatory = moderate surprise', (() => {
+  const s = scoreSurprise({ source_vibe: 'niche', interaction_format: 'participatory' });
+  return s >= 2 && s <= 4;
+})());
+
+check('capped at 10', scoreSurprise({
+  source_vibe: 'discovery', scarcity: 'one-night-only', interaction_format: 'interactive', venue_size: 'intimate',
+}, { sessionCount: 5, categories: { jazz: 10 }, neighborhoods: { bushwick: 10 } }) <= 10);
+
+// With profile: unfamiliar category adds surprise
+const profile = { sessionCount: 3, categories: { jazz: 10, comedy: 5 }, neighborhoods: { bushwick: 10 } };
+const familiarCat = scoreSurprise({ source_vibe: 'discovery', category: 'jazz' }, profile);
+const unfamiliarCat = scoreSurprise({ source_vibe: 'discovery', category: 'art' }, profile);
+check('unfamiliar category scores higher than familiar', unfamiliarCat > familiarCat);
+
+// With profile: unfamiliar neighborhood adds surprise
+const familiarHood = scoreSurprise({ source_vibe: 'discovery', neighborhood: 'bushwick' }, profile);
+const unfamiliarHood = scoreSurprise({ source_vibe: 'discovery', neighborhood: 'les' }, profile);
+check('unfamiliar neighborhood scores higher than familiar', unfamiliarHood > familiarHood);
+
+// No profile = no profile bonus
+const noProfile = scoreSurprise({ source_vibe: 'discovery', category: 'art', neighborhood: 'les' }, null);
+const newUser = scoreSurprise({ source_vibe: 'discovery', category: 'art', neighborhood: 'les' }, { sessionCount: 1 });
+check('no profile and new user get same score', noProfile === newUser);
+
 // ---- isGarbageName ----
 console.log('\nisGarbageName:');
 check('rejects "Day & Date: Friday, March 7, 2026"', isGarbageName('Day & Date: Friday, March 7, 2026'));

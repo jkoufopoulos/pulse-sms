@@ -20,6 +20,7 @@ require('./unit/proactive.test');
 require('./unit/digest.test');
 require('./unit/model-config.test');
 require('./unit/llm.test');
+require('./unit/rewrite.test');
 require('./unit/agent-loop.test');
 require('./unit/traces-latency.test');
 require('./unit/source-health-disable.test');

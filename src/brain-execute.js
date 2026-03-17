@@ -4,7 +4,7 @@
 
 const { extractNeighborhood, BOROUGHS, detectBorough } = require('./neighborhoods');
 const { getAdjacentNeighborhoods, getNycDateString, filterByTimeAfter, filterUpcomingEvents } = require('./geo');
-const { getEvents, getEventsForBorough, getEventsCitywide, getCacheStatus, scoreInterestingness, selectDiversePicks } = require('./events');
+const { getEvents, getEventsForBorough, getEventsCitywide, getCacheStatus, scoreInterestingness, scoreSurprise, selectDiversePicks } = require('./events');
 const { filterKidsEvents } = require('./curation');
 const { buildTaggedPool, buildEventMap, saveResponseFrame, mergeFilters, buildZeroMatchResponse, describeFilters, failsTimeGate, eventMatchesFilters } = require('./pipeline');
 const { setSession } = require('./session');
@@ -333,7 +333,9 @@ async function buildSearchPool(params, session, phone, trace) {
   const { matchCount, hardCount, softCount, isSparse } = taggedResult;
 
   // 5b. Score and trim pool to top N for the model
-  const { curatedPool: trimmedPool, fullScoredPool } = curatePool(taggedResult.pool, hood);
+  const { getProfile } = require('./preference-profile');
+  const userProfile = getProfile(phone);
+  const { curatedPool: trimmedPool, fullScoredPool } = curatePool(taggedResult.pool, hood, { userProfile });
   events = trimmedPool;
 
   trace.events.sent_to_claude = events.length;
@@ -575,7 +577,7 @@ const DEFAULT_POOL_SIZE = 8;
  * Requested-hood events are prioritized; nearby events pad remaining slots.
  * Returns { curatedPool, fullScoredPool }.
  */
-function curatePool(pool, requestedHood, { poolSize = DEFAULT_POOL_SIZE } = {}) {
+function curatePool(pool, requestedHood, { poolSize = DEFAULT_POOL_SIZE, userProfile = null } = {}) {
   if (!pool || pool.length === 0) {
     return { curatedPool: [], fullScoredPool: [] };
   }
@@ -601,6 +603,34 @@ function curatePool(pool, requestedHood, { poolSize = DEFAULT_POOL_SIZE } = {}) 
     const nearbySorted = [...nearbyEvents].sort((a, b) => b.interestingness - a.interestingness);
     const remaining = poolSize - hoodPicks.length;
     curatedPool = [...hoodPicks, ...nearbySorted.slice(0, remaining)];
+  }
+
+  // 5. Serendipity slot: swap last pick for highest-surprise event if available
+  if (curatedPool.length >= 3) {
+    const pickedIds = new Set(curatedPool.map(e => e.id));
+    const pickedCategories = new Set(curatedPool.map(e => e.category));
+
+    // Find best serendipity candidate from the full pool (not already picked)
+    let bestSurprise = null;
+    let bestSerendipityScore = 0;
+
+    for (const e of fullScoredPool) {
+      if (pickedIds.has(e.id)) continue;
+      const surprise = scoreSurprise(e, userProfile);
+      if (surprise < 4) continue; // minimum surprise threshold
+      const serendipityScore = e.interestingness * surprise;
+      // Prefer events from a category not already in picks
+      const categoryBonus = !pickedCategories.has(e.category) ? 1.5 : 1;
+      const adjusted = serendipityScore * categoryBonus;
+      if (adjusted > bestSerendipityScore) {
+        bestSerendipityScore = adjusted;
+        bestSurprise = { ...e, serendipity: true };
+      }
+    }
+
+    if (bestSurprise) {
+      curatedPool[curatedPool.length - 1] = bestSurprise;
+    }
   }
 
   return { curatedPool, fullScoredPool };

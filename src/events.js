@@ -199,6 +199,51 @@ function scoreInterestingness(event) {
 }
 
 /**
+ * Score how "surprising" an event is — how far outside the expected it falls.
+ * High surprise + high quality = serendipity.
+ *
+ * Without a user profile, uses global signals: discovery source, one-night-only,
+ * interactive format, intimate venue. With a profile, adds category and neighborhood
+ * distance from the user's usual patterns.
+ *
+ * Returns 0-10 surprise score.
+ */
+function scoreSurprise(event, userProfile) {
+  let score = 0;
+
+  // Global signals (always available)
+  if (event.source_vibe === 'discovery') score += 3;
+  else if (event.source_vibe === 'niche') score += 1;
+
+  if (event.scarcity === 'one-night-only') score += 2;
+  if (event.interaction_format === 'interactive') score += 2;
+  else if (event.interaction_format === 'participatory') score += 1;
+
+  if (event.venue_size === 'intimate') score += 1;
+
+  // Profile-based signals (personalized surprise)
+  if (userProfile && userProfile.sessionCount >= 2) {
+    const topCats = Object.entries(userProfile.categories || {})
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([k]) => k);
+    if (topCats.length > 0 && event.category && !topCats.includes(event.category)) {
+      score += 2; // category the user hasn't explored
+    }
+
+    const topHoods = Object.entries(userProfile.neighborhoods || {})
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([k]) => k);
+    if (topHoods.length > 0 && event.neighborhood && !topHoods.includes(event.neighborhood)) {
+      score += 1; // neighborhood the user hasn't been to
+    }
+  }
+
+  return Math.min(score, 10);
+}
+
+/**
  * Select N picks from a scored pool, maximizing category diversity.
  * Takes the highest-scored event, then picks from unseen categories, then fills remaining slots.
  */
@@ -1360,4 +1405,4 @@ function scanCityWide(filters) {
     .map(([neighborhood, matchCount]) => ({ neighborhood, matchCount }));
 }
 
-module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, refreshEmailSources, getEvents, getEventsForBorough, getEventsCitywide, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, scheduleEmailPolls, clearEmailSchedule, captureExtractionInput, getExtractionInputs, scanCityWide, scoreInterestingness, selectDiversePicks, getTopPicks, isGarbageName, remapOtherCategory };
+module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, refreshEmailSources, getEvents, getEventsForBorough, getEventsCitywide, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, scheduleEmailPolls, clearEmailSchedule, captureExtractionInput, getExtractionInputs, scanCityWide, scoreInterestingness, scoreSurprise, selectDiversePicks, getTopPicks, isGarbageName, remapOtherCategory };

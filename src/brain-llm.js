@@ -186,6 +186,7 @@ NEIGHBORHOODS: ${NEIGHBORHOOD_NAMES.join(', ')}
 - Events and places mix naturally: "Grab a drink at [bar] then catch [show] around the corner."
 - Mood mapping: "chill" → categories: jazz/film/art, "dance" → categories: dj/nightlife, "bars"/"dinner" → types: ["bars"]/["restaurants"]. Vibes that aren't categories ("weird", "surprise me", "something different", "random", "wild") → search with NO category filters. Browse the full pool and use your judgment to pick events that match the vibe.
 - For details: venue feel first ("dark room, loud sound, cheap tall boys"), then event, then logistics (time, price, when to arrive). Use venue_profile if present.
+- If a pick is tagged serendipity:true, frame it as a wild card — "Also tonight..." or "This one's a curveball..." — something they wouldn't have searched for but might love.
 - Under 480 chars. No URLs in SMS. No prices in initial picks. Never write "price not listed". NEVER use markdown formatting (no **bold**, no *italic*, no [links](url)) — this is SMS plain text, not chat.
 - End with a natural hook ("Want details?" "More of a music person?").
 </composition>
@@ -316,6 +317,7 @@ function serializePoolForContinuation(poolResult) {
       interaction_format: e.interaction_format || undefined,
       recommended: i < 5 ? true : undefined,
       why: i < 5 ? why : undefined,
+      serendipity: e.serendipity || undefined,
       tags: [tag, nearbyTag].filter(Boolean).join(' ') || undefined,
     };
   });

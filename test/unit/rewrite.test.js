@@ -104,7 +104,4 @@ const LONG_WITH_VENUES = `Tonight in Bushwick! First up, Alphaville has a one-of
   // SMS_CHAR_LIMIT is 480
   check('SMS_CHAR_LIMIT is 480', SMS_CHAR_LIMIT === 480);
 
-  // Restore module cache
-  delete require.cache[llmPath];
-  delete require.cache[require.resolve('../../src/agent-loop')];
 })();
