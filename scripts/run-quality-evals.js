@@ -16,7 +16,8 @@ require('dotenv').config();
 
 const fs = require('fs');
 const path = require('path');
-const Anthropic = require('@anthropic-ai/sdk');
+const { generate } = require('../src/llm');
+const { getProvider } = require('../src/model-config');
 
 const args = process.argv.slice(2);
 const nameFilter = args.find(a => a.startsWith('--name='))?.split('=')[1]
@@ -29,15 +30,14 @@ const CONCURRENCY = parseInt(args.find(a => a.startsWith('--concurrency='))?.spl
   || (args.includes('--concurrency') ? args[args.indexOf('--concurrency') + 1] : null)
   || (isRemote ? '3' : '5'), 10);
 
-const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-haiku-4-5-20251001';
+const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'gemini-2.5-flash';
 
 const PRICING = {
   'claude-haiku-4-5-20251001': { input: 0.80 / 1_000_000, output: 4.0 / 1_000_000 },
   'claude-sonnet-4-5-20250929': { input: 3.0 / 1_000_000, output: 15.0 / 1_000_000 },
+  'gemini-2.5-flash': { input: 0.15 / 1_000_000, output: 0.60 / 1_000_000 },
 };
 let judgeCostTotal = 0;
-
-const client = new Anthropic();
 
 const JUDGE_SYSTEM = `You are evaluating an SMS nightlife recommendation bot called Pulse.
 Pulse texts like a plugged-in friend who knows NYC — not a search engine, not a customer service bot.
@@ -89,20 +89,21 @@ async function judgeResponse(userMessage, responseText, { turnNumber, previousTu
   const turnLabel = turnNumber > 1 ? ` (turn ${turnNumber} of conversation)` : ' (first message, no prior context)';
   const prompt = `The user texted${turnLabel}: "${userMessage}"${context}\n\nPulse responded: "${responseText}"\n\nScore this response. Remember: only score dimensions that apply to this turn. Set others to null.`;
 
-  const response = await client.messages.create({
-    model: JUDGE_MODEL,
-    max_tokens: 256,
-    system: JUDGE_SYSTEM,
-    messages: [{ role: 'user', content: prompt }],
-  }, { timeout: 15000 });
+  const isGemini = getProvider(JUDGE_MODEL) === 'gemini';
+  const result = await generate(JUDGE_MODEL, JUDGE_SYSTEM, prompt, {
+    maxTokens: isGemini ? 2048 : 256,
+    temperature: 0,
+    timeout: 15000,
+  });
 
   // Track cost
-  const pricing = PRICING[JUDGE_MODEL] || PRICING['claude-haiku-4-5-20251001'];
-  const cost = (response.usage?.input_tokens || 0) * pricing.input
-    + (response.usage?.output_tokens || 0) * pricing.output;
+  const pricing = PRICING[JUDGE_MODEL] || PRICING['gemini-2.5-flash'];
+  const usage = result.usage || {};
+  const cost = (usage.input_tokens || usage.promptTokenCount || 0) * pricing.input
+    + (usage.output_tokens || usage.candidatesTokenCount || 0) * pricing.output;
   judgeCostTotal += cost;
 
-  const text = response.content?.[0]?.text || '';
+  const text = result.text || '';
 
   // Parse JSON: try fence match first, then raw extraction
   const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);

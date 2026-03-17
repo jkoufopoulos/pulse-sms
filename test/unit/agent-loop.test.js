@@ -81,14 +81,15 @@ check('returning session prompt does NOT contain first-message indicator', !retu
 console.log('\nbuildBrainSystemPrompt slim prompt:');
 
 const anyPrompt = buildBrainSystemPrompt({});
-check('prompt has RULES section', anyPrompt.includes('RULES:'));
-check('prompt has EXAMPLES section', anyPrompt.includes('EXAMPLES:'));
+check('prompt has composition section', anyPrompt.includes('<composition>'));
+check('prompt has persona section', anyPrompt.includes('<persona>'));
+check('prompt does NOT have EXAMPLES section', !anyPrompt.includes('EXAMPLES:'));
 check('prompt has 480 char limit', anyPrompt.includes('480'));
 check('prompt teaches recommended/why', anyPrompt.includes('recommended') && anyPrompt.includes('why'));
 check('prompt has mood mapping', anyPrompt.includes('chill') && anyPrompt.includes('jazz'));
 check('prompt does NOT have verbose curation block', !anyPrompt.includes('CURATION TASTE'));
 check('prompt does NOT have verbose HOW TO TALK block', !anyPrompt.includes('HOW TO TALK ABOUT PICKS'));
-check('prompt has few-shot example with SMS output', anyPrompt.includes('SMS: "Bushwick tonight'));
+check('prompt does NOT have few-shot examples', !anyPrompt.includes('SMS: "Bushwick tonight'));
 
 // ---- buildRecommendationReason ----
 console.log('\nbuildRecommendationReason:');
@@ -155,3 +156,66 @@ const dummyTrace = { events: {}, composition: {} };
   const staleResult = await executeTool('search', { intent: 'details', reference: '1' }, staleSession2, '+1234', dummyTrace);
   check('details stale returns stale', staleResult.stale === true);
 })();
+
+// ---- buildNativeHistory ----
+console.log('\nbuildNativeHistory:');
+
+const { buildNativeHistory } = require('../../src/brain-llm');
+
+check('empty input returns []', buildNativeHistory([]).length === 0);
+check('null input returns []', buildNativeHistory(null).length === 0);
+check('undefined input returns []', buildNativeHistory(undefined).length === 0);
+
+// Basic user + assistant pair
+const basicHistory = [
+  { role: 'user', content: 'bushwick' },
+  { role: 'assistant', content: 'Here are some picks...' },
+];
+const basicNative = buildNativeHistory(basicHistory);
+check('user+assistant → 2 messages', basicNative.length === 2);
+check('first is user', basicNative[0].role === 'user');
+check('second is assistant', basicNative[1].role === 'assistant');
+check('user content preserved', basicNative[0].content === 'bushwick');
+
+// tool_call folds into assistant
+const toolHistory = [
+  { role: 'user', content: 'bushwick' },
+  { role: 'tool_call', content: '', meta: { name: 'search', params: { neighborhood: 'bushwick', intent: 'discover' } } },
+  { role: 'assistant', content: 'Here are picks in Bushwick' },
+];
+const toolNative = buildNativeHistory(toolHistory);
+check('tool_call merges into assistant', toolNative.length === 2);
+check('assistant contains tool call bracket', toolNative[1].content.includes('[search('));
+
+// search_summary folds into assistant
+const summaryHistory = [
+  { role: 'user', content: 'bushwick' },
+  { role: 'tool_call', content: '', meta: { name: 'search', params: { intent: 'discover' } } },
+  { role: 'search_summary', content: '', meta: { match_count: 15, neighborhood: 'Bushwick', result_type: 'events' } },
+  { role: 'assistant', content: 'Some picks...' },
+];
+const summaryNative = buildNativeHistory(summaryHistory);
+check('search_summary merges into assistant', summaryNative.length === 2);
+check('assistant contains summary bracket', summaryNative[1].content.includes('[15 events in Bushwick]'));
+
+// Consecutive same-role merged
+const consecutiveHistory = [
+  { role: 'user', content: 'hey' },
+  { role: 'user', content: 'bushwick' },
+  { role: 'assistant', content: 'Hi!' },
+  { role: 'assistant', content: 'Here are picks' },
+];
+const consNative = buildNativeHistory(consecutiveHistory);
+check('consecutive same-role merged', consNative.length === 2);
+check('merged user has both contents', consNative[0].content.includes('hey') && consNative[0].content.includes('bushwick'));
+
+// Starts with user, ends with assistant
+const badOrder = [
+  { role: 'assistant', content: 'orphan' },
+  { role: 'user', content: 'hey' },
+  { role: 'assistant', content: 'hi' },
+  { role: 'user', content: 'trailing' },
+];
+const trimmed = buildNativeHistory(badOrder);
+check('starts with user', trimmed.length > 0 && trimmed[0].role === 'user');
+check('ends with assistant', trimmed.length > 0 && trimmed[trimmed.length - 1].role === 'assistant');

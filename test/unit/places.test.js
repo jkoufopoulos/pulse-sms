@@ -159,8 +159,8 @@ console.log('\nSystem prompt places routing:');
 const { buildBrainSystemPrompt } = require('../../src/brain-llm');
 const prompt = buildBrainSystemPrompt({});
 check('prompt contains places routing', prompt.includes('bars') && prompt.includes('restaurants'));
-check('prompt contains "best bars" example', prompt.includes('best bars'));
-check('prompt contains places in examples', prompt.includes('Commodore') || prompt.includes('bars'));
+check('prompt mentions bars in tool descriptions or rules', prompt.includes('bars'));
+check('prompt does NOT have few-shot examples', !prompt.includes('Commodore'));
 
 // ---- Session mutual exclusion ----
 console.log('\nSession mutual exclusion:');

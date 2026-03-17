@@ -99,7 +99,7 @@ function addToHistory(phone, role, content, meta) {
   const session = sessions.get(phone) || sessions.get(hashPhone(phone));
   if (!session) return;
   if (!session.conversationHistory) session.conversationHistory = [];
-  const entry = { role, content: content.slice(0, 300) };
+  const entry = { role, content: content.slice(0, 480) };
   if (meta) entry.meta = meta;
   session.conversationHistory.push(entry);
   if (session.conversationHistory.length > MAX_HISTORY_TURNS) {

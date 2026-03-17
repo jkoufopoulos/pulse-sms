@@ -455,7 +455,7 @@ async function continueChat(chatSession, toolName, toolResult, options = {}) {
  * @returns {{ text: string, toolCalls: Array<{name, params, result}>, totalUsage: object, provider: string }}
  */
 async function runAgentLoop(model, systemPrompt, message, tools, executeTool, options = {}) {
-  const { maxIterations = 3, timeout = 15000, stopTools = [] } = options;
+  const { maxIterations = 3, timeout = 15000, stopTools = [], priorMessages = [] } = options;
   const provider = getProvider(model);
   const loopStart = Date.now();
   const toolCalls = [];
@@ -487,7 +487,12 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
       generationConfig: { maxOutputTokens: 1024, temperature: 0 },
     });
 
-    const chat = geminiModel.startChat();
+    const chat = geminiModel.startChat({
+      history: priorMessages.map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+      })),
+    });
 
     // First turn: send user message
     let result = await withTimeout(chat.sendMessage(message), remainingTimeout(), `agentLoop(${model})`);
@@ -546,7 +551,10 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
     const client = getAnthropicClient();
     const cachedSystem = [{ type: 'text', text: systemPrompt }];
     const cachedTools = toAnthropicToolsCached(tools);
-    const messages = [{ role: 'user', content: message }];
+    const messages = [
+      ...priorMessages.map(m => ({ role: m.role, content: m.content })),
+      { role: 'user', content: message },
+    ];
 
     for (let i = 0; i <= maxIterations; i++) {
       const response = await withTimeout(
