@@ -873,6 +873,22 @@ async function refreshSources(sourceNames, { reprocess = false } = {}) {
 
   console.log(`Refreshing ${targets.length} source(s): ${targets.map(s => s.label).join(', ')}`);
 
+  // Clear cached-events.json for targeted sources when reprocessing
+  if (reprocess) {
+    const fs = require('fs');
+    const path = require('path');
+    const cacheDirs = { nonsensenyc: 'nonsense', screenslate: 'screenslate', bkmag: 'bkmag' };
+    for (const t of targets) {
+      const dir = cacheDirs[normalize(t.label)];
+      if (!dir) continue;
+      const cacheFile = path.join(__dirname, `../data/${dir}/cached-events.json`);
+      if (fs.existsSync(cacheFile)) {
+        fs.unlinkSync(cacheFile);
+        console.log(`Cleared cache: ${cacheFile}`);
+      }
+    }
+  }
+
   // Fetch only the targeted sources — pass reprocess to Yutori if requested
   const results = await Promise.allSettled(
     targets.map(s => {
