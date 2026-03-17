@@ -1,12 +1,7 @@
-const Anthropic = require('@anthropic-ai/sdk');
+const { generate: llmGenerate } = require('./llm');
+const { MODELS } = require('./model-config');
 
-let client = null;
-function getClient() {
-  if (!client) client = new Anthropic();
-  return client;
-}
-
-const MODEL = process.env.PULSE_MODEL_EVAL || process.env.PULSE_MODEL_EXTRACT || 'claude-sonnet-4-5-20250929';
+const MODEL = MODELS.eval;
 const BATCH_SIZE = 15;
 
 const EVAL_SYSTEM = `You are an event quality evaluator for Pulse, an NYC event recommendation SMS bot.
@@ -46,7 +41,7 @@ Return STRICT JSON array — one object per event, in the same order as input:
 ]`;
 
 /**
- * Score a batch of events using Claude.
+ * Score a batch of events using the configured eval model.
  * Returns array of { event_id, score, flags, note } objects.
  */
 async function scoreEvents(events) {
@@ -76,15 +71,11 @@ async function scoreEvents(events) {
     const userPrompt = `Score these ${batch.length} events:\n\n${JSON.stringify(eventsForPrompt, null, 2)}`;
 
     try {
-      const response = await getClient().messages.create({
-        model: MODEL,
-        max_tokens: 4096,
-        system: EVAL_SYSTEM,
-        messages: [{ role: 'user', content: userPrompt }],
-      }, { timeout: 30000 });
+      const result = await llmGenerate(MODEL, EVAL_SYSTEM, userPrompt, {
+        maxTokens: 4096, temperature: 0, json: true, timeout: 30000,
+      });
 
-      const text = response.content?.[0]?.text || '';
-      const parsed = parseJsonArray(text);
+      const parsed = parseJsonArray(result.text);
 
       if (parsed) {
         return parsed;
@@ -112,7 +103,7 @@ async function scoreEvents(events) {
 }
 
 /**
- * Parse a JSON array from Claude's response text.
+ * Parse a JSON array from LLM response text.
  */
 function parseJsonArray(text) {
   // Try code fences first

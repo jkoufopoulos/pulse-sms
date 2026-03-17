@@ -155,7 +155,7 @@ function fixJsonNewlines(text) {
  * that the preprocessor strips.
  */
 async function extractYutoriEvents(content, filename) {
-  const model = process.env.PULSE_MODEL_YUTORI_EXTRACT || 'claude-haiku-4-5-20251001';
+  const model = process.env.PULSE_MODEL_YUTORI_EXTRACT || MODELS.extract;
   const dateMatch = filename.match(/^(\d{4}-\d{2}-\d{2})/);
   const emailDate = dateMatch ? dateMatch[1] : new Date().toISOString().slice(0, 10);
 

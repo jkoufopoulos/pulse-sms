@@ -121,11 +121,11 @@ Sources: 22 entries across 19 scraper modules in `sources/` — see `source-regi
 
 ## Env Vars
 
-Required: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`.
+Required: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `GEMINI_API_KEY`.
 
-Optional: `PORT` (default 3000), `PULSE_TEST_MODE=true` (enables simulator), `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`/`GMAIL_REFRESH_TOKEN` (newsletter scrapers), `RESEND_API_KEY`/`ALERT_EMAIL` (email alerts), `PULSE_NO_RATE_LIMIT=true`, `PULSE_NUDGES_ENABLED=true` (enables hourly recurrence nudge scheduler).
+Optional: `ANTHROPIC_API_KEY` (only needed if using Claude models), `PORT` (default 3000), `PULSE_TEST_MODE=true` (enables simulator), `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`/`GMAIL_REFRESH_TOKEN` (newsletter scrapers), `RESEND_API_KEY`/`ALERT_EMAIL` (email alerts), `PULSE_NO_RATE_LIMIT=true`, `PULSE_NUDGES_ENABLED=true` (enables hourly recurrence nudge scheduler).
 
-Model config (all optional, defaults in `src/model-config.js`): `PULSE_MODEL_BRAIN` (agent loop, default `claude-haiku-4-5-20251001`), `PULSE_MODEL_EXTRACT` (event extraction, default `claude-haiku-4-5-20251001`), `PULSE_MODEL_FALLBACK` (fallback for all roles, default `gemini-2.5-flash`). Provider auto-detected from model name prefix (`gemini-*` → Gemini, `claude-*` → Anthropic).
+Model config (all optional, defaults in `src/model-config.js`): `PULSE_MODEL_BRAIN` (agent loop, default `gemini-2.5-flash`), `PULSE_MODEL_EXTRACT` (event extraction, default `gemini-2.5-flash`), `PULSE_MODEL_EVAL` (evals and quality scoring, default `gemini-2.5-flash`), `PULSE_MODEL_FALLBACK` (fallback for all roles, default `gemini-2.5-flash`). Provider auto-detected from model name prefix (`gemini-*` → Gemini, `claude-*` → Anthropic).
 
 ## Running
 

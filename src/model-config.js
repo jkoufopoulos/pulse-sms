@@ -7,7 +7,8 @@
 
 const MODELS = {
   brain:    process.env.PULSE_MODEL_BRAIN    || 'gemini-2.5-flash',           // tool calling + SMS composition — Gemini stateful chat = system prompt sent once
-  extract:  process.env.PULSE_MODEL_EXTRACT  || 'claude-haiku-4-5-20251001', // event extraction — Claude excels at structured XML
+  extract:  process.env.PULSE_MODEL_EXTRACT  || 'gemini-2.5-flash',          // event extraction — Gemini while Claude rate-limited
+  eval:     process.env.PULSE_MODEL_EVAL     || 'gemini-2.5-flash',          // evals and quality scoring
   fallback: process.env.PULSE_MODEL_FALLBACK || 'gemini-2.5-flash',          // fallback — different provider for resilience
 };
 

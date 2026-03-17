@@ -147,8 +147,8 @@ const tier1Checks = {
 // ============================================================
 
 async function runLlmAudit(event, rawText) {
-  const Anthropic = require('@anthropic-ai/sdk');
-  const client = new Anthropic();
+  const { generate: llmGenerate } = require('../llm');
+  const { MODELS } = require('../model-config');
 
   const extracted = {
     name: event.name,
@@ -159,12 +159,9 @@ async function runLlmAudit(event, rawText) {
     category: event.category,
   };
 
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 512,
-    messages: [{
-      role: 'user',
-      content: `You are auditing an event extraction. Given the raw source text and extracted event fields, verify each field.
+  const systemPrompt = 'You are auditing an event extraction. Verify each extracted field against the raw source text.';
+
+  const userPrompt = `Given the raw source text and extracted event fields, verify each field.
 
 <raw_text>
 ${rawText.slice(0, 3000)}
@@ -179,11 +176,13 @@ For each field (name, venue_name, date_local, start_time_local, price_display, c
 - WRONG — the field doesn't match (include correction)
 - UNVERIFIABLE — can't determine from source text
 
-Respond as JSON: { "verdicts": { "name": { "status": "CORRECT|WRONG|UNVERIFIABLE", "note": "..." }, ... } }`,
-    }],
-  }, { timeout: 10000 });
+Respond as JSON: { "verdicts": { "name": { "status": "CORRECT|WRONG|UNVERIFIABLE", "note": "..." }, ... } }`;
 
-  const text = response.content?.[0]?.text || '';
+  const result = await llmGenerate(MODELS.eval, systemPrompt, userPrompt, {
+    maxTokens: 512, temperature: 0, json: true, timeout: 10000,
+  });
+
+  const text = result.text;
   try {
     const match = text.match(/\{[\s\S]*\}/);
     if (match) return JSON.parse(match[0]);

@@ -59,7 +59,7 @@ async function searchTavilyEvents(neighborhood, { query: customQuery, minComplet
 
     if (!rawText.trim()) return EMPTY;
 
-    const extracted = await extractEvents(rawText, 'tavily', query, { model: 'claude-haiku-4-5-20251001' });
+    const extracted = await extractEvents(rawText, 'tavily', query);
     const events = (extracted.events || [])
       .map(raw => normalizeExtractedEvent(raw, 'tavily', 'search', 0.6))
       .filter(e => e.name && e.completeness >= minCompleteness);
@@ -149,7 +149,7 @@ async function fetchTavilyFreeEvents() {
     if (!rawText.trim()) return [];
     captureExtractionInput('tavily', rawText, 'daily scrape');
 
-    const extracted = await extractEvents(rawText, 'tavily-free', 'daily scrape', { model: 'claude-haiku-4-5-20251001' });
+    const extracted = await extractEvents(rawText, 'tavily-free', 'daily scrape');
     const events = (extracted.events || [])
       .map(raw => {
         const e = normalizeExtractedEvent(raw, 'tavily', 'search', 0.6);
