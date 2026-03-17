@@ -3,17 +3,18 @@
  * Multi-turn scenario eval runner.
  *
  * Plays each scenario turn-by-turn through the live pipeline,
- * then uses Claude as a judge to grade the actual conversation
- * against expected_behavior and failure_modes.
+ * then uses Gemini Flash as a judge to grade the actual conversation
+ * against expected_behavior and failure_modes. Judge is ON by default.
  *
  * Usage:
- *   node scripts/run-scenario-evals.js                            # Run all
+ *   node scripts/run-scenario-evals.js                            # Run all (with judge)
+ *   node scripts/run-scenario-evals.js --no-judge                 # Disable LLM judge (code evals only)
  *   node scripts/run-scenario-evals.js --category happy_path      # Filter by category
  *   node scripts/run-scenario-evals.js --difficulty must_pass     # Filter by difficulty tier
  *   node scripts/run-scenario-evals.js --name "quiet"             # Name match
  *   node scripts/run-scenario-evals.js --url http://...           # Custom server
  *   node scripts/run-scenario-evals.js --concurrency 15          # Parallel scenarios (default: 10)
- *   node scripts/run-scenario-evals.js --judge                   # Enable LLM judge (off by default)
+ *   node scripts/run-scenario-evals.js --cost-report              # Show per-intent cost breakdown
  *   node scripts/run-scenario-evals.js --pipeline agent_brain    # Run agent brain scenarios
  *   node scripts/run-scenario-evals.js --model gemini-2.5-flash  # Override brain model
  */
@@ -46,7 +47,7 @@ const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'gemini-2.5-flash';
 const BUDGET_LIMIT = parseFloat(args.find(a => a.startsWith('--budget='))?.split('=')[1]
   || (args.includes('--budget') ? args[args.indexOf('--budget') + 1] : null)
   || '2.00');
-const NO_JUDGE = !args.includes('--judge');
+const NO_JUDGE = args.includes('--no-judge');
 const pipelineFilter = args.find(a => a.startsWith('--pipeline='))?.split('=')[1]
   || (args.includes('--pipeline') ? args[args.indexOf('--pipeline') + 1] : null);
 

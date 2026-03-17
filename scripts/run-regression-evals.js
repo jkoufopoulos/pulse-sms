@@ -38,7 +38,7 @@ const CONCURRENCY = parseInt(
 const BRAIN_MODEL = args.find(a => a.startsWith('--model='))?.split('=')[1]
   || (args.includes('--model') ? args[args.indexOf('--model') + 1] : null);
 const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'gemini-2.5-flash';
-const NO_JUDGE = !args.includes('--judge');
+const NO_JUDGE = args.includes('--no-judge');
 
 const PRICING = {
   'gemini-2.5-flash': { input: 0.15 / 1_000_000, output: 0.60 / 1_000_000 },
