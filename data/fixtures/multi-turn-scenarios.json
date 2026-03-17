@@ -10826,6 +10826,49 @@
         "Error",
         "No response"
       ]
+    },
+    {
+      "name": "Nudge: timing edge — event already started",
+      "category": "edge_case",
+      "difficulty": "stretch",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Nudge scheduler should not send nudges for events that have already started",
+      "expected_behavior": "System returns normal picks. Nudge timing is tested at the scheduler level, not user-facing.",
+      "failure_modes": [
+        "System crashes when checking nudge timing"
+      ]
+    },
+    {
+      "name": "Nudge: timing edge — no time data on pattern",
+      "category": "edge_case",
+      "difficulty": "stretch",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Nudge system handles patterns with no time_local gracefully",
+      "expected_behavior": "Normal operation. Nudge message uses \"tonight\" as fallback when no time available.",
+      "failure_modes": [
+        "Crash on null time_local",
+        "Nudge message with undefined time"
+      ]
     }
   ]
 }

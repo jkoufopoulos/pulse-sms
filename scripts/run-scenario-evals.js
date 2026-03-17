@@ -544,6 +544,32 @@ async function main() {
     }
   }
 
+  // AI cost breakdown (from trace data in scenarios)
+  if (args.includes('--cost-report')) {
+    const costByIntent = {};
+    let totalTraceCost = 0;
+    let traceCount = 0;
+    for (const s of report.scenarios) {
+      for (const turn of (s.actual_conversation || [])) {
+        const cost = turn.trace_summary?.ai_cost_usd || turn.trace?.total_ai_cost_usd;
+        const intent = turn.trace_debug?.output_intent || turn.trace_summary?.intent || 'unknown';
+        if (cost) {
+          if (!costByIntent[intent]) costByIntent[intent] = { total: 0, count: 0 };
+          costByIntent[intent].total += cost;
+          costByIntent[intent].count++;
+          totalTraceCost += cost;
+          traceCount++;
+        }
+      }
+    }
+    if (traceCount > 0) {
+      console.log(`\nAI Cost Report (${traceCount} traces, $${totalTraceCost.toFixed(4)} total):`);
+      for (const [intent, data] of Object.entries(costByIntent).sort((a, b) => b[1].total - a[1].total)) {
+        console.log(`  ${intent}: $${data.total.toFixed(4)} (${data.count} calls, $${(data.total / data.count).toFixed(4)}/call)`);
+      }
+    }
+  }
+
   // Failure details
   const failures = report.scenarios.filter(s => !s.pass && !s.error);
   if (failures.length > 0) {

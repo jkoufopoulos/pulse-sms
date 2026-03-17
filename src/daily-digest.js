@@ -8,13 +8,14 @@ const { getRecentAlerts } = require('./alerts');
  * Green: all ok. Yellow: 1-2 issues. Red: >5 issues or user-facing errors.
  * With 22 sources, 1-2 having a rough day is normal variation.
  */
-function computeDigestStatus({ sourcesBelow, cacheDrop, userFacingErrors, latencyP95 }) {
+function computeDigestStatus({ sourcesBelow, cacheDrop, userFacingErrors, latencyP95, costSpike }) {
   if (userFacingErrors > 0) return 'red';
   if (cacheDrop > 40) return 'red';
   if (sourcesBelow.length > 5) return 'red';
   if (sourcesBelow.length > 0) return 'yellow';
   if (cacheDrop > 20) return 'yellow';
   if (latencyP95 > 5000) return 'yellow';
+  if (costSpike) return 'yellow';
   return 'green';
 }
 
@@ -151,7 +152,11 @@ function generateDigest(eventCache, scrapeStats) {
   const avgCost = costs.length > 0 ? costs.reduce((s, c) => s + c, 0) / costs.length : 0;
   const totalCost = costs.reduce((s, c) => s + c, 0);
 
-  const status = computeDigestStatus({ sourcesBelow, cacheDrop, userFacingErrors, latencyP95 });
+  // Cost spike detection: baseline is $0.001/request (Gemini Flash typical)
+  const COST_BASELINE = 0.001;
+  const costSpike = avgCost > COST_BASELINE * 2;
+
+  const status = computeDigestStatus({ sourcesBelow, cacheDrop, userFacingErrors, latencyP95, costSpike });
   const activeSourceCount = sourceData.filter(s => s.count > 0).length;
 
   const report = {
@@ -185,6 +190,7 @@ function generateDigest(eventCache, scrapeStats) {
       avg_per_request: parseFloat(avgCost.toFixed(4)),
       total_recent: parseFloat(totalCost.toFixed(4)),
       trace_count: costs.length,
+      spike: costSpike,
     },
   };
 
@@ -226,7 +232,8 @@ function formatDigestEmail(report) {
   }
 
   if (report.ai_cost) {
-    lines.push(`AI Cost: $${report.ai_cost.avg_per_request.toFixed(4)}/request avg | $${report.ai_cost.total_recent.toFixed(2)} total (${report.ai_cost.trace_count} traces)`);
+    const spikeTag = report.ai_cost.spike ? ' ⚠ COST SPIKE (>2x baseline)' : '';
+    lines.push(`AI Cost: $${report.ai_cost.avg_per_request.toFixed(4)}/request avg | $${report.ai_cost.total_recent.toFixed(2)} total (${report.ai_cost.trace_count} traces)${spikeTag}`);
     lines.push('');
   }
 

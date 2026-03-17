@@ -141,5 +141,26 @@
       { "user": "anything earlier?" }
     ],
     "_note": "Profile: 5 sessions, timePreference: early, top categories: art/film. Agent should lean toward earlier events."
+  },
+  {
+    "name": "bars: dive bar crawl",
+    "turns": [
+      { "user": "best dive bars in bushwick" },
+      { "user": "tell me about the first one" }
+    ]
+  },
+  {
+    "name": "bars: date night dinner + show",
+    "turns": [
+      { "user": "dinner and a show in williamsburg" },
+      { "user": "tell me more about the restaurant" }
+    ]
+  },
+  {
+    "name": "bars: cocktail spot",
+    "turns": [
+      { "user": "cocktail bars in les" },
+      { "user": "more" }
+    ]
   }
 ]
