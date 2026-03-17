@@ -85,8 +85,9 @@ async function fetchNonsenseNYC() {
 
     const latest = emails[0];
 
-    // If the latest newsletter is already cached, return cached events
-    if (cached && cached.id === latest.id) {
+    // If the latest newsletter is already cached with events, return them
+    // (skip cache if 0 events — likely a previous extraction failure)
+    if (cached && cached.id === latest.id && cached.events.length > 0) {
       console.log(`NonsenseNYC: returning ${cached.events.length} cached events from "${latest.subject}"`);
       return cached.events;
     }
