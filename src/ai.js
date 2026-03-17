@@ -45,11 +45,15 @@ Extract all events and venues into the JSON format specified in your instruction
     return { events: [], _usage: usage || null, _provider: provider };
   }
 
-  const events = Array.isArray(parsed.events) ? parsed.events
+  let events = Array.isArray(parsed.events) ? parsed.events
     : Array.isArray(parsed.venues) ? parsed.venues
     : Array.isArray(parsed) ? parsed
     : [];
-  if (!Array.isArray(parsed.events) && events.length > 0) {
+  // Gemini sometimes returns a bare event object instead of {events: [...]}
+  if (events.length === 0 && parsed.name && parsed.venue_name) {
+    events = [parsed];
+    console.warn(`extractEvents (${provider}): bare event object, wrapping in array`);
+  } else if (!Array.isArray(parsed.events) && events.length > 0) {
     console.warn(`extractEvents (${provider}): non-standard shape, found ${events.length} events`);
   }
   return { events, _usage: usage || null, _provider: provider };

@@ -9,7 +9,7 @@ const { stripHtml } = require('./shared');
 
 const SCREENSLATE_DIR = path.join(__dirname, '../../data/screenslate');
 const CACHE_FILE = path.join(SCREENSLATE_DIR, 'cached-events.json');
-const EXTRACT_BUDGET_MS = 45000; // bail before the 60s global timeout
+const EXTRACT_BUDGET_MS = 120000; // allow time for Gemini fallback (slower than Claude)
 
 /**
  * Load cached events from a previously processed newsletter.
