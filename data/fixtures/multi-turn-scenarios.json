@@ -10030,6 +10030,454 @@
         "Filter not applied — returns non-comedy events",
         "Details fail after exhaustion + pivot"
       ]
+    },
+    {
+      "name": "Filter persistence: comedy survives neighborhood switch",
+      "category": "filter_drift",
+      "difficulty": "must_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "comedy in bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "comedy picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "try williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "comedy picks in williamsburg",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Category filter persists when user switches neighborhood",
+      "expected_behavior": "Turn 1: comedy picks in Bushwick. Turn 2: comedy picks in Williamsburg — filter should persist.",
+      "failure_modes": [
+        "Comedy filter dropped on neighborhood switch",
+        "Returns generic williamsburg picks without comedy filter"
+      ]
+    },
+    {
+      "name": "Filter persistence: free filter survives more",
+      "category": "filter_drift",
+      "difficulty": "must_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "free stuff in east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "free picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "more free picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Free filter persists through MORE requests",
+      "expected_behavior": "Turn 1: free events in EV. Turn 2: more free events — free filter should persist.",
+      "failure_modes": [
+        "Free filter dropped on MORE",
+        "Returns paid events after MORE"
+      ]
+    },
+    {
+      "name": "Filter persistence: time filter survives more",
+      "category": "filter_drift",
+      "difficulty": "should_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "late night bushwick after 10pm"
+        },
+        {
+          "sender": "pulse",
+          "message": "late picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "more late picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Time filter persists through MORE requests",
+      "expected_behavior": "Turn 1: late-night Bushwick events. Turn 2: more late-night events — time filter should persist.",
+      "failure_modes": [
+        "Time filter dropped on MORE",
+        "Returns early events after MORE"
+      ]
+    },
+    {
+      "name": "Filter persistence: compound filter survives neighborhood switch",
+      "category": "filter_drift",
+      "difficulty": "should_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "free comedy in les"
+        },
+        {
+          "sender": "pulse",
+          "message": "free comedy picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "how about east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "free comedy in ev",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Compound filter (free + comedy) persists on neighborhood switch",
+      "expected_behavior": "Both free_only and comedy category should persist when switching from LES to East Village.",
+      "failure_modes": [
+        "One or both filters dropped",
+        "Returns paid or non-comedy events in EV"
+      ]
+    },
+    {
+      "name": "Filter persistence: explicit filter removal works",
+      "category": "filter_drift",
+      "difficulty": "must_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "comedy in bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "comedy picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "forget the comedy, what else is happening"
+        },
+        {
+          "sender": "pulse",
+          "message": "general picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "User explicitly removes filter — system should clear it",
+      "expected_behavior": "Turn 1: comedy picks. Turn 2: general picks in Bushwick, comedy filter removed.",
+      "failure_modes": [
+        "Comedy filter persists despite explicit removal",
+        "System ignores the removal request"
+      ]
+    },
+    {
+      "name": "Filter persistence: category replace not stack",
+      "category": "filter_drift",
+      "difficulty": "should_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "comedy in east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "comedy picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "actually jazz"
+        },
+        {
+          "sender": "pulse",
+          "message": "jazz picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "User switches category — new category replaces old, does not stack",
+      "expected_behavior": "Turn 1: comedy picks in EV. Turn 2: jazz picks in EV. Comedy filter replaced by jazz.",
+      "failure_modes": [
+        "Both comedy and jazz filters active",
+        "Jazz filter ignored, still showing comedy"
+      ]
+    },
+    {
+      "name": "Filter persistence: 3-turn filter chain",
+      "category": "filter_drift",
+      "difficulty": "should_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "jazz in west village"
+        },
+        {
+          "sender": "pulse",
+          "message": "jazz picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "more jazz",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "try east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "jazz in ev",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Filter persists through MORE then through neighborhood switch",
+      "expected_behavior": "Jazz filter survives both MORE and neighborhood switch. All 3 turns show jazz events.",
+      "failure_modes": [
+        "Jazz filter dropped at MORE",
+        "Jazz filter dropped at neighborhood switch"
+      ]
+    },
+    {
+      "name": "Filter persistence: free filter explicit removal",
+      "category": "filter_drift",
+      "difficulty": "should_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "free events in bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "free picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "drop the free filter"
+        },
+        {
+          "sender": "pulse",
+          "message": "all picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "User explicitly removes free filter",
+      "expected_behavior": "Turn 1: free events. Turn 2: all events including paid — free filter cleared.",
+      "failure_modes": [
+        "Free filter persists despite removal request",
+        "System confused by removal"
+      ]
+    },
+    {
+      "name": "Filter persistence: more then details preserves context",
+      "category": "filter_drift",
+      "difficulty": "should_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "comedy in williamsburg"
+        },
+        {
+          "sender": "pulse",
+          "message": "comedy picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "tell me about the first one"
+        },
+        {
+          "sender": "pulse",
+          "message": "details",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "more comedy picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Filters persist through details request and subsequent MORE",
+      "expected_behavior": "Comedy filter active on turn 1, detail on turn 2, more comedy on turn 3.",
+      "failure_modes": [
+        "Comedy filter dropped after details",
+        "MORE returns generic non-comedy picks"
+      ]
+    },
+    {
+      "name": "Filter persistence: vibe filter on neighborhood switch",
+      "category": "filter_drift",
+      "difficulty": "stretch",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "something chill in east village"
+        },
+        {
+          "sender": "pulse",
+          "message": "chill picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "how about west village"
+        },
+        {
+          "sender": "pulse",
+          "message": "chill west village picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Vibe filter (chill) persists on neighborhood switch",
+      "expected_behavior": "Chill vibe interpreted as mellow categories. Persist when switching to West Village.",
+      "failure_modes": [
+        "Vibe lost on switch — returns high-energy events",
+        "Asks what they want again"
+      ]
+    },
+    {
+      "name": "Profile: returning user gets personalized greeting",
+      "category": "happy_path",
+      "difficulty": "should_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "hey"
+        },
+        {
+          "sender": "pulse",
+          "message": "personalized greeting or search",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Returning user with profile gets a personalized response, not generic intro",
+      "expected_behavior": "Agent should recognize returning user and either search directly or greet with context. Should NOT ask \"what are you looking for?\" generically if profile has clear preferences.",
+      "failure_modes": [
+        "Treats returning user as brand new",
+        "Ignores profile entirely",
+        "Over-personalizes creepily"
+      ]
+    },
+    {
+      "name": "Profile: agent references favorite neighborhood naturally",
+      "category": "happy_path",
+      "difficulty": "stretch",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "tonight"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks response",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Agent uses profile neighborhood preference to guide search when user is vague",
+      "expected_behavior": "When user says \"tonight\" with no neighborhood, agent should lean toward their favorite areas from profile rather than asking which neighborhood.",
+      "failure_modes": [
+        "Asks which neighborhood despite clear profile preference",
+        "Hallucinates preferences not in profile"
+      ]
+    },
+    {
+      "name": "Profile: agent does not over-personalize for new area",
+      "category": "edge_case",
+      "difficulty": "should_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "fort greene"
+        },
+        {
+          "sender": "pulse",
+          "message": "fort greene picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "User with profile exploring new neighborhood — agent should not force old preferences",
+      "expected_behavior": "Return Fort Greene events without forcing user profile categories. The user is exploring.",
+      "failure_modes": [
+        "Only shows jazz because profile likes jazz",
+        "Says \"you usually like Bushwick\" inappropriately"
+      ]
+    },
+    {
+      "name": "Profile: blank profile treated as new user",
+      "category": "happy_path",
+      "difficulty": "must_pass",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "hey"
+        },
+        {
+          "sender": "pulse",
+          "message": "intro greeting",
+          "assert": "exists"
+        }
+      ],
+      "testing": "New user with no profile gets standard greeting, no hallucinated preferences",
+      "expected_behavior": "Standard Pulse intro — \"I'm Pulse, your NYC nightlife guide\" or similar. No mention of preferences.",
+      "failure_modes": [
+        "Hallucinated preferences for new user",
+        "References non-existent history"
+      ]
+    },
+    {
+      "name": "Profile: category preference used for vague request",
+      "category": "happy_path",
+      "difficulty": "stretch",
+      "turns": [
+        {
+          "sender": "user",
+          "message": "bushwick"
+        },
+        {
+          "sender": "pulse",
+          "message": "picks",
+          "assert": "exists"
+        },
+        {
+          "sender": "user",
+          "message": "more"
+        },
+        {
+          "sender": "pulse",
+          "message": "more picks",
+          "assert": "exists"
+        }
+      ],
+      "testing": "Agent uses category preferences from profile to weight picks for vague requests",
+      "expected_behavior": "When user just says a neighborhood, agent may lean toward profile categories in pick selection without explicitly mentioning it.",
+      "failure_modes": [
+        "Explicitly says \"since you like jazz\" when user did not mention jazz",
+        "Ignores profile entirely — same as new user"
+      ]
     }
   ]
 }

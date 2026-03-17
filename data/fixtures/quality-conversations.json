@@ -100,5 +100,46 @@
     "turns": [
       { "user": "anything happening tomorrow afternoon" }
     ]
+  },
+  {
+    "name": "returning user: jazz regular",
+    "turns": [
+      { "user": "west village" },
+      { "user": "tell me about the jazz one" },
+      { "user": "thanks" }
+    ],
+    "_note": "Profile: 12 sessions, top neighborhoods: west_village/east_village, top categories: jazz/live_music, timePreference: late. Agent should reference preferences naturally."
+  },
+  {
+    "name": "returning user: bushwick nightlife fan",
+    "turns": [
+      { "user": "tonight" },
+      { "user": "more" }
+    ],
+    "_note": "Profile: 8 sessions, top neighborhoods: bushwick/williamsburg, top categories: nightlife/dj, pricePreference: any. Agent should lean toward familiar areas and categories."
+  },
+  {
+    "name": "returning user: free event hunter",
+    "turns": [
+      { "user": "les" },
+      { "user": "how about greenpoint" }
+    ],
+    "_note": "Profile: 6 sessions, top neighborhoods: les/greenpoint, pricePreference: free. Agent should naturally surface free events or acknowledge price preference."
+  },
+  {
+    "name": "returning user: tries new neighborhood",
+    "turns": [
+      { "user": "fort greene" },
+      { "user": "tell me about the first one" }
+    ],
+    "_note": "Profile: 10 sessions, top neighborhoods: bushwick/williamsburg, top categories: comedy/live_music. User exploring outside their usual area. Agent should handle gracefully without over-personalizing."
+  },
+  {
+    "name": "returning user: early evening person",
+    "turns": [
+      { "user": "williamsburg tonight" },
+      { "user": "anything earlier?" }
+    ],
+    "_note": "Profile: 5 sessions, timePreference: early, top categories: art/film. Agent should lean toward earlier events."
   }
 ]
