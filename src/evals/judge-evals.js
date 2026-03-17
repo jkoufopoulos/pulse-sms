@@ -1,17 +1,12 @@
 /**
  * LLM-as-judge evals — binary judges for subjective quality checks.
  * Only run when explicitly requested (--judges flag) since they cost API calls.
+ * Uses provider-agnostic generate() from llm.js — works with Gemini or Anthropic.
  */
 
-const Anthropic = require('@anthropic-ai/sdk');
+const { generate } = require('../llm');
 
-let client = null;
-function getClient() {
-  if (!client) client = new Anthropic();
-  return client;
-}
-
-const MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-haiku-4-5-20251001';
+const MODEL = process.env.PULSE_MODEL_JUDGE || 'gemini-2.5-flash';
 
 /**
  * Judge: Does the SMS sound like a friend texting, not a bot?
@@ -24,9 +19,8 @@ async function judgeTone(trace) {
     return { name: 'judge_tone', pass: false, detail: 'empty SMS' };
   }
 
-  const prompt = `You are evaluating an SMS message from "Pulse", an NYC event recommendation bot that texts like a friend.
-
-SMS to evaluate:
+  const systemPrompt = 'You are evaluating SMS messages from an NYC event bot called Pulse that should sound like a friend texting.';
+  const userPrompt = `SMS to evaluate:
 "${sms}"
 
 Does this SMS sound like a real friend texting you about things to do tonight? It should feel warm, natural, and concise — not robotic, not overly formal, not like a newsletter or marketing email.
@@ -43,19 +37,10 @@ or
 FAIL: [one sentence explaining what makes it sound robotic]`;
 
   try {
-    const response = await getClient().messages.create({
-      model: MODEL,
-      max_tokens: 100,
-      messages: [{ role: 'user', content: prompt }],
-    }, { timeout: 10000 });
-
-    const text = (response.content?.[0]?.text || '').trim();
+    const result = await generate(MODEL, systemPrompt, userPrompt, { maxTokens: 100, temperature: 0, timeout: 10000 });
+    const text = (result.text || '').trim();
     const passed = text.toUpperCase().startsWith('PASS');
-    return {
-      name: 'judge_tone',
-      pass: passed,
-      detail: text,
-    };
+    return { name: 'judge_tone', pass: passed, detail: text };
   } catch (err) {
     return { name: 'judge_tone', pass: false, detail: `judge error: ${err.message}` };
   }
@@ -76,9 +61,8 @@ async function judgePickRelevance(trace) {
   const userMsg = trace.input_message;
   const sms = trace.output_sms || '';
 
-  const prompt = `You are evaluating whether an event recommendation bot picked relevant events.
-
-User's message: "${userMsg}"
+  const systemPrompt = 'You are evaluating whether an event recommendation bot picked relevant events.';
+  const userPrompt = `User's message: "${userMsg}"
 Requested neighborhood: ${hood || 'not specified'}
 Events picked: ${JSON.stringify(picks.map(p => ({ event_id: p.event_id, why: p.why })))}
 Bot's SMS response: "${sms}"
@@ -94,19 +78,10 @@ or
 FAIL: [one sentence explaining the mismatch]`;
 
   try {
-    const response = await getClient().messages.create({
-      model: MODEL,
-      max_tokens: 100,
-      messages: [{ role: 'user', content: prompt }],
-    }, { timeout: 10000 });
-
-    const text = (response.content?.[0]?.text || '').trim();
+    const result = await generate(MODEL, systemPrompt, userPrompt, { maxTokens: 100, temperature: 0, timeout: 10000 });
+    const text = (result.text || '').trim();
     const passed = text.toUpperCase().startsWith('PASS');
-    return {
-      name: 'judge_pick_relevance',
-      pass: passed,
-      detail: text,
-    };
+    return { name: 'judge_pick_relevance', pass: passed, detail: text };
   } catch (err) {
     return { name: 'judge_pick_relevance', pass: false, detail: `judge error: ${err.message}` };
   }
@@ -128,22 +103,14 @@ async function runJudgeEvals(trace) {
 /**
  * Judge: Head-to-head preference between two SMS responses to the same prompt.
  * Randomly assigns position A/B to control for position bias.
- * @param {string} userMessage - the user's original SMS
- * @param {string} neighborhood - the target neighborhood
- * @param {string} sms1 - first model's response
- * @param {string} sms2 - second model's response
- * @param {string} label1 - label for first model (e.g. 'sonnet')
- * @param {string} label2 - label for second model (e.g. 'haiku')
- * @returns {{ name: string, winner: string, confidence: string, detail: string, position_swapped: boolean }}
  */
 async function judgePreference(userMessage, neighborhood, sms1, sms2, label1, label2) {
-  // Randomly swap positions to control for position bias
   const swap = Math.random() < 0.5;
   const responseA = swap ? sms2 : sms1;
   const responseB = swap ? sms1 : sms2;
 
-  const prompt = `You are comparing two SMS responses from an NYC event recommendation bot called Pulse.
-Both responses were generated from the exact same event list and user request.
+  const systemPrompt = 'You are comparing two SMS responses from an NYC event recommendation bot called Pulse.';
+  const userPrompt = `Both responses were generated from the exact same event list and user request.
 
 User's message: "${userMessage}"
 Neighborhood: ${neighborhood || 'not specified'}
@@ -167,13 +134,8 @@ Respond with EXACTLY one line in this format:
 WINNER: A|B|TIE — [confidence: high|medium|low] — [one sentence explaining why]`;
 
   try {
-    const response = await getClient().messages.create({
-      model: MODEL,
-      max_tokens: 150,
-      messages: [{ role: 'user', content: prompt }],
-    }, { timeout: 10000 });
-
-    const text = (response.content?.[0]?.text || '').trim();
+    const result = await generate(MODEL, systemPrompt, userPrompt, { maxTokens: 150, temperature: 0, timeout: 10000 });
+    const text = (result.text || '').trim();
     const match = text.match(/WINNER:\s*(A|B|TIE)\s*[—-]\s*\[?confidence:\s*(high|medium|low)\]?\s*[—-]\s*(.*)/i);
 
     if (!match) {
@@ -184,7 +146,6 @@ WINNER: A|B|TIE — [confidence: high|medium|low] — [one sentence explaining w
     const confidence = match[2].toLowerCase();
     const reason = match[3].trim();
 
-    // Map position back to model label
     let winner;
     if (rawWinner === 'TIE') {
       winner = 'tie';

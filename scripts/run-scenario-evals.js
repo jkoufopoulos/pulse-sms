@@ -22,7 +22,7 @@ require('dotenv').config();
 
 const fs = require('fs');
 const path = require('path');
-const Anthropic = require('@anthropic-ai/sdk');
+const { generate } = require('../src/llm');
 const { runCodeEvals, runMultiTurnEvals } = require('../src/evals/code-evals');
 const { judgeTone, judgePickRelevance } = require('../src/evals/judge-evals');
 
@@ -42,7 +42,7 @@ const CONCURRENCY = parseInt(args.find(a => a.startsWith('--concurrency='))?.spl
   || (isRemote ? '5' : '10'), 10);
 const BRAIN_MODEL = args.find(a => a.startsWith('--model='))?.split('=')[1]
   || (args.includes('--model') ? args[args.indexOf('--model') + 1] : null);
-const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-haiku-4-5-20251001';
+const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'gemini-2.5-flash';
 const BUDGET_LIMIT = parseFloat(args.find(a => a.startsWith('--budget='))?.split('=')[1]
   || (args.includes('--budget') ? args[args.indexOf('--budget') + 1] : null)
   || '2.00');
@@ -50,12 +50,11 @@ const NO_JUDGE = !args.includes('--judge');
 const pipelineFilter = args.find(a => a.startsWith('--pipeline='))?.split('=')[1]
   || (args.includes('--pipeline') ? args[args.indexOf('--pipeline') + 1] : null);
 
-const client = new Anthropic();
-
-// Cost tracking for judge calls (Haiku pricing: $0.80/M input, $4/M output)
+// Cost tracking for judge calls
 const PRICING = {
   'claude-haiku-4-5-20251001': { input: 0.80 / 1_000_000, output: 4.0 / 1_000_000 },
   'claude-sonnet-4-5-20250929': { input: 3.0 / 1_000_000, output: 15.0 / 1_000_000 },
+  'gemini-2.5-flash': { input: 0.15 / 1_000_000, output: 0.60 / 1_000_000 },
 };
 let judgeCostTotal = 0;
 let budgetExceeded = false;
@@ -118,21 +117,17 @@ Grade each user turn's response and give an overall verdict.`;
 
   if (budgetExceeded) throw new Error(`Budget exceeded ($${judgeCostTotal.toFixed(2)}/$${BUDGET_LIMIT.toFixed(2)})`);
 
-  const response = await client.messages.create({
-    model: JUDGE_MODEL,
-    max_tokens: 1024,
-    system: JUDGE_SYSTEM,
-    messages: [{ role: 'user', content: prompt }],
-  }, { timeout: 15000 });
+  const result = await generate(JUDGE_MODEL, JUDGE_SYSTEM, prompt, { maxTokens: 1024, temperature: 0, timeout: 15000 });
 
   // Track judge cost
-  const pricing = PRICING[JUDGE_MODEL] || PRICING['claude-haiku-4-5-20251001'];
-  const cost = (response.usage?.input_tokens || 0) * pricing.input
-    + (response.usage?.output_tokens || 0) * pricing.output;
+  const pricing = PRICING[JUDGE_MODEL] || PRICING['gemini-2.5-flash'];
+  const usage = result.usage || {};
+  const cost = (usage.input_tokens || usage.promptTokenCount || 0) * pricing.input
+    + (usage.output_tokens || usage.candidatesTokenCount || 0) * pricing.output;
   judgeCostTotal += cost;
   if (judgeCostTotal >= BUDGET_LIMIT) budgetExceeded = true;
 
-  const text = response.content?.[0]?.text || '';
+  const text = result.text || '';
 
   // Parse JSON from response
   const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);

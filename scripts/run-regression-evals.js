@@ -20,7 +20,7 @@ require('dotenv').config();
 
 const fs = require('fs');
 const path = require('path');
-const Anthropic = require('@anthropic-ai/sdk');
+const { generate } = require('../src/llm');
 const { runCodeEvals } = require('../src/evals/code-evals');
 
 const args = process.argv.slice(2);
@@ -37,10 +37,13 @@ const CONCURRENCY = parseInt(
   || '5', 10);
 const BRAIN_MODEL = args.find(a => a.startsWith('--model='))?.split('=')[1]
   || (args.includes('--model') ? args[args.indexOf('--model') + 1] : null);
-const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'claude-haiku-4-5-20251001';
+const JUDGE_MODEL = process.env.PULSE_MODEL_JUDGE || 'gemini-2.5-flash';
 const NO_JUDGE = !args.includes('--judge');
 
-const client = new Anthropic();
+const PRICING = {
+  'gemini-2.5-flash': { input: 0.15 / 1_000_000, output: 0.60 / 1_000_000 },
+  'claude-haiku-4-5-20251001': { input: 0.80 / 1_000_000, output: 4.0 / 1_000_000 },
+};
 
 const JUDGE_SYSTEM = `You are a QA judge for Pulse, an SMS bot that recommends NYC events.
 
@@ -94,14 +97,9 @@ ${assertionList}
 
 Evaluate each assertion against the conversation. Return JSON with your verdict for each.`;
 
-  const response = await client.messages.create({
-    model: JUDGE_MODEL,
-    max_tokens: 2048,
-    system: JUDGE_SYSTEM,
-    messages: [{ role: 'user', content: prompt }],
-  }, { timeout: 30000 });
+  const result = await generate(JUDGE_MODEL, JUDGE_SYSTEM, prompt, { maxTokens: 2048, temperature: 0, timeout: 30000 });
 
-  const text = response.content?.[0]?.text || '';
+  const text = result.text || '';
 
   // Parse JSON from response
   const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
