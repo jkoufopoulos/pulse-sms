@@ -1,6 +1,10 @@
 const { setResponseState } = require('./session');
 const { filterByTimeAfter, getEventDate, isEventInDateRange } = require('./geo');
-const { VALID_CATEGORIES } = require('./evals/scrape-audit');
+const VALID_CATEGORIES = new Set([
+  'nightlife', 'live_music', 'comedy', 'theater', 'art', 'film',
+  'dance', 'community', 'music', 'food', 'trivia', 'tours',
+  'literature', 'market', 'other',
+]);
 
 /**
  * Apply event filters (free, category, time).

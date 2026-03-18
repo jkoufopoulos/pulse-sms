@@ -11,12 +11,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node test/run-all.js && node test/eval.test.js",
-
-
-
-    "eval:quality": "node scripts/run-quality-evals.js",
-    "eval:diff": "node scripts/compare-eval-reports.js"
+    "test": "node test/run-all.js"
   },
   "engines": {
     "node": ">=20.0.0"

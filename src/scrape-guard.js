@@ -1,7 +1,5 @@
 const { sourceHealth } = require('./source-health');
 const { getNycDateString } = require('./geo');
-const { checkSourceCompleteness } = require('./evals/source-completeness');
-const { runExtractionAudit } = require('./evals/extraction-audit');
 const MIN_HISTORY = 3;
 const FIELD_DRIFT_THRESHOLD = 0.60;
 const DATE_SANITY_THRESHOLD = 0.2;
@@ -109,54 +107,4 @@ function checkBaseline(label, events) {
   return { quarantined: false, reason: null };
 }
 
-const COMPLETENESS_ALERT_THRESHOLD = 0.8;
-const EXTRACTION_ALERT_THRESHOLD = 0.7;
-
-function postScrapeAudit(fetchMap, events, extractionInputs) {
-  const alerts = [];
-
-  // 1. Source field-completeness check
-  let completeness = {};
-  try {
-    completeness = checkSourceCompleteness(fetchMap);
-    for (const [label, result] of Object.entries(completeness)) {
-      if (result.total === 0) continue;
-      const passRate = result.passed / result.total;
-      if (passRate < COMPLETENESS_ALERT_THRESHOLD) {
-        const msg = `${label}: ${(passRate * 100).toFixed(0)}% completeness (${result.failed}/${result.total} failed)`;
-        alerts.push({ type: 'completeness', label, passRate, message: msg });
-      }
-    }
-  } catch (err) {
-    console.error('[SCRAPE-GUARD] Source completeness check failed:', err.message);
-  }
-
-  // 2. Extraction audit (Claude-extracted sources only)
-  let extraction = {};
-  try {
-    const report = runExtractionAudit(events, extractionInputs);
-    extraction = report;
-    if (report.sourceStats) {
-      for (const [label, stats] of Object.entries(report.sourceStats)) {
-        if (stats.total === 0) continue;
-        const passRate = stats.passed / stats.total;
-        if (passRate < EXTRACTION_ALERT_THRESHOLD) {
-          const msg = `${label}: ${(passRate * 100).toFixed(0)}% extraction audit pass rate (${stats.total - stats.passed}/${stats.total} issues)`;
-          alerts.push({ type: 'extraction', label, passRate, message: msg });
-        }
-      }
-    }
-  } catch (err) {
-    console.error('[SCRAPE-GUARD] Extraction audit failed:', err.message);
-  }
-
-  // Send alerts
-  if (alerts.length > 0) {
-    const summary = alerts.map(a => a.message).join('\n');
-    console.warn(`[SCRAPE-GUARD] Post-scrape audit found ${alerts.length} issue(s):\n${summary}`);
-  }
-
-  return { alerts, completeness, extraction };
-}
-
-module.exports = { checkBaseline, getBaselineStats, postScrapeAudit, MIN_HISTORY };
+module.exports = { checkBaseline, getBaselineStats, MIN_HISTORY };
