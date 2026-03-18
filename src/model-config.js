@@ -9,7 +9,7 @@ const MODELS = {
   brain:    process.env.PULSE_MODEL_BRAIN    || 'claude-haiku-4-5-20251001', // tool calling + SMS composition
   extract:  process.env.PULSE_MODEL_EXTRACT  || 'claude-haiku-4-5-20251001', // event extraction
   eval:     process.env.PULSE_MODEL_EVAL     || 'claude-haiku-4-5-20251001', // evals and quality scoring
-  fallback: process.env.PULSE_MODEL_FALLBACK || 'gemini-2.5-flash',          // fallback — different provider for resilience
+  fallback: process.env.PULSE_MODEL_FALLBACK || 'claude-haiku-4-5-20251001',  // fallback — same provider, Anthropic only
 };
 
 function getProvider(modelName) {

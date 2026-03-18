@@ -686,14 +686,6 @@ async function refreshCache() {
       stampInteractionFormat(eventCache);
       remapOtherCategories(eventCache);
 
-      // LLM classification for remaining "other" events (non-fatal)
-      try {
-        const { classifyOtherEvents } = require('./enrichment');
-        await classifyOtherEvents(eventCache);
-      } catch (err) {
-        console.warn('[LLM-CLASSIFY] Classification failed (non-fatal):', err.message);
-      }
-
       cacheTimestamp = Date.now();
       console.log(`SQLite: ${validEvents.length} events stored, serving ${eventCache.length} (${dbEvents.length} scraped + ${freshOccurrences.length} recurring)`);
     } catch (err) {
@@ -727,55 +719,6 @@ async function refreshCache() {
       sourcesQuarantined,
     });
 
-    // Generate daily digest and email if yellow/red
-    try {
-      const { generateDigest } = require('./daily-digest');
-      const digest = generateDigest(eventCache, {
-        totalDurationMs: scrapeEnd - scrapeStart,
-        sourcesOk,
-        sourcesFailed,
-      });
-      const db = require('./db');
-      db.saveDigest(digest.id, digest.status, digest);
-      console.log(`Daily digest: ${digest.status} — ${digest.summary}`);
-
-      if (digest.status !== 'green') {
-        const { sendGraduatedAlert } = require('./alerts');
-        sendGraduatedAlert(digest).catch(err =>
-          console.error('[ALERT] Graduated alert failed:', err.message)
-        );
-      }
-    } catch (err) {
-      console.error('Daily digest generation failed:', err.message);
-    }
-
-    // Post-scrape audit: completeness + extraction quality checks with alerting
-    try {
-      const { postScrapeAudit } = require('./scrape-guard');
-      const auditResult = postScrapeAudit(fetchMap, validEvents, getExtractionInputs());
-      if (auditResult.extraction?.summary?.total > 0) {
-        console.log(`Extraction audit: ${auditResult.extraction.summary.passed}/${auditResult.extraction.summary.total} events pass (${auditResult.extraction.summary.passRate})`);
-        const reportsDir = path.join(__dirname, '../data/reports');
-        fs.mkdirSync(reportsDir, { recursive: true });
-        const reportFile = path.join(reportsDir, `extraction-audit-${new Date().toISOString().slice(0, 10)}.json`);
-        fs.writeFileSync(reportFile, JSON.stringify(auditResult.extraction, null, 2));
-      }
-    } catch (err) {
-      console.error('Post-scrape audit failed:', err.message);
-    }
-
-    // Run scrape audit (all sources — format, completeness, counts)
-    try {
-      const { runScrapeAudit } = require('./evals/scrape-audit');
-      const scrapeReport = runScrapeAudit(validEvents, fetchMap);
-      console.log(`Scrape audit: ${scrapeReport.summary.passRate} pass (${scrapeReport.summary.passed}/${scrapeReport.summary.total}), ${scrapeReport.summary.sourcesBelow} sources below minimum`);
-      const reportsDir = path.join(__dirname, '../data/reports');
-      fs.mkdirSync(reportsDir, { recursive: true });
-      const reportFile = path.join(reportsDir, `scrape-audit-${new Date().toISOString().slice(0, 10)}.json`);
-      fs.writeFileSync(reportFile, JSON.stringify(scrapeReport, null, 2));
-    } catch (err) {
-      console.error('Scrape audit failed:', err.message);
-    }
 
     saveHealthData();
     console.log(`Cache refreshed: ${validEvents.length} events (${totalRaw} raw, ${allEvents.length} deduped, ${staleCount} stale removed | ${sourcesOk} ok / ${sourcesFailed} failed / ${sourcesEmpty} empty)`);
@@ -1062,11 +1005,20 @@ function backfillNeighborhoodFromVenue(events) {
 /**
  * Quality-gate filter — shared between getEvents and getEventsCitywide.
  */
+// Editorial sources only — aggregator/listing sources (donyc, eventbrite, dice,
+// songkick, ticketmaster, ra, nyc_parks, etc.) are excluded from the pool.
+// Luma is kept for its rich descriptions and community context.
+const ALLOWED_SOURCES = new Set([
+  'theskint', 'nonsensenyc', 'yutori', 'ScreenSlate', 'screenslate',
+  'bkmag', 'Luma', 'luma',
+]);
+
 function applyQualityGates(events) {
   const upcoming = filterUpcomingEvents(events);
   backfillNeighborhoodFromVenue(upcoming);
   return filterIncomplete(
     upcoming.filter(e => {
+      if (!ALLOWED_SOURCES.has(e.source_name)) return false;
       if (e.needs_review === true) return false;
       if (e.extraction_confidence !== null && e.extraction_confidence !== undefined && e.extraction_confidence < 0.4) return false;
       if (isGarbageName(e.name)) return false;
@@ -1263,14 +1215,6 @@ function scheduleDailyScrape() {
   dailyTimer = setTimeout(async () => {
     try {
       await refreshCache();
-      // Post-scrape hook: proactive outreach
-      try {
-        const { processProactiveMessages } = require('./proactive');
-        const cache = getRawCache();
-        await processProactiveMessages(cache);
-      } catch (proactiveErr) {
-        console.error('[PROACTIVE] Post-scrape hook error:', proactiveErr.message);
-      }
     } catch (err) {
       console.error('Scheduled scrape failed:', err.message);
     }

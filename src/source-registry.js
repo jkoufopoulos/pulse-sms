@@ -1,4 +1,4 @@
-const { fetchSkintEvents, fetchSkintOngoingEvents, fetchEventbriteEvents, fetchSongkickEvents, fetchDiceEvents, fetchRAEvents, fetchNonsenseNYC, fetchDoNYCEvents, fetchBAMEvents, fetchNYPLEvents, fetchEventbriteComedy, fetchEventbriteArts, fetchNYCParksEvents, fetchBrooklynVeganEvents, fetchYutoriEvents, fetchScreenSlateEvents, fetchLumaEvents, fetchTinyCupboardEvents, fetchBrooklynCCEvents, fetchNYCTriviaEvents, fetchBKMagEvents, fetchSofarSoundsEvents } = require('./sources');
+const { fetchSkintEvents, fetchSkintOngoingEvents, fetchNonsenseNYC, fetchYutoriEvents, fetchScreenSlateEvents, fetchBKMagEvents, fetchLumaEvents } = require('./sources');
 
 // Source tier classification for compose prompt
 const SOURCE_TIERS = {
@@ -7,62 +7,25 @@ const SOURCE_TIERS = {
   NonsenseNYC: 'unstructured',
   Yutori: 'unstructured',
   ScreenSlate: 'unstructured',
-  RA: 'primary',
-  Dice: 'primary',
-  BrooklynVegan: 'primary',
-  BAM: 'primary',
-  // SmallsLIVE removed — single-venue jazz, low volume. Scraper preserved at sources/smallslive.js.
-  NYCParks: 'secondary',
-  DoNYC: 'secondary',
-  Songkick: 'secondary',
-  // Ticketmaster removed — 826 events, 70% Broadway/tourist theater. ~30 useful jazz/indie events
-  // don't justify the noise. Key venues (Birdland, Blue Note, Brooklyn Bowl) covered by other sources.
-  Eventbrite: 'secondary',
-  Luma: 'curated',
-  NYPL: 'secondary',
-  EventbriteComedy: 'secondary',
-  EventbriteArts: 'secondary',
-  TinyCupboard: 'secondary',
-  BrooklynCC: 'secondary',
-  NYCTrivia: 'secondary',
   BKMag: 'unstructured',
-  SofarSounds: 'secondary',
+  Luma: 'primary',
 };
 
 // ============================================================
-// Single source registry — everything derives from this array
+// Single source registry — editorial sources only
+// Listing-only scrapers removed to focus on sources with
+// genuine editorial context ("why this, why now"). Scraper
+// code preserved in sources/ if we need to re-enable.
 // ============================================================
 
 const SOURCES = [
   { label: 'Skint',            fetch: fetchSkintEvents,         weight: 0.9,  mergeRank: 0, endpoint: 'https://theskint.com', minExpected: 5, volatile: true, dbName: 'theskint' },
   { label: 'SkintOngoing',     fetch: fetchSkintOngoingEvents,  weight: 0.9,  mergeRank: 1, endpoint: 'https://theskint.com/ongoing-events/', minExpected: 10, volatile: true, dbName: 'theskint' },
   { label: 'NonsenseNYC',      fetch: fetchNonsenseNYC,         weight: 0.9,  mergeRank: 1, endpoint: 'https://nonsensenyc.com', minExpected: 10, volatile: true, channel: 'email' },
-  { label: 'RA',               fetch: fetchRAEvents,            weight: 0.85, mergeRank: 0, endpoint: 'https://ra.co', minExpected: 50 },
-  // OhMyRockness removed — 80% loss to dedup/quality gates, only 3 unique events surviving.
-  // Scraper still exists at sources/ohmyrockness.js if we want to re-enable.
-  { label: 'Dice',             fetch: fetchDiceEvents,          weight: 0.8,  mergeRank: 0, endpoint: 'https://dice.fm/browse/new_york-5bbf4db0f06331478e9b2c59', minExpected: 50 },
-  { label: 'BrooklynVegan',    fetch: fetchBrooklynVeganEvents, weight: 0.8,  mergeRank: 1, endpoint: 'https://www.brooklynvegan.com', minExpected: 10 },
-  { label: 'BAM',              fetch: fetchBAMEvents,           weight: 0.8,  mergeRank: 2, endpoint: 'https://www.bam.org/api/BAMApi/GetCalendarEventsByDayWithOnGoing', minExpected: 20 },
-  // SmallsLIVE removed — single-venue jazz, low volume. Scraper preserved at sources/smallslive.js.
-  { label: 'Yutori',            fetch: fetchYutoriEvents,        weight: 0.8,  mergeRank: 4, endpoint: null, minExpected: 20, volatile: true, channel: 'email' },
-  { label: 'ScreenSlate',      fetch: fetchScreenSlateEvents,   weight: 0.9,  mergeRank: 2, endpoint: null, minExpected: 5, channel: 'email' },
-  { label: 'NYCParks',         fetch: fetchNYCParksEvents,      weight: 0.75, mergeRank: 0, endpoint: 'https://www.nycgovparks.org/events', minExpected: 15, dbName: 'nyc_parks' },
-  { label: 'DoNYC',            fetch: fetchDoNYCEvents,         weight: 0.75, mergeRank: 1, endpoint: 'https://donyc.com/events/today', minExpected: 100 },
-  { label: 'Songkick',         fetch: fetchSongkickEvents,      weight: 0.75, mergeRank: 2, endpoint: 'https://www.songkick.com/metro-areas/7644-us-new-york/today', minExpected: 20 },
-  // Ticketmaster removed — 826 events, 70% Broadway/tourist. Birdland/Blue Note covered by Dice/Songkick.
-  // Scraper preserved at sources/ticketmaster.js. Re-enable if users request Broadway/theater.
-  { label: 'Luma',              fetch: fetchLumaEvents,          weight: 0.9,  mergeRank: 0, endpoint: 'https://api.lu.ma/discover/get-paginated-events', minExpected: 100 },
-  { label: 'Eventbrite',       fetch: fetchEventbriteEvents,    weight: 0.7,  mergeRank: 1, endpoint: 'https://www.eventbrite.com/d/ny--new-york/events--today/', minExpected: 10 },
-  { label: 'NYPL',             fetch: fetchNYPLEvents,          weight: 0.7,  mergeRank: 2, endpoint: 'https://www.eventbrite.com/o/new-york-public-library-for-the-performing-arts-5993389089', minExpected: 10 },
-  { label: 'EventbriteComedy', fetch: fetchEventbriteComedy,    weight: 0.7,  mergeRank: 3, endpoint: null, minExpected: 20 },
-  { label: 'EventbriteArts',   fetch: fetchEventbriteArts,      weight: 0.7,  mergeRank: 4, endpoint: null, minExpected: 10 },
-  { label: 'TinyCupboard',    fetch: fetchTinyCupboardEvents,  weight: 0.75, mergeRank: 5, endpoint: 'https://www.thetinycupboard.com/calendar', minExpected: 10 },
-  { label: 'BrooklynCC',      fetch: fetchBrooklynCCEvents,    weight: 0.75, mergeRank: 6, endpoint: 'https://www.brooklyncc.com/show-schedule', minExpected: 15 },
-  { label: 'NYCTrivia',       fetch: fetchNYCTriviaEvents,     weight: 0.75, mergeRank: 7, endpoint: 'https://nyctrivialeague.com/', minExpected: 50 },
-  { label: 'BKMag',           fetch: fetchBKMagEvents,         weight: 0.9,  mergeRank: 3, endpoint: 'https://www.bkmag.com', minExpected: 5, schedule: { days: ['fri', 'sat'] } },
-  { label: 'SofarSounds',    fetch: fetchSofarSoundsEvents,   weight: 0.8,  mergeRank: 4, endpoint: 'https://donyc.com/venues/sofar-sounds-secret-location', minExpected: 5 },
-  // Tavily removed entirely — daily scrape returns 0 events, hot-path fallback added 9-15s
-  // latency per request with 58% waste rate. All event data comes from the 18 scrapers above.
+  { label: 'Yutori',           fetch: fetchYutoriEvents,        weight: 0.9,  mergeRank: 2, endpoint: null, minExpected: 20, volatile: true, channel: 'email' },
+  { label: 'ScreenSlate',      fetch: fetchScreenSlateEvents,   weight: 0.9,  mergeRank: 3, endpoint: null, minExpected: 5, channel: 'email' },
+  { label: 'BKMag',            fetch: fetchBKMagEvents,         weight: 0.9,  mergeRank: 4, endpoint: 'https://www.bkmag.com', minExpected: 5, schedule: { days: ['fri', 'sat'] } },
+  { label: 'Luma',             fetch: fetchLumaEvents,          weight: 0.8,  mergeRank: 5, endpoint: 'https://lu.ma', minExpected: 10 },
 ];
 
 // Boot-time validation — fail fast on config errors

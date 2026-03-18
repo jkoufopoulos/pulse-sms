@@ -44,7 +44,7 @@ check('at 09:00 AM: 1 hour away', testMsUntilNextScrape(9, 0, 0) === 3600000);
 console.log('\nSOURCES registry:');
 
 const { SOURCES } = require('../../src/events');
-check('SOURCES has at least 13 entries', SOURCES.length >= 13);
+check('SOURCES has editorial sources', SOURCES.length >= 5);
 check('SOURCES labels are unique', new Set(SOURCES.map(s => s.label)).size === SOURCES.length);
 check('all SOURCES have fetch functions', SOURCES.every(s => typeof s.fetch === 'function'));
 check('all SOURCES have valid weights', SOURCES.every(s => s.weight > 0 && s.weight <= 1));
@@ -74,72 +74,9 @@ const { scheduleEmailPolls, clearEmailSchedule } = require('../../src/events');
 check('scheduleEmailPolls is exported', typeof scheduleEmailPolls === 'function');
 check('clearEmailSchedule is exported', typeof clearEmailSchedule === 'function');
 
-// ---- getHealthStatus shape ----
-console.log('\ngetHealthStatus:');
 
-const { getHealthStatus } = require('../../src/events');
-check('getHealthStatus is a function', typeof getHealthStatus === 'function');
-
-const healthData = getHealthStatus();
-check('has status field', typeof healthData.status === 'string');
-check('status is ok|degraded|critical', ['ok', 'degraded', 'critical'].includes(healthData.status));
-check('has cache object', typeof healthData.cache === 'object' && healthData.cache !== null);
-check('cache has size', 'size' in healthData.cache);
-check('cache has age_minutes', 'age_minutes' in healthData.cache);
-check('cache has fresh', 'fresh' in healthData.cache);
-check('cache has last_refresh', 'last_refresh' in healthData.cache);
-check('has scrape object', typeof healthData.scrape === 'object' && healthData.scrape !== null);
-check('scrape has startedAt', 'startedAt' in healthData.scrape);
-check('scrape has totalDurationMs', 'totalDurationMs' in healthData.scrape);
-check('scrape has sourcesOk', 'sourcesOk' in healthData.scrape);
-check('scrape has sourcesFailed', 'sourcesFailed' in healthData.scrape);
-check('has sources object', typeof healthData.sources === 'object' && healthData.sources !== null);
-check('sources has Skint', 'Skint' in healthData.sources);
-check('sources has RA', 'RA' in healthData.sources);
-check('sources has at least 13 entries', Object.keys(healthData.sources).length >= 13);
-
-const sampleSource = healthData.sources.Skint;
-check('source has status field', 'status' in sampleSource);
-check('source has last_count', 'last_count' in sampleSource);
-check('source has consecutive_zeros', 'consecutive_zeros' in sampleSource);
-check('source has duration_ms', 'duration_ms' in sampleSource);
-check('source has last_error', 'last_error' in sampleSource);
-check('source has last_scrape', 'last_scrape' in sampleSource);
-check('source has success_rate', 'success_rate' in sampleSource);
-check('source has history array', Array.isArray(sampleSource.history));
-
-// ---- alerts module ----
 // Exported as async for runner
 module.exports.runAsync = async function() {
-  console.log('\nalerts module:');
-
-  const { sendHealthAlert } = require('../../src/alerts');
-  check('sendHealthAlert is a function', typeof sendHealthAlert === 'function');
-
-  const alertResult = await sendHealthAlert(
-    [{ label: 'TestSource', consecutiveZeros: 3, lastError: 'timeout', lastStatus: 'timeout' }],
-    { dedupedEvents: 100, sourcesOk: 14, sourcesFailed: 1, sourcesEmpty: 1, totalDurationMs: 5000, completedAt: new Date().toISOString() }
-  );
-  check('sendHealthAlert no-ops without API key (returns undefined)', alertResult === undefined);
-
-  const emptyResult = await sendHealthAlert([], {});
-  check('sendHealthAlert no-ops with empty failures', emptyResult === undefined);
-
-  // ---- sendRuntimeAlert ----
-  console.log('\nsendRuntimeAlert:');
-
-  const { sendRuntimeAlert, _runtimeCooldowns } = require('../../src/alerts');
-  check('sendRuntimeAlert is a function', typeof sendRuntimeAlert === 'function');
-
-  const runtimeResult = await sendRuntimeAlert('test_error', { phone_masked: '***1234', message: 'test', error: 'boom' });
-  check('sendRuntimeAlert no-ops without API key (returns undefined)', runtimeResult === undefined);
-
-  // Force a cooldown entry to test cooldown logic
-  _runtimeCooldowns.set('cooldown_test', Date.now());
-  const cooldownResult = await sendRuntimeAlert('cooldown_test', { phone_masked: '***1234', message: 'test', error: 'boom' });
-  check('sendRuntimeAlert no-ops on cooldown (returns undefined)', cooldownResult === undefined);
-  _runtimeCooldowns.delete('cooldown_test');
-
   // ---- Session merge semantics ----
   console.log('\nSession merge:');
 

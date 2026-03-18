@@ -14,7 +14,7 @@
 
 const { runAgentLoop, generate } = require('./llm');
 const { MODELS } = require('./model-config');
-const { BRAIN_TOOLS, buildBrainSystemPrompt, buildProfileSummary, buildNativeHistory, serializePoolForContinuation, cleanEventName } = require('./brain-llm');
+const { BRAIN_TOOLS, buildBrainSystemPrompt, buildNativeHistory, serializePoolForContinuation, cleanEventName } = require('./brain-llm');
 const { serializePlacePoolForContinuation } = require('./places');
 const { searchPlaces } = require('./places');
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || '';
@@ -24,7 +24,6 @@ const { sendSMS, maskPhone } = require('./twilio');
 const { recordAICost } = require('./traces');
 const { getSession, setSession, addToHistory, hashPhone } = require('./session');
 const { trackAICost } = require('./request-guard');
-const { updateProfile } = require('./preference-profile');
 const { smartTruncate } = require('./formatters');
 const { lookupVenueProfile } = require('./venues');
 const { sendRuntimeAlert } = require('./alerts');
@@ -575,22 +574,6 @@ function saveSessionFromToolCalls(phone, session, toolCalls, smsText) {
     } catch (err) {
       console.warn('engagement tracking failed:', err.message);
     }
-    try {
-      const { trackRecurringDetail } = require('./nudges');
-      for (const pick of (session?.lastPicks || [])) {
-        const event = session?.lastEvents?.[pick.event_id];
-        if (event?.is_recurring) {
-          const consentPrompt = trackRecurringDetail(phone, event);
-          if (consentPrompt) {
-            sendSMS(phone, consentPrompt).catch(err =>
-              console.warn('nudge consent SMS failed:', err.message)
-            );
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('nudge tracking failed:', err.message);
-    }
     return;
   }
 
@@ -707,16 +690,7 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
   if (!session) session = getSession(phone);
   addToHistory(phone, 'user', message);
 
-  // Check if we should prompt for proactive opt-in
-  const { shouldPromptOptIn } = require('./proactive');
-  const { getProfile } = require('./preference-profile');
-  const profile = getProfile(phone);
-  if (shouldPromptOptIn(profile)) {
-    session._proactivePrompt = true;
-  }
-
-  const systemPrompt = buildBrainSystemPrompt(session, profile);
-  trace.profile_summary = buildProfileSummary(profile);
+  const systemPrompt = buildBrainSystemPrompt(session);
 
   let smsSent = false;
   try {
@@ -824,12 +798,6 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     }
 
     finalizeTrace(smsText, intent);
-
-    // Increment proactive prompt count if we showed the CTA
-    if (session._proactivePrompt) {
-      const { incrementProactivePromptCount } = require('./preference-profile');
-      incrementProactivePromptCount(phone);
-    }
 
   } catch (err) {
     // If main SMS was already sent, don't send another — just log the post-send error

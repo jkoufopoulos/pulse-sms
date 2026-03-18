@@ -423,6 +423,24 @@ const VENUE_MAP = {
   'Paris Theater': { lat: 40.7642, lng: -73.9726 },
   'The Paris Theater': { lat: 40.7642, lng: -73.9726 },
 
+  // === Cultural Venues — Museums & Galleries ===
+  'Whitney Museum': { lat: 40.7396, lng: -74.0089 },
+  'Whitney Museum of American Art': { lat: 40.7396, lng: -74.0089 },
+  'Museum of Modern Art': { lat: 40.7614, lng: -73.9776 },
+  'MoMA': { lat: 40.7614, lng: -73.9776 },
+  'Museum of the Moving Image': { lat: 40.7564, lng: -73.9237 },
+  'RYAN LEE': { lat: 40.7465, lng: -74.0040 },
+  'Storefront for Art and Architecture': { lat: 40.7219, lng: -73.9960 },
+  'STOREFRONT FOR ART AND ARCHITECTURE': { lat: 40.7219, lng: -73.9960 },
+  'Luhring Augustine Chelsea': { lat: 40.7465, lng: -74.0050 },
+  'Luhring Augustine': { lat: 40.7465, lng: -74.0050 },
+  'New Museum': { lat: 40.7223, lng: -73.9927 },
+  'The Shed': { lat: 40.7538, lng: -74.0019 },
+  'Dia Chelsea': { lat: 40.7462, lng: -74.0064 },
+  'Dia Beacon': { lat: 41.5012, lng: -73.9691 },
+  'Guggenheim': { lat: 40.7830, lng: -73.9590 },
+  'Solomon R. Guggenheim Museum': { lat: 40.7830, lng: -73.9590 },
+
   // === Comedy Venues ===
   'The Tiny Cupboard': { lat: 40.6878, lng: -73.9181 },
   'Brooklyn Comedy Collective': { lat: 40.7109, lng: -73.9445 },

@@ -294,7 +294,8 @@ Return STRICT JSON:
         "location_quote": "exact text or null",
         "price_quote": "exact text or null"
       },
-      "editorial_note": "string or null",
+      "editorial_signal": "boolean, true if source highlights as pick/must-see",
+      "editorial_note": "string or null — if the source text includes a recommendation, opinion, or editorial take on why this event is worth attending, capture it verbatim or closely paraphrased (1-2 sentences, max 150 chars). Otherwise null.",
       "is_recurring": "boolean",
       "recurrence_day": "monday|tuesday|...|sunday or null",
       "recurrence_time": "HH:MM (24hr) or null"

@@ -333,9 +333,7 @@ async function buildSearchPool(params, session, phone, trace) {
   const { matchCount, hardCount, softCount, isSparse } = taggedResult;
 
   // 5b. Score and trim pool to top N for the model
-  const { getProfile } = require('./preference-profile');
-  const userProfile = getProfile(phone);
-  const { curatedPool: trimmedPool, fullScoredPool } = curatePool(taggedResult.pool, hood, { userProfile });
+  const { curatedPool: trimmedPool, fullScoredPool } = curatePool(taggedResult.pool, hood);
   events = trimmedPool;
 
   trace.events.sent_to_claude = events.length;

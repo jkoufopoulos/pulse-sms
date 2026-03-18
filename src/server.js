@@ -5,14 +5,10 @@ const helmet = require('helmet');
 const smsRoutes = require('./handler');
 const { clearSmsIntervals, getInflightCount } = require('./handler');
 const { refreshCache, getCacheStatus, getHealthStatus, getEventById, isCacheFresh, scheduleDailyScrape, clearSchedule, scheduleEmailPolls, clearEmailSchedule } = require('./events');
-const { loadProfiles } = require('./preference-profile');
-const { loadReferrals, clearReferralInterval } = require('./referral');
 const { loadSessions, flushSessions, clearSessionInterval } = require('./session');
-const { loadAlerts, getRecentAlerts } = require('./alerts');
-const { scheduleNudges, clearNudgeSchedule } = require('./nudges');
 
 // Validate required env vars — exit if critical ones are missing
-const required = ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER', 'ANTHROPIC_API_KEY', 'TAVILY_API_KEY'];
+const required = ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER'];
 const missing = required.filter(key => !process.env[key]);
 if (missing.length > 0) {
   console.error(`Fatal: missing required env vars: ${missing.join(', ')}`);
@@ -52,20 +48,6 @@ app.get('/health', (req, res) => {
     return res.sendFile(require('path').join(__dirname, 'health-ui.html'));
   }
   res.json(getHealthStatus());
-});
-
-// Alert history API — same auth gating as /health
-app.get('/api/alerts', (req, res) => {
-  const authToken = process.env.HEALTH_AUTH_TOKEN;
-  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
-  const hasValidToken = authToken && req.query.token === authToken;
-
-  if (!isTestMode && !hasValidToken) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-
-  const limit = Math.min(parseInt(req.query.limit) || 50, 100);
-  res.json(getRecentAlerts(limit));
 });
 
 // Cost summary API — same auth gating as /health
@@ -197,214 +179,12 @@ app.get('/api/health/traces/slow', (req, res) => {
 // SMS webhook
 app.use('/api/sms', smsRoutes);
 
-// Proactive outreach kill switches
-app.post('/api/proactive/pause', (req, res) => {
-  const { pauseProactive } = require('./proactive');
-  pauseProactive();
-  console.log('[PROACTIVE] Manually paused via API');
-  res.json({ status: 'paused' });
-});
-
-app.post('/api/proactive/resume', (req, res) => {
-  const { resumeProactive } = require('./proactive');
-  resumeProactive();
-  console.log('[PROACTIVE] Resumed via API');
-  res.json({ status: 'resumed' });
-});
-
 // Architecture explorer (read-only doc, always available)
 app.get('/architecture', (req, res) => {
   res.redirect(301, 'https://jkoufopoulos.github.io/pulse-sms/architecture.html');
 });
 
-// Eval report viewer (read-only, always available)
-app.get('/eval-report', (req, res) => {
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
-  res.sendFile(require('path').join(__dirname, 'eval-report.html'));
-});
 
-app.get('/eval-quality', (req, res) => {
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
-  res.sendFile(require('path').join(__dirname, 'eval-quality.html'));
-});
-
-// Eval report API — list available reports and serve report data
-const REPORT_PREFIXES = {
-  'scenario-eval-': 'scenario',
-  'regression-eval-': 'regression',
-  'extraction-audit-': 'extraction',
-  'scrape-audit-': 'scrape',
-  'quality-eval-': 'quality',
-};
-function getReportType(filename) {
-  for (const [prefix, type] of Object.entries(REPORT_PREFIXES)) {
-    if (filename.startsWith(prefix)) return type;
-  }
-  return null;
-}
-function isValidReportFilename(filename) {
-  return filename.endsWith('.json') && getReportType(filename) !== null;
-}
-
-app.get('/api/eval-reports', (req, res) => {
-  const reportsDir = require('path').join(__dirname, '..', 'data', 'reports');
-  const fs = require('fs');
-  if (!fs.existsSync(reportsDir)) return res.json([]);
-  const typeFilter = req.query.type || null;
-  const files = fs.readdirSync(reportsDir)
-    .filter(f => f.endsWith('.json') && getReportType(f) !== null)
-    .filter(f => !typeFilter || getReportType(f) === typeFilter)
-    .sort()
-    .reverse();
-  const summaries = files.map(f => {
-    try {
-      const data = JSON.parse(fs.readFileSync(require('path').join(reportsDir, f), 'utf8'));
-      const type = getReportType(f);
-      const base = { filename: f, type, timestamp: data.timestamp };
-      if (type === 'scenario') {
-        return { ...base, total: data.total, passed: data.passed, failed: data.failed, errors: data.errors, judge_model: data.judge_model, judge_cost: data.judge_cost, elapsed_seconds: data.elapsed_seconds, concurrency: data.concurrency, base_url: data.base_url, code_evals: data.code_evals };
-      }
-      if (type === 'regression') {
-        const scenarios = data.scenarios || [];
-        const passed = scenarios.filter(s => s.pass).length;
-        return { ...base, total: scenarios.length, passed, failed: scenarios.length - passed, principles: data.principles || [], elapsed_seconds: data.elapsed_seconds, base_url: data.base_url };
-      }
-      if (type === 'extraction') {
-        return { ...base, total: data.summary?.total, passed: data.summary?.passed, pass_rate: data.summary?.passRate, tier: data.tier };
-      }
-      if (type === 'scrape') {
-        return { ...base, total: data.summary?.total, passed: data.summary?.passed, pass_rate: data.summary?.passRate, sources_below: data.summary?.sourcesBelow };
-      }
-      if (type === 'quality') {
-        return { ...base, ...data.summary, judge_model: data.judge_model, judge_cost: data.judge_cost, elapsed_seconds: data.elapsed_seconds, base_url: data.base_url };
-      }
-      return base;
-    } catch { return null; }
-  }).filter(Boolean);
-  res.json(summaries);
-});
-
-app.get('/api/eval-reports/:filename', (req, res) => {
-  const fs = require('fs');
-  const filePath = require('path').join(__dirname, '..', 'data', 'reports', req.params.filename);
-  if (!isValidReportFilename(req.params.filename)) {
-    return res.status(400).json({ error: 'Invalid filename' });
-  }
-  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
-  res.sendFile(filePath);
-});
-
-// Eval report upload — accepts JSON report body, writes to data/reports/
-app.put('/api/eval-reports/:filename', (req, res) => {
-  const authToken = process.env.HEALTH_AUTH_TOKEN;
-  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
-  const hasValidToken = authToken && req.query.token === authToken;
-  if (!isTestMode && !hasValidToken) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-  const fs = require('fs');
-  const path = require('path');
-  const filename = req.params.filename;
-  if (!isValidReportFilename(filename)) {
-    return res.status(400).json({ error: 'Invalid filename' });
-  }
-  const reportsDir = path.join(__dirname, '..', 'data', 'reports');
-  if (!fs.existsSync(reportsDir)) fs.mkdirSync(reportsDir, { recursive: true });
-  fs.writeFileSync(path.join(reportsDir, filename), JSON.stringify(req.body, null, 2));
-  res.json({ ok: true, filename });
-});
-
-app.delete('/api/eval-reports/:filename', (req, res) => {
-  const authToken = process.env.HEALTH_AUTH_TOKEN;
-  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
-  const hasValidToken = authToken && req.query.token === authToken;
-  if (!isTestMode && !hasValidToken) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-  const fs = require('fs');
-  const path = require('path');
-  const filename = req.params.filename;
-  if (!isValidReportFilename(filename)) {
-    return res.status(400).json({ error: 'Invalid filename' });
-  }
-  const filePath = path.join(__dirname, '..', 'data', 'reports', filename);
-  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
-  fs.unlinkSync(filePath);
-  res.json({ ok: true, deleted: filename });
-});
-
-// Eval overrides API — human judge overrides for scenario verdicts
-app.get('/api/eval-overrides', (req, res) => {
-  const fs = require('fs');
-  const filePath = require('path').join(__dirname, '..', 'data', 'reports', 'scenario-overrides.json');
-  if (!fs.existsSync(filePath)) return res.json({});
-  try {
-    res.json(JSON.parse(fs.readFileSync(filePath, 'utf8')));
-  } catch { res.json({}); }
-});
-
-app.put('/api/eval-overrides/:scenarioName', (req, res) => {
-  const authToken = process.env.HEALTH_AUTH_TOKEN;
-  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
-  const hasValidToken = authToken && req.query.token === authToken;
-  if (!isTestMode && !hasValidToken) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-  const fs = require('fs');
-  const path = require('path');
-  const reportsDir = path.join(__dirname, '..', 'data', 'reports');
-  const filePath = path.join(reportsDir, 'scenario-overrides.json');
-  const { verdict, category, notes, against_report, against_llm_verdict } = req.body;
-
-  if (!verdict || !['pass', 'fail'].includes(verdict)) {
-    return res.status(400).json({ error: 'verdict must be "pass" or "fail"' });
-  }
-  if (!category || !['false_failure', 'false_pass', 'data_dependent', 'product_gap', 'known_bug'].includes(category)) {
-    return res.status(400).json({ error: 'category must be one of: false_failure, false_pass, data_dependent, product_gap' });
-  }
-
-  fs.mkdirSync(reportsDir, { recursive: true });
-  let overrides = {};
-  if (fs.existsSync(filePath)) {
-    try { overrides = JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch {}
-  }
-
-  overrides[req.params.scenarioName] = {
-    verdict,
-    category,
-    notes: notes || '',
-    overridden_at: new Date().toISOString(),
-    against_report: against_report || null,
-    against_llm_verdict: against_llm_verdict != null ? against_llm_verdict : null,
-  };
-
-  fs.writeFileSync(filePath, JSON.stringify(overrides, null, 2));
-  res.json({ ok: true });
-});
-
-app.delete('/api/eval-overrides/:scenarioName', (req, res) => {
-  const authToken = process.env.HEALTH_AUTH_TOKEN;
-  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
-  const hasValidToken = authToken && req.query.token === authToken;
-  if (!isTestMode && !hasValidToken) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-  const fs = require('fs');
-  const filePath = require('path').join(__dirname, '..', 'data', 'reports', 'scenario-overrides.json');
-  if (!fs.existsSync(filePath)) return res.json({ ok: true });
-
-  let overrides = {};
-  try { overrides = JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch {}
-  delete overrides[req.params.scenarioName];
-  fs.writeFileSync(filePath, JSON.stringify(overrides, null, 2));
-  res.json({ ok: true });
-});
-
-// Evals landing page (read-only, always available)
-app.get('/evals', (req, res) => {
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
-  res.sendFile(require('path').join(__dirname, 'evals-landing.html'));
-});
 
 // Events browser (read-only, always available)
 app.get('/events', (req, res) => {
@@ -478,62 +258,6 @@ app.get('/api/agent-eye', async (req, res) => {
   }
 });
 
-// --- Pulse Web App (acquisition funnel) ---
-app.get('/app', (req, res) => {
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'");
-  res.sendFile(require('path').join(__dirname, 'pulse-app.html'));
-});
-
-app.get('/api/tonight', async (req, res) => {
-  try {
-    const { getTopPicks } = require('./events');
-    const { buildRecommendationReason, cleanEventName } = require('./brain-llm');
-    const events = await getTopPicks(12);
-    const picks = events.map(e => ({
-      id: e.id,
-      name: cleanEventName(e.name),
-      venue_name: e.venue_name,
-      neighborhood: e.neighborhood,
-      category: e.category,
-      start_time_local: e.start_time_local,
-      is_free: e.is_free,
-      price_display: e.price_display,
-      short_detail: (e.short_detail || e.description_short || '').slice(0, 120),
-      venue_size: e.venue_size || null,
-      source_vibe: e.source_vibe || null,
-      scarcity: e.scarcity || null,
-      recommended: true,
-      why: buildRecommendationReason(e) || null,
-    }));
-    res.json({ ok: true, picks });
-  } catch (err) {
-    console.error('Tonight API error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/hood/:name', async (req, res) => {
-  try {
-    const { buildSearchPool } = require('./brain-execute');
-    const { serializePoolForContinuation, buildRecommendationReason } = require('./brain-llm');
-    const params = { neighborhood: req.params.name, intent: 'new_search' };
-    if (req.query.category) params.category = req.query.category;
-    const mockTrace = { events: {}, composition: {} };
-    const poolResult = await buildSearchPool(params, null, null, mockTrace);
-    if (poolResult.zeroMatch) {
-      return res.json({ ok: true, picks: [], neighborhood: req.params.name, zero_match: true });
-    }
-    const serialized = serializePoolForContinuation(poolResult);
-    const picks = (serialized.events || []).slice(0, 12).map(e => ({
-      ...e,
-      why: e.why || buildRecommendationReason(e) || null,
-    }));
-    res.json({ ok: true, picks, neighborhood: serialized.neighborhood, match_count: serialized.match_count });
-  } catch (err) {
-    console.error('Hood API error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
 // AI Insights — LLM-generated actionable summary of event cache health
 let insightsCache = { text: null, cacheKey: null, version: 0 };
 app.get('/api/events/insights', async (req, res) => {
@@ -663,19 +387,6 @@ app.get('/api/geo/neighborhoods', (req, res) => {
   res.sendFile(require('path').join(__dirname, 'public', 'nyc-neighborhoods.geojson'));
 });
 
-// Digest history
-app.get('/digests', (req, res) => {
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
-  res.sendFile(require('path').join(__dirname, 'digest-ui.html'));
-});
-app.get('/api/digests', (req, res) => {
-  try {
-    const { getDigests } = require('./db');
-    res.json(getDigests(30));
-  } catch (err) {
-    res.json([]);
-  }
-});
 
 // Event short-link — redirects to source URL
 app.get('/e/:eventId', (req, res) => {
@@ -689,57 +400,19 @@ app.get('/e/:eventId', (req, res) => {
 
 // --- Read-only dashboards & APIs (always available) ---
 
-// Eval dashboard UI
-app.get('/eval', (req, res) => {
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
-  res.sendFile(require('path').join(__dirname, 'eval-ui.html'));
-});
-
-// API: cache metadata for eval reproducibility
-app.get('/api/eval/cache-meta', (req, res) => {
-  const status = getCacheStatus();
-  const { getRawCache } = require('./events');
-  const { events } = getRawCache();
-  const sourceCounts = {};
-  for (const e of events) {
-    sourceCounts[e.source_name] = (sourceCounts[e.source_name] || 0) + 1;
-  }
-  res.json({
-    cache_size: status.cache_size,
-    cache_age_minutes: status.cache_age_minutes,
-    source_counts: sourceCounts,
-  });
-});
-
-// API: get all cached events
-app.get('/api/eval/events', (req, res) => {
-  const { getRawCache } = require('./events');
-  res.json(getRawCache());
-});
-
 // API: trace endpoints
 const { getRecentTraces, getTraceById, annotateTrace, loadTraces, saveConversation } = require('./traces');
 loadTraces(); // Load existing traces from disk at startup
 
-app.get('/api/eval/traces', (req, res) => {
+app.get('/api/traces', (req, res) => {
   const limit = parseInt(req.query.limit) || 100;
   res.json(getRecentTraces(limit));
 });
 
-app.get('/api/eval/traces/:id', (req, res) => {
+app.get('/api/traces/:id', (req, res) => {
   const trace = getTraceById(req.params.id);
   if (!trace) return res.status(404).json({ error: 'Trace not found' });
   res.json(trace);
-});
-
-app.post('/api/eval/traces/:id/annotate', (req, res) => {
-  const { verdict, failure_modes, notes } = req.body;
-  if (!verdict || !['pass', 'fail'].includes(verdict)) {
-    return res.status(400).json({ error: 'verdict must be "pass" or "fail"' });
-  }
-  const ok = annotateTrace(req.params.id, { verdict, failure_modes, notes });
-  if (!ok) return res.status(404).json({ error: 'Trace not found' });
-  res.json({ ok: true });
 });
 
 // API: save conversation on demand (admin action from simulator)
@@ -761,70 +434,11 @@ app.get('/api/conversations/saved', (req, res) => {
   res.json(getSavedConversations());
 });
 
-// API: extraction audit (GET = read latest report)
-app.get('/api/eval/audit', (req, res) => {
-  const fs = require('fs');
-  const reportsDir = require('path').join(__dirname, '../data/reports');
-  try {
-    const files = fs.readdirSync(reportsDir)
-      .filter(f => f.startsWith('extraction-audit-'))
-      .sort()
-      .reverse();
-    if (files.length === 0) return res.json({ error: 'No audit reports yet' });
-    const report = JSON.parse(fs.readFileSync(require('path').join(reportsDir, files[0]), 'utf8'));
-    res.json(report);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// API: scrape audit (GET = read latest report)
-app.get('/api/eval/scrape-audit', (req, res) => {
-  const fs = require('fs');
-  const reportsDir = require('path').join(__dirname, '../data/reports');
-  try {
-    const files = fs.readdirSync(reportsDir)
-      .filter(f => f.startsWith('scrape-audit-'))
-      .sort()
-      .reverse();
-    if (files.length === 0) return res.json({ error: 'No scrape audit reports yet' });
-    const report = JSON.parse(fs.readFileSync(require('path').join(reportsDir, files[0]), 'utf8'));
-    res.json(report);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // --- Test mode: SMS simulator + mutating APIs ---
 if (process.env.PULSE_TEST_MODE === 'true') {
   app.get('/test', (req, res) => {
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
     res.sendFile(require('path').join(__dirname, 'test-ui.html'));
-  });
-
-  // API: run AI scoring on cached events
-  app.post('/api/eval/score', async (req, res) => {
-    try {
-      const { getRawCache } = require('./events');
-      const { scoreEvents } = require('./eval');
-      const { events } = getRawCache();
-      const scored = await scoreEvents(events);
-      res.json(scored);
-    } catch (err) {
-      console.error('Eval scoring error:', err.message);
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // API: return current cache (no scrape — use POST /api/scrape to force)
-  app.post('/api/eval/refresh', async (req, res) => {
-    try {
-      const { getRawCache } = require('./events');
-      res.json(getRawCache());
-    } catch (err) {
-      console.error('Eval refresh error:', err.message);
-      res.status(500).json({ error: err.message });
-    }
   });
 
   // API: force scrape — all sources or selective (?sources=skint,yutori&reprocess=1)
@@ -845,28 +459,7 @@ if (process.env.PULSE_TEST_MODE === 'true') {
     }
   });
 
-  // API: run full extraction audit (POST = costs AI tokens)
-  app.post('/api/eval/audit', async (req, res) => {
-    try {
-      const { getRawCache, getExtractionInputs } = require('./events');
-      const { runFullAudit } = require('./evals/extraction-audit');
-      const { events } = getRawCache();
-      const inputs = getExtractionInputs();
-      const sampleSize = parseInt(req.query.sample) || 10;
-      const report = await runFullAudit(events, inputs, sampleSize);
-      const fs = require('fs');
-      const reportsDir = require('path').join(__dirname, '../data/reports');
-      fs.mkdirSync(reportsDir, { recursive: true });
-      const reportFile = require('path').join(reportsDir, `extraction-audit-${new Date().toISOString().slice(0, 10)}.json`);
-      fs.writeFileSync(reportFile, JSON.stringify(report, null, 2));
-      res.json(report);
-    } catch (err) {
-      console.error('Audit error:', err.message);
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // API: session injection for eval runner
+  // API: session injection
   const { setSession, clearSession } = require('./handler');
   app.post('/api/eval/session', (req, res) => {
     const { phone, session } = req.body;
@@ -883,10 +476,7 @@ if (process.env.PULSE_TEST_MODE === 'true') {
 
 const server = app.listen(PORT, () => {
   console.log(`Pulse listening on port ${PORT}`);
-  loadProfiles();
-  loadReferrals();
   loadSessions();
-  loadAlerts();
 
   // Scrape on startup only if no fresh persisted cache — saves time and tokens on restarts
   if (isCacheFresh()) {
@@ -896,7 +486,6 @@ const server = app.listen(PORT, () => {
   }
   scheduleDailyScrape();
   scheduleEmailPolls();
-  scheduleNudges();
 });
 
 // Graceful shutdown — wait for in-flight requests before exiting
@@ -911,9 +500,7 @@ async function shutdown(signal) {
   // Phase 1: Stop accepting new connections + clear scheduled work
   clearSchedule();
   clearEmailSchedule();
-  clearNudgeSchedule();
   clearSmsIntervals();
-  clearReferralInterval();
   clearSessionInterval();
   server.close(() => console.log('Server stopped accepting connections'));
 
