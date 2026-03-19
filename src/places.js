@@ -301,6 +301,118 @@ function serializePlacePoolForContinuation(places, neighborhood, placeType, vibe
   };
 }
 
+// --- Single-venue Google Places lookup with JSON file cache ---
+
+const venuesCachePath = require('path').join(__dirname, '../data/venue-places-cache.json');
+let venuePlacesCache = {};
+try {
+  venuePlacesCache = JSON.parse(require('fs').readFileSync(venuesCachePath, 'utf8'));
+  console.log(`Loaded ${Object.keys(venuePlacesCache).length} cached venue lookups`);
+} catch {
+  console.log('No venue places cache found, starting fresh');
+}
+
+function normalizeVenueName(name) {
+  return (name || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+}
+
+function getVenuePlacesCache() {
+  return venuePlacesCache;
+}
+
+function clearVenuePlacesCache() {
+  venuePlacesCache = {};
+}
+
+function saveVenuePlacesCache() {
+  try {
+    require('fs').writeFileSync(venuesCachePath, JSON.stringify(venuePlacesCache, null, 2));
+  } catch (err) {
+    console.warn('[places] Failed to save venue places cache:', err.message);
+  }
+}
+
+/**
+ * Look up a single venue by name via Google Places Text Search API.
+ * Checks JSON file cache first, then calls API if needed.
+ * Returns structured venue data or { not_found: true } on failure.
+ */
+async function lookupVenueFromGoogle(venueName, neighborhood) {
+  const cacheKey = normalizeVenueName(venueName);
+  if (!cacheKey) return { not_found: true, message: "No venue name provided." };
+
+  // Cache hit
+  if (venuePlacesCache[cacheKey]) {
+    return venuePlacesCache[cacheKey];
+  }
+
+  // No API key — graceful fallback
+  if (!GOOGLE_MAPS_API_KEY) {
+    return { not_found: true, message: "Couldn't find venue details — tell them what you know from the event data." };
+  }
+
+  try {
+    const query = `${venueName} ${neighborhood || 'NYC'}`;
+    const fieldMask = [
+      'places.id', 'places.displayName', 'places.formattedAddress',
+      'places.priceLevel', 'places.rating', 'places.googleMapsUri',
+      'places.editorialSummary', 'places.regularOpeningHours',
+      'places.currentOpeningHours',
+    ].join(',');
+
+    const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': GOOGLE_MAPS_API_KEY,
+        'X-Goog-FieldMask': fieldMask,
+      },
+      body: JSON.stringify({ textQuery: query, maxResultCount: 1 }),
+    });
+
+    if (!response.ok) {
+      console.warn(`[places] Venue lookup API error: ${response.status}`);
+      return { not_found: true, message: "Couldn't find venue details — tell them what you know from the event data." };
+    }
+
+    const data = await response.json();
+    const place = data.places?.[0];
+    if (!place) {
+      return { not_found: true, message: "Couldn't find venue details — tell them what you know from the event data." };
+    }
+
+    const priceLevelMap = {
+      'PRICE_LEVEL_FREE': 0, 'PRICE_LEVEL_INEXPENSIVE': 1,
+      'PRICE_LEVEL_MODERATE': 2, 'PRICE_LEVEL_EXPENSIVE': 3,
+      'PRICE_LEVEL_VERY_EXPENSIVE': 4,
+    };
+
+    const hours = place.regularOpeningHours?.weekdayDescriptions;
+    const isOpenNow = place.currentOpeningHours?.openNow ?? null;
+
+    const result = {
+      name: place.displayName?.text || venueName,
+      address: place.formattedAddress || null,
+      rating: place.rating ?? null,
+      price_level: priceLevelMap[place.priceLevel] ?? null,
+      hours: hours ? hours.join(', ') : null,
+      editorial_summary: place.editorialSummary?.text || null,
+      open_now: isOpenNow,
+      google_maps_url: place.googleMapsUri || null,
+      fetched_at: new Date().toISOString(),
+    };
+
+    // Cache and persist
+    venuePlacesCache[cacheKey] = result;
+    saveVenuePlacesCache();
+
+    return result;
+  } catch (err) {
+    console.warn(`[places] Venue lookup failed: ${err.message}`);
+    return { not_found: true, message: "Couldn't find venue details — tell them what you know from the event data." };
+  }
+}
+
 module.exports = {
   searchPlaces,
   fetchFromGoogleMaps,
@@ -311,4 +423,7 @@ module.exports = {
   filterByVibe,
   serializePlacePoolForContinuation,
   VIBE_FILTERS,
+  lookupVenueFromGoogle,
+  getVenuePlacesCache,
+  clearVenuePlacesCache,
 };

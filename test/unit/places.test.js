@@ -230,3 +230,41 @@ const eventPrompt = buildBrainSystemPrompt(eventSession);
 check('system prompt excludes place context for events', !eventPrompt.includes('Last result: PLACES'));
 
 clearSession(testPhone);
+
+// ---- lookupVenueFromGoogle ----
+console.log('\nlookupVenueFromGoogle:');
+
+const { lookupVenueFromGoogle, getVenuePlacesCache, clearVenuePlacesCache } = require('../../src/places');
+
+// Sync tests
+check('lookupVenueFromGoogle is exported', typeof lookupVenueFromGoogle === 'function');
+check('getVenuePlacesCache is exported', typeof getVenuePlacesCache === 'function');
+
+// Async tests — wrap in IIFE
+(async () => {
+  // Test cache hit path
+  const mockResult = {
+    name: 'Test Venue',
+    address: '123 Test St, Brooklyn, NY',
+    rating: 4.2,
+    price_level: 2,
+    hours: 'Mon-Sun 5PM-2AM',
+    editorial_summary: 'A test venue',
+    open_now: false,
+    google_maps_url: 'https://maps.google.com/test',
+    fetched_at: new Date().toISOString(),
+  };
+
+  // Inject into cache and verify cache hit
+  const cache = getVenuePlacesCache();
+  cache['test venue'] = mockResult;
+
+  const cacheHit = await lookupVenueFromGoogle('Test Venue', 'Williamsburg');
+  check('cache hit returns cached data', cacheHit.name === 'Test Venue');
+  check('cache hit has google_maps_url', cacheHit.google_maps_url === 'https://maps.google.com/test');
+
+  // Test not_found when no API key (cache miss + no key)
+  clearVenuePlacesCache();
+  const noKeyResult = await lookupVenueFromGoogle('Nonexistent Place', 'SoHo');
+  check('no API key returns not_found', noKeyResult.not_found === true);
+})();
