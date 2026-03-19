@@ -311,7 +311,7 @@ function stripHtml(html) {
  * @param {number} [opts.linesPerChunk=50] - Lines per chunk (lower = fewer events per LLM call, less truncation risk)
  * @returns {Promise<object[]>} Normalized, quality-gated events
  */
-async function extractEmailEvents({ text, sourceName, sourceType, sourceWeight, sourceUrl, label, categoryOverride, linesPerChunk = 50 }) {
+async function extractEmailEvents({ text, sourceName, sourceType, sourceWeight, sourceUrl, label, categoryOverride, linesPerChunk = 50, sourceHint }) {
   const { extractEvents } = require('../ai');
   const { captureExtractionInput } = require('../extraction-capture');
   const { getCachedExtraction, setCachedExtraction } = require('../extraction-cache');
@@ -340,7 +340,8 @@ async function extractEmailEvents({ text, sourceName, sourceType, sourceWeight, 
         if (cachedChunk) return cachedChunk;
 
         captureExtractionInput(label, content, sourceUrl);
-        const result = await extractEvents(content, label, sourceUrl);
+        const extractionContent = sourceHint ? `[SOURCE CONTEXT: ${sourceHint}]\n\n${content}` : content;
+        const result = await extractEvents(extractionContent, label, sourceUrl);
         const events = (result.events || [])
           .map(e => {
             if (categoryOverride) e.category = categoryOverride;

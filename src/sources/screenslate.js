@@ -68,6 +68,7 @@ async function fetchScreenSlateEvents() {
       sourceUrl: 'https://screenslate.com',
       label: 'screenslate',
       categoryOverride: 'film',
+      sourceHint: 'This is Screen Slate, a curated NYC film guide. The newsletter has three sections: (1) a featured editorial article recommending a specific film — ALWAYS extract this as an event with editorial_signal=true and capture the editorial prose in editorial_note. (2) Daily film listings by venue — ONLY extract screenings that are special: Q&As, in-person appearances, premieres, sneak previews, restorations, or retrospective series. Skip standard repertory showtimes. (3) An exhibitions section — extract all current exhibitions with their closing dates.',
     });
 
     saveCachedEvents(latest.id, events);
