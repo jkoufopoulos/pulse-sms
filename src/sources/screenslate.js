@@ -60,8 +60,14 @@ async function fetchScreenSlateEvents() {
     console.log(`ScreenSlate: processing "${latest.subject}" (${latest.date})`);
     const stripped = stripHtml(latest.body);
 
+    // Prepend the email date so all chunks know what day these listings are for
+    const emailDate = new Date(latest.date).toLocaleDateString('en-US', {
+      timeZone: 'America/New_York', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    });
+    const datedText = `--- TODAY'S LISTINGS: ${emailDate} ---\n\n${stripped}`;
+
     const events = await extractEmailEvents({
-      text: stripped,
+      text: datedText,
       sourceName: 'ScreenSlate',
       sourceType: 'unstructured',
       sourceWeight: 0.9,
