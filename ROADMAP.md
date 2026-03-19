@@ -54,23 +54,13 @@ Audit done (Mar 18). The editorial context exists in our source data but the mod
 - [x] Add `editorial_signal` + `editorial_note` to `YUTORI_EXTRACTION_PROMPT` schema (Mar 18)
 - [ ] Decide on Luma: keep for volume (408 events) or cut as non-editorial? Social proof ("91 going") has value but no editorial "why"
 
-#### 2. Harden the hallucination guardrail (Day 2)
+#### 2. ~~Harden the hallucination guardrail (Day 2)~~ DONE (Mar 19)
 
-With richer `short_detail` flowing to the model, the model now has editorial context to use. But for events without it, the model could fabricate a "why."
+Data contract in system prompt: explicit list of trusted fields (`short_detail`, `why`, `venue_profile`), anti-fabrication rule, `lookup_venue` tool as escape hatch. Tested with bare-data events — model leads with facts, doesn't embellish.
 
-**Fix:**
-- Add to system prompt: "Never invent context. If `short_detail` or `why` gives you a reason, use it. If not, lead with concrete facts (venue, time, vibe) — don't fabricate."
-- Test with 10 bare-bones events (title + venue + time only) — verify model doesn't embellish
+#### 3. ~~Rewrite the system prompt for voice (Day 3-4)~~ DONE (Mar 19)
 
-#### 3. Rewrite the system prompt for voice (Day 3-4)
-
-Current prompt is functional but not opinionated. "You text like a plugged-in friend" is a directive, not a demonstration.
-
-**Fix:**
-- Rewrite persona with clear editorial identity
-- Add 2-3 example outputs showing target voice
-- Context before logistics, opinion before facts
-- Remove dead references: serendipity framing, proactive opt-in CTA, places mixing
+Ground-up prompt rewrite: 5 sections (identity, data contract, composition, examples, name guidance). "Nightlife editor who texts" replaces "bot that texts like a friend." 3 example outputs at different data richness levels. Removed dead references (serendipity, proactive CTA, places mixing). Added `lookup_venue` tool (Google Places API) for venue research on details requests.
 
 ### Week 2: Polish the experience and ship
 
@@ -124,6 +114,7 @@ Based on user behavior, decide:
 | Delete non-core features | Mar 18 | Removed: nudges, referral, proactive outreach, preference learning, enrichment, web app, alerts, daily digest. No-op stubs for source-health and alerts. |
 | Anthropic-only | Mar 18 | All model roles default to claude-haiku-4-5-20251001. No Gemini in any path. |
 | Dashboard cleanup | Mar 18 | Removed: digests, eval-quality, evals-landing dashboards. Kept: simulator, health, eval browser, events, eval reports. |
+| Prompt rewrite + lookup_venue | Mar 19 | Editorial voice, data contract, anti-fabrication rule, 3 example outputs. `lookup_venue` tool for Google Places research on details requests. Removed dead serendipity/proactive code. |
 
 ---
 
@@ -155,13 +146,13 @@ Structural validation in hot path. Quality via evals.
 message -> checkMechanical (help + TCPA only, $0)
   -> handleAgentRequest (agent-loop.js)
   -> runAgentLoop (llm.js, multi-turn tool calling, max 3 iterations)
-  -> model calls search or respond tools
+  -> model calls search, respond, or lookup_venue tools
   -> code executes tool, result fed back to model
   -> model writes plain text SMS when ready
   -> saveSessionFromToolCalls -> saveResponseFrame -> SMS
 ```
 
-2 tools: `search` + `respond`. All Anthropic (Claude Haiku). 7 editorial sources scraped daily at 10am ET.
+3 tools: `search` + `respond` + `lookup_venue`. All Anthropic (Claude Haiku). 7 editorial sources scraped daily at 10am ET.
 
 ---
 
