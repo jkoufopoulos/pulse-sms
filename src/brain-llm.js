@@ -86,6 +86,25 @@ const BRAIN_TOOLS = [
       required: ['message', 'intent'],
     },
   },
+  {
+    name: 'lookup_venue',
+    description: 'Look up venue details from Google Places. Returns hours, rating, price level, vibe, and address. Use when writing a details response and the venue data is thin — no venue_profile, sparse short_detail. Do not call on discover or more requests.',
+    parameters: {
+      type: 'object',
+      properties: {
+        venue_name: {
+          type: 'string',
+          description: 'Name of the venue to look up',
+        },
+        neighborhood: {
+          type: 'string',
+          description: 'NYC neighborhood to disambiguate (e.g. "Williamsburg", "LES")',
+          nullable: true,
+        },
+      },
+      required: ['venue_name'],
+    },
+  },
 ];
 
 // --- Profile summary for system prompt ---

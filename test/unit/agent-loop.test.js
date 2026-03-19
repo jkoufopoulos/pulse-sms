@@ -64,6 +64,15 @@ check('no show_welcome tool', !BRAIN_TOOLS.find(t => t.name === 'show_welcome'))
 check('no search_events tool', !BRAIN_TOOLS.find(t => t.name === 'search_events'));
 check('no search_places tool', !BRAIN_TOOLS.find(t => t.name === 'search_places'));
 
+// ---- lookup_venue tool in BRAIN_TOOLS ----
+console.log('\nlookup_venue tool:');
+
+const lookupTool = BRAIN_TOOLS.find(t => t.name === 'lookup_venue');
+check('lookup_venue tool exists in BRAIN_TOOLS', !!lookupTool);
+check('lookup_venue has venue_name required', lookupTool.parameters.required.includes('venue_name'));
+check('lookup_venue has neighborhood param', !!lookupTool.parameters.properties.neighborhood);
+check('BRAIN_TOOLS has exactly 3 tools', BRAIN_TOOLS.length === 3);
+
 // ---- buildBrainSystemPrompt first-session indicator ----
 console.log('\nbuildBrainSystemPrompt first-session:');
 
