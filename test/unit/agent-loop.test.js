@@ -168,6 +168,14 @@ const dummyTrace = { events: {}, composition: {} };
   const staleSession2 = { ...detailsSession, lastResponseHadPicks: false, lastNeighborhood: 'Bushwick' };
   const staleResult = await executeTool('search', { intent: 'details', reference: '1' }, staleSession2, '+1234', dummyTrace);
   check('details stale returns stale', staleResult.stale === true);
+
+  // ---- executeTool lookup_venue ----
+  console.log('\nexecuteTool lookup_venue:');
+
+  const lookupResult = await executeTool('lookup_venue', { venue_name: 'Some Random Venue', neighborhood: 'SoHo' }, {}, '+10000000000', { events: {}, composition: {} });
+  check('lookup_venue returns object', typeof lookupResult === 'object');
+  check('lookup_venue without API key returns not_found', lookupResult.not_found === true);
+  check('lookup_venue is not unknown tool', !lookupResult.error?.includes('Unknown tool'));
 })();
 
 // ---- buildNativeHistory ----

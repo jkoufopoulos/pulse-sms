@@ -15,8 +15,7 @@
 const { runAgentLoop, generate } = require('./llm');
 const { MODELS } = require('./model-config');
 const { BRAIN_TOOLS, buildBrainSystemPrompt, buildNativeHistory, serializePoolForContinuation, cleanEventName } = require('./brain-llm');
-const { serializePlacePoolForContinuation } = require('./places');
-const { searchPlaces } = require('./places');
+const { serializePlacePoolForContinuation, searchPlaces, lookupVenueFromGoogle } = require('./places');
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || '';
 const { buildSearchPool, executeMore, executeWelcome } = require('./brain-execute');
 const { buildEventMap, saveResponseFrame, buildExhaustionMessage, sendPickUrls } = require('./pipeline');
@@ -508,6 +507,21 @@ async function executeTool(toolName, params, session, phone, trace) {
     };
   }
 
+  if (toolName === 'lookup_venue') {
+    const { venue_name, neighborhood } = params;
+
+    // Check hand-written profiles first (richest data)
+    const existingProfile = lookupVenueProfile(venue_name);
+    if (existingProfile) {
+      return { ...existingProfile, name: venue_name, _source: 'venue_profile' };
+    }
+
+    // Call Google Places
+    const result = await lookupVenueFromGoogle(venue_name, neighborhood);
+    if (result._source === undefined) result._source = 'google_places';
+    return result;
+  }
+
   // Unknown tool
   return { error: `Unknown tool: ${toolName}` };
 }
@@ -793,6 +807,14 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
           if (place?.google_maps_url) {
             await sendSMS(phone, place.google_maps_url);
           }
+        }
+      }
+
+      // Google Maps URL from lookup_venue (only if no event/place URL was already sent)
+      if (detailPicks.length === 0) {
+        const lookupCall = rawResults.find(tc => tc.name === 'lookup_venue' && tc.result?.google_maps_url);
+        if (lookupCall) {
+          await sendSMS(phone, lookupCall.result.google_maps_url);
         }
       }
     }
