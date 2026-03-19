@@ -675,8 +675,6 @@ function saveSessionFromToolCalls(phone, session, toolCalls, smsText) {
     placePicks, placeMap, resultType: placeResult ? 'mixed' : 'events',
   });
 
-  updateProfile(phone, { neighborhood: poolResult.hood, filters: poolResult.activeFilters, responseType: 'event_picks' })
-    .catch(err => console.error('profile update failed:', err.message));
   trackRecommendations(phone, picks.map(p => p.event_id));
 }
 
