@@ -77,19 +77,23 @@ const returningSession = { conversationHistory: [{ role: 'user', content: 'hey' 
 const returningPrompt = buildBrainSystemPrompt(returningSession);
 check('returning session prompt does NOT contain first-message indicator', !returningPrompt.includes('First message — new session'));
 
-// ---- buildBrainSystemPrompt slim prompt structure ----
-console.log('\nbuildBrainSystemPrompt slim prompt:');
+// ---- buildBrainSystemPrompt new prompt structure ----
+console.log('\nbuildBrainSystemPrompt prompt structure:');
 
 const anyPrompt = buildBrainSystemPrompt({});
+check('prompt has identity section', anyPrompt.includes('<identity>'));
+check('prompt has data-contract section', anyPrompt.includes('<data-contract>'));
 check('prompt has composition section', anyPrompt.includes('<composition>'));
-check('prompt has persona section', anyPrompt.includes('<persona>'));
-check('prompt does NOT have EXAMPLES section', !anyPrompt.includes('EXAMPLES:'));
+check('prompt has examples section', anyPrompt.includes('<examples>'));
 check('prompt has 480 char limit', anyPrompt.includes('480'));
-check('prompt teaches recommended/why', anyPrompt.includes('recommended') && anyPrompt.includes('why'));
+check('prompt mentions short_detail as trusted field', anyPrompt.includes('short_detail'));
+check('prompt mentions lookup_venue tool', anyPrompt.includes('lookup_venue'));
 check('prompt has mood mapping', anyPrompt.includes('chill') && anyPrompt.includes('jazz'));
-check('prompt does NOT have verbose curation block', !anyPrompt.includes('CURATION TASTE'));
-check('prompt does NOT have verbose HOW TO TALK block', !anyPrompt.includes('HOW TO TALK ABOUT PICKS'));
-check('prompt does NOT have few-shot examples', !anyPrompt.includes('SMS: "Bushwick tonight'));
+check('prompt has anti-fabrication rule', anyPrompt.includes('fabrication'));
+check('prompt has no markdown rule', anyPrompt.includes('no markdown'));
+check('prompt does NOT have old serendipity framing', !anyPrompt.includes('serendipity:true'));
+check('prompt does NOT have old proactive CTA', !anyPrompt.includes('NOTIFY'));
+check('prompt does NOT have old places mixing', !anyPrompt.includes('Grab a drink at'));
 
 // ---- buildRecommendationReason ----
 console.log('\nbuildRecommendationReason:');
