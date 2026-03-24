@@ -486,6 +486,15 @@ const server = app.listen(PORT, () => {
   }
   scheduleDailyScrape();
   scheduleEmailPolls();
+
+  // Heartbeat: if cache goes stale, trigger a scrape automatically.
+  // Catches cases where scheduled scrapes fail silently or setTimeout chains break on restart.
+  setInterval(() => {
+    if (!isCacheFresh()) {
+      console.error(`[HEARTBEAT] Cache is stale (>20hr old), triggering scrape`);
+      refreshCache().catch(err => console.error('[HEARTBEAT] Scrape failed:', err.message));
+    }
+  }, 30 * 60 * 1000); // check every 30 min
 });
 
 // Graceful shutdown — wait for in-flight requests before exiting

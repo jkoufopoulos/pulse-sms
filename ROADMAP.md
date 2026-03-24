@@ -156,6 +156,46 @@ message -> checkMechanical (help + TCPA only, $0)
 
 ---
 
+## Open Issues
+
+### FIXED: Scraper crashes on every run — stale cache for 5 days (discovered 2026-03-24)
+
+**Root cause:** `source-health.js` was stubbed out (no-op) during hypothesis focus, but `scrape-guard.js` still assumed real health data. The Proxy in the stub auto-creates empty objects `{}`, so `sourceHealth[label]` is truthy but has no `.history` array. `getBaselineStats` accessed `health.history.length` on `undefined` → crash on every scrape and email poll.
+
+**Fix:** Stubbed `scrape-guard.js` to match `source-health.js` — both are now no-ops. Added 30-min heartbeat in `server.js` that triggers a scrape if cache goes stale, so this class of failure self-heals.
+
+**Regression principle:** When stubbing a module, stub all modules that depend on its data (P1 applies to internal contracts too, not just LLM state).
+
+---
+
+### Bug: Stale/wrong source links on LLM-extracted events (discovered 2026-03-24)
+
+**Symptom:** User texts "bushwick", gets Tributary film screening at Millennium Film Workshop (8 PM, not free). Detail view sends an Instagram link (`instagram.com/p/DVYxEdrDX4J/`) that points to a *different* screening of the same film — at The Brick House on March 21 (3 days prior), 6-8 PM, free admission. The SMS text was correct (based on cache data), but the link is wrong.
+
+**Root cause:** The `[Source: URL]` markers in Yutori's newsletter text are per-section, not per-event. When the LLM extracts events from a chunk, it assigns the nearest `[Source: URL]` — but if multiple events appear near the same Instagram link, the wrong URL can bleed across. The extraction prompt (line 13 of `prompts.js`) says "use the URL from the nearest preceding [Source: ...] marker" but this is fragile for densely packed newsletters where one Instagram post promotes a different instance of a recurring/traveling event.
+
+**Impact:** User trust — clicking a link that contradicts what Pulse just told them. Violates hypothesis assumption #2 (zero hallucination extends to links).
+
+**Fix strategy:** Validate source links post-extraction: if a `source_url` contains a date or venue that contradicts the event's `date_local` or `venue_name`, null it out. Alternatively, stop sending source links for LLM-extracted events unless the URL was explicitly part of the event listing (ticket_url).
+
+### Bug: Cross-source dedup misses near-duplicates (discovered 2026-03-24)
+
+**Symptom:** Bushwick today has two duplicate pairs that should merge:
+1. "Trivia Night at Danger Danger (Bushwick)" (yutori) + "NYC Trivia League at Danger Danger" (nyctrivia) — same venue, same time (7:30 PM), same date, both trivia
+2. "downstairs video game craft club" (dice) + "downstairs level up video game club" (dice) — same venue (Purgatory), same time (7 PM), both from Dice
+
+**Root cause:** `makeEventId` in `shared.js:38` hashes `normalizeEventName(name) | venue | date | startTime`. The names normalize differently:
+- "trivia night at danger danger bushwick" vs "nyc trivia league at danger danger" → different hashes
+- "downstairs video game craft club" vs "downstairs level up video game club" → different hashes
+
+The dedup is exact-match on ID. There's no fuzzy/similarity matching for events at the same venue + time + date.
+
+**Impact:** Pool inflation — 13 events shown as available but really 11 unique ones. Model may waste a pick slot on a duplicate. Also inflates trivia category counts (25% of all events).
+
+**Fix strategy:** Add a post-dedup pass: for events with same `venue_name + date_local + start_time_local + category`, keep the one from the higher-weight source. This is a mechanical check (P6) that doesn't need LLM involvement.
+
+---
+
 ## Not Building (until hypothesis validated)
 
 - Serendipity scoring / surprise picks
