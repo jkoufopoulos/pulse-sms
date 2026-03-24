@@ -444,10 +444,11 @@ function normalizeFilters(filters) {
 async function sendPickUrls(phone, picks, eventMap) {
   if (!picks || picks.length === 0) return;
   const { sendSMS } = require('./twilio');
+  const { isReliableEventUrl } = require('./formatters');
   for (const pick of picks) {
     const event = eventMap?.[pick.event_id];
     if (!event) continue;
-    const url = event.ticket_url || event.source_url;
+    const url = event.ticket_url || (isReliableEventUrl(event.source_url) ? event.source_url : null);
     if (url) await sendSMS(phone, url);
   }
 }

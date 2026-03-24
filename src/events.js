@@ -460,6 +460,36 @@ if (eventCache.length === 0) {
 }
 
 // ============================================================
+// Venue-slot dedup — merge near-duplicates at same venue/date/time/category
+// Catches cases where different sources use different names for the same event
+// (e.g. "Trivia Night at Danger Danger" vs "NYC Trivia League at Danger Danger")
+// ============================================================
+
+function deduplicateByVenueSlot(events) {
+  const slots = new Map();
+  for (const e of events) {
+    if (!e.venue_name || e.venue_name === 'TBA') continue;
+    if (!e.date_local) continue;
+    const time = e.start_time_local?.match(/T(\d{2}:\d{2})/)?.[1] || '';
+    const key = `${e.venue_name.toLowerCase().trim()}|${e.date_local}|${time}|${e.category || ''}`;
+    if (!slots.has(key)) slots.set(key, []);
+    slots.get(key).push(e);
+  }
+
+  const dominated = new Set();
+  for (const [, group] of slots) {
+    if (group.length < 2) continue;
+    // Keep highest weight; on ties, first in merge order (already sorted by MERGE_ORDER)
+    group.sort((a, b) => (b.source_weight || 0) - (a.source_weight || 0));
+    for (let i = 1; i < group.length; i++) {
+      dominated.add(group[i].id);
+    }
+  }
+
+  return dominated.size > 0 ? events.filter(e => !dominated.has(e.id)) : events;
+}
+
+// ============================================================
 // Timed fetch wrapper — captures duration + status per source
 // ============================================================
 
@@ -598,18 +628,25 @@ async function refreshCache() {
       console.warn(`[SCRAPE-GUARD] ${sourcesQuarantined} source(s) quarantined this scrape`);
     }
 
+    // Secondary dedup: merge near-duplicates at same venue + date + time + category
+    const beforeVenueDedup = allEvents.length;
+    const venueDedupedEvents = deduplicateByVenueSlot(allEvents);
+    if (venueDedupedEvents.length < beforeVenueDedup) {
+      console.log(`Venue-slot dedup: removed ${beforeVenueDedup - venueDedupedEvents.length} near-duplicates`);
+    }
+
     // Filter out stale/far-future events and kids events at scrape time
     // Include yesterday so Friday newsletter events survive Saturday's scrape;
     // serving-time filterUpcomingEvents handles actual expiry (end_time + 2hr grace)
     const yesterday = getNycDateString(-1);
     const today = getNycDateString(0);
     const monthOut = getNycDateString(30);
-    const dateFiltered = allEvents.filter(e => {
+    const dateFiltered = venueDedupedEvents.filter(e => {
       const active = isEventInDateRange(e, yesterday, monthOut);
       return active === null ? true : active; // keep undated events (perennials, venues)
     });
     let validEvents = filterKidsEvents(dateFiltered);
-    const staleCount = allEvents.length - dateFiltered.length;
+    const staleCount = venueDedupedEvents.length - dateFiltered.length;
     const kidsCount = dateFiltered.length - validEvents.length;
     if (staleCount > 0 || kidsCount > 0) {
       console.log(`Scrape filter: removed ${staleCount} stale + ${kidsCount} kids events`);

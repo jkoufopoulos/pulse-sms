@@ -90,7 +90,7 @@ function formatEventDetails(event, { pulseUrl } = {}) {
   if (pulseUrl) {
     detail += `\n${pulseUrl}`;
   } else {
-    const directUrl = [event.ticket_url, event.source_url].find(u => u && !isSearchUrl(u));
+    const directUrl = [event.ticket_url, event.source_url].find(u => u && !isSearchUrl(u) && (u === event.ticket_url || isReliableEventUrl(u)));
     if (directUrl) {
       detail += `\n${cleanUrl(directUrl)}`;
     } else {
@@ -141,6 +141,21 @@ function smartTruncate(text, maxLen = 480) {
   }
 
   return truncated + '…';
+}
+
+/**
+ * Check if a source_url is a reliable direct link to an event page.
+ * Social media posts and newsletter homepages are unreliable — the LLM often
+ * assigns the nearest [Source: URL] marker, which may point to a different event.
+ * ticket_url (from structured scrapers) is always reliable and bypasses this check.
+ */
+function isReliableEventUrl(url) {
+  if (!url) return false;
+  // Social media posts — frequently wrong (nearest-marker bleed)
+  if (/\b(instagram\.com|twitter\.com|x\.com|facebook\.com|tiktok\.com)\b/i.test(url)) return false;
+  // Newsletter homepages — useless for detail links
+  if (/\b(nonsensenyc\.com|theskint\.com|screenslate\.com)\b/i.test(url)) return false;
+  return true;
 }
 
 /**
@@ -196,4 +211,4 @@ function injectMissingPrices(sms, picks, eventMap) {
   return sms;
 }
 
-module.exports = { formatTime, cleanUrl, formatEventDetails, smartTruncate, isSearchUrl, injectMissingPrices };
+module.exports = { formatTime, cleanUrl, formatEventDetails, smartTruncate, isSearchUrl, isReliableEventUrl, injectMissingPrices };

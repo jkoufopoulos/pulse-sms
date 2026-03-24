@@ -168,31 +168,17 @@ message -> checkMechanical (help + TCPA only, $0)
 
 ---
 
-### Bug: Stale/wrong source links on LLM-extracted events (discovered 2026-03-24)
+### FIXED: Stale/wrong source links on LLM-extracted events (discovered 2026-03-24)
 
-**Symptom:** User texts "bushwick", gets Tributary film screening at Millennium Film Workshop (8 PM, not free). Detail view sends an Instagram link (`instagram.com/p/DVYxEdrDX4J/`) that points to a *different* screening of the same film — at The Brick House on March 21 (3 days prior), 6-8 PM, free admission. The SMS text was correct (based on cache data), but the link is wrong.
+**Root cause:** LLM-extracted sources produce `source_url` via `[Source: URL]` markers that bleed across events, or blanket newsletter URLs. Instagram/social links are frequently wrong.
 
-**Root cause:** The `[Source: URL]` markers in Yutori's newsletter text are per-section, not per-event. When the LLM extracts events from a chunk, it assigns the nearest `[Source: URL]` — but if multiple events appear near the same Instagram link, the wrong URL can bleed across. The extraction prompt (line 13 of `prompts.js`) says "use the URL from the nearest preceding [Source: ...] marker" but this is fragile for densely packed newsletters where one Instagram post promotes a different instance of a recurring/traveling event.
+**Fix:** Added `isReliableEventUrl()` guard in `formatters.js`. Social media posts (Instagram, Twitter, Facebook) and newsletter homepages (nonsensenyc, theskint, screenslate) are filtered out at send time. `ticket_url` (from structured scrapers) always passes. Unreliable URLs fall back to Google Maps venue link.
 
-**Impact:** User trust — clicking a link that contradicts what Pulse just told them. Violates hypothesis assumption #2 (zero hallucination extends to links).
+### FIXED: Cross-source dedup misses near-duplicates (discovered 2026-03-24)
 
-**Fix strategy:** Validate source links post-extraction: if a `source_url` contains a date or venue that contradicts the event's `date_local` or `venue_name`, null it out. Alternatively, stop sending source links for LLM-extracted events unless the URL was explicitly part of the event listing (ticket_url).
+**Root cause:** `makeEventId` hashes normalized name — different names at same venue/time produce different IDs.
 
-### Bug: Cross-source dedup misses near-duplicates (discovered 2026-03-24)
-
-**Symptom:** Bushwick today has two duplicate pairs that should merge:
-1. "Trivia Night at Danger Danger (Bushwick)" (yutori) + "NYC Trivia League at Danger Danger" (nyctrivia) — same venue, same time (7:30 PM), same date, both trivia
-2. "downstairs video game craft club" (dice) + "downstairs level up video game club" (dice) — same venue (Purgatory), same time (7 PM), both from Dice
-
-**Root cause:** `makeEventId` in `shared.js:38` hashes `normalizeEventName(name) | venue | date | startTime`. The names normalize differently:
-- "trivia night at danger danger bushwick" vs "nyc trivia league at danger danger" → different hashes
-- "downstairs video game craft club" vs "downstairs level up video game club" → different hashes
-
-The dedup is exact-match on ID. There's no fuzzy/similarity matching for events at the same venue + time + date.
-
-**Impact:** Pool inflation — 13 events shown as available but really 11 unique ones. Model may waste a pick slot on a duplicate. Also inflates trivia category counts (25% of all events).
-
-**Fix strategy:** Add a post-dedup pass: for events with same `venue_name + date_local + start_time_local + category`, keep the one from the higher-weight source. This is a mechanical check (P6) that doesn't need LLM involvement.
+**Fix:** Added `deduplicateByVenueSlot()` in `events.js` — secondary dedup pass after ID-based dedup. Groups events by `venue_name + date_local + start_time_local + category`, keeps highest-weight source on collision. Events without venue or date are never touched.
 
 ---
 
