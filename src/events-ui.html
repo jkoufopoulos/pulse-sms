@@ -194,12 +194,13 @@
   .gaps-legend-item:hover { color: #fff; }
   .gaps-legend-item.active { color: #fff; font-weight: 600; }
   .gaps-legend-swatch { width: 10px; height: 10px; border-radius: 2px; }
-  .gaps-source-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; cursor: pointer; }
+  .gaps-source-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; cursor: pointer; border-left: 3px solid transparent; padding-left: 4px; }
   .gaps-source-row:hover { background: #1f1f1f; }
+  .gaps-source-row.active { background: #1f1f1f; border-left-color: #FF6B35; }
   .gaps-source-name { font-size: 11px; color: #bbb; width: 110px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
   .gaps-bar-track { flex: 1; height: 14px; background: #222; border-radius: 3px; overflow: hidden; display: flex; }
   .gaps-bar-seg { height: 100%; min-width: 1px; transition: width 0.3s; }
-  .gaps-source-count { font-size: 11px; color: #666; width: 40px; flex-shrink: 0; }
+  .gaps-source-count { font-size: 11px; color: #666; width: 70px; flex-shrink: 0; text-align: right; }
   .gaps-detail-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 11px; }
   .gaps-detail-table th { text-align: left; color: #888; padding: 4px 8px; border-bottom: 1px solid #333; }
   .gaps-detail-table td { padding: 4px 8px; color: #bbb; border-bottom: 1px solid #1a1a1a; }
@@ -699,17 +700,8 @@ function applyFilters() {
   const source = document.getElementById('f-source').value;
 
   const boroughFilter = window._boroughFilter || null;
-  const gapFilter = window._gapFilter || null;
 
   filteredEvents = allEvents.filter(e => {
-    if (gapFilter) {
-      if (gapFilter === 'tba' && !(e.venue_name === 'TBA' || e.venue_name === 'tba')) return false;
-      if (gapFilter === 'noVenue' && e.venue_name) return false;
-      if (gapFilter === 'noHood' && e.neighborhood) return false;
-      if (gapFilter === 'noDesc' && (e.description_short || e.description)) return false;
-      if (gapFilter === 'noTime' && e.start_time_local) return false;
-      if (gapFilter === 'noUrl' && (e.ticket_url || e.source_url)) return false;
-    }
     if (search) {
       const haystack = [e.name, e.venue_name, e.description].filter(Boolean).join(' ').toLowerCase();
       if (!haystack.includes(search)) return false;
@@ -1213,33 +1205,34 @@ function renderDataGaps(events) {
 
   let html = '';
 
-  // Legend (clickable to filter)
+  // Legend (static key)
   html += '<div class="gaps-legend">';
   for (const g of GAP_TYPES) {
     const total = events.filter(g.test).length;
     if (total === 0) continue;
-    const isActive = window._gapFilter === g.key;
-    html += `<span class="gaps-legend-item${isActive ? ' active' : ''}" onclick="filterByGap('${g.key}')" style="cursor:pointer"><span class="gaps-legend-swatch" style="background:${g.color}"></span>${g.label} (${total})</span>`;
+    html += `<span class="gaps-legend-item"><span class="gaps-legend-swatch" style="background:${g.color}"></span>${g.label} (${total})</span>`;
   }
-  if (window._gapFilter) {
-    html += `<span class="gaps-legend-item" onclick="filterByGap(null)" style="cursor:pointer;color:#FF6B35">✕ clear</span>`;
+  if (document.getElementById('f-source').value) {
+    html += `<span class="gaps-legend-item" onclick="filterBySource(document.getElementById('f-source').value)" style="cursor:pointer;color:#FF6B35">✕ clear source</span>`;
   }
   html += '</div>';
 
   // Stacked bar per source
-  const maxCount = Math.max(...withGaps.map(s => s.count));
+  const maxGaps = Math.max(...withGaps.map(s => s.totalGaps));
+  const activeSource = document.getElementById('f-source').value;
   for (const s of withGaps) {
-    html += `<div class="gaps-source-row" onclick="filterBySource('${esc(s.name)}')" title="${s.name}: ${s.totalGaps} gaps in ${s.count} events">`;
+    const isActive = activeSource === s.name;
+    html += `<div class="gaps-source-row${isActive ? ' active' : ''}" onclick="filterBySource('${esc(s.name)}')" title="${s.name}: ${s.totalGaps} gaps in ${s.count} events">`;
     html += `<span class="gaps-source-name">${esc(s.name)}</span>`;
     html += '<div class="gaps-bar-track">';
     for (const g of GAP_TYPES) {
       const count = s.gaps[g.key] || 0;
       if (count === 0) continue;
-      const widthPct = (count / maxCount * 100).toFixed(1);
+      const widthPct = (count / maxGaps * 100).toFixed(1);
       html += `<div class="gaps-bar-seg" style="width:${widthPct}%;background:${g.color}" title="${g.label}: ${count}/${s.count}"></div>`;
     }
     html += '</div>';
-    html += `<span class="gaps-source-count">${s.totalGaps}</span>`;
+    html += `<span class="gaps-source-count">${s.totalGaps} / ${s.count}</span>`;
     html += '</div>';
   }
 
@@ -1261,11 +1254,6 @@ function renderDataGaps(events) {
   el.innerHTML = html;
 }
 
-function filterByGap(key) {
-  window._gapFilter = window._gapFilter === key ? null : key;
-  applyFilters();
-}
-
 function filterBySource(name) {
   const sel = document.getElementById('f-source');
   sel.value = sel.value === name ? '' : name;
@@ -1280,8 +1268,8 @@ function updateAnalytics() {
   // Filtered badges
   const dateBadge = document.getElementById('date-filtered-badge');
   dateBadge.style.display = isFiltered ? 'inline' : 'none';
-  // Data gaps
-  renderDataGaps(events);
+  // Data gaps — always show full dataset so gap counts stay stable when filtering
+  renderDataGaps(allEvents);
 
   // Date distribution + Price
   renderDateChart(events);

@@ -400,16 +400,29 @@ function deleteEventsBySource(sourceNames) {
  */
 function pruneInactiveSources(activeLabels) {
   const d = getDb();
-  const allSources = d.prepare('SELECT DISTINCT source_name FROM events').all().map(r => r.source_name);
   const activeSet = new Set(activeLabels);
-  const inactive = allSources.filter(s => !activeSet.has(s));
-  if (inactive.length === 0) return 0;
-  const ph = inactive.map(() => '?').join(', ');
-  const result = d.prepare(`DELETE FROM events WHERE source_name IN (${ph})`).run(...inactive);
-  if (result.changes > 0) {
-    console.log(`Pruned ${result.changes} events from inactive sources: ${inactive.join(', ')}`);
+
+  // Prune events table
+  const allEventSources = d.prepare('SELECT DISTINCT source_name FROM events').all().map(r => r.source_name);
+  const inactiveEvents = allEventSources.filter(s => !activeSet.has(s));
+  if (inactiveEvents.length > 0) {
+    const ph = inactiveEvents.map(() => '?').join(', ');
+    const result = d.prepare(`DELETE FROM events WHERE source_name IN (${ph})`).run(...inactiveEvents);
+    if (result.changes > 0) {
+      console.log(`Pruned ${result.changes} events from inactive sources: ${inactiveEvents.join(', ')}`);
+    }
   }
-  return result.changes;
+
+  // Prune recurring_patterns table
+  const allPatternSources = d.prepare('SELECT DISTINCT source_name FROM recurring_patterns').all().map(r => r.source_name);
+  const inactivePatterns = allPatternSources.filter(s => !activeSet.has(s));
+  if (inactivePatterns.length > 0) {
+    const ph = inactivePatterns.map(() => '?').join(', ');
+    const result = d.prepare(`DELETE FROM recurring_patterns WHERE source_name IN (${ph})`).run(...inactivePatterns);
+    if (result.changes > 0) {
+      console.log(`Pruned ${result.changes} recurring patterns from inactive sources: ${inactivePatterns.join(', ')}`);
+    }
+  }
 }
 
 // --- Recurring patterns ---

@@ -136,7 +136,7 @@ function buildBrainSystemPrompt(session) {
       session.pendingNearby
         ? `Pending suggestion: "${session.pendingNearby}" (user was asked if they want picks there)`
         : null,
-      session.allPicks?.length
+      session.allPicks?.length >= 5
         ? `User's prior pick categories: ${[...new Set(session.allPicks.map(p => {
           const evt = session.lastEvents?.[p.event_id];
           return evt?.category;
@@ -168,6 +168,7 @@ Writing the SMS:
 - Under 480 characters. Plain text only — no markdown, no bold, no italic, no links. This is SMS.
 - Only mention price when it's a selling point (free) or the user asked. Don't display uncertain price data.
 - End with a short hook that moves the conversation forward.
+- Don't fake familiarity. Never say "your kind of stuff" or imply you know the user's taste unless you have 5+ prior picks to draw from.
 
 Choosing what to search:
 - Search first, ask later. Contrasting picks > clarifying questions. Only ask when you truly have nothing to go on.

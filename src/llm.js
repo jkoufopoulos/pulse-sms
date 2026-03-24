@@ -192,6 +192,7 @@ function extractGeminiUsage(response) {
  */
 async function generate(model, systemPrompt, userPrompt, options = {}) {
   const provider = getProvider(model);
+  console.log(`[llm] generate model=${model} provider=${provider}`);
   const { maxTokens = 1024, temperature = 0, json = false, jsonSchema, timeout = 15000 } = options;
 
   if (provider === 'gemini') {
@@ -259,6 +260,7 @@ async function generate(model, systemPrompt, userPrompt, options = {}) {
  */
 async function callWithTools(model, systemPrompt, message, tools, options = {}) {
   const provider = getProvider(model);
+  console.log(`[llm] callWithTools model=${model} provider=${provider}`);
   const { maxTokens = 1024, temperature = 0, timeout = 10000 } = options;
 
   if (provider === 'gemini') {
@@ -457,6 +459,7 @@ async function continueChat(chatSession, toolName, toolResult, options = {}) {
 async function runAgentLoop(model, systemPrompt, message, tools, executeTool, options = {}) {
   const { maxIterations = 3, timeout = 15000, stopTools = [], priorMessages = [] } = options;
   const provider = getProvider(model);
+  console.log(`[agent-loop] model=${model} provider=${provider}`);
   const loopStart = Date.now();
   const toolCalls = [];
   const iterations = [];

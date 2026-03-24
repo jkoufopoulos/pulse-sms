@@ -29,6 +29,20 @@ const { sendRuntimeAlert } = require('./alerts');
 const { getAdjacentNeighborhoods, getNycDateString } = require('./geo');
 
 // ---------------------------------------------------------------------------
+// Strip markdown from SMS — models sometimes ignore "plain text only" instruction
+// ---------------------------------------------------------------------------
+
+function stripMarkdown(text) {
+  if (!text) return text;
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')  // **bold**
+    .replace(/\*(.+?)\*/g, '$1')       // *italic*
+    .replace(/__(.+?)__/g, '$1')       // __bold__
+    .replace(/_(.+?)_/g, '$1')         // _italic_
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'); // [text](url)
+}
+
+// ---------------------------------------------------------------------------
 // SMS length enforcement — agentic rewrite loop
 // ---------------------------------------------------------------------------
 
@@ -165,11 +179,14 @@ function inferTypesFromQuery(query) {
 function deriveIntent(toolCalls) {
   if (!toolCalls?.length) return 'conversational';
 
+  // Details intent wins if ANY search used it (agent may do a follow-up search after details)
+  const hasDetails = toolCalls.some(tc => tc.name === 'search' && tc.params?.intent === 'details');
+  if (hasDetails) return 'details';
+
   const lastSearch = [...toolCalls].reverse().find(tc => tc.name === 'search');
   if (lastSearch) {
     const intent = lastSearch.params?.intent;
     if (intent === 'more') return 'more';
-    if (intent === 'details') return 'details';
     // Check if it was a welcome (no neighborhood, no types)
     if (!lastSearch.params?.neighborhood && !lastSearch.params?.types) return 'welcome';
     // Check if places-only
@@ -702,6 +719,15 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
   if (!session) session = getSession(phone);
   addToHistory(phone, 'user', message);
 
+  // Quick URL resend — $0, no LLM call needed
+  if (session?.lastSentUrl && /\b(url|link|send.*(link|url))\b/i.test(message)) {
+    await sendSMS(phone, session.lastSentUrl);
+    addToHistory(phone, 'assistant', session.lastSentUrl);
+    trace.output_sms = session.lastSentUrl;
+    finalizeTrace(session.lastSentUrl, 'url_resend');
+    return trace.id;
+  }
+
   const systemPrompt = buildBrainSystemPrompt(session);
 
   let smsSent = false;
@@ -760,6 +786,7 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     }
     smsText = smsText || "Tell me what you're in the mood for -- drop a neighborhood or a vibe.";
     smsText = await rewriteIfTooLong(smsText, trace);
+    smsText = stripMarkdown(smsText);
     smsText = smartTruncate(smsText); // final safety net
 
     // History — save tool calls + search summaries
@@ -790,29 +817,41 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
 
     // Send pick URLs for details
     if (intent === 'details') {
+      let urlSent = false;
       const detailEvents = Object.values(session?.lastEvents || {});
       const detailPicks = extractPicksFromSms(smsText, detailEvents);
       if (detailPicks.length > 0) {
-        await sendPickUrls(phone, detailPicks.slice(0, 1), session?.lastEvents || {});
+        const { isReliableEventUrl } = require('./formatters');
+        const evt = session?.lastEvents?.[detailPicks[0].event_id];
+        const url = evt?.ticket_url || (isReliableEventUrl(evt?.source_url) ? evt.source_url : null);
+        if (url) {
+          await sendSMS(phone, url);
+          setSession(phone, { lastSentUrl: url });
+          urlSent = true;
+        }
+        await sendPickUrls(phone, detailPicks.slice(1), session?.lastEvents || {});
       }
 
       // Place URL sending (Google Maps link)
-      if (detailPicks.length === 0 && session?.lastResultType === 'places') {
+      if (!urlSent && detailPicks.length === 0 && session?.lastResultType === 'places') {
         const placePool = Object.values(session?.lastPlaceMap || {});
         const placePicks = extractPlacePicksFromSms(smsText, placePool);
         if (placePicks.length > 0) {
           const place = session.lastPlaceMap[placePicks[0].place_id];
           if (place?.google_maps_url) {
             await sendSMS(phone, place.google_maps_url);
+            setSession(phone, { lastSentUrl: place.google_maps_url });
+            urlSent = true;
           }
         }
       }
 
-      // Google Maps URL from lookup_venue (only if no event/place URL was already sent)
-      if (detailPicks.length === 0) {
+      // Google Maps URL from lookup_venue (only if no URL was already sent)
+      if (!urlSent) {
         const lookupCall = rawResults.find(tc => tc.name === 'lookup_venue' && tc.result?.google_maps_url);
         if (lookupCall) {
           await sendSMS(phone, lookupCall.result.google_maps_url);
+          setSession(phone, { lastSentUrl: lookupCall.result.google_maps_url });
         }
       }
     }
@@ -884,5 +923,6 @@ module.exports = {
   deriveIntent,
   inferTypesFromQuery,
   rewriteIfTooLong,
+  stripMarkdown,
   SMS_CHAR_LIMIT,
 };

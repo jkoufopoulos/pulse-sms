@@ -28,8 +28,8 @@ async function sendSMS(to, body, { maxRetries = 2 } = {}) {
     return { sid: 'TEST_' + Date.now() };
   }
 
-  // Safety: never call Twilio in test mode — capture race conditions can leak real API calls
-  if (process.env.PULSE_TEST_MODE === 'true') {
+  // Safety: block test-phone sends that escaped capture, but allow real inbound users through
+  if (process.env.PULSE_TEST_MODE === 'true' && /^\+1(555\d{7}|0{9,})$/.test(to)) {
     console.warn(`[TEST] sendSMS called outside capture for ${maskPhone(to)} — skipping Twilio call`);
     return { sid: 'SKIPPED_TEST_' + Date.now() };
   }
@@ -43,11 +43,13 @@ async function sendSMS(to, body, { maxRetries = 2 } = {}) {
   const masked = maskPhone(to);
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const sendPromise = getClient().messages.create({
-        body,
-        from: process.env.TWILIO_PHONE_NUMBER,
-        to,
-      });
+      const createParams = { body, to };
+      if (process.env.TWILIO_MESSAGING_SERVICE_SID) {
+        createParams.messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+      } else {
+        createParams.from = process.env.TWILIO_PHONE_NUMBER;
+      }
+      const sendPromise = getClient().messages.create(createParams);
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('sendSMS timed out after 10s')), 10000)
       );
