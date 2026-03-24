@@ -758,7 +758,26 @@ async function refreshCache() {
 
 
     saveHealthData();
+    consecutiveScrapeFailures = 0;
     console.log(`Cache refreshed: ${validEvents.length} events (${totalRaw} raw, ${allEvents.length} deduped, ${staleCount} stale removed | ${sourcesOk} ok / ${sourcesFailed} failed / ${sourcesEmpty} empty)`);
+
+    // Ping external health check (Healthchecks.io dead man's snitch)
+    if (process.env.HEALTHCHECK_PING_URL) {
+      fetch(process.env.HEALTHCHECK_PING_URL).catch(() => {});
+    }
+
+    // Send scrape digest alert
+    try {
+      const { sendRuntimeAlert } = require('./alerts');
+      sendRuntimeAlert('scrape-complete', {
+        events: validEvents.length,
+        sources_ok: sourcesOk,
+        sources_failed: sourcesFailed,
+        sources_empty: sourcesEmpty,
+        impact: `${validEvents.length} events from ${sourcesOk} sources`,
+      }).catch(() => {});
+    } catch {}
+
     return eventCache;
   })().finally(() => { refreshPromise = null; });
 
@@ -873,6 +892,11 @@ async function refreshEmailSources() {
 
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
     console.log(`[EMAIL-POLL] Done in ${elapsed}s — ${added} new events added (cache: ${eventCache.length})`);
+
+    // Ping external health check after successful email poll
+    if (process.env.HEALTHCHECK_PING_URL) {
+      fetch(process.env.HEALTHCHECK_PING_URL).catch(() => {});
+    }
   })();
 
   try {
@@ -1243,6 +1267,7 @@ function msUntilNextScrape() {
 }
 
 let dailyTimer = null;
+let consecutiveScrapeFailures = 0;
 
 function scheduleDailyScrape() {
   const { ms, hour } = msUntilNextScrape();
@@ -1254,7 +1279,27 @@ function scheduleDailyScrape() {
       await refreshCache();
     } catch (err) {
       console.error('Scheduled scrape failed:', err.message);
+      consecutiveScrapeFailures++;
+      if (consecutiveScrapeFailures >= 3) {
+        try {
+          const { sendRuntimeAlert } = require('./alerts');
+          sendRuntimeAlert('scrape-critical', {
+            consecutive_failures: consecutiveScrapeFailures,
+            latest_error: err.message,
+            impact: 'Cache is stale — users may receive outdated recommendations',
+          }).catch(() => {});
+        } catch {}
+      }
     }
+
+    // Send yesterday's trace digest after scrape (non-blocking)
+    try {
+      const { execFile } = require('child_process');
+      execFile('node', [path.join(__dirname, '../scripts/daily-trace-digest.js')], { timeout: 30000 }, (err) => {
+        if (err) console.warn('[DIGEST] Trace digest failed:', err.message);
+      });
+    } catch {}
+
     // Schedule next one (repeats daily)
     scheduleDailyScrape();
   }, ms);

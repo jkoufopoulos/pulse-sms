@@ -243,6 +243,15 @@ async function handleMessageAI(phone, message) {
     return trace.id;
   }
 
+  // Staleness guard: don't serve recommendations from stale data
+  const { isCacheFresh } = require('./events');
+  if (!isCacheFresh()) {
+    console.error(`[STALE] Cache is stale, sending degradation message to ${masked}`);
+    await sendSMS(phone, "Pulse is refreshing its event data — text back in a few minutes and I'll have tonight's picks ready for you!");
+    finalizeTrace(trace);
+    return trace.id;
+  }
+
   // Agent loop handles everything else
   const { handleAgentRequest } = require('./agent-loop');
   return handleAgentRequest(phone, message, session, trace, finalizeTrace);
