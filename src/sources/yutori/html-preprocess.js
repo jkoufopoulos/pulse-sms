@@ -47,12 +47,22 @@ function preprocessYutoriHtml(html) {
 
   // Convert <li> items to [Event] blocks
   text = text.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (_, content) => {
-    const clean = content
+    // Extract source URLs from <span> badge wrappers before stripping them.
+    // By this point, <a> tags have been converted to "text (url)" format,
+    // so URLs appear as plain text inside the span, not as href attributes.
+    const sourceUrls = [];
+    const withoutBadges = content.replace(/<span[^>]*>[\s\S]*?<\/span>/gi, (span) => {
+      const hrefMatch = span.match(/href=["']([^"']+)["']/);
+      if (hrefMatch) { sourceUrls.push(hrefMatch[1]); return ''; }
+      const urlMatch = span.match(/\(?(https?:\/\/[^\s)<\]]+)/);
+      if (urlMatch) { sourceUrls.push(urlMatch[1]); return ''; }
+      return '';
+    });
+    const clean = withoutBadges
       .replace(/<b[^>]*>(.*?)<\/b>/gi, '$1')
       .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '$1')
       .replace(/<em[^>]*>(.*?)<\/em>/gi, '$1')
       .replace(/<i[^>]*>(.*?)<\/i>/gi, '$1')
-      .replace(/<span[^>]*>[\s\S]*?<\/span>/gi, '')
       .replace(/<img[^>]*>/gi, '')
       .replace(/<[^>]*>/g, '')
       .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
@@ -61,7 +71,10 @@ function preprocessYutoriHtml(html) {
       .replace(/\s+/g, ' ')
       .trim();
     if (clean.length < 20) return '';
-    return `\n[Event] ${clean}\n`;
+    // Only add [Source: url] if the clean text doesn't already contain one (from badge conversion)
+    const hasSource = /\[Source:/.test(clean);
+    const urlSuffix = !hasSource && sourceUrls.length > 0 ? ` [Source: ${sourceUrls[0]}]` : '';
+    return `\n[Event] ${clean}${urlSuffix}\n`;
   });
 
   // Convert <h3>, <p>, <strong>/<b> section headers to plain text

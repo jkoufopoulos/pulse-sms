@@ -147,9 +147,10 @@ async function fetchYutoriEvents({ reprocess = false } = {}) {
         // Fall through to LLM if trivia parse found nothing
       }
 
-      // Everything else → LLM on raw HTML
+      // Everything else → LLM on preprocessed text
       if (raw.length >= 50) {
-        llmFiles.push({ file, content: raw });
+        const content = /\.html?$/i.test(file) ? preprocessYutoriHtml(raw) : raw;
+        llmFiles.push({ file, content });
       }
     }
 
