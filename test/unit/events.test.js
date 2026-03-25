@@ -219,9 +219,9 @@ check('discovery one-off intimate = 6', scoreInterestingness({
   source_vibe: 'discovery', is_recurring: false, venue_size: 'intimate', interaction_format: null,
 }) === 6);
 
-check('mainstream recurring massive = -3', scoreInterestingness({
+check('mainstream recurring massive = -6', scoreInterestingness({
   source_vibe: 'mainstream', is_recurring: true, venue_size: 'massive', interaction_format: null,
-}) === -3);
+}) === -6);
 
 check('niche recurring interactive = 3', scoreInterestingness({
   source_vibe: 'niche', is_recurring: true, venue_size: null, interaction_format: 'interactive',

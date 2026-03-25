@@ -183,7 +183,7 @@ function classifyInteractionFormat(event) {
 /**
  * Score an event for "interestingness" — how likely it is to impress a first-time user.
  * Deterministic, $0. Used to rank citywide pools for first-message and "surprise me" queries.
- * Score range: -3 (recurring mainstream at massive venue) to 6 (one-off discovery at intimate venue).
+ * Score range: -6 (bare recurring filler) to 11 (one-off discovery editorial pick at intimate venue).
  */
 const VIBE_SCORES = { discovery: 3, niche: 2, platform: 0, mainstream: -2 };
 const VENUE_SCORES = { intimate: 1, medium: 0, large: -1, massive: -1 };
@@ -195,7 +195,11 @@ function scoreInterestingness(event) {
   const venueScore = VENUE_SCORES[event.venue_size] ?? 0;
   const editorialBonus = event.editorial_signal ? 2 : 0;
   const scarcityBonus = event.scarcity ? 2 : 0;
-  return vibeScore + rarityScore + venueScore + editorialBonus + scarcityBonus;
+  // Events with editorial context give the model something to write about
+  const contextBonus = event.short_detail ? 1 : 0;
+  // Bare recurring listings (no editorial, no interaction) are filler — deprioritize
+  const fillerPenalty = (event.is_recurring && !event.short_detail && event.interaction_format !== 'interactive') ? -3 : 0;
+  return vibeScore + rarityScore + venueScore + editorialBonus + scarcityBonus + contextBonus + fillerPenalty;
 }
 
 /**
