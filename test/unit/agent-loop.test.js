@@ -92,7 +92,7 @@ console.log('\nbuildBrainSystemPrompt prompt structure:');
 const anyPrompt = buildBrainSystemPrompt({});
 check('prompt has identity section', anyPrompt.includes('<identity>'));
 check('prompt has data-contract section', anyPrompt.includes('<data-contract>'));
-check('prompt has composition section', anyPrompt.includes('<composition>'));
+check('prompt has conversation section', anyPrompt.includes('<conversation>'));
 check('prompt has examples section', anyPrompt.includes('<examples>'));
 check('prompt has 480 char limit', anyPrompt.includes('480'));
 check('prompt mentions short_detail as trusted field', anyPrompt.includes('short_detail'));
