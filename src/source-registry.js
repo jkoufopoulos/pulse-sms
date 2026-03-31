@@ -1,4 +1,4 @@
-const { fetchSkintEvents, fetchSkintOngoingEvents, fetchNonsenseNYC, fetchYutoriEvents, fetchScreenSlateEvents, fetchBKMagEvents, fetchLumaEvents } = require('./sources');
+const { fetchSkintEvents, fetchSkintOngoingEvents, fetchNonsenseNYC, fetchYutoriEvents, fetchScreenSlateEvents, fetchBKMagEvents } = require('./sources');
 
 // Source tier classification for compose prompt
 const SOURCE_TIERS = {
@@ -8,7 +8,6 @@ const SOURCE_TIERS = {
   Yutori: 'unstructured',
   ScreenSlate: 'unstructured',
   BKMag: 'unstructured',
-  Luma: 'primary',
 };
 
 // ============================================================
@@ -25,7 +24,6 @@ const SOURCES = [
   { label: 'Yutori',           fetch: fetchYutoriEvents,        weight: 0.9,  mergeRank: 2, endpoint: null, minExpected: 20, volatile: true, channel: 'email' },
   { label: 'ScreenSlate',      fetch: fetchScreenSlateEvents,   weight: 0.9,  mergeRank: 3, endpoint: null, minExpected: 5, channel: 'email' },
   { label: 'BKMag',            fetch: fetchBKMagEvents,         weight: 0.9,  mergeRank: 4, endpoint: 'https://www.bkmag.com', minExpected: 5, schedule: { days: ['fri', 'sat'] } },
-  { label: 'Luma',             fetch: fetchLumaEvents,          weight: 0.8,  mergeRank: 5, endpoint: 'https://lu.ma', minExpected: 10 },
 ];
 
 // Boot-time validation — fail fast on config errors
