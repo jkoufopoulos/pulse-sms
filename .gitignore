@@ -14,3 +14,4 @@ scripts/split-reports.js
 scripts/tavily-impact.js
 scripts/trim-reports.js
 *.png
+client_secret*.json
