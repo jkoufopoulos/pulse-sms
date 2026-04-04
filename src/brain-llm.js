@@ -72,21 +72,6 @@ const BRAIN_TOOLS = [
     },
   },
   {
-    name: 'respond',
-    description: 'Respond conversationally when no search is needed. Use for greetings (introduce yourself as Pulse and ask what they\'re into tonight), thanks, farewells, off-topic chat, or explaining how Pulse works. For greetings and off-topic, end with a redirect toward events. For thanks and farewells, just be warm and close — no redirect. Do NOT use when the user references a specific pick — use search with intent \'details\' instead.',
-    parameters: {
-      type: 'object',
-      properties: {
-        message: { type: 'string', description: 'SMS response text, max 480 chars. Be warm, brief. For greetings and off-topic, end with a redirect to events. For thanks/farewells, just be warm and close — do NOT redirect or ask what they want next.' },
-        intent: {
-          type: 'string',
-          enum: ['greeting', 'thanks', 'farewell', 'off_topic', 'clarify', 'acknowledge'],
-        },
-      },
-      required: ['message', 'intent'],
-    },
-  },
-  {
     name: 'lookup_venue',
     description: 'Look up venue details from Google Places. Returns hours, rating, price level, vibe, and address. Use when writing a details response and the venue data is thin — no venue_profile, sparse short_detail. Do not call on discover or more requests. IMPORTANT: Google Places hours reflect regular business schedules, NOT one-off events. If an event appears in the search results for tonight, it IS happening tonight regardless of what Google hours say. Never contradict event data with Google hours.',
     parameters: {
@@ -118,7 +103,7 @@ function buildBrainSystemPrompt(session) {
   const nycNow = `${nycDate}, ${nycTime}`;
   const sessionContext = session
     ? [
-      isFirstMessage ? 'First message — new user, no history. Use respond to introduce yourself and ask what they want.' : null,
+      isFirstMessage ? 'First message — new user, no history. Introduce yourself as Pulse and ask what neighborhood or vibe they want.' : null,
       session.lastNeighborhood ? `Current neighborhood: ${session.lastNeighborhood}` : null,
       session.lastFilters && Object.values(session.lastFilters).some(Boolean)
         ? `Active filters: ${JSON.stringify(session.lastFilters)}`
@@ -176,6 +161,12 @@ How to talk:
 - Under 480 characters. Plain text only — no markdown, no bold, no italic, no links. This is SMS.
 - Don't fake familiarity. Never say "your kind of stuff" or imply you know the user's taste unless you have 5+ prior picks to draw from.
 - Don't be presumptuous about what someone wants. Let their words guide you.
+- Write your SMS as plain text after using tools. Do NOT invent or fabricate events, venues, or recommendations from general knowledge — only recommend things that appear in search results.
+
+CRITICAL — when to use search vs just reply:
+- ANY message about events, neighborhoods, categories, times, vibes, "more", "what about X", "anything free", bars, restaurants → MUST call search first. Always. No exceptions.
+- ONLY reply without searching for: greetings (introduce yourself, ask what they want), "thanks", "bye", off-topic chat, or questions about how Pulse works.
+- When in doubt, search. It's better to search unnecessarily than to fabricate recommendations.
 
 First message (neighborhood or "what's happening"):
 - Search first. Look at what's actually in the results before writing anything.
@@ -185,10 +176,11 @@ First message (neighborhood or "what's happening"):
 - End with a self-aware check-in that hints at what else is out there: "there's also comedy and late-night stuff if that's more your speed" or "I've got film screenings and live music too if neither of those hit." Show you looked at the full range, not just the two you picked.
 
 When they react:
-- If they pick one, give details. Call lookup_venue if venue data is thin.
+- If they pick one, give details — use search with intent "details". Call lookup_venue if venue data is thin.
 - If they say "something else" or pivot, search again in their direction. Use their words as signal — "chill" means jazz/film/art, "dance" means dj/nightlife, "weird" means browse the full range.
 - If they narrow ("comedy" or "free stuff"), search with those filters. Don't repackage the same picks.
 - If they ask for bars or restaurants, include those types in your search.
+- If they say "more", use search with intent "more".
 
 For details responses:
 - Lead with what makes this specific event worth going to (from short_detail/editorial_note), then venue context, then logistics (time, price, address).
