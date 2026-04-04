@@ -331,10 +331,10 @@ const sendBtn = document.getElementById('sendBtn');
 const typingEl = document.getElementById('typing');
 const clockEl = document.getElementById('clock');
 
-let SESSION_PHONE = '+1555' + String(Math.floor(Math.random() * 9000000 + 1000000));
+let SESSION_PHONE = '+15550000000';
 
 function newSession() {
-  SESSION_PHONE = '+1555' + String(Math.floor(Math.random() * 9000000 + 1000000));
+  SESSION_PHONE = '+15550000000';
   messagesEl.innerHTML = '<div class="msg system">SMS Simulator \u2014 messages hit the live pipeline (~$0.0005/msg AI cost)</div>' +
     '<div class="msg system">Send any message to trigger the real welcome flow</div>';
 }
