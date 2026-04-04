@@ -873,7 +873,7 @@ async function refreshScrapeAudit() {
 
 function renderEventMix(mix) {
   const container = $('event-mix-summary');
-  if (!mix) { container.style.display = 'none'; return; }
+  if (!mix || !mix.dateDistribution) { container.style.display = 'none'; return; }
   container.style.display = '';
 
   const dateEntries = Object.entries(mix.dateDistribution);
@@ -1062,10 +1062,11 @@ async function refresh() {
   try {
     const res = await fetch('/health?json=1');
     const data = await res.json();
-    renderSummary(data);
-    renderEventMix(data.eventMix);
-    renderTimingBars(data.sources);
-    renderSourceCards(data.sources);
+    const safe = (fn) => { try { fn(); } catch (e) { console.warn('Render error:', e.message); } };
+    safe(() => renderSummary(data));
+    safe(() => renderEventMix(data.eventMix));
+    safe(() => renderTimingBars(data.sources));
+    safe(() => renderSourceCards(data.sources));
   } catch (err) {
     console.error('Health fetch failed:', err);
   }
