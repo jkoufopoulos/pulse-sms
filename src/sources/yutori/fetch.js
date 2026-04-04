@@ -179,18 +179,38 @@ async function fetchYutoriEvents({ reprocess = false } = {}) {
           const passed = normalized.filter(e => e.name && e.completeness >= 0.25);
           // Drop prose advice/commentary with no structural event signals.
           const contentFiltered = passed.filter(e => {
+            const name = e.name || '';
+            const venue = e.venue_name || '';
+
+            // Reject fabricated midnight times (LLM default when time is unknown)
+            if (e.start_time_local && /T00:00/.test(e.start_time_local)) {
+              e.start_time_local = null;
+            }
+
+            // Reject names that are sentences (>60 chars or >10 words)
+            if (name.length > 60 || name.split(/\s+/).length > 10) return false;
+
+            // Reject venue = name (venue description extracted as event)
+            if (venue && name && venue.toLowerCase().replace(/[^\w]/g, '') === name.toLowerCase().replace(/[^\w]/g, '')) return false;
+
+            // Reject non-event content
+            if (/\b(llm|ai challenge|gsma|security leak|openai|trust safety|dealmaking|market rebound|series [a-c]\b|ipo|fundrais)\b/i.test(name)) return false;
+
+            // Reject limited-run events masquerading as recurring
+            if (/\b(through|thru)\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d/i.test(name)) return false;
+
             const hasTime = !!e.start_time_local;
             const hasUrl = !!e.ticket_url || !!e.source_url;
-            let hasVenue = !!e.venue_name && e.venue_name !== 'TBA';
+            let hasVenue = !!venue && venue !== 'TBA';
             if (hasVenue) {
-              const vLow = e.venue_name.toLowerCase();
-              const nLow = (e.name || '').toLowerCase();
+              const vLow = venue.toLowerCase();
+              const nLow = name.toLowerCase();
               if (nLow.startsWith(vLow) || vLow.startsWith(nLow.split(':')[0])) {
                 hasVenue = false;
               }
             }
             if (!hasTime && !hasVenue && !hasUrl) return false;
-            if (isGarbageName(e.name)) return false;
+            if (isGarbageName(name)) return false;
             return true;
           });
           contentFiltered.forEach(resolveDayOfWeekDate);
