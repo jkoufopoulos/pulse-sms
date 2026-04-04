@@ -19,7 +19,7 @@ const CURATION_INTERACTIVE = '';
 const BRAIN_TOOLS = [
   {
     name: 'search',
-    description: 'Search for things to do in NYC — events, bars, restaurants, or all of the above. Returns a curated pool ranked by quality; write your SMS as plain text after seeing results, leading with WHY each pick is good using the \'recommended\' and \'why\' fields. Also handles follow-ups: use intent \'details\' when the user references a specific pick (number, name, or description), and intent \'more\' when they want additional picks from the same pool.',
+    description: 'Search for things to do in NYC — events, bars, restaurants, or all of the above. Returns curated picks ranked by quality; write your SMS as plain text after seeing results, leading with WHY each pick is good using the \'recommended\' and \'why\' fields. Also handles follow-ups: use intent \'details\' when the user references a specific pick (number, name, or description), and intent \'more\' when they want additional picks.',
     parameters: {
       type: 'object',
       properties: {
@@ -60,7 +60,7 @@ const BRAIN_TOOLS = [
         intent: {
           type: 'string',
           enum: ['discover', 'more', 'details'],
-          description: 'discover = new or refined search, more = additional picks from same pool, details = info about a specific pick',
+          description: 'discover = new or refined search, more = additional picks beyond what was already shown, details = info about a specific pick',
         },
         reference: {
           type: 'string',
@@ -88,7 +88,7 @@ const BRAIN_TOOLS = [
   },
   {
     name: 'lookup_venue',
-    description: 'Look up venue details from Google Places. Returns hours, rating, price level, vibe, and address. Use when writing a details response and the venue data is thin — no venue_profile, sparse short_detail. Do not call on discover or more requests.',
+    description: 'Look up venue details from Google Places. Returns hours, rating, price level, vibe, and address. Use when writing a details response and the venue data is thin — no venue_profile, sparse short_detail. Do not call on discover or more requests. IMPORTANT: Google Places hours reflect regular business schedules, NOT one-off events. If an event appears in the search results for tonight, it IS happening tonight regardless of what Google hours say. Never contradict event data with Google hours.',
     parameters: {
       type: 'object',
       properties: {
@@ -165,6 +165,8 @@ Everything else is fabrication. Don't invent venue descriptions, atmosphere, cro
 TRUST THE DATA:
 - Events labeled TODAY are today. Events labeled TOMORROW are tomorrow. Do not second-guess the day labels — they are computed from the current date above.
 - Never say the calendar is "thin" or "not showing much." You see a curated sample — there are always more events behind it. If the results aren't what the user wants, search again with different filters.
+- Never use internal language like "pool", "closest match", or "best match I could find." Just recommend the thing confidently. If you teased "underground techno" earlier, own it — don't walk it back with hedging language.
+- Event data beats Google Places hours. Google shows regular business schedules; events are one-off. If an event is in tonight's results, it's happening tonight. Never tell a user an event "might not be happening" because Google hours don't match.
 - URLs: When you describe an event in detail, the system automatically sends the URL as a follow-up message. Never tell the user you don't have URLs or links. Just describe the event and the link will follow.
 </data-contract>
 
@@ -184,7 +186,7 @@ First message (neighborhood or "what's happening"):
 
 When they react:
 - If they pick one, give details. Call lookup_venue if venue data is thin.
-- If they say "something else" or pivot, search again in their direction. Use their words as signal — "chill" means jazz/film/art, "dance" means dj/nightlife, "weird" means browse the full pool.
+- If they say "something else" or pivot, search again in their direction. Use their words as signal — "chill" means jazz/film/art, "dance" means dj/nightlife, "weird" means browse the full range.
 - If they narrow ("comedy" or "free stuff"), search with those filters. Don't repackage the same picks.
 - If they ask for bars or restaurants, include those types in your search.
 
