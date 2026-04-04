@@ -15,6 +15,31 @@ const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@googl
 const { getProvider } = require('./model-config');
 const { smartTruncate } = require('./formatters');
 
+// --- Agent loop constants ---
+
+// Tools that are safe to run concurrently (no state mutation)
+const READ_ONLY_TOOLS = new Set(['search', 'lookup_venue']);
+
+/**
+ * Safety net: ensure every tool_use block has a matching tool_result.
+ * Generates synthetic is_error results for any orphaned tool_use blocks.
+ * Prevents Anthropic API rejection: "tool_use ids found without tool_result blocks"
+ */
+function ensureToolResultPairing(toolBlocks, toolResults) {
+  const resultIds = new Set(toolResults.map(r => r.tool_use_id));
+  for (const tb of toolBlocks) {
+    if (!resultIds.has(tb.id)) {
+      toolResults.push({
+        type: 'tool_result',
+        tool_use_id: tb.id,
+        content: JSON.stringify({ error: 'Tool execution was skipped or aborted' }),
+        is_error: true,
+      });
+    }
+  }
+  return toolResults;
+}
+
 // --- String sanitization ---
 
 /**
@@ -513,15 +538,49 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
         return { text: textPart?.text || '', toolCalls, totalUsage, provider, elapsed_ms: Date.now() - loopStart, iterations };
       }
 
-      // Execute all tool calls (Gemini may return multiple)
+      // Execute all tool calls — read-only tools run concurrently, errors become content
       const iterStart = Date.now();
       const functionResponses = [];
-      for (const fnCall of fnCalls) {
-        const toolName = fnCall.functionCall.name;
-        const toolParams = fnCall.functionCall.args || {};
-        const toolResult = await executeTool(toolName, toolParams);
-        toolCalls.push({ name: toolName, params: toolParams, result: toolResult });
-        functionResponses.push({ functionResponse: { name: toolName, response: toolResult } });
+      const allReadOnly = fnCalls.every(fc => READ_ONLY_TOOLS.has(fc.functionCall.name));
+
+      if (allReadOnly && fnCalls.length > 1) {
+        const settled = await Promise.allSettled(
+          fnCalls.map(async (fnCall) => {
+            const toolName = fnCall.functionCall.name;
+            const toolParams = fnCall.functionCall.args || {};
+            const toolResult = await executeTool(toolName, toolParams);
+            return { toolName, toolParams, toolResult };
+          })
+        );
+        for (let idx = 0; idx < settled.length; idx++) {
+          const s = settled[idx];
+          const toolName = fnCalls[idx].functionCall.name;
+          const toolParams = fnCalls[idx].functionCall.args || {};
+          if (s.status === 'fulfilled') {
+            toolCalls.push({ name: s.value.toolName, params: s.value.toolParams, result: s.value.toolResult });
+            functionResponses.push({ functionResponse: { name: s.value.toolName, response: s.value.toolResult } });
+          } else {
+            console.error(`[agentLoop] Tool ${toolName} failed: ${s.reason?.message}`);
+            const errorResult = { error: s.reason?.message || 'Unknown error' };
+            toolCalls.push({ name: toolName, params: toolParams, result: errorResult, is_error: true });
+            functionResponses.push({ functionResponse: { name: toolName, response: errorResult } });
+          }
+        }
+      } else {
+        for (const fnCall of fnCalls) {
+          const toolName = fnCall.functionCall.name;
+          const toolParams = fnCall.functionCall.args || {};
+          try {
+            const toolResult = await executeTool(toolName, toolParams);
+            toolCalls.push({ name: toolName, params: toolParams, result: toolResult });
+            functionResponses.push({ functionResponse: { name: toolName, response: toolResult } });
+          } catch (err) {
+            console.error(`[agentLoop] Tool ${toolName} failed: ${err.message}`);
+            const errorResult = { error: err.message };
+            toolCalls.push({ name: toolName, params: toolParams, result: errorResult, is_error: true });
+            functionResponses.push({ functionResponse: { name: toolName, response: errorResult } });
+          }
+        }
       }
 
       // Stop early if any tool is a terminal tool
@@ -596,18 +655,66 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
         return { text: textBlock?.text || '', toolCalls, totalUsage, provider, elapsed_ms: Date.now() - loopStart, iterations };
       }
 
-      // Execute all tool calls in parallel (Sonnet may return multiple)
+      // Execute tool calls — read-only tools run concurrently, errors become content
       const iterStart = Date.now();
-      const toolResults = [];
-      for (const toolBlock of toolBlocks) {
-        const toolResult = await executeTool(toolBlock.name, toolBlock.input || {});
-        toolCalls.push({ name: toolBlock.name, params: toolBlock.input || {}, result: toolResult });
-        toolResults.push({
-          type: 'tool_result',
-          tool_use_id: toolBlock.id,
-          content: JSON.stringify(sanitizeUnicode(toolResult)),
-        });
+      let toolResults = [];
+      const allReadOnly = toolBlocks.every(tb => READ_ONLY_TOOLS.has(tb.name));
+
+      if (allReadOnly && toolBlocks.length > 1) {
+        const settled = await Promise.allSettled(
+          toolBlocks.map(async (toolBlock) => {
+            const toolResult = await executeTool(toolBlock.name, toolBlock.input || {});
+            return { toolBlock, toolResult };
+          })
+        );
+        for (let idx = 0; idx < settled.length; idx++) {
+          const s = settled[idx];
+          const toolBlock = toolBlocks[idx];
+          if (s.status === 'fulfilled') {
+            toolCalls.push({ name: toolBlock.name, params: toolBlock.input || {}, result: s.value.toolResult });
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: toolBlock.id,
+              content: JSON.stringify(sanitizeUnicode(s.value.toolResult)),
+            });
+          } else {
+            console.error(`[agentLoop] Tool ${toolBlock.name} failed: ${s.reason?.message}`);
+            const errorResult = { error: s.reason?.message || 'Unknown error' };
+            toolCalls.push({ name: toolBlock.name, params: toolBlock.input || {}, result: errorResult, is_error: true });
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: toolBlock.id,
+              content: JSON.stringify(errorResult),
+              is_error: true,
+            });
+          }
+        }
+      } else {
+        for (const toolBlock of toolBlocks) {
+          try {
+            const toolResult = await executeTool(toolBlock.name, toolBlock.input || {});
+            toolCalls.push({ name: toolBlock.name, params: toolBlock.input || {}, result: toolResult });
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: toolBlock.id,
+              content: JSON.stringify(sanitizeUnicode(toolResult)),
+            });
+          } catch (err) {
+            console.error(`[agentLoop] Tool ${toolBlock.name} failed: ${err.message}`);
+            const errorResult = { error: err.message };
+            toolCalls.push({ name: toolBlock.name, params: toolBlock.input || {}, result: errorResult, is_error: true });
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: toolBlock.id,
+              content: JSON.stringify(errorResult),
+              is_error: true,
+            });
+          }
+        }
       }
+
+      // Safety net: ensure every tool_use has a matching tool_result
+      ensureToolResultPairing(toolBlocks, toolResults);
 
       // Stop early if any tool is a terminal tool
       const hitStop = toolBlocks.some(tb => stopTools.includes(tb.name));
