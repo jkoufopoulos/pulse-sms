@@ -1,30 +1,130 @@
 /**
- * source-health.js — No-op stub. Auto-quarantine removed during hypothesis focus.
- * Provides the same API surface so events.js doesn't need surgery.
+ * source-health.js — Per-source scrape health tracking.
+ * Tracks status, event counts, timing, errors, and history for each source.
+ * All state is in-memory (reset on deploy) — sufficient for 6 sources.
  */
 
-// Proxy that auto-creates entries so sourceHealth[label].anything = x never crashes
+const MAX_HISTORY = 14; // ~2 weeks of daily scrapes
+
+// Per-source health state: { [label]: { status, last_count, duration_ms, ... } }
 const sourceHealth = new Proxy({}, {
   get(target, prop) {
-    if (!(prop in target)) target[prop] = {};
+    if (typeof prop !== 'string') return target[prop];
+    if (!(prop in target)) {
+      target[prop] = {
+        status: null,
+        last_count: null,
+        duration_ms: null,
+        last_scrape: null,
+        last_error: null,
+        quarantine_reason: null,
+        consecutive_zeros: 0,
+        history: [],
+      };
+    }
     return target[prop];
   }
 });
 
+// Aggregate scrape stats from most recent run
+let scrapeStats = {};
+
+function updateSourceHealth(label, result) {
+  const h = sourceHealth[label];
+  h.status = result.status || 'ok';
+  h.last_count = result.events ? result.events.length : 0;
+  h.duration_ms = result.durationMs ?? null;
+  h.last_scrape = new Date().toISOString();
+
+  if (result.status === 'error' || result.status === 'timeout') {
+    h.last_error = result.error || 'unknown error';
+    h.consecutive_zeros++;
+  } else if (h.last_count === 0) {
+    h.status = 'empty';
+    h.last_error = null;
+    h.consecutive_zeros++;
+  } else {
+    h.last_error = null;
+    h.consecutive_zeros = 0;
+  }
+
+  // Append to history (capped)
+  h.history.push({
+    count: h.last_count,
+    status: h.status,
+    durationMs: h.duration_ms,
+    timestamp: h.last_scrape,
+  });
+  if (h.history.length > MAX_HISTORY) {
+    h.history = h.history.slice(-MAX_HISTORY);
+  }
+
+  // Compute success rate from history
+  const total = h.history.length;
+  const successes = h.history.filter(entry => entry.status === 'ok').length;
+  h.success_rate = total > 0 ? Math.round((successes / total) * 100) + '%' : '--';
+}
+
+function updateScrapeStats(stats) {
+  scrapeStats = stats;
+}
+
+function saveHealthData() {
+  // In-memory only — no persistence needed for 6 sources with daily scrapes.
+  // State resets on deploy, which is fine: first scrape repopulates everything.
+}
+
+function computeEventMix(events) {
+  const mix = {};
+  for (const e of events) {
+    const cat = e.category || 'other';
+    mix[cat] = (mix[cat] || 0) + 1;
+  }
+  return mix;
+}
+
+function getHealthStatus({ size, timestamp } = {}) {
+  const ageMins = timestamp ? Math.round((Date.now() - timestamp) / 60000) : null;
+  const fresh = size > 0 && ageMins != null && ageMins < 20 * 60;
+
+  // Build sources snapshot (plain objects, not Proxy)
+  const sources = {};
+  for (const [label, h] of Object.entries(Object.assign({}, sourceHealth))) {
+    sources[label] = { ...h };
+  }
+
+  return {
+    status: !fresh ? 'critical' : scrapeStats.sourcesFailed > 0 ? 'degraded' : 'ok',
+    cache: {
+      size: size || 0,
+      fresh,
+      age_minutes: ageMins,
+    },
+    scrape: {
+      totalDurationMs: scrapeStats.totalDurationMs ?? null,
+      completedAt: scrapeStats.completedAt ?? null,
+      sourcesOk: scrapeStats.sourcesOk ?? 0,
+      sourcesFailed: scrapeStats.sourcesFailed ?? 0,
+      sourcesEmpty: scrapeStats.sourcesEmpty ?? 0,
+      sourcesQuarantined: scrapeStats.sourcesQuarantined ?? 0,
+      totalEvents: scrapeStats.totalEvents ?? 0,
+      dedupedEvents: scrapeStats.dedupedEvents ?? 0,
+    },
+    sources,
+  };
+}
+
+// Auto-quarantine disabled — all sources enabled
+function isSourceDisabled() { return false; }
+function shouldProbeDisabled() { return false; }
+
 module.exports = {
   sourceHealth,
-  saveHealthData() {},
-  updateSourceHealth() {},
-  updateScrapeStats() {},
-  computeEventMix(events) {
-    const mix = {};
-    for (const e of events) {
-      const cat = e.category || 'other';
-      mix[cat] = (mix[cat] || 0) + 1;
-    }
-    return mix;
-  },
-  getHealthStatus() { return { sources: {} }; },
-  isSourceDisabled() { return false; },
-  shouldProbeDisabled() { return false; },
+  saveHealthData,
+  updateSourceHealth,
+  updateScrapeStats,
+  computeEventMix,
+  getHealthStatus,
+  isSourceDisabled,
+  shouldProbeDisabled,
 };
