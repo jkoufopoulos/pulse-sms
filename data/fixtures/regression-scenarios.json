@@ -7493,6 +7493,137 @@
           "anti_pattern": "Comedy filter dropped or jazz returns"
         }
       ]
+    },
+    {
+      "name": "Regression: model must not second-guess date labels or expose internals",
+      "category": "regression",
+      "tests_principles": [
+        "P5",
+        "P13"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "Bushwick"
+        },
+        {
+          "turn": 2,
+          "message": "Tonight"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "R1",
+          "principle": "P13",
+          "check": "Returns event picks for Bushwick. Does NOT say 'I'm seeing tomorrow's events' or question the date labels. Does NOT expose internal language like 'the search is showing me' or 'listings haven't updated'.",
+          "anti_pattern": "Model does its own date math, says events are for wrong day, tells user the system is broken, or asks user to 'reset the search'"
+        },
+        {
+          "after_turn": 2,
+          "id": "R2",
+          "principle": "P13",
+          "check": "Returns tonight's events. Does NOT say 'not much going on' or 'listings haven't updated yet'. If pool is sparse, silently broadens to nearby neighborhoods.",
+          "anti_pattern": "Model exposes sparsity ('hard truth', 'not much live going on'), suggests system is broken, or tells user to try a different day"
+        }
+      ]
+    },
+    {
+      "name": "Regression: follow-ups must use search tool, not hallucinate venues",
+      "category": "regression",
+      "tests_principles": [
+        "P7",
+        "P13"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "what's happening in brooklyn tonight"
+        },
+        {
+          "turn": 2,
+          "message": "what about bushwick"
+        },
+        {
+          "turn": 3,
+          "message": "anything free?"
+        },
+        {
+          "turn": 4,
+          "message": "more"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 1,
+          "id": "R3",
+          "principle": "P13",
+          "check": "Returns event picks from the event pool for Brooklyn",
+          "anti_pattern": "Venues or events fabricated from general knowledge"
+        },
+        {
+          "after_turn": 2,
+          "id": "R4",
+          "principle": "P13",
+          "check": "Returns event picks from a fresh search of Bushwick. Events must exist in the pool.",
+          "anti_pattern": "Model recommends venues from general knowledge (Bossa Nova Civic Club, Wonderville, etc.) without them being in the search results"
+        },
+        {
+          "after_turn": 3,
+          "id": "R5",
+          "principle": "P1",
+          "check": "Free filter applied — returns free events from search results in Bushwick",
+          "anti_pattern": "Model fabricates free venue recommendations without searching"
+        },
+        {
+          "after_turn": 4,
+          "id": "R6",
+          "principle": "P7",
+          "check": "Returns additional picks from the pool, no repeats from prior turns",
+          "anti_pattern": "Model fabricates 'more' picks from general knowledge instead of using the event pool"
+        }
+      ]
+    },
+    {
+      "name": "Regression: conversation history corruption must not break subsequent turns",
+      "category": "regression",
+      "tests_principles": [
+        "P7"
+      ],
+      "user_turns": [
+        {
+          "turn": 1,
+          "message": "Blues music tonight"
+        },
+        {
+          "turn": 2,
+          "message": "What about for a date tomorrow"
+        },
+        {
+          "turn": 3,
+          "message": "Anything outside or walkable in north Brooklyn"
+        },
+        {
+          "turn": 4,
+          "message": "Try again"
+        }
+      ],
+      "assertions": [
+        {
+          "after_turn": 3,
+          "id": "R7",
+          "principle": "P7",
+          "check": "Returns outdoor/walkable event picks in north Brooklyn. If this turn errors, the error must not corrupt session state for future turns.",
+          "anti_pattern": "Error on this turn causes 'Pulse hit a snag' on ALL subsequent turns due to corrupted conversation history"
+        },
+        {
+          "after_turn": 4,
+          "id": "R8",
+          "principle": "P7",
+          "check": "'Try again' produces a valid response with real event picks, even if turn 3 errored. Session must recover.",
+          "anti_pattern": "Same error repeats because broken tool_use/tool_result pair is stuck in conversation history"
+        }
+      ]
     }
   ]
 }
