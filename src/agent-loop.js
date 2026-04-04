@@ -6,8 +6,7 @@
  * Session save happens AFTER the loop based on which tools were called.
  *
  * Design:
- *   - respond tool: SMS text comes from params.message (model writes it in tool call)
- *   - search tool: SMS text comes from loopResult.text (model writes after seeing results)
+ *   - SMS text always comes from loopResult.text (model writes plain text after tool results, or directly for conversational turns)
  *   - Internal data (_poolResult, _placePoolResult, _moreResult, _welcomeResult) attached to tool results for session save
  *   - sanitizeForLLM strips _ prefixed keys before data goes to the model
  */
@@ -195,9 +194,6 @@ function deriveIntent(toolCalls) {
     return 'events';
   }
 
-  const lastRespond = [...toolCalls].reverse().find(tc => tc.name === 'respond');
-  if (lastRespond) return 'conversational';
-
   return 'conversational';
 }
 
@@ -211,10 +207,6 @@ function deriveIntent(toolCalls) {
  * The caller wraps this with sanitizeForLLM before passing to the LLM.
  */
 async function executeTool(toolName, params, session, phone, trace) {
-  if (toolName === 'respond') {
-    return { ok: true, intent: params.intent };
-  }
-
   if (toolName === 'search') {
     const { intent, neighborhood, types, filters, reference } = params;
     const searchTypes = types || inferTypesFromQuery(params.query);
@@ -556,24 +548,24 @@ function saveSessionFromToolCalls(phone, session, toolCalls, smsText) {
   if (!toolCalls?.length) return;
 
   const lastSearch = [...toolCalls].reverse().find(tc => tc.name === 'search');
-  const lastRespond = [...toolCalls].reverse().find(tc => tc.name === 'respond');
 
-  // respond only (no search) — preserve existing session
-  if (!lastSearch && lastRespond) {
-    saveResponseFrame(phone, {
-      picks: session?.lastPicks || [],
-      eventMap: session?.lastEvents || {},
-      neighborhood: session?.lastNeighborhood || null,
-      borough: session?.lastBorough || null,
-      filters: session?.lastFilters || null,
-      offeredIds: session?.allOfferedIds || [],
-      visitedHoods: session?.visitedHoods || [],
-      lastResponseHadPicks: false,
-    });
+  // No search tool called (conversational turn) — preserve existing session
+  if (!lastSearch) {
+    if (toolCalls.length === 0) {
+      // Pure conversational — no tools at all. Preserve session via saveResponseFrame.
+      saveResponseFrame(phone, {
+        picks: session?.lastPicks || [],
+        eventMap: session?.lastEvents || {},
+        neighborhood: session?.lastNeighborhood || null,
+        borough: session?.lastBorough || null,
+        filters: session?.lastFilters || null,
+        offeredIds: session?.allOfferedIds || [],
+        visitedHoods: session?.visitedHoods || [],
+        lastResponseHadPicks: false,
+      });
+    }
     return;
   }
-
-  if (!lastSearch) return;
 
   const { params, result } = lastSearch;
   const intent = params.intent;
@@ -744,7 +736,7 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     const loopResult = await runAgentLoop(
       MODELS.brain, systemPrompt, message, BRAIN_TOOLS,
       executeAndTrack,
-      { maxIterations: 3, timeout: 12000, stopTools: ['respond'], priorMessages }
+      { maxIterations: 3, timeout: 12000, priorMessages }
     );
 
     // Record costs
@@ -759,14 +751,8 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     trace.routing.pre_routed = false;
     trace.routing.provider = loopResult.provider;
 
-    // Determine SMS: respond > loopResult.text (model-composed)
-    const lastRespond = [...rawResults].reverse().find(tc => tc.name === 'respond');
-    let smsText;
-    if (lastRespond) {
-      smsText = lastRespond.params.message;
-    } else {
-      smsText = loopResult.text;
-    }
+    // SMS comes from model's plain text output (after tool results, or directly for conversational)
+    let smsText = loopResult.text;
     // Fallback: if model failed to compose (MALFORMED_FUNCTION_CALL), build SMS from pool
     if (!smsText) {
       const lastSearchFb = [...rawResults].reverse().find(tc => tc.name === 'search');
@@ -878,7 +864,7 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
         const fallbackResult = await runAgentLoop(
           MODELS.fallback, systemPrompt, message, BRAIN_TOOLS,
           async (toolName, params) => sanitizeForLLM(await executeTool(toolName, params, session, phone, trace)),
-          { maxIterations: 2, timeout: 12000, stopTools: ['respond'], priorMessages: fbPriorMessages }
+          { maxIterations: 2, timeout: 12000, priorMessages: fbPriorMessages }
         );
 
         recordAICost(trace, 'brain_fallback', fallbackResult.totalUsage, fallbackResult.provider);
@@ -886,8 +872,7 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
         trace.brain_latency_ms = (trace.brain_latency_ms || 0) + (fallbackResult.elapsed_ms || 0);
         trace.brain_iterations = [...(trace.brain_iterations || []), ...(fallbackResult.iterations || [])];
 
-        const fbRespond = [...fallbackResult.toolCalls].reverse().find(tc => tc.name === 'respond');
-        let fbSmsText = fbRespond ? fbRespond.params.message : fallbackResult.text;
+        let fbSmsText = fallbackResult.text;
         fbSmsText = smartTruncate(fbSmsText || "Tell me what you're in the mood for!");
 
         await sendSMS(phone, fbSmsText);

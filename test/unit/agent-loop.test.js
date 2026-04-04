@@ -71,7 +71,7 @@ const lookupTool = BRAIN_TOOLS.find(t => t.name === 'lookup_venue');
 check('lookup_venue tool exists in BRAIN_TOOLS', !!lookupTool);
 check('lookup_venue has venue_name required', lookupTool.parameters.required.includes('venue_name'));
 check('lookup_venue has neighborhood param', !!lookupTool.parameters.properties.neighborhood);
-check('BRAIN_TOOLS has exactly 3 tools', BRAIN_TOOLS.length === 3);
+check('BRAIN_TOOLS has exactly 2 tools', BRAIN_TOOLS.length === 2);
 
 // ---- buildBrainSystemPrompt first-session indicator ----
 console.log('\nbuildBrainSystemPrompt first-session:');
