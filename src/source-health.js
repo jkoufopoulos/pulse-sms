@@ -1,9 +1,13 @@
 /**
  * source-health.js — Per-source scrape health tracking.
  * Tracks status, event counts, timing, errors, and history for each source.
- * All state is in-memory (reset on deploy) — sufficient for 6 sources.
+ * Persists to data/source-health.json so state survives restarts.
  */
 
+const fs = require('fs');
+const path = require('path');
+
+const HEALTH_FILE = path.join(__dirname, '../data/source-health.json');
 const MAX_HISTORY = 14; // ~2 weeks of daily scrapes
 
 // Per-source health state: { [label]: { status, last_count, duration_ms, ... } }
@@ -28,6 +32,22 @@ const sourceHealth = new Proxy({}, {
 
 // Aggregate scrape stats from most recent run
 let scrapeStats = {};
+
+// Load persisted state on startup
+try {
+  const saved = JSON.parse(fs.readFileSync(HEALTH_FILE, 'utf8'));
+  if (saved.sources) {
+    for (const [label, data] of Object.entries(saved.sources)) {
+      Object.assign(sourceHealth[label], data);
+    }
+  }
+  if (saved.scrapeStats) {
+    scrapeStats = saved.scrapeStats;
+  }
+  console.log(`Loaded source health for ${Object.keys(saved.sources || {}).length} sources`);
+} catch {
+  // No saved data yet — starts fresh
+}
 
 function updateSourceHealth(label, result) {
   const h = sourceHealth[label];
@@ -70,8 +90,15 @@ function updateScrapeStats(stats) {
 }
 
 function saveHealthData() {
-  // In-memory only — no persistence needed for 6 sources with daily scrapes.
-  // State resets on deploy, which is fine: first scrape repopulates everything.
+  const sources = {};
+  for (const [label, h] of Object.entries(Object.assign({}, sourceHealth))) {
+    sources[label] = { ...h };
+  }
+  try {
+    fs.writeFileSync(HEALTH_FILE, JSON.stringify({ sources, scrapeStats }, null, 2));
+  } catch (err) {
+    console.warn('Failed to persist source health:', err.message);
+  }
 }
 
 function computeEventMix(events) {
