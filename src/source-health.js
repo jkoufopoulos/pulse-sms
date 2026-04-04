@@ -102,12 +102,73 @@ function saveHealthData() {
 }
 
 function computeEventMix(events) {
-  const mix = {};
+  const categoryDistribution = {};
+  const neighborhoodDistribution = {};
+  const dateDistribution = {};
+  let free = 0, paid = 0;
+
+  // Build 7-day date range starting today
+  const today = new Date();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() + i);
+    dateDistribution[d.toISOString().slice(0, 10)] = 0;
+  }
+
   for (const e of events) {
     const cat = e.category || 'other';
-    mix[cat] = (mix[cat] || 0) + 1;
+    categoryDistribution[cat] = (categoryDistribution[cat] || 0) + 1;
+    if (e.neighborhood) {
+      neighborhoodDistribution[e.neighborhood] = (neighborhoodDistribution[e.neighborhood] || 0) + 1;
+    }
+    if (e.date_local && dateDistribution[e.date_local] !== undefined) {
+      dateDistribution[e.date_local]++;
+    }
+    if (e.is_free) free++; else paid++;
   }
-  return mix;
+
+  // Event composition
+  const recurring = events.filter(e => e.is_recurring).length;
+  const triviaRe = /trivia/i;
+  const trivia = events.filter(e => triviaRe.test(e.category || '') || triviaRe.test(e.name || '') || triviaRe.test(e.subcategory || '')).length;
+  const recurringOrTrivia = events.filter(e => e.is_recurring || triviaRe.test(e.category || '') || triviaRe.test(e.name || '') || triviaRe.test(e.subcategory || '')).length;
+  const unique = events.length - recurringOrTrivia;
+
+  // Data gaps by source — seed with all registered sources so they always appear
+  const gapTypes = [
+    { key: 'tbaVenue', test: e => e.venue_name === 'TBA' || e.venue_name === 'tba' },
+    { key: 'noVenue', test: e => !e.venue_name },
+    { key: 'noNeighborhood', test: e => !e.neighborhood },
+    { key: 'noDescription', test: e => !e.description_short && !e.description },
+    { key: 'noTime', test: e => !e.start_time_local },
+    { key: 'noUrl', test: e => !e.ticket_url && !e.source_url },
+  ];
+  const dataGaps = {};
+  try {
+    const { SOURCES } = require('./source-registry');
+    for (const s of SOURCES) {
+      dataGaps[s.label] = { count: 0, gaps: {} };
+    }
+  } catch {}
+  for (const e of events) {
+    const src = e.source_name || 'unknown';
+    if (!dataGaps[src]) dataGaps[src] = { count: 0, gaps: {} };
+    dataGaps[src].count++;
+    for (const g of gapTypes) {
+      if (!dataGaps[src].gaps[g.key]) dataGaps[src].gaps[g.key] = 0;
+      if (g.test(e)) dataGaps[src].gaps[g.key]++;
+    }
+  }
+
+  return {
+    total: events.length,
+    categoryDistribution,
+    neighborhoodDistribution,
+    dateDistribution,
+    freePaid: { free, paid },
+    composition: { recurring, trivia, unique, recurringOrTrivia },
+    dataGaps,
+  };
 }
 
 function getHealthStatus({ size, timestamp } = {}) {
@@ -141,6 +202,53 @@ function getHealthStatus({ size, timestamp } = {}) {
   };
 }
 
+/**
+ * Compute a coverage matrix: neighborhood x category with completeness stats.
+ * An event is "complete" if it has time + neighborhood + (URL or description).
+ */
+function computeCoverageMatrix(events) {
+  const isComplete = e => !!e.start_time_local && !!e.neighborhood && (!!e.source_url || !!e.ticket_url || !!e.description_short);
+
+  const byNeighborhood = {};
+  const byCategory = {};
+  const byDate = {};
+  let totalComplete = 0;
+
+  for (const e of events) {
+    const hood = e.neighborhood || 'Unknown';
+    const cat = e.category || 'other';
+    const date = e.date_local || 'undated';
+    const complete = isComplete(e);
+    if (complete) totalComplete++;
+
+    if (!byNeighborhood[hood]) byNeighborhood[hood] = { total: 0, complete: 0, categories: {} };
+    byNeighborhood[hood].total++;
+    if (complete) byNeighborhood[hood].complete++;
+    byNeighborhood[hood].categories[cat] = (byNeighborhood[hood].categories[cat] || 0) + 1;
+
+    if (!byCategory[cat]) byCategory[cat] = { total: 0, complete: 0 };
+    byCategory[cat].total++;
+    if (complete) byCategory[cat].complete++;
+
+    if (!byDate[date]) byDate[date] = { total: 0, complete: 0 };
+    byDate[date].total++;
+    if (complete) byDate[date].complete++;
+  }
+
+  return {
+    byNeighborhood,
+    byCategory,
+    byDate,
+    summary: {
+      total: events.length,
+      complete: totalComplete,
+      completeRate: events.length > 0 ? Math.round(totalComplete / events.length * 100) : 0,
+      neighborhoods: Object.keys(byNeighborhood).length,
+      categories: Object.keys(byCategory).length,
+    },
+  };
+}
+
 // Auto-quarantine disabled — all sources enabled
 function isSourceDisabled() { return false; }
 function shouldProbeDisabled() { return false; }
@@ -151,6 +259,7 @@ module.exports = {
   updateSourceHealth,
   updateScrapeStats,
   computeEventMix,
+  computeCoverageMatrix,
   getHealthStatus,
   isSourceDisabled,
   shouldProbeDisabled,

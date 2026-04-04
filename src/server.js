@@ -193,7 +193,10 @@ app.get('/events', (req, res) => {
 });
 app.get('/api/events', (req, res) => {
   const { getRawCache } = require('./events');
-  res.json(getRawCache());
+  const { SOURCES } = require('./source-registry');
+  const data = getRawCache();
+  data.registeredSources = SOURCES.map(s => s.label);
+  res.json(data);
 });
 
 // Agent Eye — simulate what the model sees for a neighborhood/filter combo

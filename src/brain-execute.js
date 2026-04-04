@@ -6,7 +6,7 @@ const { extractNeighborhood, BOROUGHS, detectBorough } = require('./neighborhood
 const { getAdjacentNeighborhoods, getNycDateString, filterByTimeAfter, filterUpcomingEvents } = require('./geo');
 const { getEvents, getEventsForBorough, getEventsCitywide, getCacheStatus, scoreInterestingness, scoreSurprise, selectDiversePicks } = require('./events');
 const { filterKidsEvents } = require('./curation');
-const { buildTaggedPool, buildEventMap, saveResponseFrame, mergeFilters, buildZeroMatchResponse, describeFilters, failsTimeGate, eventMatchesFilters } = require('./pipeline');
+const { buildTaggedPool, buildEventMap, saveResponseFrame, mergeFilters, buildZeroMatchResponse, describeFilters, failsTimeGate, eventMatchesFilters, computeTimeProximityBoost } = require('./pipeline');
 const { setSession } = require('./session');
 
 // --- Date range resolution ---
@@ -336,7 +336,28 @@ async function buildSearchPool(params, session, phone, trace) {
 
   // 5. Build tagged pool
   const taggedResult = buildTaggedPool(curated, activeFilters, { citywide: isCitywide || isBorough });
-  const { matchCount, hardCount, softCount, isSparse } = taggedResult;
+  let { matchCount, hardCount, softCount, isSparse } = taggedResult;
+
+  // 5a. Auto-expand to adjacent neighborhoods when sparse
+  if (isSparse && hood && !isBorough && !isCitywide) {
+    const expandHoods = getAdjacentNeighborhoods(hood, 3);
+    if (expandHoods.length > 0) {
+      console.log(`[POOL] Sparse results for ${hood} (${matchCount} matches), expanding to: ${expandHoods.join(', ')}`);
+      const existingIds = new Set(taggedResult.pool.map(e => e.id));
+      const qualityEvents = getEvents();
+      const adjacentEvents = qualityEvents.filter(e =>
+        expandHoods.includes(e.neighborhood) && !existingIds.has(e.id)
+      );
+      if (adjacentEvents.length > 0) {
+        for (const e of adjacentEvents) {
+          e._nearby = true;
+          e._nearbyFrom = hood;
+        }
+        taggedResult.pool.push(...adjacentEvents);
+        trace.events.nearby_expansion = { from: hood, hoods: expandHoods, added: adjacentEvents.length };
+      }
+    }
+  }
 
   // 5b. Score and trim pool to top N for the model
   const { curatedPool: trimmedPool, fullScoredPool } = curatePool(taggedResult.pool, hood);
@@ -352,7 +373,7 @@ async function buildSearchPool(params, session, phone, trace) {
     source_vibe: e.source_vibe || null,
     editorial_signal: e.editorial_signal || false,
     scarcity: e.scarcity || null,
-    interestingness: scoreInterestingness(e),
+    interestingness: scoreInterestingness(e) + computeTimeProximityBoost(e),
   }));
   trace.events.pool_meta = { matchCount, hardCount, softCount, isSparse };
   trace.events.full_scored_count = fullScoredPool.length;
@@ -586,10 +607,10 @@ function curatePool(pool, requestedHood, { poolSize = DEFAULT_POOL_SIZE, userPro
     return { curatedPool: [], fullScoredPool: [] };
   }
 
-  // 1. Score every event
+  // 1. Score every event (with time-proximity boost)
   const fullScoredPool = pool.map(e => ({
     ...e,
-    interestingness: scoreInterestingness(e),
+    interestingness: scoreInterestingness(e) + computeTimeProximityBoost(e),
   }));
 
   // 2. Split into requested hood vs nearby

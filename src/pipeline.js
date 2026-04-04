@@ -453,4 +453,35 @@ async function sendPickUrls(phone, picks, eventMap) {
   }
 }
 
-module.exports = { buildEventMap, saveResponseFrame, buildExhaustionMessage, describeFilters, buildZeroMatchResponse, mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, failsTimeGate, sendPickUrls };
+/**
+ * Compute a time-proximity boost for an event relative to "now."
+ * Returns 0.0-0.4 bonus score:
+ *   - 0.4 if event is happening right now
+ *   - 0.2-0.3 if starting within 2 hours
+ *   - 0.05-0.15 if starting within 4 hours
+ *   - 0 if already ended, no time, or >4 hours away
+ */
+function computeTimeProximityBoost(event, now = new Date()) {
+  if (!event.start_time_local) return 0;
+
+  const start = new Date(event.start_time_local);
+  const end = event.end_time_local ? new Date(event.end_time_local) : null;
+  const nowMs = now.getTime();
+
+  // Already ended
+  if (end && end.getTime() < nowMs) return 0;
+
+  // Happening now (started but not ended)
+  if (start.getTime() <= nowMs && (!end || end.getTime() > nowMs)) return 0.4;
+
+  // Future event — boost inversely proportional to time until start
+  const hoursUntilStart = (start.getTime() - nowMs) / (1000 * 60 * 60);
+  if (hoursUntilStart <= 0) return 0.4;
+  if (hoursUntilStart <= 1) return 0.3;
+  if (hoursUntilStart <= 2) return 0.2;
+  if (hoursUntilStart <= 3) return 0.1;
+  if (hoursUntilStart <= 4) return 0.05;
+  return 0;
+}
+
+module.exports = { buildEventMap, saveResponseFrame, buildExhaustionMessage, describeFilters, buildZeroMatchResponse, mergeFilters, eventMatchesFilters, buildTaggedPool, normalizeFilters, failsTimeGate, sendPickUrls, computeTimeProximityBoost };

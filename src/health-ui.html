@@ -445,6 +445,16 @@
   /* Event Mix Summary */
   .event-mix-summary { margin-bottom: 24px; }
 
+  /* Data Gaps */
+  .gaps-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; padding-left: 7px; }
+  .gaps-name { font-size: 11px; color: #bbb; width: 110px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
+  .gaps-track { flex: 1; height: 14px; background: #222; border-radius: 3px; overflow: hidden; display: flex; }
+  .gaps-seg { height: 100%; min-width: 1px; }
+  .gaps-count { font-size: 11px; color: #666; width: 70px; flex-shrink: 0; text-align: right; }
+  .gaps-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; }
+  .gaps-legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #aaa; }
+  .gaps-legend-swatch { width: 10px; height: 10px; border-radius: 2px; }
+
   /* Scrape controls */
   .scrape-btn {
     background: #222; border: 1px solid #444; color: #ccc; font-size: 11px;
@@ -538,6 +548,22 @@
     <a href="/events" style="font-size:12px;color:#FF6B35;text-decoration:none">Full analytics &rarr;</a>
   </div>
   <div class="summary-row" id="event-mix-cards"></div>
+</div>
+
+<div class="event-mix-summary" id="event-composition-section" style="display:none">
+  <h2 style="font-size:16px;font-weight:600;color:#aaa;margin-bottom:12px">Event Composition</h2>
+  <div class="summary-row" id="event-composition-cards"></div>
+</div>
+
+<div class="event-mix-summary" id="data-gaps-section" style="display:none">
+  <h2 style="font-size:16px;font-weight:600;color:#aaa;margin-bottom:12px">Data Gaps by Source</h2>
+  <div id="data-gaps-chart"></div>
+</div>
+
+<div class="event-mix-summary" id="coverage-section" style="display:none">
+  <h2 style="font-size:16px;font-weight:600;color:#aaa;margin-bottom:12px">Coverage Matrix</h2>
+  <div class="summary-row" id="coverage-summary-cards"></div>
+  <div id="coverage-heatmap" style="margin-top:12px"></div>
 </div>
 
 <div class="timing-section">
@@ -890,6 +916,103 @@ function renderEventMix(mix) {
     { label: 'Neighborhoods', value: hoodCount, sub: topHood ? `top: ${topHood[0]} (${topHood[1]})` : '' },
     { label: 'Free Events', value: `${mix.freePaid.free} (${freePct}%)`, sub: `${mix.freePaid.paid} paid` },
   ].map(c => `<div class="summary-card"><div class="label">${c.label}</div><div class="value">${c.value}</div><div class="sub">${c.sub}</div></div>`).join('');
+
+  // Composition
+  const comp = mix.composition;
+  if (comp) {
+    const compSection = $('event-composition-section');
+    compSection.style.display = '';
+    const uniquePct = mix.total > 0 ? Math.round(comp.unique / mix.total * 100) : 0;
+    const recurPct = mix.total > 0 ? Math.round(comp.recurring / mix.total * 100) : 0;
+    const triviaPct = mix.total > 0 ? Math.round(comp.trivia / mix.total * 100) : 0;
+    $('event-composition-cards').innerHTML = [
+      { label: 'Unique Events', value: comp.unique, sub: `${uniquePct}% of pool` },
+      { label: 'Recurring', value: comp.recurring, sub: `${recurPct}% of pool` },
+      { label: 'Trivia', value: comp.trivia, sub: `${triviaPct}% of pool` },
+      { label: 'Total', value: mix.total, sub: `serving now` },
+    ].map(c => `<div class="summary-card"><div class="label">${c.label}</div><div class="value">${c.value}</div><div class="sub">${c.sub}</div></div>`).join('');
+  }
+
+  // Data gaps
+  const gaps = mix.dataGaps;
+  if (gaps) {
+    const gapSection = $('data-gaps-section');
+    gapSection.style.display = '';
+    const GAP_TYPES = [
+      { key: 'tbaVenue', label: 'TBA Venue', color: '#fc8181' },
+      { key: 'noVenue', label: 'No Venue', color: '#f6ad55' },
+      { key: 'noNeighborhood', label: 'No Neighborhood', color: '#f6e05e' },
+      { key: 'noDescription', label: 'No Description', color: '#90cdf4' },
+      { key: 'noTime', label: 'No Time', color: '#b794f4' },
+      { key: 'noUrl', label: 'No URL', color: '#fbb6ce' },
+    ];
+    const sorted = Object.entries(gaps).map(([name, s]) => {
+      const totalGaps = GAP_TYPES.reduce((sum, g) => sum + (s.gaps[g.key] || 0), 0);
+      return { name, count: s.count, gaps: s.gaps, totalGaps };
+    }).sort((a, b) => b.totalGaps - a.totalGaps);
+    const maxGaps = Math.max(...sorted.map(s => s.totalGaps), 1);
+
+    let html = '<div class="gaps-legend">';
+    for (const g of GAP_TYPES) {
+      const total = sorted.reduce((s, src) => s + (src.gaps[g.key] || 0), 0);
+      if (total === 0) continue;
+      html += `<span class="gaps-legend-item"><span class="gaps-legend-swatch" style="background:${g.color}"></span>${g.label} (${total})</span>`;
+    }
+    html += '</div>';
+
+    for (const s of sorted) {
+      html += `<div class="gaps-row" title="${s.name}: ${s.totalGaps} gaps in ${s.count} events">`;
+      html += `<span class="gaps-name">${s.name}</span>`;
+      html += '<div class="gaps-track">';
+      if (s.totalGaps === 0) {
+        html += '<div style="font-size:10px;color:#4ade80;padding:0 6px;line-height:14px">complete</div>';
+      } else {
+        for (const g of GAP_TYPES) {
+          const count = s.gaps[g.key] || 0;
+          if (count === 0) continue;
+          const widthPct = (count / maxGaps * 100).toFixed(1);
+          html += `<div class="gaps-seg" style="width:${widthPct}%;background:${g.color}" title="${g.label}: ${count}/${s.count}"></div>`;
+        }
+      }
+      html += '</div>';
+      html += `<span class="gaps-count">${s.totalGaps} / ${s.count}</span>`;
+      html += '</div>';
+    }
+    $('data-gaps-chart').innerHTML = html;
+  }
+}
+
+function renderCoverageMatrix(matrix) {
+  const section = $('coverage-section');
+  if (!matrix || !matrix.summary) { section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  $('coverage-summary-cards').innerHTML = [
+    { label: 'Usable Events', value: `${matrix.summary.complete}/${matrix.summary.total}`, sub: `${matrix.summary.completeRate}% complete` },
+    { label: 'Neighborhoods', value: matrix.summary.neighborhoods, sub: 'with events' },
+    { label: 'Categories', value: matrix.summary.categories, sub: 'represented' },
+  ].map(c => `<div class="summary-card"><div class="label">${c.label}</div><div class="value">${c.value}</div><div class="sub">${c.sub}</div></div>`).join('');
+
+  const hoods = Object.entries(matrix.byNeighborhood)
+    .filter(([name]) => name !== 'Unknown')
+    .sort((a, b) => b[1].total - a[1].total)
+    .slice(0, 20);
+
+  if (hoods.length === 0) { $('coverage-heatmap').innerHTML = ''; return; }
+
+  const maxCount = Math.max(...hoods.map(([,h]) => h.total));
+  let html = '<div style="font-size:11px;color:#666;margin-bottom:6px">Top 20 neighborhoods by event count</div>';
+  for (const [name, data] of hoods) {
+    const pct = (data.total / maxCount * 100).toFixed(0);
+    const completePct = data.total > 0 ? Math.round(data.complete / data.total * 100) : 0;
+    const barColor = completePct >= 80 ? '#4ade80' : completePct >= 50 ? '#fbbf24' : '#f87171';
+    html += `<div class="gaps-row" title="${name}: ${data.total} events, ${completePct}% complete">`;
+    html += `<span class="gaps-name">${name}</span>`;
+    html += `<div class="gaps-track"><div class="gaps-seg" style="width:${pct}%;background:${barColor}" title="${data.complete}/${data.total} complete"></div></div>`;
+    html += `<span class="gaps-count">${data.total} (${completePct}%)</span>`;
+    html += '</div>';
+  }
+  $('coverage-heatmap').innerHTML = html;
 }
 
 // ========== Scrape controls ==========
@@ -1065,6 +1188,7 @@ async function refresh() {
     const safe = (fn) => { try { fn(); } catch (e) { console.warn('Render error:', e.message); } };
     safe(() => renderSummary(data));
     safe(() => renderEventMix(data.eventMix));
+    safe(() => renderCoverageMatrix(data.coverageMatrix));
     safe(() => renderTimingBars(data.sources));
     safe(() => renderSourceCards(data.sources));
   } catch (err) {

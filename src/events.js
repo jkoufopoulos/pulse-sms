@@ -664,6 +664,18 @@ async function refreshCache() {
       console.error('Geocoding failed, continuing with un-geocoded events:', err.message);
     }
 
+    // Enrich events missing URLs, times, descriptions
+    try {
+      const { enrichEvents } = require('./enrich');
+      const enrichCount = await enrichEvents(validEvents);
+      if (enrichCount > 0) console.log(`Enrichment: filled gaps for ${enrichCount} events`);
+    } catch (err) {
+      console.warn('Enrichment failed, continuing:', err.message);
+    }
+
+    // Backfill neighborhoods from known venues at scrape time
+    backfillNeighborhoodFromVenue(validEvents);
+
     // Drop events with resolved venue coordinates outside NYC bounding box
     // Events with NO coordinates are kept (might be unlisted NYC venues)
     const NYC_BOUNDS = { latMin: 40.49, latMax: 40.92, lngMin: -74.27, lngMax: -73.68 };
@@ -992,6 +1004,18 @@ async function refreshSources(sourceNames, { reprocess = false } = {}) {
 
   // Resolve neighborhoods for new events via venue map + geocoding
   await batchGeocodeEvents(validNew);
+
+  // Enrich events missing URLs, times, descriptions
+  try {
+    const { enrichEvents } = require('./enrich');
+    const enrichCount = await enrichEvents(validNew);
+    if (enrichCount > 0) console.log(`Enrichment: filled gaps for ${enrichCount} events`);
+  } catch (err) {
+    console.warn('Enrichment failed, continuing:', err.message);
+  }
+
+  // Backfill neighborhoods from known venues at scrape time
+  backfillNeighborhoodFromVenue(validNew);
 
   // Write to SQLite and rebuild 7-day serving cache
   const weekOut = getNycDateString(7);
@@ -1377,6 +1401,9 @@ function getHealthStatus() {
   const result = _getHealthStatus({ size: eventCache.length, timestamp: cacheTimestamp });
   // Attach eventMix computed from live cache
   result.eventMix = computeEventMix(eventCache);
+  // Attach coverage matrix
+  const { computeCoverageMatrix } = require('./source-health');
+  result.coverageMatrix = computeCoverageMatrix(eventCache);
   // Attach recurring pattern count
   try {
     const { getPatternCount } = require('./db');

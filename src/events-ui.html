@@ -192,9 +192,7 @@
   .gaps-legend { display: flex; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
   .gaps-legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #aaa; }
   .gaps-legend-swatch { width: 10px; height: 10px; border-radius: 2px; }
-  .gaps-source-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; cursor: pointer; border-left: 3px solid transparent; padding-left: 4px; }
-  .gaps-source-row:hover { background: #1f1f1f; }
-  .gaps-source-row.active { background: #1f1f1f; border-left-color: #FF6B35; }
+  .gaps-source-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; padding-left: 7px; }
   .gaps-source-name { font-size: 11px; color: #bbb; width: 110px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
   .gaps-bar-track { flex: 1; height: 14px; background: #222; border-radius: 3px; overflow: hidden; display: flex; }
   .gaps-bar-seg { height: 100%; min-width: 1px; transition: width 0.3s; }
@@ -570,6 +568,7 @@
 
 <script>
 let allEvents = [];
+let registeredSources = [];
 let filteredEvents = [];
 let currentSort = { col: 'start_time_local', asc: true };
 let selectedId = null;
@@ -583,6 +582,7 @@ async function loadEvents() {
     const res = await fetch('/api/events');
     const data = await res.json();
     allEvents = data.events || [];
+    registeredSources = data.registeredSources || [];
     if (allEvents.length === 0) {
       document.getElementById('event-table').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#666;padding:40px">No events in cache. The daily scrape runs at 10am ET, or force one with <code>POST /api/scrape</code>.</td></tr>';
       return;
@@ -1173,8 +1173,11 @@ function renderDataGaps(events) {
     { key: 'noUrl', label: 'No URL', color: '#fbb6ce', test: e => !e.ticket_url && !e.source_url },
   ];
 
-  // Aggregate by source
+  // Aggregate by source — seed with all registered sources
   const sources = {};
+  for (const label of registeredSources) {
+    sources[label] = { count: 0, gaps: {} };
+  }
   for (const e of events) {
     const src = e.source_name || 'unknown';
     if (!sources[src]) sources[src] = { count: 0, gaps: {} };
@@ -1191,9 +1194,8 @@ function renderDataGaps(events) {
     return { name, count: s.count, gaps: s.gaps, totalGaps };
   }).sort((a, b) => b.totalGaps - a.totalGaps);
 
-  // Only show sources that have gaps
-  const withGaps = sorted.filter(s => s.totalGaps > 0);
-  if (withGaps.length === 0) { el.innerHTML = '<div style="color:#4ade80;font-size:12px">All events have complete data</div>'; return; }
+  // Show all sources (including those with zero gaps)
+  if (sorted.length === 0) { el.innerHTML = '<div style="color:#4ade80;font-size:12px">All events have complete data</div>'; return; }
 
   let html = '';
 
@@ -1204,24 +1206,23 @@ function renderDataGaps(events) {
     if (total === 0) continue;
     html += `<span class="gaps-legend-item"><span class="gaps-legend-swatch" style="background:${g.color}"></span>${g.label} (${total})</span>`;
   }
-  if (document.getElementById('f-source').value) {
-    html += `<span class="gaps-legend-item" onclick="filterBySource(document.getElementById('f-source').value)" style="cursor:pointer;color:#FF6B35">✕ clear source</span>`;
-  }
   html += '</div>';
 
   // Stacked bar per source
-  const maxGaps = Math.max(...withGaps.map(s => s.totalGaps));
-  const activeSource = document.getElementById('f-source').value;
-  for (const s of withGaps) {
-    const isActive = activeSource === s.name;
-    html += `<div class="gaps-source-row${isActive ? ' active' : ''}" onclick="filterBySource('${esc(s.name)}')" title="${s.name}: ${s.totalGaps} gaps in ${s.count} events">`;
+  const maxGaps = Math.max(...sorted.map(s => s.totalGaps), 1);
+  for (const s of sorted) {
+    html += `<div class="gaps-source-row" title="${s.name}: ${s.totalGaps} gaps in ${s.count} events">`;
     html += `<span class="gaps-source-name">${esc(s.name)}</span>`;
     html += '<div class="gaps-bar-track">';
-    for (const g of GAP_TYPES) {
-      const count = s.gaps[g.key] || 0;
-      if (count === 0) continue;
-      const widthPct = (count / maxGaps * 100).toFixed(1);
-      html += `<div class="gaps-bar-seg" style="width:${widthPct}%;background:${g.color}" title="${g.label}: ${count}/${s.count}"></div>`;
+    if (s.totalGaps === 0) {
+      html += '<div style="font-size:10px;color:#4ade80;padding:0 6px;line-height:14px">complete</div>';
+    } else {
+      for (const g of GAP_TYPES) {
+        const count = s.gaps[g.key] || 0;
+        if (count === 0) continue;
+        const widthPct = (count / maxGaps * 100).toFixed(1);
+        html += `<div class="gaps-bar-seg" style="width:${widthPct}%;background:${g.color}" title="${g.label}: ${count}/${s.count}"></div>`;
+      }
     }
     html += '</div>';
     html += `<span class="gaps-source-count">${s.totalGaps} / ${s.count}</span>`;
@@ -1233,7 +1234,7 @@ function renderDataGaps(events) {
   html += '<table class="gaps-detail-table"><tr><th>Source</th><th>Events</th>';
   for (const g of GAP_TYPES) html += `<th>${g.label}</th>`;
   html += '</tr>';
-  for (const s of withGaps) {
+  for (const s of sorted) {
     html += `<tr><td>${esc(s.name)}</td><td>${s.count}</td>`;
     for (const g of GAP_TYPES) {
       const count = s.gaps[g.key] || 0;
