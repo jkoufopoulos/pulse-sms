@@ -84,6 +84,7 @@ function runMigrations(db) {
       last_confirmed TEXT NOT NULL,
       active_until TEXT NOT NULL,
       deactivated INTEGER DEFAULT 0,
+      confirmation_count INTEGER DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -239,6 +240,16 @@ function runMigrations(db) {
       tx();
       console.log(`Backfilled normalized_name for ${rows.length} events`);
     }
+  }
+
+  // Migration: add confirmation_count to recurring_patterns
+  try {
+    db.prepare("SELECT confirmation_count FROM recurring_patterns LIMIT 1").get();
+  } catch {
+    db.exec("ALTER TABLE recurring_patterns ADD COLUMN confirmation_count INTEGER DEFAULT 0");
+    // Backfill: existing patterns with last_confirmed != first_seen have been seen multiple times
+    db.exec("UPDATE recurring_patterns SET confirmation_count = CASE WHEN last_confirmed > first_seen THEN 2 ELSE 1 END");
+    console.log('Added confirmation_count to recurring_patterns');
   }
 }
 
@@ -437,17 +448,21 @@ function makePatternKey(name, venue, dayOfWeek) {
   return `${normalizePatternName(name)}|${(venue || '').toLowerCase().trim()}|${dayOfWeek}`;
 }
 
+const PATTERN_TTL_DAYS = 28; // 4 weeks — pattern expires if not re-confirmed
+
 /**
- * Add 6 months to an ISO date string. Returns YYYY-MM-DD.
+ * Add days to an ISO date string. Returns YYYY-MM-DD.
  */
-function addMonths(dateStr, months) {
+function addDays(dateStr, days) {
   const d = new Date(dateStr + 'T00:00:00Z');
-  d.setUTCMonth(d.getUTCMonth() + months);
+  d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 
 /**
- * Upsert a recurring pattern. Sets active_until to last_confirmed + 6 months.
+ * Upsert a recurring pattern. Sets active_until to last_confirmed + 28 days.
+ * Increments confirmation_count on each sighting. Only patterns with
+ * confirmation_count >= 2 are served by generateOccurrences.
  */
 function upsertPattern(pattern) {
   const d = getDb();
@@ -459,7 +474,7 @@ function upsertPattern(pattern) {
 
   const key = makePatternKey(pattern.name, pattern.venue_name, dayNum);
   const lastConfirmed = pattern.last_confirmed || now.slice(0, 10);
-  const activeUntil = addMonths(lastConfirmed, 6);
+  const activeUntil = addDays(lastConfirmed, PATTERN_TTL_DAYS);
 
   d.prepare(`
     INSERT INTO recurring_patterns (
@@ -468,6 +483,7 @@ function upsertPattern(pattern) {
       is_free, price_display, description_short, source_name,
       source_url, ticket_url, extraction_confidence,
       first_seen, last_confirmed, active_until, deactivated,
+      confirmation_count,
       created_at, updated_at
     ) VALUES (
       @pattern_key, @name, @venue_name, @venue_address, @neighborhood,
@@ -475,11 +491,13 @@ function upsertPattern(pattern) {
       @is_free, @price_display, @description_short, @source_name,
       @source_url, @ticket_url, @extraction_confidence,
       @first_seen, @last_confirmed, @active_until, 0,
+      1,
       @created_at, @updated_at
     )
     ON CONFLICT(pattern_key) DO UPDATE SET
       last_confirmed = excluded.last_confirmed,
       active_until = excluded.active_until,
+      confirmation_count = recurring_patterns.confirmation_count + 1,
       description_short = COALESCE(excluded.description_short, recurring_patterns.description_short),
       source_url = COALESCE(excluded.source_url, recurring_patterns.source_url),
       ticket_url = COALESCE(excluded.ticket_url, recurring_patterns.ticket_url),
@@ -514,13 +532,15 @@ function upsertPattern(pattern) {
 }
 
 /**
- * Get all active (non-expired, non-deactivated) recurring patterns.
+ * Get all active (non-expired, non-deactivated, confirmed) recurring patterns.
+ * Only patterns seen 2+ times generate occurrences — single-extraction
+ * candidates stay in the table but don't produce events until re-confirmed.
  */
 function getActivePatterns() {
   const d = getDb();
   const today = new Date().toISOString().slice(0, 10);
   return d.prepare(
-    'SELECT * FROM recurring_patterns WHERE active_until >= ? AND deactivated = 0'
+    'SELECT * FROM recurring_patterns WHERE active_until >= ? AND deactivated = 0 AND confirmation_count >= 2'
   ).all(today);
 }
 
@@ -720,7 +740,7 @@ function getPatternCount() {
   const d = getDb();
   const today = new Date().toISOString().slice(0, 10);
   const row = d.prepare(
-    'SELECT COUNT(*) as total FROM recurring_patterns WHERE active_until >= ? AND deactivated = 0'
+    'SELECT COUNT(*) as total FROM recurring_patterns WHERE active_until >= ? AND deactivated = 0 AND confirmation_count >= 2'
   ).get(today);
   return row.total;
 }
@@ -940,6 +960,6 @@ module.exports = {
   // Exposed for testing
   makePatternKey,
   normalizePatternName,
-  addMonths,
+  addDays,
   DAY_NAMES,
 };

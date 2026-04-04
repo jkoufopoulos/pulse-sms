@@ -80,7 +80,7 @@ function createTestDb() {
 // --- Test helpers ---
 
 const { makeEventId } = require('../../src/sources/shared');
-const { addMonths, makePatternKey, DAY_NAMES } = require('../../src/db');
+const { addDays, makePatternKey, DAY_NAMES } = require('../../src/db');
 
 function makeTestEvent(overrides = {}) {
   const name = overrides.name || 'Test Event';
@@ -303,11 +303,11 @@ function upsertEvents(db, events) {
   db.close();
 }
 
-// 9. addMonths utility
+// 9. addDays utility
 {
-  check('addMonths: 6 months from 2026-03-01', addMonths('2026-03-01', 6) === '2026-09-01');
-  check('addMonths: 6 months from 2026-08-15', addMonths('2026-08-15', 6) === '2027-02-15');
-  check('addMonths: 6 months from 2026-09-30', addMonths('2026-09-30', 6) === '2027-03-30');
+  check('addDays: 28 days from 2026-03-01', addDays('2026-03-01', 28) === '2026-03-29');
+  check('addDays: 28 days from 2026-08-15', addDays('2026-08-15', 28) === '2026-09-12');
+  check('addDays: 7 days from 2026-12-28', addDays('2026-12-28', 7) === '2027-01-04');
 }
 
 // 10. makePatternKey
@@ -322,7 +322,7 @@ function upsertEvents(db, events) {
   const db = createTestDb();
   const now = new Date().toISOString();
   const today = now.slice(0, 10);
-  const activeUntil = addMonths(today, 6);
+  const activeUntil = addDays(today, 6);
 
   db.prepare(`
     INSERT INTO recurring_patterns (
@@ -367,7 +367,7 @@ function upsertEvents(db, events) {
   const db = createTestDb();
   const now = new Date().toISOString();
   const today = now.slice(0, 10);
-  const activeUntil = addMonths(today, 6);
+  const activeUntil = addDays(today, 6);
 
   db.prepare(`
     INSERT INTO recurring_patterns (
@@ -389,7 +389,7 @@ function upsertEvents(db, events) {
   const db = createTestDb();
   const now = new Date().toISOString();
   const today = now.slice(0, 10);
-  const activeUntil = addMonths(today, 6);
+  const activeUntil = addDays(today, 6);
 
   // Insert a Tuesday pattern (day_of_week = 2)
   db.prepare(`
