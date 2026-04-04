@@ -6,6 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { getNycDateString } = require('./geo');
 
 function atomicWriteSync(filePath, data) {
   const tmp = filePath + '.tmp';
@@ -46,8 +47,18 @@ function hashPhone(phone) {
 function getSession(phone) {
   // Check raw phone key first, then hashed key (from disk load)
   const s = sessions.get(phone) || sessions.get(hashPhone(phone));
-  if (s && Date.now() - s.timestamp < SESSION_TTL) return s;
-  return null;
+  if (!s || Date.now() - s.timestamp >= SESSION_TTL) return null;
+
+  // Date boundary: if the session is from a different NYC calendar day,
+  // clear conversation history. Old assistant messages contain hard-coded
+  // day names ("Thursday the 26th") that confuse the model on a new day.
+  const sessionDate = getNycDateString(0, s.timestamp);
+  const todayDate = getNycDateString(0);
+  if (sessionDate !== todayDate) {
+    s.conversationHistory = [];
+  }
+
+  return s;
 }
 
 function setSession(phone, data) {

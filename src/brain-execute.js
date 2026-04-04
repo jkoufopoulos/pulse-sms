@@ -292,7 +292,13 @@ async function buildSearchPool(params, session, phone, trace) {
   }
   if (params.free_only) toolFilters.free_only = true;
   if (params.time_after && /^\d{2}:\d{2}$/.test(params.time_after)) toolFilters.time_after = params.time_after;
-  if (params.date_range) toolFilters.date_range = resolveDateRange(params.date_range);
+  if (params.date_range) {
+    toolFilters.date_range = resolveDateRange(params.date_range);
+  } else {
+    // Default to today — users texting a neighborhood mean "tonight."
+    // Model can explicitly pass date_range for broader searches.
+    toolFilters.date_range = resolveDateRange('today');
+  }
 
   // 3. Merge or replace based on intent
   let activeFilters;
