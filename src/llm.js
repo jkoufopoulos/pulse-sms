@@ -505,30 +505,35 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
     for (let i = 0; i < maxIterations; i++) {
       const candidate = response.candidates?.[0];
       const parts = candidate?.content?.parts || [];
-      const fnCall = parts.find(p => p.functionCall);
+      const fnCalls = parts.filter(p => p.functionCall);
 
-      if (!fnCall?.functionCall) {
+      if (fnCalls.length === 0) {
         // No tool call — LLM is done, return text
         const textPart = parts.find(p => p.text);
         return { text: textPart?.text || '', toolCalls, totalUsage, provider, elapsed_ms: Date.now() - loopStart, iterations };
       }
 
-      // Execute the tool
+      // Execute all tool calls (Gemini may return multiple)
       const iterStart = Date.now();
-      const toolName = fnCall.functionCall.name;
-      const toolParams = fnCall.functionCall.args || {};
-      const toolResult = await executeTool(toolName, toolParams);
-      toolCalls.push({ name: toolName, params: toolParams, result: toolResult });
+      const functionResponses = [];
+      for (const fnCall of fnCalls) {
+        const toolName = fnCall.functionCall.name;
+        const toolParams = fnCall.functionCall.args || {};
+        const toolResult = await executeTool(toolName, toolParams);
+        toolCalls.push({ name: toolName, params: toolParams, result: toolResult });
+        functionResponses.push({ functionResponse: { name: toolName, response: toolResult } });
+      }
 
-      // Stop early if this is a terminal tool (no extra LLM call needed)
-      if (stopTools.includes(toolName)) {
-        iterations.push({ tool: toolName, ms: Date.now() - iterStart });
+      // Stop early if any tool is a terminal tool
+      const hitStop = fnCalls.some(fc => stopTools.includes(fc.functionCall.name));
+      if (hitStop) {
+        iterations.push({ tool: fnCalls.map(fc => fc.functionCall.name).join('+'), ms: Date.now() - iterStart });
         return { text: '', toolCalls, totalUsage, provider, elapsed_ms: Date.now() - loopStart, iterations };
       }
 
-      // Send result back
+      // Send all results back
       result = await withTimeout(
-        chat.sendMessage([{ functionResponse: { name: toolName, response: toolResult } }]),
+        chat.sendMessage(functionResponses),
         remainingTimeout(), `agentLoop(${model}) turn ${i + 2}`
       );
       response = result.response;
@@ -537,11 +542,11 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
       // Handle MALFORMED_FUNCTION_CALL — model tried to call a tool but generated bad JSON
       if (response.candidates?.[0]?.finishReason === 'MALFORMED_FUNCTION_CALL') {
         console.warn(`[agentLoop] MALFORMED_FUNCTION_CALL on turn ${i + 2}`);
-        iterations.push({ tool: toolName, ms: Date.now() - iterStart });
+        iterations.push({ tool: fnCalls.map(fc => fc.functionCall.name).join('+'), ms: Date.now() - iterStart });
         return { text: '', toolCalls, totalUsage, provider, malformedCall: true, elapsed_ms: Date.now() - loopStart, iterations };
       }
 
-      iterations.push({ tool: toolName, ms: Date.now() - iterStart });
+      iterations.push({ tool: fnCalls.map(fc => fc.functionCall.name).join('+'), ms: Date.now() - iterStart });
     }
 
     // Hit max iterations — extract whatever text we have
@@ -583,33 +588,39 @@ async function runAgentLoop(model, systemPrompt, message, tools, executeTool, op
         }
       }
 
-      const toolBlock = response.content.find(b => b.type === 'tool_use');
+      const toolBlocks = response.content.filter(b => b.type === 'tool_use');
 
-      if (!toolBlock) {
+      if (toolBlocks.length === 0) {
         // No tool call — return text
         const textBlock = response.content.find(b => b.type === 'text');
         return { text: textBlock?.text || '', toolCalls, totalUsage, provider, elapsed_ms: Date.now() - loopStart, iterations };
       }
 
-      // Execute the tool
+      // Execute all tool calls in parallel (Sonnet may return multiple)
       const iterStart = Date.now();
-      const toolResult = await executeTool(toolBlock.name, toolBlock.input || {});
-      toolCalls.push({ name: toolBlock.name, params: toolBlock.input || {}, result: toolResult });
+      const toolResults = [];
+      for (const toolBlock of toolBlocks) {
+        const toolResult = await executeTool(toolBlock.name, toolBlock.input || {});
+        toolCalls.push({ name: toolBlock.name, params: toolBlock.input || {}, result: toolResult });
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: toolBlock.id,
+          content: JSON.stringify(sanitizeUnicode(toolResult)),
+        });
+      }
 
-      // Stop early if this is a terminal tool (no extra LLM call needed)
-      if (stopTools.includes(toolBlock.name)) {
-        iterations.push({ tool: toolBlock.name, ms: Date.now() - iterStart });
+      // Stop early if any tool is a terminal tool
+      const hitStop = toolBlocks.some(tb => stopTools.includes(tb.name));
+      if (hitStop) {
+        iterations.push({ tool: toolBlocks.map(tb => tb.name).join('+'), ms: Date.now() - iterStart });
         return { text: '', toolCalls, totalUsage, provider, elapsed_ms: Date.now() - loopStart, iterations };
       }
 
-      // Append assistant response + tool result for next turn
+      // Append assistant response + ALL tool results for next turn
       messages.push({ role: 'assistant', content: response.content });
-      messages.push({
-        role: 'user',
-        content: [{ type: 'tool_result', tool_use_id: toolBlock.id, content: JSON.stringify(sanitizeUnicode(toolResult)) }],
-      });
+      messages.push({ role: 'user', content: toolResults });
 
-      iterations.push({ tool: toolBlock.name, ms: Date.now() - iterStart });
+      iterations.push({ tool: toolBlocks.map(tb => tb.name).join('+'), ms: Date.now() - iterStart });
     }
 
     // Hit max iterations
