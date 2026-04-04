@@ -89,6 +89,7 @@ function setResponseState(phone, frame) {
     pendingNearby: frame.pendingNearby ?? null,
     pendingFilters: frame.pendingFilters ?? null,
     pendingMessage: frame.pendingMessage ?? null,
+    pendingClarification: frame.pendingClarification ?? null,
     lastResponseHadPicks: frame.lastResponseHadPicks ?? false,
     // Place state — frame values override, else preserved from existing
     lastPlaces: frame.placePicks ?? existing?.lastPlaces ?? [],
@@ -148,6 +149,7 @@ function scheduleDiskWrite() {
           pendingNearby: session.pendingNearby || null,
           pendingFilters: session.pendingFilters || null,
           pendingMessage: session.pendingMessage || null,
+          pendingClarification: session.pendingClarification || null,
           lastPlaces: session.lastPlaces || [],
           lastPlaceMap: session.lastPlaceMap || {},
           lastResultType: session.lastResultType || null,
@@ -213,6 +215,7 @@ function flushSessions() {
         pendingNearbyEvents: session.pendingNearbyEvents || null,
         pendingFilters: session.pendingFilters || null,
         pendingMessage: session.pendingMessage || null,
+        pendingClarification: session.pendingClarification || null,
         lastPlaces: session.lastPlaces || [],
         lastPlaceMap: session.lastPlaceMap || {},
         lastResultType: session.lastResultType || null,

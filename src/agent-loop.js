@@ -178,6 +178,9 @@ function inferTypesFromQuery(query) {
 function deriveIntent(toolCalls) {
   if (!toolCalls?.length) return 'conversational';
 
+  // Clarify intent wins — it's a terminal action
+  if (toolCalls.some(tc => tc.name === 'clarify')) return 'clarify';
+
   // Details intent wins if ANY search used it (agent may do a follow-up search after details)
   const hasDetails = toolCalls.some(tc => tc.name === 'search' && tc.params?.intent === 'details');
   if (hasDetails) return 'details';
@@ -531,6 +534,16 @@ async function executeTool(toolName, params, session, phone, trace) {
     return result;
   }
 
+  if (toolName === 'clarify') {
+    return {
+      reason: params.reason,
+      question: params.question,
+      options: params.options || [],
+      confidence: params.confidence ?? null,
+      implicit_filters: params.implicit_filters || null,
+    };
+  }
+
   // Unknown tool
   return { error: `Unknown tool: ${toolName}` };
 }
@@ -546,6 +559,17 @@ async function executeTool(toolName, params, session, phone, trace) {
  */
 function saveSessionFromToolCalls(phone, session, toolCalls, smsText) {
   if (!toolCalls?.length) return;
+
+  // Clarify — save pending clarification for next turn
+  const clarifyCall = toolCalls.find(tc => tc.name === 'clarify');
+  if (clarifyCall) {
+    const { reason, options, implicit_filters, confidence, question } = clarifyCall.params || {};
+    setSession(phone, {
+      ...session,
+      pendingClarification: { reason, options, implicit_filters: implicit_filters || null, confidence: confidence ?? null, question },
+    });
+    return;
+  }
 
   const lastSearch = [...toolCalls].reverse().find(tc => tc.name === 'search');
 
@@ -711,6 +735,39 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
   if (!session) session = getSession(phone);
   addToHistory(phone, 'user', message);
 
+  // --- Pending clarification bridging ---
+  const pending = session?.pendingClarification;
+  if (pending) {
+    // Detect if user ignored clarification and sent a new query
+    const { extractNeighborhood } = require('./neighborhoods');
+    const hasNeighborhood = !!extractNeighborhood(message);
+    const hasCategory = /\b(comedy|jazz|live music|dj|trivia|film|theater|art|dance|nightlife|bars?|restaurant|dinner|brunch)\b/i.test(message);
+    const isNewQuery = hasNeighborhood && hasCategory;
+
+    if (!isNewQuery && pending.implicit_filters) {
+      // Merge implicit_filters into session as lastFilters
+      const merged = { ...(session.lastFilters || {}) };
+      if (pending.implicit_filters.neighborhood && !session.lastNeighborhood) {
+        setSession(phone, { lastNeighborhood: pending.implicit_filters.neighborhood });
+        session.lastNeighborhood = pending.implicit_filters.neighborhood;
+      }
+      if (pending.implicit_filters.category) {
+        merged.categories = [pending.implicit_filters.category];
+      }
+      if (pending.implicit_filters.time) {
+        merged.date_range = pending.implicit_filters.time;
+      }
+      if (Object.keys(merged).length > 0) {
+        setSession(phone, { lastFilters: merged });
+        session.lastFilters = merged;
+      }
+    }
+
+    // Clear pendingClarification — must not persist to a third turn
+    setSession(phone, { pendingClarification: null });
+    session.pendingClarification = null;
+  }
+
   // Quick URL resend — $0, no LLM call needed
   if (session?.lastSentUrl && /\b(url|link|send.*(link|url))\b/i.test(message)) {
     await sendSMS(phone, session.lastSentUrl);
@@ -726,17 +783,35 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
   try {
     // Track raw results (with _ fields) for session save
     const rawResults = [];
+    let clarifySeenInBatch = false;
     const executeAndTrack = async (toolName, params) => {
+      // Edge case: clarify + other tools in parallel — clarify wins, skip others
+      if (toolName === 'clarify') {
+        clarifySeenInBatch = true;
+        const result = await executeTool(toolName, params, session, phone, trace);
+        rawResults.push({ name: toolName, params, result });
+        return sanitizeForLLM(result);
+      }
+      if (clarifySeenInBatch) {
+        console.warn(`[agent-loop] Skipping ${toolName} — clarify was called in same batch`);
+        return { skipped: true, reason: 'clarify_in_batch' };
+      }
       const result = await executeTool(toolName, params, session, phone, trace);
       rawResults.push({ name: toolName, params, result });
       return sanitizeForLLM(result);  // LLM only sees clean version
     };
 
     const priorMessages = buildNativeHistory(session?.conversationHistory);
+
+    // Remove clarify tool after a clarification turn — enforce one-question max
+    const tools = pending
+      ? BRAIN_TOOLS.filter(t => t.name !== 'clarify')
+      : BRAIN_TOOLS;
+
     const loopResult = await runAgentLoop(
-      MODELS.brain, systemPrompt, message, BRAIN_TOOLS,
+      MODELS.brain, systemPrompt, message, tools,
       executeAndTrack,
-      { maxIterations: 3, timeout: 12000, priorMessages }
+      { maxIterations: 3, timeout: 12000, priorMessages, stopTools: ['clarify'] }
     );
 
     // Record costs
@@ -753,6 +828,12 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
 
     // SMS comes from model's plain text output (after tool results, or directly for conversational)
     let smsText = loopResult.text;
+
+    // Clarify stop-tool: use the question text as SMS
+    const clarifyCall = loopResult.toolCalls.find(tc => tc.name === 'clarify');
+    if (clarifyCall) {
+      smsText = clarifyCall.params?.question || smsText;
+    }
     // Fallback: if model failed to compose (MALFORMED_FUNCTION_CALL), build SMS from pool
     if (!smsText) {
       const lastSearchFb = [...rawResults].reverse().find(tc => tc.name === 'search');
@@ -898,6 +979,21 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
   return trace.id;
 }
 
+/**
+ * Eval check: detect if SMS ends with a question but no clarify tool was called.
+ * Returns true if this is a "question leak" — model bypassed the clarify tool.
+ */
+function detectQuestionLeak(smsText, toolCalls) {
+  if (!smsText) return false;
+  const trimmed = smsText.trim();
+  if (trimmed.endsWith('?') && !toolCalls?.some(tc => tc.name === 'clarify')) {
+    const okPatterns = [/you going\??$/i, /want (me to|more|details)/i, /sound good\??$/i, /interest(ed|ing)\??$/i];
+    if (okPatterns.some(p => p.test(trimmed))) return false;
+    return true;
+  }
+  return false;
+}
+
 module.exports = {
   handleAgentRequest,
   executeTool,
@@ -909,5 +1005,6 @@ module.exports = {
   inferTypesFromQuery,
   rewriteIfTooLong,
   stripMarkdown,
+  detectQuestionLeak,
   SMS_CHAR_LIMIT,
 };

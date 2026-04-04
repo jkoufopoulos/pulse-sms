@@ -90,6 +90,44 @@ const BRAIN_TOOLS = [
       required: ['venue_name'],
     },
   },
+  {
+    name: 'clarify',
+    description: 'Ask the user a clarifying question before searching. Use when the request is genuinely ambiguous — context shifts, bare boroughs, vague mood queries. Do NOT use when there\'s enough specificity to search. This is a terminal action — the question becomes the SMS.',
+    parameters: {
+      type: 'object',
+      properties: {
+        reason: {
+          type: 'string',
+          enum: ['broad_area', 'missing_neighborhood', 'context_shift', 'vague_intent'],
+          description: 'Why clarification is needed',
+        },
+        question: {
+          type: 'string',
+          description: 'The SMS text to send. One short question with 3-4 concrete options baked in. Under 320 characters.',
+        },
+        options: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'The 3-4 concrete options offered (for logging/eval, not rendered as buttons)',
+        },
+        confidence: {
+          type: 'number',
+          description: '0-1. How close the model was to just searching instead of asking. Higher = nearly had enough info.',
+        },
+        implicit_filters: {
+          type: 'object',
+          nullable: true,
+          properties: {
+            neighborhood: { type: 'string', description: 'Neighborhood already understood', nullable: true },
+            category: { type: 'string', description: 'Category already understood', nullable: true },
+            time: { type: 'string', description: 'Time constraint already understood', nullable: true },
+          },
+          description: 'What the model already understood before asking. Partial intent extracted from the ambiguous message.',
+        },
+      },
+      required: ['reason', 'question', 'options'],
+    },
+  },
 ];
 
 // --- Profile summary for system prompt ---
@@ -166,19 +204,29 @@ How to talk:
 
 CRITICAL — when to use search vs just reply:
 - ANY message with enough specificity to search (neighborhood + intent, category, time, "more", "what about X", "anything free", bars, restaurants) → MUST call search first. Always. No exceptions.
-- Reply WITHOUT searching for: greetings, "thanks", "bye", off-topic chat, questions about how Pulse works, AND clarifying questions for ambiguous requests (see "When to ask vs when to pick" below).
+- Reply WITHOUT searching for: greetings, "thanks", "bye", off-topic chat, questions about how Pulse works.
 - When in doubt, search. It's better to search unnecessarily than to fabricate recommendations.
 - NEVER recommend specific venues or events without search results backing them up.
 
-When to ask vs when to pick:
-- SPECIFIC ENOUGH → just search and pick: "comedy in bushwick", "free jazz tonight", "east village", "what's happening tonight"
-- GENUINELY AMBIGUOUS → ask ONE short clarifying question with 3-4 concrete options before searching. Keep it under 160 characters. This applies to:
-  - Context shifts to a new intent: "date tomorrow", "birthday plans", "group outing for 8"
-  - Bare borough names as first message: "brooklyn", "manhattan" (too broad to pick well)
-  - Vague lifestyle queries: "entertain me", "I'm bored"
-- The options should reveal what's possible and do the thinking for the user. "Dinner and a show, something outdoors, or just drinks?" not "What are you looking for?"
-- ONE question only. Never ask multiple things. Never ask for neighborhood AND vibe AND time.
-- After they answer, search and give picks immediately. Don't ask a follow-up question.
+## Clarification
+You have a \`clarify\` tool. Use it ONLY when the request is genuinely ambiguous.
+
+SEARCH — enough specificity exists:
+- "comedy in bushwick" → search
+- "free jazz tonight" → search
+- "something fun in williamsburg" → search (neighborhood + vibe = enough)
+- "live music east village tonight" → search
+
+CLARIFY — genuinely ambiguous:
+- "brooklyn" → clarify (reason: broad_area — borough with no intent)
+- "what's good tonight" → clarify (reason: missing_neighborhood)
+- "date tomorrow" → clarify (reason: context_shift — social frame, no activity)
+- "I'm bored" → clarify (reason: vague_intent — no specificity at all)
+
+When you call clarify, extract implicit_filters for anything you already understood (neighborhood, time, category). These persist to the next turn.
+
+Never write a clarifying question as plain text. If you need to ask, use the tool.
+If you have enough to search, search — don't ask to be safe.
 
 First message (neighborhood or "what's happening"):
 - Search first. Look at what's actually in the results before writing anything.
@@ -204,15 +252,7 @@ Event names:
 </conversation>
 
 <examples>
-Clarifying question (ambiguous context shift):
-User: "what about for a date tomorrow"
-SMS: What kind of date — dinner and a show, something active like a comedy or concert, or more low-key wine bar vibes?
-
-Clarifying question (bare borough):
-User: "brooklyn"
-SMS: Big borough — what are you in the mood for? Live music, comedy, a good bar, or just show me what's interesting tonight?
-
-Contrasting picks (specific enough):
+Contrasting picks (specific enough — search, not clarify):
 User: "what's happening in williamsburg tonight"
 SMS: Comedy show at Union Pool tonight (9 PM, free) — don't know the lineup but that room always delivers. Or if you want to be out later, there's a DJ set at Good Room (11 PM). There's also film and live music nearby if you want something different.
 
@@ -227,7 +267,11 @@ SMS: Union Pool is a Williamsburg dive — indoor stage, big outdoor patio, chea
 Context shift (drop prior filters):
 User: [was searching blues music, now pivots]
 User: "what about for a date tomorrow"
-SMS: [does NOT carry jazz/blues filters — this is a new intent. Asks clarifying question or searches fresh with date-appropriate categories]
+SMS: [calls clarify tool — this is a context shift with no activity specified. Does NOT carry jazz/blues filters.]
+
+After clarification resolved:
+User: [was asked "What kind of date?" and replied "something active"]
+SMS: [searches with date-appropriate categories, uses implicit_filters from clarify turn. Gives picks immediately — no follow-up question.]
 </examples>
 
 <session>

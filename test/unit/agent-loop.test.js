@@ -51,6 +51,15 @@ check('multi-call: last search wins', deriveIntent([
   { name: 'search', params: { intent: 'discover', neighborhood: 'les' } },
 ]) === 'events');
 
+// ---- deriveIntent with clarify ----
+console.log('\nderiveIntent with clarify:');
+
+check('clarify -> clarify intent', deriveIntent([{ name: 'clarify', params: { reason: 'broad_area' } }]) === 'clarify');
+check('clarify + search -> clarify intent wins', deriveIntent([
+  { name: 'clarify', params: { reason: 'broad_area' } },
+  { name: 'search', params: { intent: 'discover', neighborhood: 'bushwick' } },
+]) === 'clarify');
+
 // ---- search tool in BRAIN_TOOLS ----
 console.log('\nsearch tool:');
 
@@ -71,7 +80,23 @@ const lookupTool = BRAIN_TOOLS.find(t => t.name === 'lookup_venue');
 check('lookup_venue tool exists in BRAIN_TOOLS', !!lookupTool);
 check('lookup_venue has venue_name required', lookupTool.parameters.required.includes('venue_name'));
 check('lookup_venue has neighborhood param', !!lookupTool.parameters.properties.neighborhood);
-check('BRAIN_TOOLS has exactly 2 tools', BRAIN_TOOLS.length === 2);
+check('BRAIN_TOOLS has exactly 3 tools', BRAIN_TOOLS.length === 3);
+
+// ---- clarify tool in BRAIN_TOOLS ----
+console.log('\nclarify tool:');
+
+const clarifyTool = BRAIN_TOOLS.find(t => t.name === 'clarify');
+check('clarify tool exists in BRAIN_TOOLS', !!clarifyTool);
+check('clarify has reason required', clarifyTool.parameters.required.includes('reason'));
+check('clarify has question required', clarifyTool.parameters.required.includes('question'));
+check('clarify has options required', clarifyTool.parameters.required.includes('options'));
+check('clarify reason has 4 enum values', clarifyTool.parameters.properties.reason.enum.length === 4);
+check('clarify reason includes broad_area', clarifyTool.parameters.properties.reason.enum.includes('broad_area'));
+check('clarify reason includes missing_neighborhood', clarifyTool.parameters.properties.reason.enum.includes('missing_neighborhood'));
+check('clarify reason includes context_shift', clarifyTool.parameters.properties.reason.enum.includes('context_shift'));
+check('clarify reason includes vague_intent', clarifyTool.parameters.properties.reason.enum.includes('vague_intent'));
+check('clarify has confidence param', !!clarifyTool.parameters.properties.confidence);
+check('clarify has implicit_filters param', !!clarifyTool.parameters.properties.implicit_filters);
 
 // ---- buildBrainSystemPrompt first-session indicator ----
 console.log('\nbuildBrainSystemPrompt first-session:');
@@ -103,6 +128,21 @@ check('prompt has no markdown rule', anyPrompt.includes('no markdown'));
 check('prompt does NOT have old serendipity framing', !anyPrompt.includes('serendipity:true'));
 check('prompt does NOT have old proactive CTA', !anyPrompt.includes('NOTIFY'));
 check('prompt does NOT have old places mixing', !anyPrompt.includes('Grab a drink at'));
+
+// ---- clarify prompt structure ----
+console.log('\nclarify prompt structure:');
+
+check('prompt has clarification section', anyPrompt.includes('## Clarification'));
+check('prompt mentions clarify tool', anyPrompt.includes('clarify') && anyPrompt.includes('tool'));
+check('prompt has SEARCH vs CLARIFY contrastive pairs', anyPrompt.includes('SEARCH') && anyPrompt.includes('CLARIFY'));
+check('prompt has broad_area reason', anyPrompt.includes('broad_area'));
+check('prompt has missing_neighborhood reason', anyPrompt.includes('missing_neighborhood'));
+check('prompt has context_shift reason', anyPrompt.includes('context_shift'));
+check('prompt has vague_intent reason', anyPrompt.includes('vague_intent'));
+check('prompt has bias-to-action line', anyPrompt.includes("don't ask to be safe"));
+check('prompt mentions implicit_filters', anyPrompt.includes('implicit_filters'));
+check('prompt does NOT have old ask-vs-pick prose', !anyPrompt.includes('When to ask vs when to pick'));
+check('prompt does NOT have old GENUINELY AMBIGUOUS prose', !anyPrompt.includes('GENUINELY AMBIGUOUS'));
 
 // ---- buildRecommendationReason ----
 console.log('\nbuildRecommendationReason:');
@@ -151,6 +191,139 @@ const detailsSession = {
   },
 };
 const dummyTrace = { events: {}, composition: {} };
+
+// ---- clarify tool execution ----
+console.log('\nclarify tool execution:');
+
+(async () => {
+  const clarifyResult = await executeTool('clarify', {
+    reason: 'context_shift',
+    question: 'What kind of date — dinner and a show, something active, or low-key?',
+    options: ['dinner and a show', 'something active', 'low-key wine bar'],
+    confidence: 0.4,
+    implicit_filters: { time: 'tomorrow' },
+  }, {}, '+1234', dummyTrace);
+
+  check('clarify returns question text', clarifyResult.question === 'What kind of date — dinner and a show, something active, or low-key?');
+  check('clarify returns reason', clarifyResult.reason === 'context_shift');
+  check('clarify returns options', Array.isArray(clarifyResult.options) && clarifyResult.options.length === 3);
+  check('clarify returns confidence', clarifyResult.confidence === 0.4);
+  check('clarify returns implicit_filters', clarifyResult.implicit_filters?.time === 'tomorrow');
+
+  const minResult = await executeTool('clarify', {
+    reason: 'vague_intent',
+    question: "What are you in the mood for?",
+    options: ['live music', 'comedy', 'bars'],
+  }, {}, '+1234', dummyTrace);
+  check('clarify works without optional fields', minResult.reason === 'vague_intent');
+  check('clarify confidence defaults to null when missing', minResult.confidence == null);
+})();
+
+// ---- saveSessionFromToolCalls with clarify ----
+console.log('\nsaveSessionFromToolCalls with clarify:');
+
+const { saveSessionFromToolCalls } = require('../../src/agent-loop');
+const { getSession, setSession, clearSession } = require('../../src/session');
+
+const testPhone = '+10000001234';
+setSession(testPhone, { conversationHistory: [] });
+
+const clarifyToolCalls = [{
+  name: 'clarify',
+  params: {
+    reason: 'context_shift',
+    question: 'What kind of date?',
+    options: ['dinner', 'active', 'low-key'],
+    confidence: 0.4,
+    implicit_filters: { time: 'tomorrow' },
+  },
+  result: {
+    reason: 'context_shift',
+    question: 'What kind of date?',
+    options: ['dinner', 'active', 'low-key'],
+    confidence: 0.4,
+    implicit_filters: { time: 'tomorrow' },
+  },
+}];
+
+saveSessionFromToolCalls(testPhone, getSession(testPhone), clarifyToolCalls, 'What kind of date?');
+const savedSession = getSession(testPhone);
+check('pendingClarification saved to session', !!savedSession.pendingClarification);
+check('pendingClarification has reason', savedSession.pendingClarification.reason === 'context_shift');
+check('pendingClarification has options', savedSession.pendingClarification.options.length === 3);
+check('pendingClarification has implicit_filters', savedSession.pendingClarification.implicit_filters?.time === 'tomorrow');
+check('pendingClarification has confidence', savedSession.pendingClarification.confidence === 0.4);
+check('pendingClarification has question', savedSession.pendingClarification.question === 'What kind of date?');
+clearSession(testPhone);
+
+// ---- question leak detection ----
+console.log('\nquestion leak detection:');
+
+const { detectQuestionLeak } = require('../../src/agent-loop');
+
+check('leak: question without clarify call', detectQuestionLeak('What neighborhood?', []));
+check('no leak: question WITH clarify call', !detectQuestionLeak('What neighborhood?', [{ name: 'clarify' }]));
+check('no leak: recommendation (no question)', !detectQuestionLeak('Check out this jazz show at Blue Note.', []));
+check('no leak: "You going?" is OK', !detectQuestionLeak('Show starts at 9. You going?', []));
+check('no leak: "sound good?" is OK', !detectQuestionLeak('I got comedy and jazz. Sound good?', []));
+check('leak: bare question after recommendation', detectQuestionLeak('There are options. What vibe are you going for?', []));
+check('no leak: null SMS', !detectQuestionLeak(null, []));
+check('no leak: empty SMS', !detectQuestionLeak('', []));
+
+// ---- clarify integration flow ----
+console.log('\nclarify integration flow:');
+
+const flowPhone = '+10000009999';
+setSession(flowPhone, { conversationHistory: [], lastNeighborhood: null, lastFilters: null });
+
+// Step 1: clarify call → pendingClarification saved
+const clarifyTCs2 = [{
+  name: 'clarify',
+  params: {
+    reason: 'context_shift',
+    question: 'What kind of date — dinner, active, or chill?',
+    options: ['dinner and a show', 'something active', 'low-key'],
+    confidence: 0.35,
+    implicit_filters: { time: 'tomorrow', neighborhood: 'williamsburg' },
+  },
+  result: {
+    reason: 'context_shift',
+    question: 'What kind of date — dinner, active, or chill?',
+    options: ['dinner and a show', 'something active', 'low-key'],
+    confidence: 0.35,
+    implicit_filters: { time: 'tomorrow', neighborhood: 'williamsburg' },
+  },
+}];
+
+saveSessionFromToolCalls(flowPhone, getSession(flowPhone), clarifyTCs2, 'What kind of date?');
+const s1 = getSession(flowPhone);
+check('flow: pendingClarification saved', !!s1.pendingClarification);
+check('flow: reason is context_shift', s1.pendingClarification.reason === 'context_shift');
+
+// Step 2: new-query detection
+const { extractNeighborhood } = require('../../src/neighborhoods');
+
+// Case A: user replies to clarification ("something active") — NOT a new query
+const replyMessage = 'something active';
+const hasHood = !!extractNeighborhood(replyMessage);
+const hasCat = /\b(comedy|jazz|live music|dj|trivia|film|theater|art|dance|nightlife|bars?|restaurant|dinner|brunch)\b/i.test(replyMessage);
+const isNewQuery = hasHood && hasCat;
+check('flow: "something active" is NOT detected as new query', !isNewQuery);
+
+// Case B: user ignores clarification ("jazz in the east village") — IS a new query
+const newQueryMessage = 'jazz in the east village';
+const hasHood2 = !!extractNeighborhood(newQueryMessage);
+const hasCat2 = /\b(comedy|jazz|live music|dj|trivia|film|theater|art|dance|nightlife|bars?|restaurant|dinner|brunch)\b/i.test(newQueryMessage);
+const isNewQuery2 = hasHood2 && hasCat2;
+check('flow: "jazz in the east village" IS detected as new query', isNewQuery2);
+
+// Step 3: verify tools list filtering
+check('flow: BRAIN_TOOLS includes clarify normally', BRAIN_TOOLS.some(t => t.name === 'clarify'));
+const filteredTools = BRAIN_TOOLS.filter(t => t.name !== 'clarify');
+check('flow: filtered tools exclude clarify', !filteredTools.some(t => t.name === 'clarify'));
+check('flow: filtered tools still have search + lookup_venue', filteredTools.length === 2);
+
+clearSession(flowPhone);
 
 (async () => {
   // Returns event data via unified search tool
