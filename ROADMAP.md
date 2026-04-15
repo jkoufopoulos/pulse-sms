@@ -182,6 +182,41 @@ message -> checkMechanical (help + TCPA only, $0)
 
 ---
 
+## Active Plan — Agent conversational redesign (2026-04-15)
+
+User tests surfaced four failure patterns that contradict the current prompt. Insight sources: Anthropic's `AskUserQuestion` tool pattern (multiple-choice, "Other" free-text), `EXPLORE_AGENT_MIN_QUERIES` (enforce breadth at the tool level), and the "collaborator not executor" transparency principle.
+
+**Problem 1 — Agent skips discovery.** Current prompt says "if you have enough to search, search — don't ask to be safe." Model searches on the first substantive message and returns ranked picks, never learning what the user actually wants.
+
+**Problem 2 — Picks are homogeneous.** `serializePoolForContinuation` marks `i < 5` as recommended. Top-5 by ranker are often clones (same category, same vibe). Model reads what's labeled `recommended: true` and echoes it.
+
+**Problem 3 — Broadening is hidden.** Prompt explicitly says "silently include nearby neighborhoods. Don't explain the sparsity to the user." User asks for LES, gets a Williamsburg pick, has no idea why.
+
+**Problem 4 — Prose blob, no structure.** Prompt explicitly says "No headers, no lists, no formatting. Short sentences." A 420-char comma-spliced paragraph with two picks is less scannable than numbered lines. Twilio renders `\n` fine.
+
+### Fixes
+
+1. **Flip `clarify` gate.** Keep tool name (already wired through `agent-loop.js`, `session.js`). Change the prompt from "only when ambiguous" to "default on first substantive request unless user gave neighborhood + (category OR vibe OR time)." Require 3-4 concrete options. Mark recommended option with `(Recommended)` prefix per Anthropic pattern. Examples in prompt flip: "comedy in bushwick" now clarifies (seated vs loud, early vs late); "comedy in bushwick around 9pm" searches.
+
+2. **Diversify the recommended slice in the serializer.** Add `diversifyPool()` in `brain-llm.js` that picks top-N by rank, then swaps in lower-ranked candidates until categories span ≥3 distinct values and vibes span ≥2. Tag each with `diversity_role: 'primary' | 'contrast' | 'wildcard'`. Model reads the tag, doesn't compute diversity itself (P1 — structured state owns breadth).
+
+3. **Flip transparency rules.** Remove "silently broaden" from prompt. Add `off_query: true` + `off_query_reason: string` fields on pool items that fell outside the user's stated filters (nearby neighborhood, adjacent category, different price). Prompt: "When including off-query picks, name it. 'Nothing great in LES for comedy, but 10 min away in Williamsburg…'"
+
+4. **Allow numbered format.** Update prompt: when returning ≥2 picks, use `1) Name — why. Time, price.\n2) …`. Remove the "no headers, no lists, no formatting" blanket ban. Update few-shot examples. Keep 480-char cap.
+
+### Files touched
+
+- `src/brain-llm.js` — `BRAIN_TOOLS.clarify` description + required fields, `buildBrainSystemPrompt` sections (conversation, examples, clarification), `serializePoolForContinuation` + new `diversifyPool()`, new `buildRecommendationReason` handling for `off_query`.
+- `src/agent-loop.js` — no functional change; clarify routing already present. Check `deriveIntent` still correct.
+- `test/` — add regression tests for numbered format, diversity spread, off-query labeling, clarify-first on bare inputs.
+
+### Not in scope (deferred)
+
+- Prompt cache split (`SYSTEM_PROMPT_DYNAMIC_BOUNDARY`) — tracked separately in `memory/plan-cost-reduction.md`.
+- Renaming `clarify` → `askUser` — would churn session field `pendingClarification` and history entries.
+
+---
+
 ## Not Building (until hypothesis validated)
 
 - Serendipity scoring / surprise picks

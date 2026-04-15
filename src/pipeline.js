@@ -305,19 +305,34 @@ function eventMatchesFilters(event, filters) {
 function buildTaggedPool(events, activeFilters, { citywide = false } = {}) {
   const hasFilters = activeFilters && Object.values(activeFilters).some(Boolean);
   if (!hasFilters) {
-    let pool = events.slice(0, 100);
-    // For citywide pools, apply neighborhood diversity even without filters
-    if (citywide) {
-      const diversePool = [];
-      const hoodCounts = {};
-      for (const e of events) {
-        const hood = e.neighborhood || 'unknown';
-        hoodCounts[hood] = (hoodCounts[hood] || 0) + 1;
-        if (hoodCounts[hood] <= 5) diversePool.push(e);
-        if (diversePool.length >= 100) break;
+    // Two-pass: first fill under diversity caps, then top up with overflow if short.
+    // Prevents any single category (e.g. nightlife from RA) from dominating when
+    // diversity is available, without shrinking small/uniform pools.
+    const CATEGORY_CAP = 12;
+    const HOOD_CAP = 5;
+    const diversePool = [];
+    const overflow = [];
+    const hoodCounts = {};
+    const catCounts = {};
+    for (const e of events) {
+      const cat = e.category || 'other';
+      const hood = e.neighborhood || 'unknown';
+      const catOver = (catCounts[cat] || 0) >= CATEGORY_CAP;
+      const hoodOver = citywide && (hoodCounts[hood] || 0) >= HOOD_CAP;
+      if (catOver || hoodOver) {
+        overflow.push(e);
+        continue;
       }
-      pool = diversePool;
+      catCounts[cat] = (catCounts[cat] || 0) + 1;
+      if (citywide) hoodCounts[hood] = (hoodCounts[hood] || 0) + 1;
+      diversePool.push(e);
+      if (diversePool.length >= 100) break;
     }
+    for (const e of overflow) {
+      if (diversePool.length >= 100) break;
+      diversePool.push(e);
+    }
+    const pool = diversePool;
     return {
       pool: pool.map(e => ({ ...e, filter_match: false })),
       matchCount: 0,

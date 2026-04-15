@@ -1000,18 +1000,27 @@ function renderCoverageMatrix(matrix) {
 
   if (hoods.length === 0) { $('coverage-heatmap').innerHTML = ''; return; }
 
-  const maxCount = Math.max(...hoods.map(([,h]) => h.total));
-  let html = '<div style="font-size:11px;color:#666;margin-bottom:6px">Top 20 neighborhoods by event count</div>';
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  html += '<thead><tr style="color:#666;text-align:left;border-bottom:1px solid #333">';
+  html += '<th style="padding:6px 8px;font-weight:500">Neighborhood</th>';
+  html += '<th style="padding:6px 8px;font-weight:500;text-align:right">Events</th>';
+  html += '<th style="padding:6px 8px;font-weight:500;text-align:right">Usable</th>';
+  html += '<th style="padding:6px 8px;font-weight:500;width:120px">Quality</th>';
+  html += '</tr></thead><tbody>';
   for (const [name, data] of hoods) {
-    const pct = (data.total / maxCount * 100).toFixed(0);
     const completePct = data.total > 0 ? Math.round(data.complete / data.total * 100) : 0;
-    const barColor = completePct >= 80 ? '#4ade80' : completePct >= 50 ? '#fbbf24' : '#f87171';
-    html += `<div class="gaps-row" title="${name}: ${data.total} events, ${completePct}% complete">`;
-    html += `<span class="gaps-name">${name}</span>`;
-    html += `<div class="gaps-track"><div class="gaps-seg" style="width:${pct}%;background:${barColor}" title="${data.complete}/${data.total} complete"></div></div>`;
-    html += `<span class="gaps-count">${data.total} (${completePct}%)</span>`;
-    html += '</div>';
+    const barColor = completePct >= 80 ? '#60a5fa' : completePct >= 50 ? '#60a5fa88' : '#60a5fa44';
+    html += `<tr style="border-bottom:1px solid #1e293b">`;
+    html += `<td style="padding:5px 8px;color:#e2e8f0">${name}</td>`;
+    html += `<td style="padding:5px 8px;text-align:right;color:#94a3b8">${data.total}</td>`;
+    html += `<td style="padding:5px 8px;text-align:right;color:#e2e8f0">${data.complete}</td>`;
+    html += `<td style="padding:5px 8px"><div style="display:flex;align-items:center;gap:6px">`;
+    html += `<div style="flex:1;height:6px;background:#1e293b;border-radius:3px;overflow:hidden"><div style="width:${completePct}%;height:100%;background:${barColor};border-radius:3px"></div></div>`;
+    html += `<span style="color:#94a3b8;font-size:11px;min-width:32px;text-align:right">${completePct}%</span>`;
+    html += '</div></td>';
+    html += '</tr>';
   }
+  html += '</tbody></table>';
   $('coverage-heatmap').innerHTML = html;
 }
 

@@ -1,13 +1,13 @@
-const { fetchSkintEvents, fetchSkintOngoingEvents, fetchNonsenseNYC, fetchYutoriEvents, fetchScreenSlateEvents, fetchBKMagEvents } = require('./sources');
+const { fetchSkintEvents, fetchNonsenseNYC, fetchYutoriEvents, fetchScreenSlateEvents, fetchBKMagEvents, fetchRAEvents } = require('./sources');
 
 // Source tier classification for compose prompt
 const SOURCE_TIERS = {
   Skint: 'unstructured',
-  SkintOngoing: 'unstructured',
   NonsenseNYC: 'unstructured',
   Yutori: 'unstructured',
   ScreenSlate: 'unstructured',
   BKMag: 'unstructured',
+  RA: 'structured',
 };
 
 // ============================================================
@@ -19,11 +19,11 @@ const SOURCE_TIERS = {
 
 const SOURCES = [
   { label: 'Skint',            fetch: fetchSkintEvents,         weight: 0.9,  mergeRank: 0, endpoint: 'https://theskint.com', minExpected: 5, volatile: true, dbName: 'theskint' },
-  { label: 'SkintOngoing',     fetch: fetchSkintOngoingEvents,  weight: 0.9,  mergeRank: 1, endpoint: 'https://theskint.com/ongoing-events/', minExpected: 10, volatile: true, dbName: 'theskint' },
   { label: 'NonsenseNYC',      fetch: fetchNonsenseNYC,         weight: 0.9,  mergeRank: 1, endpoint: 'https://nonsensenyc.com', minExpected: 10, volatile: true, channel: 'email' },
   { label: 'Yutori',           fetch: fetchYutoriEvents,        weight: 0.9,  mergeRank: 2, endpoint: null, minExpected: 20, volatile: true, channel: 'email' },
   { label: 'ScreenSlate',      fetch: fetchScreenSlateEvents,   weight: 0.9,  mergeRank: 3, endpoint: null, minExpected: 5, channel: 'email' },
   { label: 'BKMag',            fetch: fetchBKMagEvents,         weight: 0.9,  mergeRank: 4, endpoint: 'https://www.bkmag.com', minExpected: 5, schedule: { days: ['fri', 'sat'] } },
+  { label: 'RA',               fetch: fetchRAEvents,            weight: 0.85, mergeRank: 5, endpoint: 'https://ra.co/events/us/newyorkcity', minExpected: 30, dbName: 'ra' },
 ];
 
 // Boot-time validation — fail fast on config errors

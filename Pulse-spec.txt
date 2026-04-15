@@ -1,0 +1,102 @@
+﻿1. Tool schema.
+The schema is almost right. Here's the final version I'd ship:
+json
+{
+  "name": "clarify",
+  "description": "Ask the user a clarifying question before searching. Use when the request is genuinely ambiguous — context shifts, bare boroughs, vague mood queries. Do NOT use when there's enough specificity to search. This is a terminal action — the question becomes the SMS.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "reason": {
+        "type": "string",
+        "enum": ["broad_area", "missing_neighborhood", "context_shift", "vague_intent"],
+        "description": "Why clarification is needed"
+      },
+      "question": {
+        "type": "string",
+        "description": "The SMS text to send. One short question with 3-4 concrete options baked in. Under 320 characters."
+      },
+      "options": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "The 3-4 concrete options offered (for logging/eval, not rendered as buttons)"
+      },
+      "confidence": {
+        "type": "number",
+        "description": "0-1. How close the model was to just searching instead of asking. Higher = nearly had enough info."
+      },
+      "implicit_filters": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "neighborhood": { "type": "string", "nullable": true },
+          "category": { "type": "string", "nullable": true },
+          "time": { "type": "string", "nullable": true }
+        },
+        "description": "What the model already understood before asking. Partial intent extracted from the ambiguous message. Keep flat — no nesting."
+      }
+    },
+    "required": ["reason", "question", "options"]
+  }
+}
+Changes from your original and why:
+The reason enum gets four values: broad_area (has a category but no specific neighborhood — "comedy in Brooklyn"), missing_neighborhood (no geographic signal at all — "what's good tonight"), context_shift (social frame with no activity — "date tomorrow," "birthday plans"), vague_intent (pure mood — "I'm bored," "entertain me"). missing_neighborhood is Gemini's good catch — it's operationally distinct from broad_area because one needs geographic narrowing and the other needs intent discovery. I originally proposed occasion and multi_intent — drop both. They create fuzzy boundaries with context_shift that would hurt eval clarity.
+confidence is new. This is the field that lets you tune the ask-vs-search threshold over time. If the model calls clarify with confidence 0.85, your prompt is too conservative — it should've just searched. If it searches at 0.3 and gives bad results, it should've asked. You can't optimize the decision boundary without this signal. Neither Gemini nor I mentioned this in the original prompt, but I raised it in my first answer and still think it's worth it.
+Options stay as string array. Structured objects (label + description) are overkill for metadata that's never rendered. Gemini agrees.
+Question field cap goes to 320 characters. 120 (Gemini's suggestion) is too tight — you'd get robotic compressed questions. 160 (your original) barely fits a question with 3 options. 320 gives the model room to write naturally while staying well under your 480 SMS cap. You don't need to worry about SMS segment splitting — Twilio handles concatenation transparently and you're already paying for multi-segment messages on every recommendation.
+Keep implicit_filters flat. Gemini correctly flagged that nested objects in tool call parameters can occasionally trip up Haiku's extraction. The three flat fields (neighborhood, category, time) cover the partial intent you actually need. Don't add more until you have data showing the model is losing other signals.
+2. Session bridging — synthetic history entry, not tool result injection.
+This is where Gemini and I disagree most sharply, and I'm confident Gemini is wrong.
+Gemini says inject a synthetic tool result: Tool Result [clarify]: User selected: "Something active". The problem is that the model didn't call a tool in the current turn. You're fabricating a tool_result for a tool_use that happened in a previous agent loop invocation. Both Anthropic's and Google's message formats expect tool_results to follow tool_use blocks within the same conversational turn. An orphaned tool_result — one that doesn't correspond to a tool_use the model just made — can confuse the model about what actions it's already taken this turn. Haiku in particular may think it already called clarify and skip searching.
+The right approach is a synthetic assistant/user message pair injected into the conversation history via buildNativeHistory():
+assistant: [called clarify: reason=context_shift, question="What kind of date — dinner and a show, something active, or low-key?", implicit_filters={time: "tomorrow"}]
+user: "something active"
+This fits the natural conversational structure both APIs expect. The model sees "I asked this, the user said that" — standard multi-turn dialogue. No fake tool mechanics, no orphaned results.
+On the orchestrator side, when the model calls clarify:
+1. executeTool returns the question text (same as any stop-tool)
+2. The orchestrator writes session.pendingClarification = { reason, options, implicit_filters, confidence, question } before sending the SMS
+3. The question goes out via Twilio as the SMS
+When the next message arrives and session.pendingClarification exists:
+1. The pre-router detects pendingClarification
+2. It merges implicit_filters into the active filter set via mergeFilters() — same as any other filter source, P1-clean
+3. It injects the synthetic history pair into buildNativeHistory()
+4. It clears pendingClarification from the session (critical — don't let it persist into a third turn)
+5. The agent loop runs normally with the enriched context
+The model now has conversation continuity, the filters are pre-applied deterministically, and the code owns all the state. P1 is preserved.
+3. Option matching in the pre-router — don't do it.
+My original answer suggested a "cheap substring match" — check if the user's reply is an exact substring of exactly one option. I'm walking that back. Gemini convinced me the failure modes aren't worth it.
+The reasoning: the marginal latency cost of letting Haiku resolve "the first one" or "dinner" is ~200-400ms. That's negligible against your 2-5s total response time. The engineering cost of matching code is small but the UX cost of a bad match is severe. If deterministic matching silently picks the wrong option, the user gets a recommendation they didn't ask for with no indication that the system misunderstood them. If it fails to match and falls through to the LLM, you've added a code path that fires sometimes and doesn't sometimes — harder to test, harder to reason about.
+The LLM already sees the conversation history including the options that were offered. It handles "the first one," "dinner," "not the active one," and "actually tacos instead" equally well. Let it do its job. The synthetic history pair gives it all the context it needs.
+Skip this entirely. Zero pre-router option matching logic. The pendingClarification check should only do two things: merge implicit_filters and inject the history pair.
+4. Eval hooks — six checks.
+Check 1: Question leak detection. Any agent loop response ending in ? that did NOT call clarify is a flag. This is the most important eval because it catches the primary failure mode — the model bypassing the tool and writing questions as plain text. Run this on every single trace. It should be a hard fail in your eval suite, not a warning.
+Check 2: Clarification rate by reason. Track clarify calls per 100 messages, broken down by the four reason values. Set alert thresholds: overall clarification rate above 25% means the model is asking too much (annoying). Below 5% means it's guessing on ambiguous queries (bad recs). The per-reason breakdown tells you where the drift is. If vague_intent spikes, your prompt's "do NOT clarify when you can search" examples aren't working. If missing_neighborhood spikes, maybe your neighborhood extraction in the pre-router regressed.
+Check 3: Clarification-to-resolution rate. When a clarify call happens, does the next turn produce picks (picks > 0)? If the model asks a clarifying question and the follow-up still fails, the clarification didn't help — either the question was poorly targeted or the pool is genuinely empty for that query. Target above 80%. Below that, you're burning user patience on questions that don't lead to better answers.
+Check 4: Implicit_filters accuracy. Sample-based, requires manual labeling. For every clarify call, check whether the implicit_filters captured what a human would extract. If the field is null more than 70% of the time, it's not earning its keep and you should consider making it required or adding prompt emphasis. If it's populated but wrong more than 20% of the time, the model is hallucinating partial intent — tighten the prompt to say "only extract filters you're confident about."
+Check 5: Double-clarification rate. How often does a user hit two clarification turns in a row (message → clarify → reply → clarify again)? This should be near zero because your enforceability guard removes clarify from the tool list after one use. If it's happening, the guard isn't working. This is a code correctness check, not a model behavior check.
+Check 6: Reason/filter cross-validation. Gemini's addition and it's good. Structural invariant: if reason === "broad_area", then implicit_filters.category should probably be non-null (the user said a category but not a place). If reason === "missing_neighborhood", then implicit_filters.neighborhood should be null (that's what's missing). If reason === "context_shift", then implicit_filters.time should probably be non-null (dates and birthdays imply a timeframe). These aren't hard fails — "probably" means flag for review, not auto-fail — but they catch cases where the model is using the reason enum incorrectly or not extracting the partial intent it clearly has.
+5. Prompt changes — replace prose with tool-aware contrastive examples.
+Kill the current "When to ask vs when to pick" prose block entirely. Replace it with a section that references the tool and uses contrastive pairs (search vs. clarify for similar-looking queries):
+## Clarification
+You have a `clarify` tool. Use it ONLY when the request is genuinely ambiguous.
+SEARCH — enough specificity exists:
+- "comedy in bushwick" → search
+- "free jazz tonight" → search  
+- "something fun in williamsburg" → search (neighborhood + vibe = enough)
+- "live music east village tonight" → search
+CLARIFY — genuinely ambiguous:
+- "brooklyn" → clarify (reason: broad_area — borough with no intent)
+- "what's good tonight" → clarify (reason: missing_neighborhood)
+- "date tomorrow" → clarify (reason: context_shift — social frame, no activity)
+- "I'm bored" → clarify (reason: vague_intent — no specificity at all)
+When you call clarify, extract implicit_filters for anything you already 
+understood (neighborhood, time, category). These persist to the next turn.
+Never write a clarifying question as plain text. If you need to ask, use the tool.
+If you have enough to search, search — don't ask to be safe.
+Don't include full tool call JSON examples in the prompt. Gemini suggested two-shot examples with JSON tool call syntax. I disagree — both Haiku and Flash understand tool schemas from the tool definition itself. The prompt's job is to define the decision boundary (when to ask vs. search), not to teach the model how to format a tool call. Token-expensive examples of tool call JSON are wasted context. The contrastive pairs above are more valuable because they teach the boundary through near-miss comparisons: "something fun in williamsburg" is a search (neighborhood + vibe), but "brooklyn" is a clarify (borough, no vibe). That's the judgment the model needs to learn.
+The last line — "If you have enough to search, search — don't ask to be safe" — is critical. Without it, the model will default to clarifying whenever it's uncertain, because asking feels like the "responsible" choice. You want to bias toward action. The model should ask only when searching would genuinely produce bad results, not when it's merely unsure which results would be best.
+6. Edge cases — four scenarios.
+Clarify + search in parallel: The orchestrator should reject this at the executeTool level. If a tool call batch contains clarify, ignore all other tool calls in the batch and treat it as clarify-only. Log the occurrence as an eval anomaly. Clarify means "I don't have enough to search" — searching simultaneously is a contradiction. If this happens more than 1-2% of the time, the prompt's decision boundary isn't clear enough and needs sharper contrastive examples.
+Double clarify (model calls clarify twice in one turn): Take the first, drop the second. There's no SMS UX where two questions in one message is good. If this happens at all, it's a prompt problem — add "Ask ONE question about the MOST ambiguous dimension" to the clarification section.
+User's reply to clarification is itself ambiguous ("idk, surprise me"): This is where the enforceability guard and implicit_filters work together beautifully. The pre-router detects pendingClarification, removes clarify from the tool list for this turn, and merges whatever implicit_filters exist. The model can't ask again — it's forced to search. But it's not searching blind, because implicit_filters carries forward the partial intent: "date tomorrow" → { time: "tomorrow" } means even "surprise me" produces a time-filtered search. The model sees the conversation history ("I asked about date type, they said surprise me") and will interpret that as permission to pick broadly. This is the correct outcome — the user opted out of disambiguation, so you do your best with partial information. No special handling needed; the existing architecture produces the right behavior.
+User ignores the clarification and sends a new query: This is the edge case neither the original prompt nor Gemini addressed. The user gets "What kind of date?" and replies "jazz in the east village." The pre-router should detect that the reply contains a standalone searchable intent (neighborhood + category) and skip the pending clarification flow entirely — clear pendingClarification, do NOT merge implicit_filters (they're from a different conversational context), treat it as a completely fresh query. The detection heuristic is simple: if the pre-router's normal filter extraction finds both a neighborhood and a category/activity signal in the message, it's a new query, not a clarification reply. Don't force the conversation into a funnel the user already walked out of.

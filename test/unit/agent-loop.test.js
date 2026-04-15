@@ -134,15 +134,15 @@ console.log('\nclarify prompt structure:');
 
 check('prompt has clarification section', anyPrompt.includes('## Clarification'));
 check('prompt mentions clarify tool', anyPrompt.includes('clarify') && anyPrompt.includes('tool'));
-check('prompt has SEARCH vs CLARIFY contrastive pairs', anyPrompt.includes('SEARCH') && anyPrompt.includes('CLARIFY'));
-check('prompt has broad_area reason', anyPrompt.includes('broad_area'));
-check('prompt has missing_neighborhood reason', anyPrompt.includes('missing_neighborhood'));
-check('prompt has context_shift reason', anyPrompt.includes('context_shift'));
-check('prompt has vague_intent reason', anyPrompt.includes('vague_intent'));
-check('prompt has bias-to-action line', anyPrompt.includes("don't ask to be safe"));
+check('prompt has ASK vs SEARCH vs REPLY routing', anyPrompt.includes('ASK') && anyPrompt.includes('SEARCH') && anyPrompt.includes('REPLY'));
+check('prompt defaults to ASK on first substantive request', anyPrompt.includes('DEFAULT on a first substantive request'));
+check('prompt has recommended option prefix rule', anyPrompt.includes('(Recommended)'));
 check('prompt mentions implicit_filters', anyPrompt.includes('implicit_filters'));
-check('prompt does NOT have old ask-vs-pick prose', !anyPrompt.includes('When to ask vs when to pick'));
-check('prompt does NOT have old GENUINELY AMBIGUOUS prose', !anyPrompt.includes('GENUINELY AMBIGUOUS'));
+check('prompt has diversity_role guidance', anyPrompt.includes('diversity_role'));
+check('prompt has off_query transparency rule', anyPrompt.includes('off_query'));
+check('prompt allows numbered format', anyPrompt.includes('numbered format'));
+check('prompt does NOT have old bias-to-action line', !anyPrompt.includes("don't ask to be safe"));
+check('prompt does NOT have old "no lists" ban', !anyPrompt.includes('no headers, no lists'));
 
 // ---- buildRecommendationReason ----
 console.log('\nbuildRecommendationReason:');
@@ -413,3 +413,50 @@ const badOrder = [
 const trimmed = buildNativeHistory(badOrder);
 check('starts with user', trimmed.length > 0 && trimmed[0].role === 'user');
 check('ends with assistant', trimmed.length > 0 && trimmed[trimmed.length - 1].role === 'assistant');
+
+// ---- diversifyPool + off_query serialization (2026-04-15 conversational redesign) ----
+console.log('\ndiversifyPool:');
+
+const { diversifyPool, buildOffQueryReason, serializePoolForContinuation: serializePool } = require('../../src/brain-llm');
+
+// Clone-heavy pool: 5 comedy events. Without diversity, top-5 would all be comedy.
+const homogeneousPool = [
+  { id: 'c1', category: 'comedy', venue_size: 'intimate' },
+  { id: 'c2', category: 'comedy', venue_size: 'intimate' },
+  { id: 'c3', category: 'comedy', venue_size: 'intimate' },
+  { id: 'j1', category: 'jazz', venue_size: 'intimate' },
+  { id: 'd1', category: 'dj', venue_size: 'massive' },
+  { id: 'f1', category: 'film', venue_size: 'standard' },
+  { id: 'c4', category: 'comedy', venue_size: 'intimate' },
+];
+const { recommendedIds, roleMap } = diversifyPool(homogeneousPool);
+check('recommends at most targetSize', recommendedIds.size <= 5);
+check('recommended slice spans ≥3 categories', (() => {
+  const cats = new Set([...recommendedIds].map(id => homogeneousPool.find(e => e.id === id).category));
+  return cats.size >= 3;
+})());
+check('primary role assigned', Object.values(roleMap).includes('primary'));
+check('contrast role assigned', Object.values(roleMap).includes('contrast'));
+check('top-ranked pool item is primary', roleMap['c1'] === 'primary');
+
+// Empty pool doesn't crash
+const empty = diversifyPool([]);
+check('empty pool returns empty set', empty.recommendedIds.size === 0);
+
+console.log('\nbuildOffQueryReason:');
+check('matching neighborhood + category → undefined', buildOffQueryReason({ neighborhood: 'bushwick', category: 'comedy' }, 'bushwick', { categories: ['comedy'] }) === undefined);
+check('different neighborhood → reason', buildOffQueryReason({ neighborhood: 'williamsburg', category: 'comedy' }, 'bushwick', { categories: ['comedy'] })?.includes('williamsburg'));
+check('different category → reason', buildOffQueryReason({ neighborhood: 'bushwick', category: 'jazz' }, 'bushwick', { categories: ['comedy'] })?.includes('jazz'));
+check('paid when free_only → reason', buildOffQueryReason({ neighborhood: 'bushwick', is_free: false }, 'bushwick', { free_only: true })?.includes('not free'));
+
+console.log('\nserializePoolForContinuation (conversational redesign):');
+const serTestPool = [
+  { id: 's1', name: 'Show 1', venue_name: 'V1', neighborhood: 'bushwick', category: 'comedy' },
+  { id: 's2', name: 'Show 2', venue_name: 'V2', neighborhood: 'williamsburg', category: 'jazz' },
+  { id: 's3', name: 'Show 3', venue_name: 'V3', neighborhood: 'bushwick', category: 'dj' },
+];
+const ser = serializePool({ pool: serTestPool, hood: 'bushwick', activeFilters: { categories: ['comedy'] }, matchCount: 3 });
+check('recommended items tagged with diversity_role', ser.events.find(e => e.recommended)?.diversity_role != null);
+check('off-neighborhood pick tagged off_query', ser.events.find(e => e.id === 's2')?.off_query === true);
+check('off-neighborhood pick has reason string', ser.events.find(e => e.id === 's2')?.off_query_reason?.length > 0);
+check('on-query pick has no off_query flag', ser.events.find(e => e.id === 's1')?.off_query === undefined);
