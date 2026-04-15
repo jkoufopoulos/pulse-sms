@@ -27,7 +27,7 @@ Pulse turns a simple text message into a curated night out. A user texts a neigh
 
 Pulse routes every incoming message through `checkMechanical` (help + TCPA only, $0) then the agent brain (Gemini tool calling). Session state is derived from the agent's structured tool call parameters — never parsed from free-text output.
 
-**Agent loop (sole path, ~$0.001/call)** — True agent loop via `runAgentLoop` in `llm.js`. `checkMechanical` handles only "help"/"?" and TCPA opt-out at $0. Everything else goes through `handleAgentRequest` in `agent-loop.js`, which runs a multi-turn tool calling loop (max 3 iterations): model calls a tool → code executes it → result fed back → model decides next action or writes SMS. 2 tools: `search` (unified — events, bars, restaurants, details, more, welcome) and `respond` (conversation). The model writes the SMS as plain text when it's ready. Falls back to Anthropic Haiku on Gemini failure. 2-5s typical latency.
+**Agent loop (sole path, ~$0.001/call)** — True agent loop via `runAgentLoop` in `llm.js`. `checkMechanical` handles only "help"/"?" and TCPA opt-out at $0. Everything else goes through `handleAgentRequest` in `agent-loop.js`, which runs a multi-turn tool calling loop (max 3 iterations): model calls a tool → code executes it → result fed back → model decides next action or writes SMS. 2 tools: `search` (unified — events, bars, restaurants, details, more, welcome) and `respond` (conversation). The model writes the SMS as plain text when it's ready. Primary model: Claude Haiku 4.5. Falls back to Gemini 2.5 Flash on failure. 2-5s typical latency.
 
 A typical multi-turn conversation:
 ```
@@ -53,8 +53,8 @@ Daily scrape (10am ET)              Incoming SMS
         │                                │
         ▼                                ▼
    sources/                         handler.js
-   (22 entries across               (request-guard.js:           $0
-    19 scraper modules)              TCPA, dedup, budget)
+   (5 editorial sources             (request-guard.js:           $0
+    5 editorial sources)             TCPA, dedup, budget)
         │                                │
         ├─► venues.js              checkMechanical ◄── session.js
         │   (auto-learn             (help + TCPA          (12 fields,
@@ -100,12 +100,12 @@ Daily scrape (10am ET)              Incoming SMS
 | `prompts.js` | System prompts: `EXTRACTION_PROMPT` |
 | `session.js` | Per-phone session store, 2hr TTL, 12 fields |
 | `events.js` | Daily event cache + disk persistence, cross-source dedup, quality gates, source vibe stamping |
-| `source-registry.js` | Single source of truth for all 22 source entries across 19 scraper modules (weights, tiers, fetch functions) |
+| `source-registry.js` | Single source of truth for all 5 editorial sources (weights, tiers, fetch functions). Listing-only scrapers preserved in `src/sources/` but not registered. |
 | `nudges.js` | Recurrence nudge system: attendance tracking via detail requests, consent flow (REMIND ME / NUDGE OFF), deterministic nudge messages, hourly scheduler. `trackRecurringDetail`, `captureConsent`, `buildNudgeMessage`, `checkAndSendNudges` |
 
 Other modules: `intent-handlers.js` (help response), `geo.js` + `neighborhoods.js` (75 NYC hoods across 5 boroughs), `venues.js` (auto-learning coords), `formatters.js` (480-char cap), `twilio.js`, `traces.js`, `alerts.js`, `preference-profile.js`, `referral.js`, `curation.js`, `source-health.js`, `db.js` (SQLite).
 
-Sources: 22 entries across 19 scraper modules in `sources/` — see `source-registry.js` for the full list. Evals: 6 modules in `src/evals/`. Scripts: 13 runners in `scripts/`. UIs: 8 dashboards served by `server.js`.
+Sources: 5 editorial sources registered in `source-registry.js` (Skint, NonsenseNYC, Yutori, ScreenSlate, BKMag). Listing-only scrapers preserved in `src/sources/` but not registered. Evals: 6 modules in `src/evals/`. Scripts: 18 runners in `scripts/`. UIs: 8 dashboards served by `server.js`.
 
 ## Design Principles (do not violate)
 
@@ -125,7 +125,7 @@ Required: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `GEM
 
 Optional: `ANTHROPIC_API_KEY` (only needed if using Claude models), `PORT` (default 3000), `PULSE_TEST_MODE=true` (enables simulator), `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`/`GMAIL_REFRESH_TOKEN` (newsletter scrapers), `RESEND_API_KEY`/`ALERT_EMAIL` (email alerts), `PULSE_NO_RATE_LIMIT=true`, `PULSE_NUDGES_ENABLED=true` (enables hourly recurrence nudge scheduler).
 
-Model config (all optional, defaults in `src/model-config.js`): `PULSE_MODEL_BRAIN` (agent loop, default `gemini-2.5-flash`), `PULSE_MODEL_EXTRACT` (event extraction, default `gemini-2.5-flash`), `PULSE_MODEL_EVAL` (evals and quality scoring, default `gemini-2.5-flash`), `PULSE_MODEL_FALLBACK` (fallback for all roles, default `gemini-2.5-flash`). Provider auto-detected from model name prefix (`gemini-*` → Gemini, `claude-*` → Anthropic).
+Model config (all optional, defaults in `src/model-config.js`): `PULSE_MODEL_BRAIN` (agent loop, default `claude-haiku-4-5-20251001`), `PULSE_MODEL_EXTRACT` (event extraction, default `claude-haiku-4-5-20251001`), `PULSE_MODEL_EVAL` (evals and quality scoring), `PULSE_MODEL_FALLBACK` (fallback for all roles, default `claude-haiku-4-5-20251001`). Provider auto-detected from model name prefix (`gemini-*` → Gemini, `claude-*` → Anthropic).
 
 ## Running
 

@@ -8,7 +8,7 @@ Pulse turns a text message into a curated night out. Send an NYC neighborhood na
 
 ## How It Works
 
-Every incoming SMS runs through a lightweight agent loop powered by Gemini 2.5 Flash (with Anthropic Haiku fallback):
+Every incoming SMS runs through a lightweight agent loop powered by Claude Haiku 4.5 (with Gemini 2.5 Flash fallback):
 
 1. **Mechanical check** — handles "help" and TCPA opt-out at $0
 2. **Agent loop** — multi-turn tool calling (max 3 iterations) with 2 tools:
@@ -16,7 +16,7 @@ Every incoming SMS runs through a lightweight agent loop powered by Gemini 2.5 F
    - `respond` — handles greetings, thanks, off-topic
 3. **Model writes the SMS** as plain text, capped at 480 characters. Pool items carry pre-computed `recommended` and `why` fields so the model trusts editorial signals without verbose prompt rules.
 
-Events are scraped daily at 10am ET from 22 sources across 19 scraper modules, cached to disk, and deduplicated across sources. The model costs ~$0.001/msg.
+Events are scraped daily at 10am ET from 5 editorial sources, cached to disk, and deduplicated across sources. The model costs ~$0.001/msg.
 
 See the [architecture explorer](https://web-production-c8fdb.up.railway.app/architecture) for the full pipeline.
 
@@ -45,7 +45,7 @@ Pulse: Late night music in Bushwick — Elsewhere has Mall Grab across two
 
 ## Sources
 
-22 source entries across 19 scraper modules covering NYC events: Resident Advisor, Dice, Nonsense NYC, Skint, Brooklyn Vegan, Eventbrite, DoNYC, Songkick, BAM, NYPL, Luma, and more. Four sources use LLM extraction (Skint, Nonsense NYC, Yutori, Screen Slate). See `src/source-registry.js` for the full list.
+5 editorial sources: Skint, Nonsense NYC, Yutori, Screen Slate, BKMag. All use LLM extraction. Listing-only scrapers (RA, Dice, Eventbrite, DoNYC, Songkick, BAM, NYPL, Luma, etc.) were removed to focus on sources with genuine editorial context — scraper code preserved in `src/sources/` if we re-enable. See `src/source-registry.js`.
 
 75 neighborhoods across all 5 NYC boroughs are supported.
 
@@ -56,7 +56,7 @@ cp .env.example .env   # fill in your keys
 npm install
 npm start              # boots on PORT (default 3000)
 npm run dev            # dev server with file-watch reload
-npm test               # smoke tests (905 tests, $0)
+npm test               # smoke tests (1113 tests, $0)
 ```
 
 ## Environment Variables
