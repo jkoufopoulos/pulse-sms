@@ -1,5 +1,5 @@
 const { check } = require('../helpers');
-const { sanitizeForLLM, extractPicksFromSms, deriveIntent, inferTypesFromQuery } = require('../../src/agent-loop');
+const { sanitizeForLLM, extractPicksFromSms, deriveIntent, inferTypesFromQuery, buildPreemptCopy } = require('../../src/agent-loop');
 
 // ---- sanitizeForLLM ----
 console.log('\nsanitizeForLLM:');
@@ -460,3 +460,15 @@ check('recommended items tagged with diversity_role', ser.events.find(e => e.rec
 check('off-neighborhood pick tagged off_query', ser.events.find(e => e.id === 's2')?.off_query === true);
 check('off-neighborhood pick has reason string', ser.events.find(e => e.id === 's2')?.off_query_reason?.length > 0);
 check('on-query pick has no off_query flag', ser.events.find(e => e.id === 's1')?.off_query === undefined);
+
+// ---- buildPreemptCopy (pre-empt latency text, 2026-04-15) ----
+console.log('\nbuildPreemptCopy:');
+
+check('search with neighborhood + category', buildPreemptCopy('search', { intent: 'discover', neighborhood: 'bushwick', filters: { categories: ['comedy'] } }) === 'Looking at comedy in bushwick tonight…');
+check('search with only neighborhood', buildPreemptCopy('search', { intent: 'discover', neighborhood: 'williamsburg' }) === 'Looking at williamsburg tonight…');
+check('search with only category', buildPreemptCopy('search', { intent: 'discover', filters: { categories: ['jazz'] } }) === 'Looking at jazz tonight…');
+check('search with intent=more', buildPreemptCopy('search', { intent: 'more' }) === 'Finding more picks…');
+check('search with intent=details + reference', buildPreemptCopy('search', { intent: 'details', reference: 'pick 2' }) === 'Pulling details on pick 2…');
+check('lookup_venue with name', buildPreemptCopy('lookup_venue', { venue_name: 'Union Pool' }) === 'Checking Union Pool…');
+check('clarify returns null (terminal, no pre-empt)', buildPreemptCopy('clarify', {}) === null);
+check('unknown tool returns null', buildPreemptCopy('respond', {}) === null);

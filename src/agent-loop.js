@@ -80,6 +80,33 @@ async function rewriteIfTooLong(smsText, trace) {
 }
 
 // ---------------------------------------------------------------------------
+// Pre-empt copy — derive a short "working on it" SMS from the first tool call.
+// Fired the moment the model commits to a tool (predictive signal: tool call
+// means ≥2 LLM round-trips, near-certain >3s total).
+// ---------------------------------------------------------------------------
+
+function buildPreemptCopy(toolName, params) {
+  if (toolName === 'lookup_venue') {
+    return params?.venue_name ? `Checking ${params.venue_name}…` : 'Looking up the venue…';
+  }
+  if (toolName === 'search') {
+    const intent = params?.intent;
+    if (intent === 'more') return 'Finding more picks…';
+    if (intent === 'details') {
+      const ref = params?.reference;
+      return ref ? `Pulling details on ${ref}…` : 'Pulling details…';
+    }
+    const hood = params?.neighborhood;
+    const cats = params?.filters?.categories;
+    if (hood && cats?.length) return `Looking at ${cats[0]} in ${hood} tonight…`;
+    if (hood) return `Looking at ${hood} tonight…`;
+    if (cats?.length) return `Looking at ${cats[0]} tonight…`;
+    return 'Looking tonight…';
+  }
+  return null; // clarify and respond are fast / terminal — skip pre-empt
+}
+
+// ---------------------------------------------------------------------------
 // Pure helpers
 // ---------------------------------------------------------------------------
 
@@ -784,6 +811,9 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     // Track raw results (with _ fields) for session save
     const rawResults = [];
     let clarifySeenInBatch = false;
+    let preemptSent = false;
+    const preemptEnabled = process.env.PULSE_PREEMPT_ENABLED === 'true' && !process.env.PULSE_TEST_MODE;
+
     const executeAndTrack = async (toolName, params) => {
       // Edge case: clarify + other tools in parallel — clarify wins, skip others
       if (toolName === 'clarify') {
@@ -796,6 +826,30 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
         console.warn(`[agent-loop] Skipping ${toolName} — clarify was called in same batch`);
         return { skipped: true, reason: 'clarify_in_batch' };
       }
+
+      // Pre-empt on first tool call (excluding clarify, which is terminal).
+      // Fires parallel to tool execution — we don't await the pre-empt send.
+      // `delivered` is eventually consistent: if the send resolves after
+      // finalizeTrace() serializes the trace to disk, the dashboard (ring buffer)
+      // sees it but the JSONL row does not. Acceptable for observability.
+      if (preemptEnabled && !preemptSent) {
+        const copy = buildPreemptCopy(toolName, params);
+        if (copy) {
+          preemptSent = true;
+          trace.preempt = { fired: true, copy, tool: toolName };
+          sendSMS(phone, copy)
+            .then(msg => {
+              trace.preempt.delivered = true;
+              if (msg?.sid) trace.preempt.sid = msg.sid;
+            })
+            .catch(err => {
+              trace.preempt.delivered = false;
+              trace.preempt.error = err.message;
+              console.warn(`[agent-loop] Pre-empt send failed: ${err.message}`);
+            });
+        }
+      }
+
       const result = await executeTool(toolName, params, session, phone, trace);
       rawResults.push({ name: toolName, params, result });
       return sanitizeForLLM(result);  // LLM only sees clean version
@@ -998,6 +1052,7 @@ module.exports = {
   handleAgentRequest,
   executeTool,
   sanitizeForLLM,
+  buildPreemptCopy,
   saveSessionFromToolCalls,
   extractPicksFromSms,
   extractPlacePicksFromSms,

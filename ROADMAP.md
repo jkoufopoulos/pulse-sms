@@ -217,6 +217,76 @@ User tests surfaced four failure patterns that contradict the current prompt. In
 
 ---
 
+## Next-up — Claude Code-inspired integrations (2026-04-15)
+
+Patterns stolen from `codeaashu/claude-code` that fit Pulse's editorial-curation hypothesis. Each is independently shippable.
+
+### 1. Pre-empt for long latencies — SHIPPED (2026-04-15)
+
+Fires a request-specific "working on it" SMS the moment the model commits to its first tool call. Predictive signal (tool call → ≥2 round-trips → near-certain >3s), not a wall-clock timer. Env-gated via `PULSE_PREEMPT_ENABLED=true`. Copy derived from tool call params: `"Looking at comedy in bushwick tonight…"` / `"Checking Union Pool…"` / `"Pulling details on 2…"`. Non-blocking send. Skipped in `PULSE_TEST_MODE` so evals stay single-message. Delivery tracked via `trace.preempt.{fired,delivered,sid,error}` (eventually consistent — `delivered` may be missing from on-disk JSONL if Twilio resolves after `finalizeTrace`; ring buffer + dashboard see it). Health dashboard tile: `/health` → Pre-empt.
+
+**Known gaps (not blocking ship):**
+- `[search, clarify]` batch causes pre-empt + clarify question = 2 SMS. Frequency negligible (prompt steers against it). Revisit if traces show >0.
+- Brain fallback to Gemini (`agent-loop.js:991`) uses an inline executor that bypasses pre-empt. Worst-affected case (Claude degraded) gets no pre-empt. Fix is to extract `executeAndTrack` into a `buildExecutor` factory and reuse for both loops.
+- `PULSE_TEST_MODE` gate means evals never exercise the firing logic — only the pure `buildPreemptCopy` is unit-tested. A `PULSE_PREEMPT_CAPTURE_MODE` (record-don't-send) would close the gap without breaking single-message assertions.
+
+### 2. `lookup_event_url` tool — structured enrichment from event pages
+
+**Problem:** When `short_detail` is thin (title + time + venue only, no editorial context), the model has nothing to say beyond logistics. Right now we throw up our hands.
+
+**Borrowed pattern:** Claude Code's `WebFetchTool` (`src/tools/WebFetchTool/`). Two design elements are load-bearing:
+- **Preapproved domain list** (`preapproved.ts`) — only allowed hosts can be fetched without user approval. Pulse equivalent: the allow-list already implied by `isReliableEventUrl` in `formatters.js` — formalize it.
+- **Secondary model post-processing** (`makeSecondaryModelPrompt`) — fetched HTML is piped through a cheap Haiku pass to extract a structured payload, never fed raw to the main brain. Same pattern Pulse already uses for `extractEvents` at scrape time.
+
+**Shape:** New tool exposed to the brain:
+```
+lookup_event_url({ event_id: string }) →
+  { confirmed_date, confirmed_price, confirmed_time, editorial_blurb, source_host }
+```
+Brain calls this on details requests when `short_detail` is <60 chars or missing. Internally: resolves `event_id` → `source_url`, checks against preapproved domain list, fetches with 15-min cache (steal the CC caching pattern), feeds HTML to Haiku with a fixed extraction prompt, returns structured payload.
+
+**Guardrails:**
+- Allow-list only — no free-roaming fetch.
+- Never call on discover/more — only on details.
+- Budget-aware — counts against per-user `$0.10/day`.
+- Empty-result fallback — if extraction fails or yields nothing useful, return `{ _empty: true }` and let the brain write details from existing fields.
+
+**Risk:** Tempting to expand into a general `web_fetch` tool. Don't — that invites fabrication from low-quality snippets and breaks the data contract.
+
+### 3. `get_directions` helper — deterministic walking/transit URLs
+
+**Problem:** Users asking "how do I get there" today get nothing. The simulator has Google Maps API keys and we already geocode venues via `venues.js`.
+
+**Borrowed pattern:** Claude Code's `isReadOnly: true` + `isConcurrencySafe: true` tool flags (`src/tools/WebFetchTool/WebFetchTool.ts`). Pattern: purely deterministic helpers are exposed as tools but run without an LLM round-trip — the tool signature IS the output.
+
+**Shape:** No LLM call. Pure function that builds a Google Maps deep link:
+```
+get_directions({ venue_name: string, from?: string }) →
+  "https://www.google.com/maps/dir/?api=1&destination=..."
+```
+Called on the `details` path when the SMS includes "how do I get there" / "directions" / "where is". Rendered as a follow-up URL message — same pattern as `sendPickUrls`.
+
+**Guardrails:**
+- `from` defaults to "current location" (user's phone GPS, not known to us — Google's app prompts).
+- Never include user's home address or prior locations — no PII leakage.
+- Fails open: if venue isn't geocoded, fall back to `https://maps.google.com/?q=<venue_name>`.
+
+### 4. Parallelize `search` + `lookup_venue` — concurrency optimization
+
+**Problem:** On details requests with thin venue data, the loop runs sequentially: search returns the pick → model calls `lookup_venue` → waits for Google Places → writes SMS. That's 2 serial round-trips + 1 Google call, often 5-7s.
+
+**Borrowed pattern:** Claude Code's parallel tool execution (`isConcurrencySafe`). The brain issues multiple tool calls in one turn and they run in parallel — the orchestrator awaits all before feeding results back.
+
+**Shape:** In `executeAndTrack`, detect when the brain calls `search` + `lookup_venue` in the same turn and run them concurrently with `Promise.all`. Already supported by the underlying `runAgentLoop` — just needs the execute wrapper to not serialize them. Prompt update to tell the brain "on a details request with a known pick, call `search({intent: 'details', reference})` AND `lookup_venue({venue_name})` in the same turn."
+
+**Guardrails:**
+- Only parallelize read-only, concurrency-safe tools (both of these are).
+- `clarify` + anything else must stay serialized (clarify is terminal).
+
+**Order of operations:** #2 → #3 → #4. #2 is the biggest quality win (fixes thin-data details responses). #3 is low-risk UX polish. #4 is a latency optimization worth ~1-2s but requires #2 to land first so the prompt rewrite is one change.
+
+---
+
 ## Not Building (until hypothesis validated)
 
 - Serendipity scoring / surprise picks

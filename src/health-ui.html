@@ -542,6 +542,13 @@
   <div id="latency-outliers"></div>
 </div>
 
+<div id="preempt-section" style="display:none">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin:24px 0 12px">
+    <h2 style="font-size:16px;font-weight:600;color:#aaa">Pre-empt <span style="font-size:11px;font-weight:400;color:#666">-- "working on it" SMS delivery (24h)</span></h2>
+  </div>
+  <div class="summary-row" id="preempt-row"></div>
+</div>
+
 <div class="event-mix-summary" id="event-mix-summary" style="display:none">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
     <h2 style="font-size:16px;font-weight:600;color:#aaa">Event Mix</h2>
@@ -1190,6 +1197,60 @@ async function refreshLatency() {
   }
 }
 
+function renderPreempt(data) {
+  const section = $('preempt-section');
+  if (!data) { section.style.display = 'none'; return; }
+
+  const s = data.last_24h;
+  if (!s || s.fired === 0) {
+    section.style.display = '';
+    $('preempt-row').innerHTML = `
+      <div class="summary-card">
+        <div class="label">Fires (24h)</div>
+        <div class="value">0</div>
+        <div class="sub">feature off or no qualifying turns</div>
+      </div>`;
+    return;
+  }
+  section.style.display = '';
+
+  const pct = s.delivery_rate == null ? '--' : Math.round(s.delivery_rate * 1000) / 10 + '%';
+  const rateColor = s.delivery_rate == null ? '' :
+    s.delivery_rate >= 0.95 ? '' :
+    s.delivery_rate >= 0.80 ? 'style="color:#fbbf24"' : 'style="color:#f87171"';
+
+  const topTool = Object.entries(s.by_tool || {}).sort((a, b) => b[1] - a[1])[0];
+  const toolSub = topTool ? `${escHtml(topTool[0])}: ${Number(topTool[1])}` : '';
+
+  const cards = [
+    { label: 'Fires (24h)', value: Number(s.fired), sub: toolSub, color: '' },
+    { label: 'Delivered', value: pct, sub: `${Number(s.delivered)}/${Number(s.fired)}`, color: rateColor },
+    { label: 'Failed', value: Number(s.failed), sub: s.failed === 0 ? 'clean' : 'Twilio errors', color: s.failed === 0 ? '' : 'style="color:#f87171"' },
+    { label: 'Pending', value: Number(s.pending), sub: 'eventual-consistency', color: '' },
+  ];
+
+  $('preempt-row').innerHTML = cards.map(c => `
+    <div class="summary-card">
+      <div class="label">${c.label}</div>
+      <div class="value" ${c.color}>${c.value}</div>
+      <div class="sub">${c.sub}</div>
+    </div>
+  `).join('');
+}
+
+async function refreshPreempt() {
+  try {
+    const res = await fetch('/api/health/preempt');
+    if (res.ok) {
+      renderPreempt(await res.json());
+    } else {
+      renderPreempt(null);
+    }
+  } catch {
+    renderPreempt(null);
+  }
+}
+
 async function refresh() {
   try {
     const res = await fetch('/health?json=1');
@@ -1273,12 +1334,14 @@ async function refreshAlerts() {
 refresh();
 refreshCosts();
 refreshLatency();
+refreshPreempt();
 refreshAudit();
 refreshScrapeAudit();
 refreshAlerts();
 setInterval(refresh, 60000);
 setInterval(refreshCosts, 60000);
 setInterval(refreshLatency, 60000);
+setInterval(refreshPreempt, 60000);
 setInterval(refreshAudit, 60000);
 setInterval(refreshScrapeAudit, 60000);
 setInterval(refreshAlerts, 60000);

@@ -128,6 +128,25 @@ app.get('/api/health/latency', (req, res) => {
   });
 });
 
+// Pre-empt firing + delivery stats -- same auth gating as /health
+app.get('/api/health/preempt', (req, res) => {
+  const authToken = process.env.HEALTH_AUTH_TOKEN;
+  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
+  const hasValidToken = authToken && req.query.token === authToken;
+  if (!isTestMode && !hasValidToken) return res.status(403).json({ error: 'Forbidden' });
+
+  const { computePreemptStats } = require('./traces');
+  const traces = getRecentTraces(500);
+
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const last24h = traces.filter(t => t.timestamp && new Date(t.timestamp).getTime() >= cutoff);
+
+  res.json({
+    last_24h: computePreemptStats(last24h),
+    recent: computePreemptStats(traces),
+  });
+});
+
 // Latency history from daily digests -- trend over 14-30 days
 app.get('/api/health/latency/history', (req, res) => {
   const authToken = process.env.HEALTH_AUTH_TOKEN;

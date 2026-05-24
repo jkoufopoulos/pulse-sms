@@ -360,8 +360,33 @@ function computeLatencyStats(traces) {
   };
 }
 
+/**
+ * Compute pre-empt firing + delivery stats from an array of traces.
+ * `delivered` is eventually consistent (see agent-loop.js); pending = fired
+ * but Twilio response not yet observed at snapshot time.
+ */
+function computePreemptStats(traces) {
+  const fired = traces.filter(t => t.preempt?.fired);
+  const delivered = fired.filter(t => t.preempt?.delivered === true);
+  const failed = fired.filter(t => t.preempt?.delivered === false);
+  const pending = fired.filter(t => t.preempt?.delivered === undefined);
+  const byTool = {};
+  for (const t of fired) {
+    const k = t.preempt.tool || 'unknown';
+    byTool[k] = (byTool[k] || 0) + 1;
+  }
+  return {
+    fired: fired.length,
+    delivered: delivered.length,
+    failed: failed.length,
+    pending: pending.length,
+    delivery_rate: fired.length > 0 ? delivered.length / fired.length : null,
+    by_tool: byTool,
+  };
+}
+
 module.exports = {
   startTrace, saveTrace, loadTraces, annotateTrace, getRecentTraces, getTraceById, getLatestTraceForPhone,
   recordConversationTurn, saveConversation,
-  PRICING, recordAICost, computeLatencyStats
+  PRICING, recordAICost, computeLatencyStats, computePreemptStats
 };

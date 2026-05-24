@@ -1,6 +1,7 @@
 node_modules/
 .env
 .DS_Store
+.superpowers/
 ISSUES.md
 SPEC.md
 twilio_2FA_recovery_code.txt
