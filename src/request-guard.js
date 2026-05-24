@@ -9,8 +9,10 @@ const DEDUP_TTL = 5 * 60 * 1000; // 5 minutes
 const OPT_OUT_KEYWORDS = /^\s*(stop|unsubscribe|cancel|quit)\s*$/i;
 
 // --- Cost-based daily AI budget per user ---
+// PULSE_DAILY_BUDGET_USD overrides the default (0.10). Set higher in test
+// environments so the simulator exercises the gate without tripping it.
 const aiBudgets = new Map(); // phone -> { cost_usd, date }
-const DAILY_BUDGET_USD = 0.10;
+const DAILY_BUDGET_USD = Number(process.env.PULSE_DAILY_BUDGET_USD) || 0.10;
 
 function getNycDate() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });

@@ -9,6 +9,37 @@ const { processedMessages, OPT_OUT_KEYWORDS, isOverBudget, trackAICost, getCostS
 
 const router = express.Router();
 
+// =============================================================================
+// Simulator / prod divergence manifest
+// =============================================================================
+// The simulator at /test MUST mirror prod end-to-end behavior — same agent
+// loop, same model, same prompts, same session writes, same pre-empt logic,
+// same budget gates, same auth checks. Divergences are ONLY allowed for
+// cost avoidance, and every one of them is listed here.
+//
+// ALLOWED divergences (cost avoidance):
+//   1. twilio.js: sendSMS captures to memory for test phones (+1555*, +10*)
+//      instead of hitting Twilio. Real-phone sends always go through Twilio.
+//   2. server.js: /test (simulator UI) and /api/sms/test (simulator endpoint)
+//      are mounted only when PULSE_TEST_MODE=true. Prod must never expose them.
+//   3. request-guard.js: DAILY_BUDGET_USD is env-tunable via
+//      PULSE_DAILY_BUDGET_USD. Test envs should set a higher ceiling (e.g. $10)
+//      so the gate still RUNS but doesn't trip during normal sim use. Never
+//      bypass the gate based on test mode.
+//   4. session.js: test-phone sessions (+1000000*) are not persisted to disk,
+//      preventing test state from leaking across restarts.
+//   5. traces.js: recordConversationTurn populates a sim-only "save conversation"
+//      map for the simulator UI's Save button. Trace JSONL persistence is
+//      identical in both modes.
+//
+// FORBIDDEN: gating agent behavior on PULSE_TEST_MODE.
+// If you find yourself reaching for `process.env.PULSE_TEST_MODE` in a
+// behavior path (tool calls, model selection, prompts, pre-empt, formatters,
+// session writes, scoring, filters, etc.), stop. Either it's a real cost-
+// avoidance divergence that belongs in this manifest, or it's an accidental
+// divergence that will silently break sim/prod parity.
+// =============================================================================
+
 // In-flight request counter for graceful shutdown
 let inflightRequests = 0;
 function getInflightCount() { return inflightRequests; }
@@ -150,7 +181,7 @@ async function handleMessage(phone, message) {
       return;
     }
 
-    if (!process.env.PULSE_TEST_MODE && isOverBudget(phone)) {
+    if (isOverBudget(phone)) {
       console.warn(`Over daily AI budget: ${masked}`);
       await sendSMS(phone, "You've hit your daily limit — check back tomorrow for more picks!");
       return;

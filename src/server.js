@@ -32,16 +32,18 @@ app.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'pulse', build: BUILD_SHA });
 });
 
-// Health dashboard — gated behind test mode or auth token
-app.get('/health', (req, res) => {
+// All /health and /api/health/* routes use the same auth: HEALTH_AUTH_TOKEN
+// must be set and match ?token=. No test-mode bypass — sim must mirror prod.
+function requireHealthAuth(req, res, next) {
   const authToken = process.env.HEALTH_AUTH_TOKEN;
-  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
-  const hasValidToken = authToken && req.query.token === authToken;
-
-  if (!isTestMode && !hasValidToken) {
+  if (!authToken || req.query.token !== authToken) {
     return res.status(403).json({ error: 'Forbidden' });
   }
+  next();
+}
 
+// Health dashboard
+app.get('/health', requireHealthAuth, (req, res) => {
   const acceptsHtml = (req.headers.accept || '').includes('text/html');
   if (acceptsHtml && !req.query.json) {
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
@@ -50,16 +52,8 @@ app.get('/health', (req, res) => {
   res.json(getHealthStatus());
 });
 
-// Cost summary API — same auth gating as /health
-app.get('/api/health/costs', (req, res) => {
-  const authToken = process.env.HEALTH_AUTH_TOKEN;
-  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
-  const hasValidToken = authToken && req.query.token === authToken;
-
-  if (!isTestMode && !hasValidToken) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-
+// Cost summary API
+app.get('/api/health/costs', requireHealthAuth, (req, res) => {
   const { getCostSummary } = require('./handler');
   const traces = getRecentTraces(500);
 
@@ -102,16 +96,8 @@ app.get('/api/health/costs', (req, res) => {
   });
 });
 
-// Latency stats API -- same auth gating as /health
-app.get('/api/health/latency', (req, res) => {
-  const authToken = process.env.HEALTH_AUTH_TOKEN;
-  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
-  const hasValidToken = authToken && req.query.token === authToken;
-
-  if (!isTestMode && !hasValidToken) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-
+// Latency stats API
+app.get('/api/health/latency', requireHealthAuth, (req, res) => {
   const { computeLatencyStats } = require('./traces');
   const traces = getRecentTraces(500);
 
@@ -128,13 +114,8 @@ app.get('/api/health/latency', (req, res) => {
   });
 });
 
-// Pre-empt firing + delivery stats -- same auth gating as /health
-app.get('/api/health/preempt', (req, res) => {
-  const authToken = process.env.HEALTH_AUTH_TOKEN;
-  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
-  const hasValidToken = authToken && req.query.token === authToken;
-  if (!isTestMode && !hasValidToken) return res.status(403).json({ error: 'Forbidden' });
-
+// Pre-empt firing + delivery stats
+app.get('/api/health/preempt', requireHealthAuth, (req, res) => {
   const { computePreemptStats } = require('./traces');
   const traces = getRecentTraces(500);
 
@@ -148,12 +129,7 @@ app.get('/api/health/preempt', (req, res) => {
 });
 
 // Latency history from daily digests -- trend over 14-30 days
-app.get('/api/health/latency/history', (req, res) => {
-  const authToken = process.env.HEALTH_AUTH_TOKEN;
-  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
-  const hasValidToken = authToken && req.query.token === authToken;
-  if (!isTestMode && !hasValidToken) return res.status(403).json({ error: 'Forbidden' });
-
+app.get('/api/health/latency/history', requireHealthAuth, (req, res) => {
   const { getDigests } = require('./db');
   const days = Math.min(parseInt(req.query.days) || 14, 60);
   const digests = getDigests(days);
@@ -167,12 +143,7 @@ app.get('/api/health/latency/history', (req, res) => {
 });
 
 // Slow traces -- return N slowest from ring buffer with full detail
-app.get('/api/health/traces/slow', (req, res) => {
-  const authToken = process.env.HEALTH_AUTH_TOKEN;
-  const isTestMode = process.env.PULSE_TEST_MODE === 'true';
-  const hasValidToken = authToken && req.query.token === authToken;
-  if (!isTestMode && !hasValidToken) return res.status(403).json({ error: 'Forbidden' });
-
+app.get('/api/health/traces/slow', requireHealthAuth, (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 20, 50);
   const traces = getRecentTraces(500);
   const slow = traces
