@@ -223,12 +223,12 @@ Patterns stolen from `codeaashu/claude-code` that fit Pulse's editorial-curation
 
 ### 1. Pre-empt for long latencies — SHIPPED (2026-04-15)
 
-Fires a request-specific "working on it" SMS the moment the model commits to its first tool call. Predictive signal (tool call → ≥2 round-trips → near-certain >3s), not a wall-clock timer. Env-gated via `PULSE_PREEMPT_ENABLED=true`. Copy derived from tool call params: `"Looking at comedy in bushwick tonight…"` / `"Checking Union Pool…"` / `"Pulling details on 2…"`. Non-blocking send. Skipped in `PULSE_TEST_MODE` so evals stay single-message. Delivery tracked via `trace.preempt.{fired,delivered,sid,error}` (eventually consistent — `delivered` may be missing from on-disk JSONL if Twilio resolves after `finalizeTrace`; ring buffer + dashboard see it). Health dashboard tile: `/health` → Pre-empt.
+Fires a request-specific "working on it" SMS the moment the model commits to its first tool call. Predictive signal (tool call → ≥2 round-trips → near-certain >3s), not a wall-clock timer. Env-gated via `PULSE_PREEMPT_ENABLED=true`. Copy derived from tool call params: `"Looking at comedy in bushwick tonight…"` / `"Checking Union Pool…"` / `"Pulling details on 2…"`. Non-blocking send. Fires in both prod and `PULSE_TEST_MODE` (simulator) — the original test-mode skip was dropped because no live eval indexes capture order from tool-using turns, and the simulator is the main iteration surface where the feature needs to be visible. Delivery tracked via `trace.preempt.{fired,delivered,sid,error}` (eventually consistent — `delivered` may be missing from on-disk JSONL if Twilio resolves after `finalizeTrace`; ring buffer + dashboard see it). Health dashboard tile: `/health` → Pre-empt.
 
 **Known gaps (not blocking ship):**
 - `[search, clarify]` batch causes pre-empt + clarify question = 2 SMS. Frequency negligible (prompt steers against it). Revisit if traces show >0.
 - Brain fallback to Gemini (`agent-loop.js:991`) uses an inline executor that bypasses pre-empt. Worst-affected case (Claude degraded) gets no pre-empt. Fix is to extract `executeAndTrack` into a `buildExecutor` factory and reuse for both loops.
-- `PULSE_TEST_MODE` gate means evals never exercise the firing logic — only the pure `buildPreemptCopy` is unit-tested. A `PULSE_PREEMPT_CAPTURE_MODE` (record-don't-send) would close the gap without breaking single-message assertions.
+- Integration evals that index captured messages by position (`msgs[0]`, `msgs[1]`) will need to skip pre-empt captures (e.g. `msgs.filter(m => !m.preempt)` once we tag them). No active eval is affected today; flag for future evals that use tool-call paths.
 
 ### 2. `lookup_event_url` tool — structured enrichment from event pages
 

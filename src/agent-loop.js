@@ -812,7 +812,7 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     const rawResults = [];
     let clarifySeenInBatch = false;
     let preemptSent = false;
-    const preemptEnabled = process.env.PULSE_PREEMPT_ENABLED === 'true' && !process.env.PULSE_TEST_MODE;
+    const preemptEnabled = process.env.PULSE_PREEMPT_ENABLED === 'true';
 
     const executeAndTrack = async (toolName, params) => {
       // Edge case: clarify + other tools in parallel — clarify wins, skip others
