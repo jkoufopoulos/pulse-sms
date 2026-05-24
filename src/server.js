@@ -1,4 +1,5 @@
 require('dotenv').config();
+require('./tracing');   // Phoenix tracing bootstrap — must run before Anthropic SDK is imported elsewhere
 
 const express = require('express');
 const helmet = require('helmet');
