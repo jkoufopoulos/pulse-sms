@@ -402,13 +402,23 @@ async function send() {
     });
 
     const data = await res.json();
-    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+    const totalElapsed = ((Date.now() - start) / 1000).toFixed(1);
 
     typingEl.classList.remove('active');
 
     if (data.ok && data.messages?.length > 0) {
+      // Each captured message carries its own timestamp from when it was
+      // pushed to the capture array. Use that to label each bubble with
+      // its actual generation latency instead of the total request time.
       for (const msg of data.messages) {
-        addMessage(msg.body, 'received', elapsed + 's');
+        let label = totalElapsed + 's';
+        if (msg.timestamp) {
+          const msgMs = new Date(msg.timestamp).getTime() - start;
+          if (Number.isFinite(msgMs) && msgMs >= 0) {
+            label = (msgMs / 1000).toFixed(1) + 's';
+          }
+        }
+        addMessage(msg.body, 'received', label);
       }
     } else if (data.error) {
       addMessage('Error: ' + data.error, 'system');
