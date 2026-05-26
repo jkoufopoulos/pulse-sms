@@ -68,6 +68,7 @@ npm test               # smoke tests (1113 tests, $0)
 
 **Optional:**
 - `PORT` — default 3000
+- `HEALTH_AUTH_TOKEN` — required to access `/health` and `/api/health/*` in deployed environments
 - `PULSE_TEST_MODE=true` — enables the web simulator
 - `PULSE_MODEL_BRAIN` — agent loop model (default `claude-haiku-4-5-20251001`)
 - `PULSE_MODEL_EXTRACT` — event extraction model (default `claude-haiku-4-5-20251001`)
@@ -79,4 +80,4 @@ npm test               # smoke tests (1113 tests, $0)
 
 - [Simulator](https://web-production-c8fdb.up.railway.app/test) — try it in a browser
 - [Architecture Explorer](https://jkoufopoulos.github.io/pulse-sms/architecture.html) — interactive pipeline diagram
-- [Health Dashboard](https://web-production-c8fdb.up.railway.app/health) — scraper status and event counts
+- [Health Dashboard](https://web-production-c8fdb.up.railway.app/health?token={{HEALTH_AUTH_TOKEN}}) — scraper status and event counts (token required)

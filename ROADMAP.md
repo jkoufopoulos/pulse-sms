@@ -1,7 +1,7 @@
 # Pulse — Roadmap
 
 > Single source of truth for what we're testing and why.
-> Last updated: 2026-03-18
+> Last updated: 2026-05-26
 
 ---
 
@@ -115,6 +115,7 @@ Based on user behavior, decide:
 | Anthropic-only | Mar 18 | All model roles default to claude-haiku-4-5-20251001. No Gemini in any path. |
 | Dashboard cleanup | Mar 18 | Removed: digests, eval-quality, evals-landing dashboards. Kept: simulator, health, eval browser, events, eval reports. |
 | Prompt rewrite + lookup_venue | Mar 19 | Editorial voice, data contract, anti-fabrication rule, 3 example outputs. `lookup_venue` tool for Google Places research on details requests. Removed dead serendipity/proactive code. |
+| Health endpoint auth configured in Railway | May 26 | Set `HEALTH_AUTH_TOKEN` on production `web` service and verified `/health?token=...` returns 200; unauthenticated `/health` remains forbidden by design. |
 
 ---
 
