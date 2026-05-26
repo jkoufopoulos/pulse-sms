@@ -116,6 +116,7 @@ Based on user behavior, decide:
 | Dashboard cleanup | Mar 18 | Removed: digests, eval-quality, evals-landing dashboards. Kept: simulator, health, eval browser, events, eval reports. |
 | Prompt rewrite + lookup_venue | Mar 19 | Editorial voice, data contract, anti-fabrication rule, 3 example outputs. `lookup_venue` tool for Google Places research on details requests. Removed dead serendipity/proactive code. |
 | Health endpoint auth configured in Railway | May 26 | Set `HEALTH_AUTH_TOKEN` on production `web` service and verified `/health?token=...` returns 200; unauthenticated `/health` remains forbidden by design. |
+| RA re-enabled as editorial source | May 26 | Resident Advisor registered in `source-registry.js` (weight 0.85, mergeRank 5), bringing registered editorial sources to 6. Live and healthy (254 events, 100% success). Docs in CLAUDE.md/README.md reconciled from stale "5 sources" count. |
 
 ---
 

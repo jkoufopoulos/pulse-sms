@@ -53,8 +53,8 @@ Daily scrape (10am ET)              Incoming SMS
         │                                │
         ▼                                ▼
    sources/                         handler.js
-   (5 editorial sources             (request-guard.js:           $0
-    5 editorial sources)             TCPA, dedup, budget)
+   (6 editorial sources             (request-guard.js:           $0
+    6 editorial sources)             TCPA, dedup, budget)
         │                                │
         ├─► venues.js              checkMechanical ◄── session.js
         │   (auto-learn             (help + TCPA          (12 fields,
@@ -100,12 +100,12 @@ Daily scrape (10am ET)              Incoming SMS
 | `prompts.js` | System prompts: `EXTRACTION_PROMPT` |
 | `session.js` | Per-phone session store, 2hr TTL, 12 fields |
 | `events.js` | Daily event cache + disk persistence, cross-source dedup, quality gates, source vibe stamping |
-| `source-registry.js` | Single source of truth for all 5 editorial sources (weights, tiers, fetch functions). Listing-only scrapers preserved in `src/sources/` but not registered. |
+| `source-registry.js` | Single source of truth for all 6 editorial sources (weights, tiers, fetch functions). Listing-only scrapers preserved in `src/sources/` but not registered. |
 | `nudges.js` | Recurrence nudge system: attendance tracking via detail requests, consent flow (REMIND ME / NUDGE OFF), deterministic nudge messages, hourly scheduler. `trackRecurringDetail`, `captureConsent`, `buildNudgeMessage`, `checkAndSendNudges` |
 
 Other modules: `intent-handlers.js` (help response), `geo.js` + `neighborhoods.js` (75 NYC hoods across 5 boroughs), `venues.js` (auto-learning coords), `formatters.js` (480-char cap), `twilio.js`, `traces.js`, `alerts.js`, `preference-profile.js`, `referral.js`, `curation.js`, `source-health.js`, `db.js` (SQLite).
 
-Sources: 5 editorial sources registered in `source-registry.js` (Skint, NonsenseNYC, Yutori, ScreenSlate, BKMag). Listing-only scrapers preserved in `src/sources/` but not registered. Evals: 6 modules in `src/evals/`. Scripts: 18 runners in `scripts/`. UIs: 8 dashboards served by `server.js`.
+Sources: 6 editorial sources registered in `source-registry.js` (Skint, NonsenseNYC, Yutori, ScreenSlate, BKMag, RA). Listing-only scrapers preserved in `src/sources/` but not registered. Evals: 6 modules in `src/evals/`. Scripts: 18 runners in `scripts/`. UIs: 8 dashboards served by `server.js`.
 
 ## Design Principles (do not violate)
 

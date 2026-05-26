@@ -16,7 +16,7 @@ Every incoming SMS runs through a lightweight agent loop powered by Claude Haiku
    - `respond` — handles greetings, thanks, off-topic
 3. **Model writes the SMS** as plain text, capped at 480 characters. Pool items carry pre-computed `recommended` and `why` fields so the model trusts editorial signals without verbose prompt rules.
 
-Events are scraped daily at 10am ET from 5 editorial sources, cached to disk, and deduplicated across sources. The model costs ~$0.001/msg.
+Events are scraped daily at 10am ET from 6 editorial sources, cached to disk, and deduplicated across sources. The model costs ~$0.001/msg.
 
 See the [architecture explorer](https://web-production-c8fdb.up.railway.app/architecture) for the full pipeline.
 
@@ -45,7 +45,7 @@ Pulse: Late night music in Bushwick — Elsewhere has Mall Grab across two
 
 ## Sources
 
-5 editorial sources: Skint, Nonsense NYC, Yutori, Screen Slate, BKMag. All use LLM extraction. Listing-only scrapers (RA, Dice, Eventbrite, DoNYC, Songkick, BAM, NYPL, Luma, etc.) were removed to focus on sources with genuine editorial context — scraper code preserved in `src/sources/` if we re-enable. See `src/source-registry.js`.
+6 editorial sources: Skint, Nonsense NYC, Yutori, Screen Slate, BKMag, RA. All use LLM extraction. Listing-only scrapers (Dice, Eventbrite, DoNYC, Songkick, BAM, NYPL, Luma, etc.) were removed to focus on sources with genuine editorial context — scraper code preserved in `src/sources/` if we re-enable. See `src/source-registry.js`.
 
 75 neighborhoods across all 5 NYC boroughs are supported.
 
