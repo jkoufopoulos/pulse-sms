@@ -1,5 +1,5 @@
 const { check } = require('../helpers');
-const { sanitizeForLLM, extractPicksFromSms, deriveIntent, inferTypesFromQuery, buildPreemptCopy } = require('../../src/agent-loop');
+const { sanitizeForLLM, extractPicksFromSms, deriveIntent, inferTypesFromQuery, buildPreemptCopy, resolveDetailUrl } = require('../../src/agent-loop');
 
 // ---- sanitizeForLLM ----
 console.log('\nsanitizeForLLM:');
@@ -467,7 +467,35 @@ console.log('\nbuildPreemptCopy:');
 check('search with neighborhood + category', buildPreemptCopy('search', { intent: 'discover', neighborhood: 'bushwick', filters: { categories: ['comedy'] } }) === 'Looking at comedy in bushwick tonight…');
 check('search with only neighborhood', buildPreemptCopy('search', { intent: 'discover', neighborhood: 'williamsburg' }) === 'Looking at williamsburg tonight…');
 check('search with only category', buildPreemptCopy('search', { intent: 'discover', filters: { categories: ['jazz'] } }) === 'Looking at jazz tonight…');
+check('search humanizes underscored category', buildPreemptCopy('search', { intent: 'discover', neighborhood: 'williamsburg', filters: { categories: ['live_music'] } }) === 'Looking at live music in williamsburg tonight…');
 check('search with intent=more', buildPreemptCopy('search', { intent: 'more' }) === 'Finding more picks…');
+
+// ---- resolveDetailUrl (single correct URL for details, 2026-05-26) ----
+// Regression: details URL was re-derived from SMS prose via venue match, which
+// returned every event at the venue (wrong event + multiple messages). Must
+// resolve the ONE event from the structured `reference` param instead.
+console.log('\nresolveDetailUrl:');
+const detailSession = {
+  lastResponseHadPicks: true,
+  lastPicks: [
+    { event_id: 'ofarrill' },      // pick 1 — National Sawdust
+    { event_id: 'hannah' },        // pick 2 — 3 Dollar Bill
+    { event_id: 'variety' },       // pick 3 — National Sawdust (same venue as pick 1)
+  ],
+  lastEvents: {
+    ofarrill: { id: 'ofarrill', name: "Arturo O'Farrill + Akua Dixon", venue_name: 'National Sawdust', ticket_url: 'https://nationalsawdust.org/event/ofarrill' },
+    hannah: { id: 'hannah', name: 'Hannah Montana 20th Anniversary Show', venue_name: '3 Dollar Bill', ticket_url: 'https://3dollarbill.example/hannah' },
+    variety: { id: 'variety', name: 'Interdisciplinary Variety Show', venue_name: 'National Sawdust', ticket_url: 'https://nationalsawdust.org/event/variety' },
+    // In the pool but NOT a pick — the sibling event whose URL wrongly leaked before:
+    vagabon: { id: 'vagabon', name: 'Vagabon + Friends', venue_name: 'National Sawdust', ticket_url: 'https://nationalsawdust.org/event/vagabon-friends-3-24' },
+  },
+};
+check('resolves correct event URL from numeric reference', resolveDetailUrl('1', detailSession) === 'https://nationalsawdust.org/event/ofarrill');
+check('returns a single string, not an array', typeof resolveDetailUrl('1', detailSession) === 'string');
+check('does NOT leak a sibling venue event URL', resolveDetailUrl('1', detailSession) !== 'https://nationalsawdust.org/event/vagabon-friends-3-24');
+check('resolves pick 3 to its own URL', resolveDetailUrl('3', detailSession) === 'https://nationalsawdust.org/event/variety');
+check('unresolvable reference returns null', resolveDetailUrl('99', detailSession) === null);
+check('no picks loaded returns null', resolveDetailUrl('1', { lastPicks: [], lastEvents: {} }) === null);
 check('search with intent=details + reference', buildPreemptCopy('search', { intent: 'details', reference: 'pick 2' }) === 'Pulling details on pick 2…');
 check('lookup_venue with name', buildPreemptCopy('lookup_venue', { venue_name: 'Union Pool' }) === 'Checking Union Pool…');
 check('clarify returns null (terminal, no pre-empt)', buildPreemptCopy('clarify', {}) === null);

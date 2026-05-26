@@ -158,6 +158,16 @@ message -> checkMechanical (help + TCPA only, $0)
 
 ## Open Issues
 
+### FIXED: Details response linked the wrong event + fired multiple URL SMS (discovered 2026-05-26)
+
+**Root cause:** The details URL-send path (`agent-loop.js`) re-derived which events to link by substring-matching the free-text SMS prose (`extractPicksFromSms`) against `Object.values(session.lastEvents)` — the entire shown pool, not the resolved pick. The matcher falls back to bare *venue-name* matching, so a details response about one National Sawdust event linked every National Sawdust event in the pool (including a sibling event, Vagabon, never shown as a pick) and sent each as a separate SMS. The structured `reference` param that already names the pick was available but ignored.
+
+**Fix:** Added `resolveDetailUrl(reference, session)` — resolves the single referenced event via `executeDetails` (structured `reference`, not prose) and returns its one URL. The details path now sends exactly one URL for that event; removed `extractPicksFromSms`/`sendPickUrls` from this path. Unit-tested against the multi-event-same-venue scenario.
+
+**Regression principle:** P1 — structured tool calls own state, free-text owns language. Re-parsing the outgoing SMS prose to choose a URL is the free-text-owns-state anti-pattern; link from the structured `reference`, never from generated text.
+
+---
+
 ### FIXED: Scraper crashes on every run — stale cache for 5 days (discovered 2026-03-24)
 
 **Root cause:** `source-health.js` was stubbed out (no-op) during hypothesis focus, but `scrape-guard.js` still assumed real health data. The Proxy in the stub auto-creates empty objects `{}`, so `sourceHealth[label]` is truthy but has no `.history` array. `getBaselineStats` accessed `health.history.length` on `undefined` → crash on every scrape and email poll.

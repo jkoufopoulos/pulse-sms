@@ -16,8 +16,8 @@ const { MODELS } = require('./model-config');
 const { BRAIN_TOOLS, buildBrainSystemPrompt, buildNativeHistory, serializePoolForContinuation, cleanEventName } = require('./brain-llm');
 const { serializePlacePoolForContinuation, searchPlaces, lookupVenueFromGoogle } = require('./places');
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || '';
-const { buildSearchPool, executeMore, executeWelcome } = require('./brain-execute');
-const { buildEventMap, saveResponseFrame, buildExhaustionMessage, sendPickUrls } = require('./pipeline');
+const { buildSearchPool, executeMore, executeWelcome, executeDetails } = require('./brain-execute');
+const { buildEventMap, saveResponseFrame, buildExhaustionMessage } = require('./pipeline');
 const { sendSMS, maskPhone } = require('./twilio');
 const { recordAICost } = require('./traces');
 const { getSession, setSession, addToHistory, hashPhone } = require('./session');
@@ -98,12 +98,28 @@ function buildPreemptCopy(toolName, params) {
     }
     const hood = params?.neighborhood;
     const cats = params?.filters?.categories;
-    if (hood && cats?.length) return `Looking at ${cats[0]} in ${hood} tonight…`;
+    const cat = cats?.length ? cats[0].replace(/_/g, ' ') : null;
+    if (hood && cat) return `Looking at ${cat} in ${hood} tonight…`;
     if (hood) return `Looking at ${hood} tonight…`;
-    if (cats?.length) return `Looking at ${cats[0]} tonight…`;
+    if (cat) return `Looking at ${cat} tonight…`;
     return 'Looking tonight…';
   }
   return null; // clarify and respond are fast / terminal — skip pre-empt
+}
+
+// ---------------------------------------------------------------------------
+// Detail URL resolution (P1: structured `reference` owns which event we link).
+// Resolve the single event the user referenced and return its one URL — never
+// re-parse free-text prose, which leaked sibling-venue events and fired one SMS
+// per match. Returns a single URL string, or null if none is reliable.
+// ---------------------------------------------------------------------------
+
+function resolveDetailUrl(reference, session) {
+  const { isReliableEventUrl } = require('./formatters');
+  const res = executeDetails(reference, session);
+  if (!res?.found || !res.event) return null;
+  const evt = res.event;
+  return evt.ticket_url || (isReliableEventUrl(evt.source_url) ? evt.source_url : null);
 }
 
 // ---------------------------------------------------------------------------
@@ -936,25 +952,21 @@ async function handleAgentRequest(phone, message, session, trace, finalizeTrace)
     await sendSMS(phone, smsText);
     smsSent = true;
 
-    // Send pick URLs for details
+    // Send a single URL for details — for the ONE event named by the
+    // structured `reference` param (P1). We do NOT re-parse the SMS prose:
+    // that leaked sibling-venue events and fired one SMS per match.
     if (intent === 'details') {
       let urlSent = false;
-      const detailEvents = Object.values(session?.lastEvents || {});
-      const detailPicks = extractPicksFromSms(smsText, detailEvents);
-      if (detailPicks.length > 0) {
-        const { isReliableEventUrl } = require('./formatters');
-        const evt = session?.lastEvents?.[detailPicks[0].event_id];
-        const url = evt?.ticket_url || (isReliableEventUrl(evt?.source_url) ? evt.source_url : null);
-        if (url) {
-          await sendSMS(phone, url);
-          setSession(phone, { lastSentUrl: url });
-          urlSent = true;
-        }
-        await sendPickUrls(phone, detailPicks.slice(1), session?.lastEvents || {});
+      const detailsCall = rawResults.find(tc => tc.name === 'search' && tc.params?.intent === 'details');
+      const eventUrl = detailsCall ? resolveDetailUrl(detailsCall.params?.reference, session) : null;
+      if (eventUrl) {
+        await sendSMS(phone, eventUrl);
+        setSession(phone, { lastSentUrl: eventUrl });
+        urlSent = true;
       }
 
       // Place URL sending (Google Maps link)
-      if (!urlSent && detailPicks.length === 0 && session?.lastResultType === 'places') {
+      if (!urlSent && session?.lastResultType === 'places') {
         const placePool = Object.values(session?.lastPlaceMap || {});
         const placePicks = extractPlacePicksFromSms(smsText, placePool);
         if (placePicks.length > 0) {
@@ -1053,6 +1065,7 @@ module.exports = {
   executeTool,
   sanitizeForLLM,
   buildPreemptCopy,
+  resolveDetailUrl,
   saveSessionFromToolCalls,
   extractPicksFromSms,
   extractPlacePicksFromSms,
