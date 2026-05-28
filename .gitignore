@@ -16,3 +16,6 @@ scripts/tavily-impact.js
 scripts/trim-reports.js
 *.png
 client_secret*.json
+
+# Cached Gemini embeddings for Phase 0 / Phase A retrieval experiments
+data/embeddings-cache.json
