@@ -1,0 +1,32 @@
+# BUCKET A — State / reference (5 queries)
+more
+2
+i meant brooklyn not bushwick
+send me the link
+actually skip the music, just bars
+
+# BUCKET B — Vibe / semantic (8 queries)
+something romantic and intimate in BK
+cozy date night spot
+weird underground vibes tonight
+low-key bar that isnt another wine bar
+where do creatives hang out in brooklyn
+something different tonight
+after-work drinks but not basic
+actually fun trivia somewhere
+
+# BUCKET C — Classic retrieve (7 queries)
+williamsburg
+free events
+comedy in the lower east side
+jazz tonight
+events tomorrow night
+anything happening in bushwick
+dj set in brooklyn
+
+# BUCKET D — Edges (5 queries)
+help
+dinner and a show
+how about comedy later tonight
+wburg
+free or cheap things this weekend
