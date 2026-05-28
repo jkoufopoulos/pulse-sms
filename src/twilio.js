@@ -14,16 +14,23 @@ function maskPhone(phone) {
   return phone.slice(0, -4).replace(/\d/g, '*') + phone.slice(-4);
 }
 
-// Test capture mode — per-phone capture so concurrent test requests don't bleed
-const _testCaptures = new Map(); // phone → messages[]
+// Test capture mode — per-phone capture so concurrent test requests don't bleed.
+// Optional onCapture callback fires inline with sendSMS so the test endpoint
+// can stream messages to the client as they happen instead of batching.
+const _testCaptures = new Map(); // phone → { messages: [], onCapture: fn|null }
 
-function enableTestCapture(phone) { _testCaptures.set(phone, []); }
-function disableTestCapture(phone) { const msgs = _testCaptures.get(phone) || []; _testCaptures.delete(phone); return msgs; }
+function enableTestCapture(phone, onCapture = null) { _testCaptures.set(phone, { messages: [], onCapture }); }
+function disableTestCapture(phone) { const entry = _testCaptures.get(phone); _testCaptures.delete(phone); return entry?.messages || []; }
 
 async function sendSMS(to, body, { maxRetries = 2 } = {}) {
   const capture = _testCaptures.get(to);
   if (capture) {
-    capture.push({ to, body, timestamp: new Date().toISOString() });
+    const msg = { to, body, timestamp: new Date().toISOString() };
+    capture.messages.push(msg);
+    if (capture.onCapture) {
+      try { capture.onCapture(msg); }
+      catch (err) { console.warn(`[TEST] onCapture callback error: ${err.message}`); }
+    }
     console.log(`[TEST] Captured SMS to ${maskPhone(to)}: ${body.slice(0, 80)}...`);
     return { sid: 'TEST_' + Date.now() };
   }
