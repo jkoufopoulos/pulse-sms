@@ -1,33 +1,27 @@
 /**
- * Reciprocal Rank Fusion (RRF) — fuses multiple ranked lists into one.
+ * Reciprocal Rank Fusion — merges multiple ranked lists into one.
  *
- * Standard formula: score(d) = sum_r 1 / (k + rank_r(d))
- * where rank is 1-indexed and k is a smoothing constant (default 60).
+ * Each input ranking is an array of doc IDs in descending score order.
+ * Each doc gets fused_score = sum over rankings of 1 / (k + rank_in_ranking).
+ * Standard k = 60 from the original Cormack/Clarke/Buettcher paper.
  */
 
-/**
- * @param {string[][]} rankings  - Array of ranked ID lists (best first)
- * @param {{ k?: number, topK?: number }} opts
- * @returns {{ id: string, score: number }[]}  sorted best-first, length <= topK
- */
-function rrfFuse(rankings, opts = {}) {
-  const k = opts.k ?? 60;
-  const topK = opts.topK ?? Infinity;
-
+function rrfFuse(rankings, { k = 60, topK = null } = {}) {
   const scores = new Map();
 
-  for (const ranked of rankings) {
-    ranked.forEach((id, i) => {
-      const rank = i + 1; // 1-indexed
-      const contrib = 1 / (k + rank);
-      scores.set(id, (scores.get(id) || 0) + contrib);
-    });
+  for (const ranking of rankings) {
+    for (let rank = 0; rank < ranking.length; rank++) {
+      const id = ranking[rank];
+      const inc = 1 / (k + rank);
+      scores.set(id, (scores.get(id) || 0) + inc);
+    }
   }
 
-  return [...scores.entries()]
+  const fused = [...scores.entries()]
     .map(([id, score]) => ({ id, score }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, topK);
+    .sort((a, b) => b.score - a.score);
+
+  return topK == null ? fused : fused.slice(0, topK);
 }
 
 module.exports = { rrfFuse };
