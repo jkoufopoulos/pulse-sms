@@ -284,8 +284,8 @@ async function handleMessageAI(phone, message) {
   }
 
   // Agent loop handles everything else
-  const { handleAgentRequest } = require('./agent-loop');
-  return handleAgentRequest(phone, message, session, trace, finalizeTrace);
+  const { handleAgentRequestGraph } = require('./agent-graph');
+  return handleAgentRequestGraph(phone, message, session, trace, finalizeTrace);
 }
 
 // Cleanup intervals (for graceful shutdown)
