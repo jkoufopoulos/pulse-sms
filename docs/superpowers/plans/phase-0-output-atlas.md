@@ -6,6 +6,10 @@ Queries: 25 across 4 buckets
 
 ---
 
+**IMPORTANT — session-state carry-over during this atlas run:** All 25 queries used the same phone number (`+15550001234`), so the agent loop accumulated session state turn-by-turn. This is realistic for a real conversation but pollutes some single-query reads — see annotations C-14 through C-20 where the agent's "state contamination" failures stem from filter state carried in from earlier turns. The hybrid retrieval has no session memory, so it doesn't have this problem (but loses the corresponding wins that state enables).
+
+**Also:** the agent hit its per-user daily AI budget at query D-24, so D-24 and D-25 don't have meaningful agent responses. Hybrid still ran for those.
+
 **How to read the columns:**
 - _Agent response_: full SMS captured from agent-Pulse on port 3000
 - _Hybrid top-3_: top 3 events from BM25+vector RRF fusion over the same corpus
@@ -25,7 +29,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| yes | no | state required + duplicate pollution (3x same near-dupe) |
 
 ---
 
@@ -41,7 +45,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| yes | no | reference resolution + false positive on noise floor |
 
 ---
 
@@ -61,7 +65,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| partial | no | state required + duplicate pollution (3x same Bushwick event for a Brooklyn query) |
 
 ---
 
@@ -77,7 +81,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| yes | no | reference resolution (no prior pick to send link for) |
 
 ---
 
@@ -93,7 +97,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| partial | no | state required + false positive (Hoboken bar surfaced for NYC query) |
 
 ---
 
@@ -109,7 +113,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| partial | partial | agent over-clarifies + duplicate pollution (3x Weekday Happy Hour) |
 
 ---
 
@@ -129,7 +133,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| yes | yes | agent over-clarifies (hybrid found great matches first try) |
 
 ---
 
@@ -149,7 +153,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| yes | yes | semantic vibe — both methods earned their keep here |
 
 ---
 
@@ -165,7 +169,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| partial | no | hybrid fails negation ("isnt another wine bar" surfaced literal wine bar) + duplicate pollution |
 
 ---
 
@@ -181,7 +185,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| partial | yes | agent narrates instead of picking; hybrid semantic match was strong |
 
 ---
 
@@ -201,7 +205,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| yes | no | intent ambiguity (abstract "different" — hybrid surfaces noise) |
 
 ---
 
@@ -219,7 +223,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| partial | no | vocabulary mismatch (hybrid hit "after-work" on comedy not bars) |
 
 ---
 
@@ -235,7 +239,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| no | yes | agent under-returns (says no trivia exists; hybrid finds plenty) |
 
 ---
 
@@ -251,7 +255,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| no | yes | agent state contamination (carries trivia filter from prior turn) |
 
 ---
 
@@ -267,7 +271,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| no | no | agent state contamination (still on Williamsburg) + hybrid false positives on "free" |
 
 ---
 
@@ -283,7 +287,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| no | yes | agent state contamination (after-5 time filter from prior turns) |
 
 ---
 
@@ -299,7 +303,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| partial | yes | agent over-restrictive ("no jazz citywide" wrong; hybrid finds Smalls) |
 
 ---
 
@@ -319,7 +323,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| yes | no | vocabulary mismatch — hybrid matches literal "Tomorrow" in name, no temporal understanding |
 
 ---
 
@@ -335,7 +339,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| no | yes | agent state contamination (carries "tomorrow" from prior turn) |
 
 ---
 
@@ -351,7 +355,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| no | yes | agent state contamination + hybrid finds real Brooklyn DJ sets |
 
 ---
 
@@ -369,7 +373,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| yes | no | mechanical help vs hybrid noise — hybrid retrieves on noise floor |
 
 ---
 
@@ -389,7 +393,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| yes | partial | agent over-clarifies; hybrid finds dinners but no "show" component |
 
 ---
 
@@ -407,7 +411,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| yes | partial | duplicate pollution (3x Comedy Cellar); agent time-aware reply was sharp |
 
 ---
 
@@ -423,7 +427,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| no | yes | agent budget cap (suite exhausted user-budget at this query); hybrid resolves "wburg" → Williamsburg semantically |
 
 ---
 
@@ -439,7 +443,7 @@ Queries: 25 across 4 buckets
 
 | Agent right? | Hybrid right? | Failure mode |
 |---|---|---|
-| _(annotate)_ | _(annotate)_ | _(annotate)_ |
+| no | partial | agent budget cap (no response possible); hybrid mixed (matched "free" but duplicate pollution) |
 
 ---
 
