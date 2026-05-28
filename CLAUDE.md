@@ -25,9 +25,9 @@ Pulse turns a simple text message into a curated night out. A user texts a neigh
 
 ## How Conversations Work
 
-Pulse routes every incoming message through `checkMechanical` (help + TCPA only, $0) then the agent brain (Gemini tool calling). Session state is derived from the agent's structured tool call parameters — never parsed from free-text output.
+Pulse routes every incoming message through `checkMechanical` (help + TCPA only, $0) then the agent brain (tool calling). Session state is derived from the agent's structured tool call parameters — never parsed from free-text output.
 
-**Agent loop (sole path, ~$0.001/call)** — True agent loop via `runAgentLoop` in `llm.js`. `checkMechanical` handles only "help"/"?" and TCPA opt-out at $0. Everything else goes through `handleAgentRequest` in `agent-loop.js`, which runs a multi-turn tool calling loop (max 3 iterations): model calls a tool → code executes it → result fed back → model decides next action or writes SMS. 2 tools: `search` (unified — events, bars, restaurants, details, more, welcome) and `respond` (conversation). The model writes the SMS as plain text when it's ready. Primary model: Claude Haiku 4.5. Falls back to Gemini 2.5 Flash on failure. 2-5s typical latency.
+**Agent loop (sole path, ~$0.001/call)** — True agent loop via `runAgentLoop` in `llm.js`. `checkMechanical` handles only "help"/"?" and TCPA opt-out at $0. Everything else goes through `handleAgentRequest` in `agent-loop.js`, which runs a multi-turn tool calling loop (max 3 iterations): model calls a tool → code executes it → result fed back → model decides next action or writes SMS. 2 tools: `search` (unified — events, bars, restaurants, details, more, welcome) and `respond` (conversation). The model writes the SMS as plain text when it's ready. Primary model: Claude Sonnet 4.6 (Haiku couldn't reliably hold session memory across turns). Falls back to Gemini 2.5 Flash on failure. 2-5s typical latency.
 
 A typical multi-turn conversation:
 ```
@@ -125,7 +125,7 @@ Required: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `GEM
 
 Optional: `ANTHROPIC_API_KEY` (only needed if using Claude models), `PORT` (default 3000), `PULSE_TEST_MODE=true` (enables simulator), `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`/`GMAIL_REFRESH_TOKEN` (newsletter scrapers), `RESEND_API_KEY`/`ALERT_EMAIL` (email alerts), `PULSE_NO_RATE_LIMIT=true`, `PULSE_NUDGES_ENABLED=true` (enables hourly recurrence nudge scheduler).
 
-Model config (all optional, defaults in `src/model-config.js`): `PULSE_MODEL_BRAIN` (agent loop, default `claude-haiku-4-5-20251001`), `PULSE_MODEL_EXTRACT` (event extraction, default `claude-haiku-4-5-20251001`), `PULSE_MODEL_EVAL` (evals and quality scoring), `PULSE_MODEL_FALLBACK` (fallback for all roles, default `claude-haiku-4-5-20251001`). Provider auto-detected from model name prefix (`gemini-*` → Gemini, `claude-*` → Anthropic).
+Model config (all optional, defaults in `src/model-config.js`): `PULSE_MODEL_BRAIN` (agent loop, default `claude-sonnet-4-6`), `PULSE_MODEL_EXTRACT` (event extraction, default `claude-haiku-4-5-20251001`), `PULSE_MODEL_EVAL` (evals and quality scoring), `PULSE_MODEL_FALLBACK` (fallback for all roles, default `gemini-2.5-flash`). Provider auto-detected from model name prefix (`gemini-*` → Gemini, `claude-*` → Anthropic).
 
 ## Running
 
