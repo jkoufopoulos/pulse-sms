@@ -401,29 +401,58 @@ async function send() {
       body: 'Body=' + encodeURIComponent(text) + '&From=' + encodeURIComponent(SESSION_PHONE),
     });
 
-    const data = await res.json();
-    const totalElapsed = ((Date.now() - start) / 1000).toFixed(1);
+    // Non-streaming early errors (rate limit, validation) come back as JSON.
+    if (!res.ok) {
+      typingEl.classList.remove('active');
+      const data = await res.json().catch(() => ({ error: 'HTTP ' + res.status }));
+      addMessage('Error: ' + (data.error || 'Unknown error'), 'system');
+      return;
+    }
 
-    typingEl.classList.remove('active');
+    // Streaming NDJSON — render each bubble at its actual arrival time.
+    // First `{type: "sms"}` event dismisses the typing indicator (matches iMessage UX).
+    // Final `{type: "done"}` event carries trace_summary / trace if needed.
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let typingDismissed = false;
+    let sawAnyMessage = false;
 
-    if (data.ok && data.messages?.length > 0) {
-      // Each captured message carries its own timestamp from when it was
-      // pushed to the capture array. Use that to label each bubble with
-      // its actual generation latency instead of the total request time.
-      for (const msg of data.messages) {
-        let label = totalElapsed + 's';
-        if (msg.timestamp) {
-          const msgMs = new Date(msg.timestamp).getTime() - start;
-          if (Number.isFinite(msgMs) && msgMs >= 0) {
-            label = (msgMs / 1000).toFixed(1) + 's';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let nl;
+      while ((nl = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, nl);
+        buffer = buffer.slice(nl + 1);
+        if (!line.trim()) continue;
+        let evt;
+        try { evt = JSON.parse(line); } catch { continue; }
+
+        if (evt.type === 'sms') {
+          if (!typingDismissed) {
+            typingEl.classList.remove('active');
+            typingDismissed = true;
+          }
+          let label = ((Date.now() - start) / 1000).toFixed(1) + 's';
+          if (evt.timestamp) {
+            const msgMs = new Date(evt.timestamp).getTime() - start;
+            if (Number.isFinite(msgMs) && msgMs >= 0) {
+              label = (msgMs / 1000).toFixed(1) + 's';
+            }
+          }
+          addMessage(evt.body, 'received', label);
+          sawAnyMessage = true;
+        } else if (evt.type === 'done') {
+          typingEl.classList.remove('active');
+          if (!evt.ok && evt.error) {
+            addMessage('Error: ' + evt.error, 'system');
+          } else if (!sawAnyMessage) {
+            addMessage('(no response)', 'system');
           }
         }
-        addMessage(msg.body, 'received', label);
       }
-    } else if (data.error) {
-      addMessage('Error: ' + data.error, 'system');
-    } else {
-      addMessage('(no response)', 'system');
     }
   } catch (err) {
     typingEl.classList.remove('active');

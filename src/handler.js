@@ -93,7 +93,20 @@ if (process.env.PULSE_TEST_MODE === 'true') {
       return res.status(400).json({ error: 'Missing Body parameter' });
     }
     const testPhone = phone || '+10000000000';
-    enableTestCapture(testPhone);
+
+    // Stream captured SMS messages as NDJSON so the client can render each
+    // bubble at its actual fire time instead of all-at-once when the request
+    // completes. The final `{type: "done"}` line carries trace_summary + trace.
+    res.setHeader('Content-Type', 'application/x-ndjson');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('X-Accel-Buffering', 'no');
+
+    const writeLine = (obj) => {
+      res.write(JSON.stringify(obj) + '\n');
+      if (typeof res.flush === 'function') res.flush();
+    };
+
+    enableTestCapture(testPhone, (msg) => writeLine({ type: 'sms', ...msg }));
 
     // Temporarily override brain model if requested
     const { MODELS } = require('./model-config');
@@ -106,7 +119,7 @@ if (process.env.PULSE_TEST_MODE === 'true') {
         handleMessage(testPhone, message.trim()),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out (25s)')), TEST_TIMEOUT_MS)),
       ]);
-      const captured = disableTestCapture(testPhone);
+      disableTestCapture(testPhone);
       const trace = traceId ? getTraceById(traceId) : getLatestTraceForPhone(maskPhone(testPhone));
       const trace_summary = trace ? {
         id: trace.id,
@@ -120,10 +133,12 @@ if (process.env.PULSE_TEST_MODE === 'true') {
         nearby_highlight: trace.events?.nearby_highlight || null,
         picks: trace.composition?.picks,
       } : null;
-      res.json({ ok: true, messages: captured, trace_summary, trace });
+      writeLine({ type: 'done', ok: true, trace_summary, trace });
+      res.end();
     } catch (err) {
-      const captured = disableTestCapture(testPhone);
-      res.status(500).json({ error: err.message, messages: captured });
+      disableTestCapture(testPhone);
+      writeLine({ type: 'done', ok: false, error: err.message });
+      res.end();
     } finally {
       if (modelOverride) MODELS.brain = originalModel;
     }
