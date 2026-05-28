@@ -30,7 +30,14 @@ const ROOT = path.resolve(__dirname, '../..');
 const QUERIES_FILE = path.join(ROOT, 'scripts/phase-0/comparison-queries.txt');
 const EVENTS_FILE = path.join(ROOT, 'data/events-cache.json');
 const EMBED_FILE = path.join(ROOT, 'data/embeddings-cache.json');
-const OUT_FILE = path.join(ROOT, 'docs/superpowers/plans/phase-0-output-atlas.md');
+const OUT_FILE = process.env.PULSE_OUT_FILE
+  ? path.resolve(process.env.PULSE_OUT_FILE)
+  : path.join(ROOT, 'docs/superpowers/plans/phase-0-output-atlas.md');
+
+// PULSE_ROTATE_PHONE=true → use a fresh phone per query so the agent loop
+// can't accumulate session state across the suite. Default is single phone
+// to match the original Phase 0 run.
+const ROTATE_PHONE = process.env.PULSE_ROTATE_PHONE === 'true';
 
 const PAUSE_MS = 4000;   // pause between queries to be kind to LLM rate limits
 
@@ -128,9 +135,16 @@ function fmtHybridTop(hybridTop, eventsById) {
       console.error(`  hybrid failed: ${err.message}`);
     }
 
+    // Rotate phone per query when ROTATE_PHONE is set, to avoid session-state
+    // carry-over from one query polluting the next (real issue surfaced by
+    // the original Phase 0 run, esp. in Bucket C).
+    const queryPhone = ROTATE_PHONE
+      ? `+1555000${String(2000 + i).padStart(4, '0')}`
+      : '+15550001234';
+
     let agentResp;
     try {
-      agentResp = await callAgent(query, { phone: '+15550001234' });
+      agentResp = await callAgent(query, { phone: queryPhone });
       console.log(`  agent: ${(agentResp.messages || []).length} msg, intent=${agentResp.trace_summary?.intent || '?'}`);
     } catch (err) {
       agentResp = { error: err.message };
