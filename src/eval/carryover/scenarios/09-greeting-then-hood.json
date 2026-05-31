@@ -1,0 +1,10 @@
+{
+  "id": "09-greeting-then-hood",
+  "description": "Greeting followed by a neighborhood should land in a normal discover search",
+  "turns": [
+    { "user": "hi",
+      "expect": { "tool": "respond", "args": {} } },
+    { "user": "williamsburg",
+      "expect": { "tool": "search", "args": { "neighborhood": "williamsburg", "intent": "discover" } } }
+  ]
+}

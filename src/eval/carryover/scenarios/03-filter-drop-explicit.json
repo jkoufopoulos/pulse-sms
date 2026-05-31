@@ -1,0 +1,18 @@
+{
+  "id": "03-filter-drop-explicit",
+  "description": "An explicit 'forget the X' drops that filter but keeps neighborhood",
+  "turns": [
+    { "user": "bushwick",
+      "expect": { "tool": "search", "args": { "neighborhood": "bushwick" } } },
+    { "user": "comedy",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "bushwick",
+        "filters": { "categories": { "$contains": "comedy" } }
+      } } },
+    { "user": "forget the comedy",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "bushwick",
+        "filters": { "categories": { "$absent_or_empty": true } }
+      } } }
+  ]
+}

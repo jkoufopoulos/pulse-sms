@@ -1,0 +1,10 @@
+{
+  "id": "05-numeric-pick-is-details",
+  "description": "A bare number after picks is a details lookup, not a new search",
+  "turns": [
+    { "user": "williamsburg",
+      "expect": { "tool": "search", "args": { "neighborhood": "williamsburg" } } },
+    { "user": "2",
+      "expect": { "tool": "search", "args": { "intent": "details", "reference": { "$present": true } } } }
+  ]
+}

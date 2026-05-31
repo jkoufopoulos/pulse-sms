@@ -1,0 +1,14 @@
+{
+  "id": "01-filter-add-time",
+  "description": "Adding 'later tonight' keeps the neighborhood and adds a time filter",
+  "turns": [
+    { "user": "williamsburg",
+      "expect": { "tool": "search", "args": { "neighborhood": "williamsburg", "intent": "discover" } } },
+    { "user": "later tonight",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "williamsburg",
+        "filters": { "time_after": { "$regex": "^2[0-3]:" } },
+        "intent": "discover"
+      } } }
+  ]
+}

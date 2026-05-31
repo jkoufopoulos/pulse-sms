@@ -1,0 +1,16 @@
+{
+  "id": "08-date-swap",
+  "description": "Saying 'actually tomorrow' after a 'tonight' search swaps the date range",
+  "turns": [
+    { "user": "tonight in williamsburg",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "williamsburg",
+        "filters": { "date_range": { "$present": true } }
+      } } },
+    { "user": "actually tomorrow",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "williamsburg",
+        "filters": { "date_range": { "$regex": "tomorrow|2026-" } }
+      } } }
+  ]
+}

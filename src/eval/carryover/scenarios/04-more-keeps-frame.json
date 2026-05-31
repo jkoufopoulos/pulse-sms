@@ -1,0 +1,10 @@
+{
+  "id": "04-more-keeps-frame",
+  "description": "'more' should be intent=more without restating neighborhood",
+  "turns": [
+    { "user": "williamsburg",
+      "expect": { "tool": "search", "args": { "neighborhood": "williamsburg" } } },
+    { "user": "more",
+      "expect": { "tool": "search", "args": { "intent": "more" } } }
+  ]
+}

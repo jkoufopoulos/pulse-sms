@@ -1,0 +1,10 @@
+{
+  "id": "07-disjunction-honored",
+  "description": "'greenpoint or williamsburg' should not silently collapse to one hood",
+  "turns": [
+    { "user": "greenpoint or williamsburg",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": { "$in": ["greenpoint", "williamsburg"] }
+      } } }
+  ]
+}

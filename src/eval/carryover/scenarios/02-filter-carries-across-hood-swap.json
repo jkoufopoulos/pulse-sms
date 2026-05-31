@@ -1,0 +1,18 @@
+{
+  "id": "02-filter-carries-across-hood-swap",
+  "description": "After a category filter is set, switching neighborhoods keeps the filter",
+  "turns": [
+    { "user": "williamsburg",
+      "expect": { "tool": "search", "args": { "neighborhood": "williamsburg" } } },
+    { "user": "how about comedy",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "williamsburg",
+        "filters": { "categories": { "$contains": "comedy" } }
+      } } },
+    { "user": "try bushwick",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "bushwick",
+        "filters": { "categories": { "$contains": "comedy" } }
+      } } }
+  ]
+}

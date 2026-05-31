@@ -1,0 +1,16 @@
+{
+  "id": "06-intent-survives-hood-swap",
+  "description": "'what about greenpoint' after a wine-bar query should keep the wine-bar intent",
+  "turns": [
+    { "user": "wine bar in williamsburg",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "williamsburg",
+        "filters": { "categories": { "$contains": "food" } }
+      } } },
+    { "user": "what about greenpoint",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "greenpoint",
+        "filters": { "categories": { "$contains": "food" } }
+      } } }
+  ]
+}

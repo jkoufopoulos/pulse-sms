@@ -1,0 +1,13 @@
+{
+  "id": "10-comedy-keyword-refinement",
+  "description": "A category keyword after a hood should refine, not restart",
+  "turns": [
+    { "user": "bushwick",
+      "expect": { "tool": "search", "args": { "neighborhood": "bushwick" } } },
+    { "user": "comedy",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "bushwick",
+        "filters": { "categories": { "$contains": "comedy" } }
+      } } }
+  ]
+}
