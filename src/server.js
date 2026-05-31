@@ -430,7 +430,7 @@ app.get('/api/conversations/saved', (req, res) => {
 
 // --- Carryover eval workspace ---
 app.get('/eval', (req, res) => {
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'");
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
   res.sendFile(require('path').join(__dirname, 'eval-ui.html'));
 });
 
