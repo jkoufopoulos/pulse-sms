@@ -192,12 +192,13 @@ function runMigrations(db) {
       trace_id TEXT NOT NULL,
       axis TEXT NOT NULL,
       label REAL NOT NULL,            -- human ground truth, same scale as score
-      labeler_id TEXT,                -- optional, e.g. 'jk' for now
+      labeler_id TEXT NOT NULL DEFAULT 'anon',  -- caller may supply 'jk' etc.; default makes UNIQUE work
       notes TEXT,
       labeled_at TEXT NOT NULL,
       UNIQUE(trace_id, axis, labeler_id)
     );
     CREATE INDEX IF NOT EXISTS idx_response_labels_trace ON response_labels(trace_id);
+    CREATE INDEX IF NOT EXISTS idx_response_labels_axis_labeled_at ON response_labels(axis, labeled_at);
 
     CREATE TABLE IF NOT EXISTS calibration_runs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -995,7 +996,8 @@ module.exports = {
   insertScrapedEvents,
   insertRecommendations,
   markRecommendationEngaged,
-  // Exposed for testing
+  // Exposed for testing / migrations
+  runMigrations,
   makePatternKey,
   normalizePatternName,
   addDays,

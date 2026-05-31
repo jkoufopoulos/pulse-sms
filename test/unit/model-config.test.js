@@ -14,7 +14,7 @@ delete require.cache[require.resolve('../../src/model-config')];
 const { MODELS, getProvider } = require('../../src/model-config');
 
 // Defaults — verify they match what's in model-config.js
-check('brain defaults to claude-sonnet-4-6-20250514', MODELS.brain === 'claude-sonnet-4-6-20250514');
+check('brain defaults to claude-sonnet-4-6', MODELS.brain === 'claude-sonnet-4-6');
 check('extract defaults to claude-haiku-4-5-20251001', MODELS.extract === 'claude-haiku-4-5-20251001');
 check('eval defaults to claude-haiku-4-5-20251001', MODELS.eval === 'claude-haiku-4-5-20251001');
 check('fallback defaults to gemini-2.5-flash', MODELS.fallback === 'gemini-2.5-flash');

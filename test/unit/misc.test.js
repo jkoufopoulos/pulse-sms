@@ -129,6 +129,48 @@ module.exports.runAsync = async function() {
   check('transition: conversationHistory still preserved', s5.conversationHistory?.length === 1);
 
   clearSession(testPhone);
+
+  // ---- handleHelp must not wipe the search frame ----
+  // Regression: help previously routed through saveResponseFrame and silently
+  // dropped lastBorough + visitedHoods + filter dimensions it didn't pass.
+  console.log('\nhandleHelp preserves session frame:');
+
+  const { handleHelp } = require('../../src/intent-handlers');
+  const { enableTestCapture, disableTestCapture } = require('../../src/twilio');
+
+  setSession(testPhone, {
+    lastNeighborhood: null,
+    lastBorough: 'brooklyn',
+    lastFilters: { categories: ['comedy'], time_after: '22:00', date_range: { start: '2026-05-27', end: '2026-05-27' } },
+    lastPicks: [{ event_id: 'evt1' }],
+    lastEvents: { evt1: { id: 'evt1', name: 'Test' } },
+    allOfferedIds: ['evt1'],
+    visitedHoods: ['Bushwick'],
+    lastResponseHadPicks: true,
+    conversationHistory: [{ role: 'user', content: 'comedy in brooklyn' }],
+  });
+
+  enableTestCapture(testPhone);
+  await handleHelp({
+    phone: testPhone,
+    session: getSession(testPhone),
+    masked: '+*******0000',
+    finalizeTrace: () => {},
+  });
+  const captured = disableTestCapture(testPhone);
+
+  const sAfterHelp = getSession(testPhone);
+  check('help: sends 2 SMS', captured.length === 2);
+  check('help: preserves lastBorough', sAfterHelp.lastBorough === 'brooklyn');
+  check('help: preserves lastFilters.categories', JSON.stringify(sAfterHelp.lastFilters?.categories) === '["comedy"]');
+  check('help: preserves lastFilters.time_after', sAfterHelp.lastFilters?.time_after === '22:00');
+  check('help: preserves lastPicks', sAfterHelp.lastPicks?.[0]?.event_id === 'evt1');
+  check('help: preserves lastEvents', sAfterHelp.lastEvents?.evt1?.name === 'Test');
+  check('help: preserves visitedHoods (not appended with citywide)', JSON.stringify(sAfterHelp.visitedHoods) === '["Bushwick"]');
+  check('help: preserves allOfferedIds', JSON.stringify(sAfterHelp.allOfferedIds) === '["evt1"]');
+  check('help: preserves lastResponseHadPicks', sAfterHelp.lastResponseHadPicks === true);
+
+  clearSession(testPhone);
   clearSessionInterval();
 
   // ---- TCPA opt-out regex ----
