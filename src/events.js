@@ -1462,4 +1462,12 @@ function scanCityWide(filters) {
     .map(([neighborhood, matchCount]) => ({ neighborhood, matchCount }));
 }
 
-module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, refreshEmailSources, getEvents, getEventsForBorough, getEventsCitywide, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, scheduleEmailPolls, clearEmailSchedule, captureExtractionInput, getExtractionInputs, scanCityWide, scoreInterestingness, scoreSurprise, selectDiversePicks, getTopPicks, isGarbageName, remapOtherCategory };
+// Test-only: overwrite the in-memory event cache with a fixture array.
+// Used by the carryover eval harness to isolate brain behavior from
+// scrape variance. Should never be called from production code paths.
+function setEventCache(events) {
+  if (!Array.isArray(events)) throw new Error('setEventCache: events must be an array');
+  eventCache = events;
+}
+
+module.exports = { SOURCES, SOURCE_TIERS, refreshCache, refreshSources, refreshEmailSources, getEvents, getEventsForBorough, getEventsCitywide, getEventById, getCacheStatus, getHealthStatus, getRawCache, isCacheFresh, scheduleDailyScrape, clearSchedule, scheduleEmailPolls, clearEmailSchedule, captureExtractionInput, getExtractionInputs, scanCityWide, scoreInterestingness, scoreSurprise, selectDiversePicks, getTopPicks, isGarbageName, remapOtherCategory, setEventCache };
