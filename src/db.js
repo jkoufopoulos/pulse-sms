@@ -173,6 +173,44 @@ function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_nudge_phone ON nudge_subscriptions(phone_hash);
     CREATE INDEX IF NOT EXISTS idx_nudge_optin ON nudge_subscriptions(opted_in, opted_out);
 
+    CREATE TABLE IF NOT EXISTS response_scores (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      trace_id TEXT NOT NULL,
+      axis TEXT NOT NULL,
+      score REAL NOT NULL,            -- 0..1 for scalar axes, 0/1 for binary
+      tier TEXT NOT NULL,             -- 'programmatic' | 'heuristic' | 'llm'
+      details_json TEXT,              -- per-axis structured breakdown
+      scored_at TEXT NOT NULL,
+      UNIQUE(trace_id, axis)
+    );
+    CREATE INDEX IF NOT EXISTS idx_response_scores_trace ON response_scores(trace_id);
+    CREATE INDEX IF NOT EXISTS idx_response_scores_axis ON response_scores(axis);
+    CREATE INDEX IF NOT EXISTS idx_response_scores_scored_at ON response_scores(scored_at);
+
+    CREATE TABLE IF NOT EXISTS response_labels (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      trace_id TEXT NOT NULL,
+      axis TEXT NOT NULL,
+      label REAL NOT NULL,            -- human ground truth, same scale as score
+      labeler_id TEXT,                -- optional, e.g. 'jk' for now
+      notes TEXT,
+      labeled_at TEXT NOT NULL,
+      UNIQUE(trace_id, axis, labeler_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_response_labels_trace ON response_labels(trace_id);
+
+    CREATE TABLE IF NOT EXISTS calibration_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      axis TEXT NOT NULL,
+      n_labeled INTEGER NOT NULL,
+      agreement REAL NOT NULL,        -- percent agreement, 0..1
+      kappa REAL,                     -- Cohen's kappa where applicable
+      window_start TEXT NOT NULL,
+      window_end TEXT NOT NULL,
+      computed_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_calibration_runs_axis ON calibration_runs(axis);
+
     CREATE TABLE IF NOT EXISTS places (
       place_id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
