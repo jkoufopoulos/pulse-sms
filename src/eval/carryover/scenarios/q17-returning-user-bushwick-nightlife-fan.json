@@ -1,0 +1,12 @@
+{
+  "id": "q17-returning-user-bushwick-nightlife-fan",
+  "description": "returning user: bushwick nightlife fan",
+  "turns": [
+    {
+      "user": "tonight"
+    },
+    {
+      "user": "more"
+    }
+  ]
+}

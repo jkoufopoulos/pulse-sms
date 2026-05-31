@@ -1,0 +1,12 @@
+{
+  "id": "q19-returning-user-tries-new-neighborhood",
+  "description": "returning user: tries new neighborhood",
+  "turns": [
+    {
+      "user": "fort greene"
+    },
+    {
+      "user": "tell me about the first one"
+    }
+  ]
+}

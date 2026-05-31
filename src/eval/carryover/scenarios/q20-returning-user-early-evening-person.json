@@ -1,0 +1,12 @@
+{
+  "id": "q20-returning-user-early-evening-person",
+  "description": "returning user: early evening person",
+  "turns": [
+    {
+      "user": "williamsburg tonight"
+    },
+    {
+      "user": "anything earlier?"
+    }
+  ]
+}

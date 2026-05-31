@@ -1,0 +1,15 @@
+{
+  "id": "q14-exhaustion-trivia-deep-dive",
+  "description": "exhaustion: trivia deep dive",
+  "turns": [
+    {
+      "user": "trivia"
+    },
+    {
+      "user": "more"
+    },
+    {
+      "user": "more"
+    }
+  ]
+}

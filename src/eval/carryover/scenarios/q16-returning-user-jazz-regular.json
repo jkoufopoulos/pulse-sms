@@ -1,0 +1,15 @@
+{
+  "id": "q16-returning-user-jazz-regular",
+  "description": "returning user: jazz regular",
+  "turns": [
+    {
+      "user": "west village"
+    },
+    {
+      "user": "tell me about the jazz one"
+    },
+    {
+      "user": "thanks"
+    }
+  ]
+}

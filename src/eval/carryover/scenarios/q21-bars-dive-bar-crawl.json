@@ -1,0 +1,12 @@
+{
+  "id": "q21-bars-dive-bar-crawl",
+  "description": "bars: dive bar crawl",
+  "turns": [
+    {
+      "user": "best dive bars in bushwick"
+    },
+    {
+      "user": "tell me about the first one"
+    }
+  ]
+}

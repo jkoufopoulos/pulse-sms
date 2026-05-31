@@ -1,0 +1,9 @@
+{
+  "id": "q12-new-user-just-says-hey",
+  "description": "new user: just says hey",
+  "turns": [
+    {
+      "user": "hey"
+    }
+  ]
+}

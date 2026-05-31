@@ -1,0 +1,12 @@
+{
+  "id": "q18-returning-user-free-event-hunter",
+  "description": "returning user: free event hunter",
+  "turns": [
+    {
+      "user": "les"
+    },
+    {
+      "user": "how about greenpoint"
+    }
+  ]
+}

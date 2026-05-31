@@ -1,0 +1,12 @@
+{
+  "id": "q22-bars-date-night-dinner-show",
+  "description": "bars: date night dinner + show",
+  "turns": [
+    {
+      "user": "dinner and a show in williamsburg"
+    },
+    {
+      "user": "tell me more about the restaurant"
+    }
+  ]
+}

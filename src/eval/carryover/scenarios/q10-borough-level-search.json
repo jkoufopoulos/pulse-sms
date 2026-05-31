@@ -1,0 +1,9 @@
+{
+  "id": "q10-borough-level-search",
+  "description": "borough-level search",
+  "turns": [
+    {
+      "user": "comedy tonight somewhere in brooklyn"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "q02-specific-request-genre-neighborhood",
+  "description": "specific request: genre + neighborhood",
+  "turns": [
+    {
+      "user": "jazz in west village"
+    }
+  ]
+}

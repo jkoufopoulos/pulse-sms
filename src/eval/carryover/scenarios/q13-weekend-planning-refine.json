@@ -1,0 +1,12 @@
+{
+  "id": "q13-weekend-planning-refine",
+  "description": "weekend planning: refine",
+  "turns": [
+    {
+      "user": "what's good this weekend"
+    },
+    {
+      "user": "saturday night specifically"
+    }
+  ]
+}

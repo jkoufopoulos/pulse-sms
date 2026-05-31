@@ -1,0 +1,15 @@
+{
+  "id": "q08-pivot-mid-conversation",
+  "description": "pivot mid-conversation",
+  "turns": [
+    {
+      "user": "les"
+    },
+    {
+      "user": "actually bushwick"
+    },
+    {
+      "user": "techno stuff"
+    }
+  ]
+}

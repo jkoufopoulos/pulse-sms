@@ -1,0 +1,15 @@
+{
+  "id": "q05-progressive-filtering",
+  "description": "progressive filtering",
+  "turns": [
+    {
+      "user": "free stuff in greenpoint"
+    },
+    {
+      "user": "how about comedy"
+    },
+    {
+      "user": "more"
+    }
+  ]
+}

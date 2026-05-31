@@ -1,0 +1,15 @@
+{
+  "id": "q09-natural-detail-request",
+  "description": "natural detail request",
+  "turns": [
+    {
+      "user": "east village"
+    },
+    {
+      "user": "any comedy?"
+    },
+    {
+      "user": "tell me about the first one"
+    }
+  ]
+}
