@@ -27,6 +27,7 @@ require('./unit/project-brain-context.test');
 require('./unit/eval-schema.test');
 require('./unit/eval-runs-schema.test');
 require('./unit/eval-matcher.test');
+require('./unit/eval-scenario-loader.test');
 const misc = require('./unit/misc.test');
 
 (async () => {
