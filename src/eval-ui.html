@@ -4,7 +4,20 @@
   <meta charset="UTF-8">
   <title>Carryover Eval Workspace</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 24px; max-width: 1100px; color: #222; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 24px; max-width: 1400px; color: #222; }
+    .scenario-grid { display: grid; grid-template-columns: 380px 1fr; gap: 20px; height: calc(100vh - 180px); }
+    .chat-col { overflow-y: auto; padding-right: 10px; border-right: 1px solid #e5e7eb; }
+    .detail-col { overflow-y: auto; padding-left: 10px; }
+    .bubble { padding: 8px 12px; border-radius: 12px; max-width: 90%; font-size: 13px; line-height: 1.4; word-break: break-word; }
+    .bubble.user { background: #dbeafe; color: #1e3a8a; margin-left: auto; border-bottom-right-radius: 4px; }
+    .bubble.ai { background: #f3f4f6; color: #111827; margin-right: auto; border-bottom-left-radius: 4px; cursor: pointer; }
+    .bubble.ai:hover { background: #e5e7eb; }
+    .bubble.ai.focused { box-shadow: 0 0 0 2px #2563eb; background: #eff6ff; }
+    .bubble.ai.labeled { border-left: 3px solid #10b981; }
+    .bubble.ai.matcher-fail { border-left: 3px solid #ef4444; }
+    .chat-turn { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+    .turn-meta { font-size: 10px; color: #6b7280; margin: 0 4px; }
+    .turn-tool-badge { display: inline-block; background: #e5e7eb; color: #374151; font-size: 10px; padding: 1px 6px; border-radius: 8px; margin-left: 4px; }
     h1 { font-size: 20px; margin: 0 0 16px; }
     h2 { font-size: 16px; margin: 24px 0 8px; }
     .crumbs { color: #666; font-size: 13px; margin-bottom: 12px; }
@@ -195,6 +208,7 @@
     }
 
     async function showScenario(scenarioId) {
+      if (state.scenarioId !== scenarioId) state.focusedTurnIdx = undefined;
       state.view = 'scenario';
       state.scenarioId = scenarioId;
       const r = state.run;
@@ -210,41 +224,67 @@
         _el('a', { onclick: () => showRun(state.runId) }, `Run #${state.runId}`),
         document.createTextNode(` · ${scenarioId}`),
       );
-      // Conversation header — chronological user → tool/sms summary, easier to skim
-      // than expanding each turn card individually.
-      const summaryRows = details.map(d => {
-        const t = d.turn;
-        const tc = t.tool_call ? JSON.parse(t.tool_call) : null;
-        return _el('div', { style: 'padding:6px 8px; border-bottom:1px solid #f3f4f6; font-size:12px;' },
-          _el('span', { style: 'color:#6b7280; margin-right:8px;' }, `t${t.turn_index}`),
-          _el('span', { style: 'color:#111827; font-weight:600;' }, '→ '),
-          _el('code', {}, t.user_msg || ''),
-          _el('span', { style: 'color:#6b7280; margin-left:8px;' }, `· ${tc ? tc.name : 'no tool'}`),
-        );
-      });
+      // Two-column layout: chat stream on the left, focused turn detail on the right.
+      // Clicking an AI bubble selects the turn; the right column re-renders.
+
       const discardBtn = isDiscarded
         ? _el('button', {
-            onclick: (e) => { e.stopPropagation(); restoreScenario(scenarioId); },
+            onclick: () => restoreScenario(scenarioId),
             style: 'padding:4px 10px; background:#fff; border:1px solid #d1d5db; border-radius:4px; cursor:pointer; font-size:12px;',
           }, 'Restore')
         : _el('button', {
-            onclick: (e) => { e.stopPropagation(); discardScenario(scenarioId); },
+            onclick: () => discardScenario(scenarioId),
             style: 'padding:4px 10px; background:#fff; border:1px solid #d1d5db; border-radius:4px; cursor:pointer; font-size:12px; color:#991b1b;',
           }, 'Discard conversation');
-      const titleRow = _el('div', {
-        style: 'padding:8px 12px; background:#f3f4f6; font-weight:600; font-size:13px; display:flex; align-items:center; justify-content:space-between;',
+
+      const titleBar = _el('div', {
+        style: 'display:flex; align-items:center; justify-content:space-between; padding:8px 0; margin-bottom:8px; border-bottom:1px solid #e5e7eb;' + (isDiscarded ? ' opacity:0.55;' : ''),
       },
-        _el('span', {}, `Conversation: ${scenarioId} · ${scenarioTurns.length} turns`,
-          isDiscarded ? _el('span', { class: 'badge fail', style: 'margin-left:8px;' }, 'discarded') : null),
+        _el('span', { style: 'font-weight:600; font-size:13px;' },
+          `${scenarioId} · ${scenarioTurns.length} turns`,
+          isDiscarded ? _el('span', { class: 'badge fail', style: 'margin-left:8px;' }, 'discarded') : null,
+        ),
         discardBtn,
       );
-      const header = _el('div', {
-        style: 'border:1px solid #e5e7eb; border-radius:6px; background:#fafafa; margin-bottom:16px;' + (isDiscarded ? ' opacity:0.55;' : ''),
-      },
-        titleRow,
-        ...summaryRows,
+
+      // Pick the focused turn (default: first unlabeled, fallback to turn 0).
+      const focusedIdx = state.focusedTurnIdx !== undefined && details[state.focusedTurnIdx]
+        ? state.focusedTurnIdx
+        : (details.findIndex(d => !d.prior_labels.find(l => l.trace_id === d.turn.trace_id)) !== -1
+            ? details.findIndex(d => !d.prior_labels.find(l => l.trace_id === d.turn.trace_id))
+            : 0);
+      state.focusedTurnIdx = focusedIdx;
+
+      const chatCol = _el('div', { class: 'chat-col' }, ...details.map((d, i) => renderChatTurn(d, i, i === focusedIdx)));
+      const detailCol = _el('div', { class: 'detail-col' }, renderTurn(details[focusedIdx]));
+
+      const grid = _el('div', { class: 'scenario-grid' }, chatCol, detailCol);
+      _replaceChildren(document.getElementById('view'), titleBar, grid);
+    }
+
+    function renderChatTurn(d, idx, isFocused) {
+      const t = d.turn;
+      const tc = t.tool_call ? JSON.parse(t.tool_call) : null;
+      const mr = t.matcher_result ? JSON.parse(t.matcher_result) : null;
+      const labeled = !!d.prior_labels.find(l => l.trace_id === t.trace_id);
+
+      const classes = ['bubble', 'ai'];
+      if (isFocused) classes.push('focused');
+      if (labeled) classes.push('labeled');
+      if (mr && !mr.passed) classes.push('matcher-fail');
+
+      return _el('div', { class: 'chat-turn' },
+        _el('div', { class: 'turn-meta' }, `t${t.turn_index}`),
+        _el('div', { class: 'bubble user' }, t.user_msg || ''),
+        _el('div', {
+          class: classes.join(' '),
+          onclick: () => { state.focusedTurnIdx = idx; showScenario(state.scenarioId); },
+        },
+          _el('div', {}, t.agent_sms || _el('em', { style: 'color:#9ca3af;' }, '(no SMS)')),
+          tc ? _el('span', { class: 'turn-tool-badge' }, tc.name) : null,
+          labeled ? _el('span', { class: 'turn-tool-badge', style: 'background:#d1fae5; color:#065f46;' }, '✓ labeled') : null,
+        ),
       );
-      _replaceChildren(document.getElementById('view'), header, ...details.map(renderTurn));
     }
 
     function renderTurn(d) {
@@ -346,9 +386,9 @@
           body: JSON.stringify({ trace_id, axis: AXIS, label, notes }),
         }).then(x => x.json());
         if (r.ok) {
-          const saved = turnEl.querySelector('.saved');
-          saved.style.display = 'inline';
-          saved.textContent = 'saved ✓';
+          // Re-render the scenario so the chat-column bubble picks up the "labeled" badge
+          // and the run-detail's labeled-count refreshes on next visit.
+          if (state.view === 'scenario') showScenario(state.scenarioId);
         } else {
           alert('save failed: ' + (r.error || 'unknown'));
         }
