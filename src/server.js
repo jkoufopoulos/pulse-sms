@@ -428,6 +428,110 @@ app.get('/api/conversations/saved', (req, res) => {
   res.json(getSavedConversations());
 });
 
+// --- Carryover eval workspace ---
+app.get('/eval', (req, res) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'");
+  res.sendFile(require('path').join(__dirname, 'eval-ui.html'));
+});
+
+app.get('/api/eval/runs', (req, res) => {
+  const { getDb } = require('./db');
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT r.*,
+      (SELECT COUNT(*) FROM eval_turn_captures WHERE run_id = r.id) AS turn_count,
+      (SELECT COUNT(*) FROM eval_turn_captures c
+        WHERE c.run_id = r.id
+          AND EXISTS (SELECT 1 FROM response_labels l WHERE l.trace_id = c.trace_id)) AS labeled_count,
+      (SELECT COUNT(*) FROM eval_turn_captures c
+        WHERE c.run_id = r.id
+          AND c.matcher_result IS NOT NULL
+          AND json_extract(c.matcher_result, '$.passed') = 1) AS matcher_passed,
+      (SELECT COUNT(*) FROM eval_turn_captures c
+        WHERE c.run_id = r.id AND c.matcher_result IS NOT NULL) AS matcher_evaluated
+    FROM eval_runs r
+    ORDER BY r.id DESC
+    LIMIT 50
+  `).all();
+  res.json({ runs: rows });
+});
+
+app.get('/api/eval/runs/:id', (req, res) => {
+  const { getDb } = require('./db');
+  const db = getDb();
+  const run = db.prepare(`SELECT * FROM eval_runs WHERE id = ?`).get(req.params.id);
+  if (!run) return res.status(404).json({ error: 'run not found' });
+
+  const scenarios = db.prepare(`
+    SELECT
+      scenario_id,
+      COUNT(*) AS turn_count,
+      SUM(CASE WHEN matcher_result IS NOT NULL AND json_extract(matcher_result, '$.passed') = 1 THEN 1 ELSE 0 END) AS matcher_passed,
+      SUM(CASE WHEN matcher_result IS NOT NULL THEN 1 ELSE 0 END) AS matcher_evaluated
+    FROM eval_turn_captures
+    WHERE run_id = ?
+    GROUP BY scenario_id
+    ORDER BY scenario_id
+  `).all(req.params.id);
+
+  for (const s of scenarios) {
+    s.labeled_count = db.prepare(`
+      SELECT COUNT(*) AS n FROM eval_turn_captures c
+      WHERE c.run_id = ? AND c.scenario_id = ?
+      AND EXISTS (SELECT 1 FROM response_labels l WHERE l.trace_id = c.trace_id)
+    `).get(req.params.id, s.scenario_id).n;
+  }
+
+  const turns = db.prepare(`
+    SELECT id AS capture_id, scenario_id, turn_index, trace_id, user_msg,
+           tool_call, agent_sms, matcher_result, captured_at
+    FROM eval_turn_captures WHERE run_id = ? ORDER BY scenario_id, turn_index
+  `).all(req.params.id);
+
+  res.json({ run, scenarios, turns });
+});
+
+app.get('/api/eval/turns/:capture_id', (req, res) => {
+  const { getDb } = require('./db');
+  const db = getDb();
+  const turn = db.prepare(`SELECT * FROM eval_turn_captures WHERE id = ?`).get(req.params.capture_id);
+  if (!turn) return res.status(404).json({ error: 'turn not found' });
+
+  // Prior labels on the same logical turn (scenario_id, turn_index) across all runs
+  const priorLabels = db.prepare(`
+    SELECT l.*, c.run_id, c.captured_at AS turn_captured_at
+    FROM response_labels l
+    JOIN eval_turn_captures c ON c.trace_id = l.trace_id
+    WHERE c.scenario_id = ? AND c.turn_index = ?
+    ORDER BY l.labeled_at DESC
+  `).all(turn.scenario_id, turn.turn_index);
+
+  res.json({ turn, prior_labels: priorLabels });
+});
+
+app.post('/api/eval/labels', (req, res) => {
+  const { trace_id, axis, label, notes } = req.body || {};
+  if (!trace_id || !axis || label === undefined) {
+    return res.status(400).json({ error: 'trace_id, axis, and label are required' });
+  }
+  const labeler_id = process.env.PULSE_LABELER_ID || 'jk';
+  const { getDb } = require('./db');
+  const db = getDb();
+  try {
+    db.prepare(`
+      INSERT INTO response_labels (trace_id, axis, label, labeler_id, notes, labeled_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(trace_id, axis, labeler_id) DO UPDATE SET
+        label = excluded.label,
+        notes = excluded.notes,
+        labeled_at = excluded.labeled_at
+    `).run(trace_id, axis, label, labeler_id, notes || null, new Date().toISOString());
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // --- Test mode: SMS simulator + mutating APIs ---
 if (process.env.PULSE_TEST_MODE === 'true') {
   app.get('/test', (req, res) => {
