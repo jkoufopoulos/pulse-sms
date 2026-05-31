@@ -212,6 +212,34 @@ function runMigrations(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_calibration_runs_axis ON calibration_runs(axis);
 
+    CREATE TABLE IF NOT EXISTS eval_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      started_at TEXT NOT NULL,
+      git_sha TEXT,
+      model TEXT NOT NULL,
+      env_flags TEXT,
+      notes TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS eval_turn_captures (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id INTEGER NOT NULL REFERENCES eval_runs(id),
+      scenario_id TEXT NOT NULL,
+      turn_index INTEGER NOT NULL,
+      trace_id TEXT NOT NULL,
+      user_msg TEXT NOT NULL,
+      brain_prompt TEXT,
+      brain_messages TEXT,
+      tool_call TEXT,
+      agent_sms TEXT,
+      session_before TEXT,
+      session_after TEXT,
+      matcher_result TEXT,
+      captured_at TEXT NOT NULL,
+      UNIQUE(run_id, scenario_id, turn_index)
+    );
+    CREATE INDEX IF NOT EXISTS idx_captures_scenario_turn ON eval_turn_captures(scenario_id, turn_index);
+
     CREATE TABLE IF NOT EXISTS places (
       place_id TEXT PRIMARY KEY,
       name TEXT NOT NULL,

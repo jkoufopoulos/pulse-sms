@@ -25,6 +25,7 @@ require('./unit/venue-aliases.test');
 require('./unit/places.test');
 require('./unit/project-brain-context.test');
 require('./unit/eval-schema.test');
+require('./unit/eval-runs-schema.test');
 const misc = require('./unit/misc.test');
 
 (async () => {
