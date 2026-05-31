@@ -99,9 +99,13 @@ async function replayScenario(scenario, { runId, db }) {
 
       const sessionAfter = snapshotSession(getSession(phone));
 
-      const toolCall = trace.brain_tool
-        ? { name: trace.brain_tool, params: trace.brain_params || {} }
-        : null;
+      // agent-graph populates trace.brain_tool_calls (plural array) — take the
+      // last call as the brain's final decision for the turn. If the brain ran
+      // multiple iterations (e.g. clarify → search), the last call is the most
+      // informative signal for matcher assertions.
+      const toolCalls = trace.brain_tool_calls || [];
+      const lastCall = toolCalls.length > 0 ? toolCalls[toolCalls.length - 1] : null;
+      const toolCall = lastCall ? { name: lastCall.name, params: lastCall.params || {} } : null;
 
       let matcherResult = null;
       if (turn.expect) {
