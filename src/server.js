@@ -429,6 +429,12 @@ app.get('/api/conversations/saved', (req, res) => {
 });
 
 // --- Carryover eval workspace ---
+// All eval routes gated by PULSE_TEST_MODE — same pattern as /test and
+// /api/sms/test. The workspace is a local dev tool; in production (Railway,
+// PULSE_TEST_MODE unset) the routes don't exist at all. This avoids exposing
+// captured brain prompts and unauthenticated label-write to the public.
+if (process.env.PULSE_TEST_MODE === 'true') {
+
 app.get('/eval', (req, res) => {
   res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
   res.sendFile(require('path').join(__dirname, 'eval-ui.html'));
@@ -528,9 +534,12 @@ app.post('/api/eval/labels', (req, res) => {
     `).run(trace_id, axis, label, labeler_id, notes || null, new Date().toISOString());
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('Label insert failed:', e);
+    res.status(500).json({ error: 'internal error' });
   }
 });
+
+} // end PULSE_TEST_MODE gate for carryover eval workspace
 
 // --- Test mode: SMS simulator + mutating APIs ---
 if (process.env.PULSE_TEST_MODE === 'true') {
