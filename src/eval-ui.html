@@ -104,10 +104,12 @@
       _replaceChildren(document.getElementById('view'), table);
     }
 
-    async function showRun(runId) {
+    async function showRun(runId, opts = {}) {
       state.view = 'run';
       state.runId = runId;
-      const r = await fetch(`/api/eval/runs/${runId}`).then(x => x.json());
+      state.showDiscarded = !!opts.showDiscarded;
+      const url = `/api/eval/runs/${runId}` + (state.showDiscarded ? '?show=all' : '');
+      const r = await fetch(url).then(x => x.json());
       state.run = r;
       _replaceChildren(document.getElementById('crumbs'),
         _el('a', { onclick: showRuns }, 'Runs'),
@@ -130,14 +132,21 @@
       const tbody = _el('tbody');
       for (const s of sortedScenarios) {
         const labeledFully = s.labeled_count >= s.turn_count;
+        const isDiscarded = s.status === 'discarded';
         const firstMsg = firstMsgByScenario[s.scenario_id] || '';
         const matcherCell = s.matcher_evaluated > 0 ? `${s.matcher_passed}/${s.matcher_evaluated}` : '—';
+        let rowStyle = '';
+        if (isDiscarded) rowStyle = 'opacity:0.4; text-decoration:line-through;';
+        else if (labeledFully) rowStyle = 'opacity:0.55';
+        const idCell = isDiscarded
+          ? _el('td', {}, s.scenario_id, ' ', _el('span', { class: 'badge fail' }, 'discarded'))
+          : _el('td', {}, s.scenario_id);
         tbody.append(_el('tr', {
           class: 'screnrow',
-          style: labeledFully ? 'opacity:0.55' : '',
+          style: rowStyle,
           onclick: () => showScenario(s.scenario_id),
         },
-          _el('td', {}, s.scenario_id),
+          idCell,
           _el('td', { style: 'color:#374151; max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;' },
             firstMsg.slice(0, 80)),
           _el('td', {}, `${s.turn_count} turns`),
@@ -145,8 +154,15 @@
           _el('td', {}, matcherCell),
         ));
       }
-      const meta = _el('div', { style: 'margin-bottom:12px; color:#6b7280; font-size:13px' },
-        `${r.run.source || 'synthetic'} · ${r.run.model || ''} · ${fmtFlags(r.run.env_flags)} · ${fmtShortSha(r.run.git_sha)} · ${sortedScenarios.length} conversations`);
+      const meta = _el('div', { style: 'margin-bottom:12px; color:#6b7280; font-size:13px; display:flex; align-items:center; gap:12px;' },
+        _el('span', {}, `${r.run.source || 'synthetic'} · ${r.run.model || ''} · ${fmtFlags(r.run.env_flags)} · ${fmtShortSha(r.run.git_sha)} · ${sortedScenarios.length} active conversations`),
+        r.discarded_count > 0
+          ? _el('a', {
+              onclick: () => showRun(runId, { showDiscarded: !state.showDiscarded }),
+              style: 'color:#2563eb; cursor:pointer; font-size:12px;',
+            }, state.showDiscarded ? '← hide discarded' : `show ${r.discarded_count} discarded`)
+          : null,
+      );
       const table = _el('table', {},
         _el('thead', {}, _el('tr', {},
           ...['Scenario', 'First message', 'Turns', 'Labels', 'Matcher'].map(h => _el('th', {}, h))
@@ -156,10 +172,34 @@
       _replaceChildren(document.getElementById('view'), meta, table);
     }
 
+    async function discardScenario(scenarioId) {
+      const note = prompt('(Optional) Why discard this conversation?', '');
+      if (note === null) return;  // cancelled
+      const r = await fetch('/api/eval/scenarios/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ run_id: state.runId, scenario_id: scenarioId, status: 'discarded', notes: note || null }),
+      }).then(x => x.json());
+      if (r.ok) showRun(state.runId);
+      else alert('discard failed: ' + (r.error || 'unknown'));
+    }
+
+    async function restoreScenario(scenarioId) {
+      const r = await fetch('/api/eval/scenarios/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ run_id: state.runId, scenario_id: scenarioId, status: 'active', notes: null }),
+      }).then(x => x.json());
+      if (r.ok) showRun(state.runId, { showDiscarded: state.showDiscarded });
+      else alert('restore failed: ' + (r.error || 'unknown'));
+    }
+
     async function showScenario(scenarioId) {
       state.view = 'scenario';
       state.scenarioId = scenarioId;
       const r = state.run;
+      const scenarioMeta = (r.scenarios || []).find(s => s.scenario_id === scenarioId) || {};
+      const isDiscarded = scenarioMeta.status === 'discarded';
       const scenarioTurns = r.turns.filter(t => t.scenario_id === scenarioId);
       const details = await Promise.all(
         scenarioTurns.map(t => fetch(`/api/eval/turns/${t.capture_id}`).then(x => x.json()))
@@ -182,11 +222,26 @@
           _el('span', { style: 'color:#6b7280; margin-left:8px;' }, `· ${tc ? tc.name : 'no tool'}`),
         );
       });
-      const header = _el('div', {
-        style: 'border:1px solid #e5e7eb; border-radius:6px; background:#fafafa; margin-bottom:16px;',
+      const discardBtn = isDiscarded
+        ? _el('button', {
+            onclick: (e) => { e.stopPropagation(); restoreScenario(scenarioId); },
+            style: 'padding:4px 10px; background:#fff; border:1px solid #d1d5db; border-radius:4px; cursor:pointer; font-size:12px;',
+          }, 'Restore')
+        : _el('button', {
+            onclick: (e) => { e.stopPropagation(); discardScenario(scenarioId); },
+            style: 'padding:4px 10px; background:#fff; border:1px solid #d1d5db; border-radius:4px; cursor:pointer; font-size:12px; color:#991b1b;',
+          }, 'Discard conversation');
+      const titleRow = _el('div', {
+        style: 'padding:8px 12px; background:#f3f4f6; font-weight:600; font-size:13px; display:flex; align-items:center; justify-content:space-between;',
       },
-        _el('div', { style: 'padding:8px 12px; background:#f3f4f6; font-weight:600; font-size:13px;' },
-          `Conversation: ${scenarioId} · ${scenarioTurns.length} turns`),
+        _el('span', {}, `Conversation: ${scenarioId} · ${scenarioTurns.length} turns`,
+          isDiscarded ? _el('span', { class: 'badge fail', style: 'margin-left:8px;' }, 'discarded') : null),
+        discardBtn,
+      );
+      const header = _el('div', {
+        style: 'border:1px solid #e5e7eb; border-radius:6px; background:#fafafa; margin-bottom:16px;' + (isDiscarded ? ' opacity:0.55;' : ''),
+      },
+        titleRow,
         ...summaryRows,
       );
       _replaceChildren(document.getElementById('view'), header, ...details.map(renderTurn));

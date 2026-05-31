@@ -241,6 +241,19 @@ function runMigrations(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_captures_scenario_turn ON eval_turn_captures(scenario_id, turn_index);
 
+    -- Per-scenario metadata: soft-delete + notes. Keyed by (run_id, scenario_id)
+    -- so a scenario can be discarded in one run without affecting other runs
+    -- containing the same scenario (e.g. re-runs of synthetic suites).
+    CREATE TABLE IF NOT EXISTS eval_scenario_meta (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id INTEGER NOT NULL REFERENCES eval_runs(id),
+      scenario_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',  -- 'active' | 'discarded'
+      notes TEXT,
+      updated_at TEXT NOT NULL,
+      UNIQUE(run_id, scenario_id)
+    );
+
     CREATE TABLE IF NOT EXISTS places (
       place_id TEXT PRIMARY KEY,
       name TEXT NOT NULL,

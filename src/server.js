@@ -465,19 +465,24 @@ app.get('/api/eval/runs', (req, res) => {
 app.get('/api/eval/runs/:id', (req, res) => {
   const { getDb } = require('./db');
   const db = getDb();
+  const showAll = req.query.show === 'all';
   const run = db.prepare(`SELECT * FROM eval_runs WHERE id = ?`).get(req.params.id);
   if (!run) return res.status(404).json({ error: 'run not found' });
 
   const scenarios = db.prepare(`
     SELECT
-      scenario_id,
+      c.scenario_id,
       COUNT(*) AS turn_count,
-      SUM(CASE WHEN matcher_result IS NOT NULL AND json_extract(matcher_result, '$.passed') = 1 THEN 1 ELSE 0 END) AS matcher_passed,
-      SUM(CASE WHEN matcher_result IS NOT NULL THEN 1 ELSE 0 END) AS matcher_evaluated
-    FROM eval_turn_captures
-    WHERE run_id = ?
-    GROUP BY scenario_id
-    ORDER BY scenario_id
+      SUM(CASE WHEN c.matcher_result IS NOT NULL AND json_extract(c.matcher_result, '$.passed') = 1 THEN 1 ELSE 0 END) AS matcher_passed,
+      SUM(CASE WHEN c.matcher_result IS NOT NULL THEN 1 ELSE 0 END) AS matcher_evaluated,
+      COALESCE(m.status, 'active') AS status,
+      m.notes AS status_notes
+    FROM eval_turn_captures c
+    LEFT JOIN eval_scenario_meta m
+      ON m.run_id = c.run_id AND m.scenario_id = c.scenario_id
+    WHERE c.run_id = ?
+    GROUP BY c.scenario_id
+    ORDER BY c.scenario_id
   `).all(req.params.id);
 
   for (const s of scenarios) {
@@ -488,13 +493,16 @@ app.get('/api/eval/runs/:id', (req, res) => {
     `).get(req.params.id, s.scenario_id).n;
   }
 
+  const discardedCount = scenarios.filter(s => s.status === 'discarded').length;
+  const visibleScenarios = showAll ? scenarios : scenarios.filter(s => s.status !== 'discarded');
+
   const turns = db.prepare(`
     SELECT id AS capture_id, scenario_id, turn_index, trace_id, user_msg,
            tool_call, agent_sms, matcher_result, captured_at
     FROM eval_turn_captures WHERE run_id = ? ORDER BY scenario_id, turn_index
   `).all(req.params.id);
 
-  res.json({ run, scenarios, turns });
+  res.json({ run, scenarios: visibleScenarios, turns, discarded_count: discardedCount });
 });
 
 app.get('/api/eval/turns/:capture_id', (req, res) => {
@@ -513,6 +521,32 @@ app.get('/api/eval/turns/:capture_id', (req, res) => {
   `).all(turn.scenario_id, turn.turn_index);
 
   res.json({ turn, prior_labels: priorLabels });
+});
+
+app.post('/api/eval/scenarios/status', (req, res) => {
+  const { run_id, scenario_id, status, notes } = req.body || {};
+  if (!run_id || !scenario_id || !status) {
+    return res.status(400).json({ error: 'run_id, scenario_id, status are required' });
+  }
+  if (!['active', 'discarded'].includes(status)) {
+    return res.status(400).json({ error: "status must be 'active' or 'discarded'" });
+  }
+  const { getDb } = require('./db');
+  const db = getDb();
+  try {
+    db.prepare(`
+      INSERT INTO eval_scenario_meta (run_id, scenario_id, status, notes, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(run_id, scenario_id) DO UPDATE SET
+        status = excluded.status,
+        notes = excluded.notes,
+        updated_at = excluded.updated_at
+    `).run(run_id, scenario_id, status, notes || null, new Date().toISOString());
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Scenario status update failed:', e);
+    res.status(500).json({ error: 'internal error' });
+  }
 });
 
 app.post('/api/eval/labels', (req, res) => {
