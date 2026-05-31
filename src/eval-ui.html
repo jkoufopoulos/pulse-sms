@@ -83,19 +83,21 @@
         for (const run of r.runs) {
           tbody.append(_el('tr', { class: 'runrow', onclick: () => showRun(run.id) },
             _el('td', {}, `#${run.id}`),
+            _el('td', {}, _el('span', {
+              class: 'badge ' + (run.source === 'production' ? 'pass' : 'none'),
+            }, run.source || 'synthetic')),
             _el('td', {}, run.started_at.slice(0, 16).replace('T', ' ')),
             _el('td', {}, fmtShortSha(run.git_sha)),
             _el('td', {}, run.model || ''),
-            _el('td', {}, fmtFlags(run.env_flags)),
             _el('td', {}, `${run.turn_count} turns`),
             _el('td', {}, `${run.labeled_count} labeled`),
-            _el('td', {}, `${run.matcher_passed}/${run.matcher_evaluated} matched`),
+            _el('td', {}, run.matcher_evaluated > 0 ? `${run.matcher_passed}/${run.matcher_evaluated} matched` : '—'),
           ));
         }
       }
       const table = _el('table', {},
         _el('thead', {}, _el('tr', {},
-          ...['Run', 'Started', 'SHA', 'Model', 'Flags', 'Turns', 'Labels', 'Matcher'].map(h => _el('th', {}, h))
+          ...['Run', 'Source', 'Started', 'SHA', 'Model', 'Turns', 'Labels', 'Matcher'].map(h => _el('th', {}, h))
         )),
         tbody,
       );
@@ -111,20 +113,43 @@
         _el('a', { onclick: showRuns }, 'Runs'),
         document.createTextNode(` · Run #${runId}`),
       );
+      // Compute first user message per scenario from the turn list (turn_index=0).
+      const firstMsgByScenario = {};
+      for (const t of r.turns) {
+        if (t.turn_index === 0 && !firstMsgByScenario[t.scenario_id]) {
+          firstMsgByScenario[t.scenario_id] = t.user_msg || '';
+        }
+      }
+      // Sort: scenarios with 0 labels first, then by id.
+      const sortedScenarios = [...r.scenarios].sort((a, b) => {
+        const aDone = a.labeled_count >= a.turn_count;
+        const bDone = b.labeled_count >= b.turn_count;
+        if (aDone !== bDone) return aDone ? 1 : -1;  // unlabeled first
+        return a.scenario_id.localeCompare(b.scenario_id);
+      });
       const tbody = _el('tbody');
-      for (const s of r.scenarios) {
-        tbody.append(_el('tr', { class: 'screnrow', onclick: () => showScenario(s.scenario_id) },
+      for (const s of sortedScenarios) {
+        const labeledFully = s.labeled_count >= s.turn_count;
+        const firstMsg = firstMsgByScenario[s.scenario_id] || '';
+        const matcherCell = s.matcher_evaluated > 0 ? `${s.matcher_passed}/${s.matcher_evaluated}` : '—';
+        tbody.append(_el('tr', {
+          class: 'screnrow',
+          style: labeledFully ? 'opacity:0.55' : '',
+          onclick: () => showScenario(s.scenario_id),
+        },
           _el('td', {}, s.scenario_id),
+          _el('td', { style: 'color:#374151; max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;' },
+            firstMsg.slice(0, 80)),
           _el('td', {}, `${s.turn_count} turns`),
-          _el('td', {}, `${s.labeled_count} labeled`),
-          _el('td', {}, `${s.matcher_passed}/${s.matcher_evaluated} matched`),
+          _el('td', {}, `${s.labeled_count}/${s.turn_count} labeled`),
+          _el('td', {}, matcherCell),
         ));
       }
       const meta = _el('div', { style: 'margin-bottom:12px; color:#6b7280; font-size:13px' },
-        `${r.run.model || ''} · ${fmtFlags(r.run.env_flags)} · ${fmtShortSha(r.run.git_sha)}`);
+        `${r.run.source || 'synthetic'} · ${r.run.model || ''} · ${fmtFlags(r.run.env_flags)} · ${fmtShortSha(r.run.git_sha)} · ${sortedScenarios.length} conversations`);
       const table = _el('table', {},
         _el('thead', {}, _el('tr', {},
-          ...['Scenario', 'Turns', 'Labels', 'Matcher'].map(h => _el('th', {}, h))
+          ...['Scenario', 'First message', 'Turns', 'Labels', 'Matcher'].map(h => _el('th', {}, h))
         )),
         tbody,
       );
@@ -145,7 +170,26 @@
         _el('a', { onclick: () => showRun(state.runId) }, `Run #${state.runId}`),
         document.createTextNode(` · ${scenarioId}`),
       );
-      _replaceChildren(document.getElementById('view'), ...details.map(renderTurn));
+      // Conversation header — chronological user → tool/sms summary, easier to skim
+      // than expanding each turn card individually.
+      const summaryRows = details.map(d => {
+        const t = d.turn;
+        const tc = t.tool_call ? JSON.parse(t.tool_call) : null;
+        return _el('div', { style: 'padding:6px 8px; border-bottom:1px solid #f3f4f6; font-size:12px;' },
+          _el('span', { style: 'color:#6b7280; margin-right:8px;' }, `t${t.turn_index}`),
+          _el('span', { style: 'color:#111827; font-weight:600;' }, '→ '),
+          _el('code', {}, t.user_msg || ''),
+          _el('span', { style: 'color:#6b7280; margin-left:8px;' }, `· ${tc ? tc.name : 'no tool'}`),
+        );
+      });
+      const header = _el('div', {
+        style: 'border:1px solid #e5e7eb; border-radius:6px; background:#fafafa; margin-bottom:16px;',
+      },
+        _el('div', { style: 'padding:8px 12px; background:#f3f4f6; font-weight:600; font-size:13px;' },
+          `Conversation: ${scenarioId} · ${scenarioTurns.length} turns`),
+        ...summaryRows,
+      );
+      _replaceChildren(document.getElementById('view'), header, ...details.map(renderTurn));
     }
 
     function renderTurn(d) {

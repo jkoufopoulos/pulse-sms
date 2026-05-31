@@ -218,7 +218,8 @@ function runMigrations(db) {
       git_sha TEXT,
       model TEXT NOT NULL,
       env_flags TEXT,
-      notes TEXT
+      notes TEXT,
+      source TEXT NOT NULL DEFAULT 'synthetic'    -- 'synthetic' (scenario replay) | 'production' (ingested traces)
     );
 
     CREATE TABLE IF NOT EXISTS eval_turn_captures (
