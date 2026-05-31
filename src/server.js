@@ -549,6 +549,24 @@ app.post('/api/eval/scenarios/status', (req, res) => {
   }
 });
 
+app.delete('/api/eval/labels', (req, res) => {
+  const { trace_id, axis } = req.body || {};
+  if (!trace_id || !axis) {
+    return res.status(400).json({ error: 'trace_id and axis are required' });
+  }
+  const labeler_id = process.env.PULSE_LABELER_ID || 'jk';
+  const { getDb } = require('./db');
+  const db = getDb();
+  try {
+    db.prepare(`DELETE FROM response_labels WHERE trace_id = ? AND axis = ? AND labeler_id = ?`)
+      .run(trace_id, axis, labeler_id);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Label delete failed:', e);
+    res.status(500).json({ error: 'internal error' });
+  }
+});
+
 app.post('/api/eval/labels', (req, res) => {
   const { trace_id, axis, label, notes } = req.body || {};
   if (!trace_id || !axis || label === undefined) {

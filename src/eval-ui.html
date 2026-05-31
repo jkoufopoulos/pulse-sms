@@ -35,9 +35,14 @@
     .turn .label-key { color: #6b7280; font-weight: 500; margin-right: 6px; }
     .turn pre { background: #f9fafb; padding: 8px 10px; border-radius: 4px; font-size: 12px; overflow-x: auto; margin: 6px 0; white-space: pre-wrap; word-break: break-word; }
     .score-widget { margin-top: 12px; padding-top: 10px; border-top: 1px solid #f3f4f6; }
-    .score-btns { display: inline-flex; gap: 4px; margin-right: 10px; }
-    .score-btns button { padding: 4px 10px; border: 1px solid #d1d5db; background: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; }
-    .score-btns button.active { background: #2563eb; color: white; border-color: #2563eb; }
+    .score-btns { display: inline-flex; gap: 6px; margin-right: 10px; }
+    .score-btns button { padding: 6px 18px; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
+    .score-btns button.pass-btn:hover { background: #f0fdf4; border-color: #10b981; }
+    .score-btns button.fail-btn:hover { background: #fef2f2; border-color: #ef4444; }
+    .score-btns button.pass-btn.active { background: #10b981; color: white; border-color: #10b981; }
+    .score-btns button.fail-btn.active { background: #ef4444; color: white; border-color: #ef4444; }
+    .clear-link { color: #6b7280; font-size: 12px; cursor: pointer; text-decoration: underline; margin-left: 8px; }
+    .clear-link:hover { color: #991b1b; }
     .score-widget textarea { width: 100%; min-height: 50px; padding: 6px 8px; font-family: inherit; font-size: 13px; box-sizing: border-box; margin-top: 8px; border: 1px solid #d1d5db; border-radius: 4px; }
     .score-widget button.save { padding: 6px 14px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; margin-top: 6px; }
     .saved { color: #065f46; font-size: 12px; margin-left: 8px; }
@@ -330,22 +335,32 @@
         _el('summary', {}, 'session before / after'),
         _el('pre', {}, `before: ${JSON.stringify(sb, null, 2)}\nafter:  ${JSON.stringify(sa, null, 2)}`));
 
-      const scoreBtns = _el('div', { class: 'score-btns' },
-        ...[1, 2, 3, 4, 5].map(n => _el('button', {
-          class: currentScore === n ? 'active' : '',
-          dataset: { score: String(n) },
-        }, String(n)))
-      );
+      // Binary scoring per the EDD canon (Hamel + sticker-pipeline):
+      //   pass = label 1; fail = label 0; absence of row = unlabeled.
+      // Skip is not a stored state — just don't click anything and move on.
+      const hasLabel = currentScore === 0 || currentScore === 1;
+      const passBtn = _el('button', {
+        class: 'pass-btn' + (currentScore === 1 ? ' active' : ''),
+        dataset: { score: '1' },
+      }, '✓ Pass');
+      const failBtn = _el('button', {
+        class: 'fail-btn' + (currentScore === 0 ? ' active' : ''),
+        dataset: { score: '0' },
+      }, '✗ Fail');
+      const scoreBtns = _el('div', { class: 'score-btns' }, passBtn, failBtn);
       const savedAffordance = _el('span', {
         class: 'saved',
-        style: 'display:' + (currentScore ? 'inline' : 'none'),
+        style: 'display:' + (hasLabel ? 'inline' : 'none'),
       }, 'saved ✓');
-      const notesArea = _el('textarea', { placeholder: 'notes (why this grade?)' });
+      const clearLink = hasLabel
+        ? _el('span', { class: 'clear-link', dataset: { clearLabel: '1' } }, 'clear')
+        : null;
+      const notesArea = _el('textarea', { placeholder: 'critique (why pass/fail? this becomes a judge few-shot later)' });
       notesArea.value = currentNotes;
       const saveBtn = _el('button', { class: 'save' }, 'Save label');
 
       const scoreWidget = _el('div', { class: 'score-widget' },
-        scoreBtns, savedAffordance, notesArea, saveBtn);
+        scoreBtns, savedAffordance, clearLink, notesArea, saveBtn);
 
       const priorBlock = otherPrior.length
         ? _el('div', { class: 'prior' },
@@ -371,14 +386,15 @@
       if (e.target.matches('.score-btns button')) {
         const turnEl = e.target.closest('.turn');
         turnEl.querySelectorAll('.score-btns button').forEach(b => b.classList.remove('active'));
+        // active class respects pass-btn / fail-btn variants via CSS
         e.target.classList.add('active');
       }
       if (e.target.matches('.score-widget button.save')) {
         const turnEl = e.target.closest('.turn');
         const trace_id = turnEl.dataset.traceId;
         const active = turnEl.querySelector('.score-btns button.active');
-        if (!active) { alert('pick a score first'); return; }
-        const label = parseInt(active.dataset.score, 10);
+        if (!active) { alert('pick Pass or Fail first'); return; }
+        const label = parseInt(active.dataset.score, 10);  // 0 = fail, 1 = pass
         const notes = turnEl.querySelector('textarea').value;
         const r = await fetch('/api/eval/labels', {
           method: 'POST',
@@ -386,11 +402,23 @@
           body: JSON.stringify({ trace_id, axis: AXIS, label, notes }),
         }).then(x => x.json());
         if (r.ok) {
-          // Re-render the scenario so the chat-column bubble picks up the "labeled" badge
-          // and the run-detail's labeled-count refreshes on next visit.
           if (state.view === 'scenario') showScenario(state.scenarioId);
         } else {
           alert('save failed: ' + (r.error || 'unknown'));
+        }
+      }
+      if (e.target.matches('.clear-link')) {
+        const turnEl = e.target.closest('.turn');
+        const trace_id = turnEl.dataset.traceId;
+        const r = await fetch('/api/eval/labels', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trace_id, axis: AXIS }),
+        }).then(x => x.json());
+        if (r.ok) {
+          if (state.view === 'scenario') showScenario(state.scenarioId);
+        } else {
+          alert('clear failed: ' + (r.error || 'unknown'));
         }
       }
     });
