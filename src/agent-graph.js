@@ -23,7 +23,23 @@
 
 const { runAgentLoop } = require('./llm');
 const { MODELS } = require('./model-config');
-const { BRAIN_TOOLS, buildBrainSystemPrompt, buildNativeHistory } = require('./brain-llm');
+const { BRAIN_TOOLS, buildBrainSystemPrompt, buildNativeHistory, projectBrainContext } = require('./brain-llm');
+
+// PULSE_BRAIN_PROJECT=true switches the brain to projected prompts: a terser
+// <state> block (single source of truth for canonical facts) + a 1-2 turn
+// linguistic tail (no tool_call/search_summary noise). Off by default until
+// eval signs off. tailTurns is tighter for Haiku because that's where dual-
+// channel reconciliation load matters most.
+function buildBrainPrompt(session) {
+  if (process.env.PULSE_BRAIN_PROJECT === 'true') {
+    const tailTurns = MODELS.brain.startsWith('claude-haiku') ? 1 : 2;
+    return projectBrainContext(session, { tailTurns });
+  }
+  return {
+    systemPrompt: buildBrainSystemPrompt(session),
+    messages: buildNativeHistory(session?.conversationHistory),
+  };
+}
 const { sendSMS, maskPhone } = require('./twilio');
 const { recordAICost } = require('./traces');
 const { getSession, setSession, addToHistory } = require('./session');
@@ -161,8 +177,7 @@ const nodes = {
   },
 
   [STATES.AGENT]: async (ctx) => {
-    const systemPrompt = buildBrainSystemPrompt(ctx.session);
-    const priorMessages = buildNativeHistory(ctx.session?.conversationHistory);
+    const { systemPrompt, messages: priorMessages } = buildBrainPrompt(ctx.session);
     const tools = ctx.session?.pendingClarification
       ? BRAIN_TOOLS.filter(t => t.name !== 'clarify')
       : BRAIN_TOOLS;
@@ -285,8 +300,7 @@ const nodes = {
   },
 
   [STATES.FALLBACK_MODEL]: async (ctx) => {
-    const systemPrompt = buildBrainSystemPrompt(ctx.session);
-    const priorMessages = buildNativeHistory(ctx.session?.conversationHistory);
+    const { systemPrompt, messages: priorMessages } = buildBrainPrompt(ctx.session);
     console.warn(`[agent-graph] ${MODELS.brain} failed, trying ${MODELS.fallback}: ${ctx.error?.message}`);
     try {
       const fallbackResult = await runAgentLoop(

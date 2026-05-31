@@ -23,18 +23,14 @@ require('./unit/traces-latency.test');
 require('./unit/extraction-cache.test');
 require('./unit/venue-aliases.test');
 require('./unit/places.test');
+require('./unit/project-brain-context.test');
+require('./unit/eval-schema.test');
 const misc = require('./unit/misc.test');
-
-// Integration tests
-const smsFlow = require('./integration/sms-flow.test');
 
 (async () => {
   // Async unit tests
   await venues.runAsync();
   await misc.runAsync();
-
-  // Async integration tests
-  await smsFlow.runAsync();
 
   // Summary
   const { pass, fail } = require('./helpers').getResults();

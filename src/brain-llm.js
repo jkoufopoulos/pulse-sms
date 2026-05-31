@@ -134,41 +134,16 @@ const BRAIN_TOOLS = [
 
 // --- System prompt for the brain ---
 
-function buildBrainSystemPrompt(session) {
-  const isFirstMessage = !session?.conversationHistory?.length && !session?.lastNeighborhood;
+// --- Prompt shell -----------------------------------------------------------
+// Holds the giant identity / data-contract / conversation / examples body that
+// both the legacy and projected prompt builders share. Only the <session>
+// block at the bottom varies between callers — that block is passed in as a
+// pre-rendered string so this helper stays a pure template.
+
+function _renderBrainPrompt(sessionContext) {
   const nycDate = new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   const nycTime = new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
   const nycNow = `${nycDate}, ${nycTime}`;
-  const sessionContext = session
-    ? [
-      isFirstMessage ? 'First message — new user, no history. Introduce yourself as Pulse and ask what neighborhood or vibe they want.' : null,
-      session.lastNeighborhood ? `Current neighborhood: ${session.lastNeighborhood}` : null,
-      session.lastFilters && Object.values(session.lastFilters).some(Boolean)
-        ? `Active filters: ${JSON.stringify(session.lastFilters)}`
-        : null,
-      session.lastPicks?.length
-        ? `Last picks shown: ${session.lastPicks.map(p => {
-          const evt = session.lastEvents?.[p.event_id];
-          return evt ? `"${evt.name}" at ${evt.venue_name || 'unknown venue'}` : p.event_id;
-        }).join(', ')}`
-        : null,
-      session.lastResultType === 'places' && session.lastPlaces?.length
-        ? `Last result: PLACES. Shown: ${session.lastPlaces.map(p => {
-            const place = session.lastPlaceMap?.[p.place_id];
-            return place ? `"${place.name}"` : p.place_id;
-          }).join(', ')}. Use search with intent "details" or "more" for follow-ups.`
-        : null,
-      session.pendingNearby
-        ? `Pending suggestion: "${session.pendingNearby}" (user was asked if they want picks there)`
-        : null,
-      session.allPicks?.length >= 5
-        ? `User's prior pick categories: ${[...new Set(session.allPicks.map(p => {
-          const evt = session.lastEvents?.[p.event_id];
-          return evt?.category;
-        }).filter(Boolean))].join(', ')}`
-        : null,
-    ].filter(Boolean).join('\n')
-    : 'No prior session.';
 
   return `<identity>
 You are Pulse — a friend who always knows what's happening tonight in NYC. You read every newsletter, know every venue, and when someone texts you asking what to do, you give them the kind of honest, opinionated take a well-connected friend would. You're not a listing service — you're the person people text when they want to actually go do something good.
@@ -290,6 +265,174 @@ User: "what about for a date tomorrow"
 <session>
 ${sessionContext}
 </session>`;
+}
+
+// --- Legacy session-context renderer (verbose, prose) -----------------------
+// Preserved as-is so existing regression tests on buildBrainSystemPrompt stay
+// green. Replaced in the projected path by buildStateBlock (terser key:value).
+
+function buildBrainSystemPrompt(session) {
+  const isFirstMessage = !session?.conversationHistory?.length && !session?.lastNeighborhood;
+  const sessionContext = session
+    ? [
+      isFirstMessage ? 'First message — new user, no history. Introduce yourself as Pulse and ask what neighborhood or vibe they want.' : null,
+      session.lastNeighborhood ? `Current neighborhood: ${session.lastNeighborhood}` : null,
+      session.lastFilters && Object.values(session.lastFilters).some(Boolean)
+        ? `Active filters: ${JSON.stringify(session.lastFilters)}`
+        : null,
+      session.lastPicks?.length
+        ? `Last picks shown: ${session.lastPicks.map(p => {
+          const evt = session.lastEvents?.[p.event_id];
+          return evt ? `"${evt.name}" at ${evt.venue_name || 'unknown venue'}` : p.event_id;
+        }).join(', ')}`
+        : null,
+      session.lastResultType === 'places' && session.lastPlaces?.length
+        ? `Last result: PLACES. Shown: ${session.lastPlaces.map(p => {
+            const place = session.lastPlaceMap?.[p.place_id];
+            return place ? `"${place.name}"` : p.place_id;
+          }).join(', ')}. Use search with intent "details" or "more" for follow-ups.`
+        : null,
+      session.pendingNearby
+        ? `Pending suggestion: "${session.pendingNearby}" (user was asked if they want picks there)`
+        : null,
+      session.allPicks?.length >= 5
+        ? `User's prior pick categories: ${[...new Set(session.allPicks.map(p => {
+          const evt = session.lastEvents?.[p.event_id];
+          return evt?.category;
+        }).filter(Boolean))].join(', ')}`
+        : null,
+    ].filter(Boolean).join('\n')
+    : 'No prior session.';
+
+  return _renderBrainPrompt(sessionContext);
+}
+
+// --- Projected state block (terse key:value, single source of truth) --------
+// Renders the canonical session state the brain needs to reason about the
+// current turn. Pairs with projectRecentTurns to form the projected prompt.
+// Designed so each fact appears in exactly one place — no duplication between
+// this block and the conversation history tail.
+
+function buildStateBlock(session) {
+  if (!session) return 'No prior session.';
+
+  const isFirst = !session.conversationHistory?.length && !session.lastNeighborhood;
+  if (isFirst) {
+    return 'First message — new user, no history. Introduce yourself as Pulse and ask what neighborhood or vibe they want.';
+  }
+
+  const lines = [];
+  if (session.lastNeighborhood) lines.push(`neighborhood: ${session.lastNeighborhood}`);
+  if (session.lastBorough) lines.push(`borough: ${session.lastBorough}`);
+
+  if (session.lastFilters && Object.values(session.lastFilters).some(Boolean)) {
+    const f = session.lastFilters;
+    const parts = [];
+    if (f.categories?.length) parts.push(`categories=${f.categories.join('/')}`);
+    if (f.free_only) parts.push('free_only');
+    if (f.time_after) parts.push(`after=${f.time_after}`);
+    if (f.date_range) parts.push(`when=${f.date_range}`);
+    if (f.vibe) parts.push(`vibe=${f.vibe}`);
+    if (parts.length) lines.push(`filters: ${parts.join(', ')}`);
+  }
+
+  if (session.lastPicks?.length) {
+    const picks = session.lastPicks.slice(0, 5).map((p, i) => {
+      const evt = session.lastEvents?.[p.event_id];
+      return evt
+        ? `  ${i + 1}) ${evt.name} @ ${evt.venue_name || '?'}`
+        : `  ${i + 1}) ${p.event_id}`;
+    });
+    lines.push(`last_picks_shown:\n${picks.join('\n')}`);
+  }
+
+  if (session.lastResultType === 'places' && session.lastPlaces?.length) {
+    const places = session.lastPlaces.slice(0, 5).map((p, i) => {
+      const place = session.lastPlaceMap?.[p.place_id];
+      return place ? `  ${i + 1}) ${place.name}` : `  ${i + 1}) ${p.place_id}`;
+    });
+    lines.push(`last_result_type: places\nlast_places_shown:\n${places.join('\n')}`);
+  }
+
+  if (session.pendingNearby) lines.push(`pending_offer: "${session.pendingNearby}"`);
+  if (session.pendingClarification) {
+    const pc = session.pendingClarification;
+    const q = pc.question || pc.reason || '';
+    lines.push(`pending_clarify: ${q}`);
+  }
+
+  if (session.visitedHoods?.length > 1) {
+    lines.push(`already_explored: ${session.visitedHoods.slice(-3).join(', ')}`);
+  }
+
+  if (session.allPicks?.length >= 5) {
+    const cats = [...new Set(session.allPicks
+      .map(p => session.lastEvents?.[p.event_id]?.category)
+      .filter(Boolean))];
+    if (cats.length) lines.push(`prior_interests: ${cats.join(', ')}`);
+  }
+
+  return lines.length > 0 ? lines.join('\n') : 'Session exists but no prior context.';
+}
+
+// --- Lean prompt builder (uses projected state block) -----------------------
+
+function buildBrainSystemPromptLean(session) {
+  return _renderBrainPrompt(buildStateBlock(session));
+}
+
+// --- Projected recent turns (linguistic only, tool noise stripped) ----------
+// Drops tool_call and search_summary entries — those facts now live in the
+// state block. Returns the last N user→assistant exchanges as native
+// {role, content} pairs, matching buildNativeHistory's invariants:
+//   - starts with a user message
+//   - ends with an assistant message
+//   - no consecutive same-role messages
+
+function projectRecentTurns(history, tailTurns = 2) {
+  if (!history?.length || tailTurns <= 0) return [];
+
+  const linguistic = history.filter(h => h.role === 'user' || h.role === 'assistant');
+
+  const exchanges = [];
+  let i = 0;
+  while (i < linguistic.length) {
+    if (linguistic[i].role !== 'user') { i++; continue; }
+    const pair = [linguistic[i]];
+    if (linguistic[i + 1]?.role === 'assistant') pair.push(linguistic[i + 1]);
+    exchanges.push(pair);
+    i += pair.length;
+  }
+
+  const tail = exchanges.slice(-tailTurns).flat()
+    .map(h => ({ role: h.role, content: h.content || '' }));
+
+  // Merge consecutive same-role (defensive: history truncation at
+  // MAX_HISTORY_TURNS can clip a pair and leave two users adjacent)
+  const merged = [];
+  for (const turn of tail) {
+    const prev = merged[merged.length - 1];
+    if (prev && prev.role === turn.role) prev.content += '\n' + turn.content;
+    else merged.push(turn);
+  }
+
+  while (merged.length > 0 && merged[0].role !== 'user') merged.shift();
+  while (merged.length > 0 && merged[merged.length - 1].role !== 'assistant') merged.pop();
+
+  return merged;
+}
+
+// --- Projected brain context (one source of truth per fact) -----------------
+// Replaces the buildBrainSystemPrompt + buildNativeHistory pair. The state
+// block carries canonical facts (neighborhood, filters, picks, pending); the
+// recent-turns tail carries only the linguistic context the model needs to
+// maintain tone and resolve refinements like "more" or "forget the comedy".
+
+function projectBrainContext(session, { tailTurns = 2 } = {}) {
+  return {
+    systemPrompt: buildBrainSystemPromptLean(session),
+    messages: projectRecentTurns(session?.conversationHistory, tailTurns),
+  };
 }
 
 
@@ -523,7 +666,11 @@ function stripCodeFences(text) {
 module.exports = {
   BRAIN_TOOLS,
   buildBrainSystemPrompt,
+  buildBrainSystemPromptLean,
+  buildStateBlock,
   buildNativeHistory,
+  projectRecentTurns,
+  projectBrainContext,
   serializePoolForContinuation,
   buildRecommendationReason,
   buildOffQueryReason,
