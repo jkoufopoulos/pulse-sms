@@ -105,7 +105,7 @@ Daily scrape (10am ET)              Incoming SMS
 
 Other modules: `intent-handlers.js` (help response), `geo.js` + `neighborhoods.js` (75 NYC hoods across 5 boroughs), `venues.js` (auto-learning coords), `formatters.js` (480-char cap), `twilio.js`, `traces.js`, `alerts.js`, `preference-profile.js`, `referral.js`, `curation.js`, `source-health.js`, `db.js` (SQLite).
 
-Sources: 6 editorial sources registered in `source-registry.js` (Skint, NonsenseNYC, Yutori, ScreenSlate, BKMag, RA). Listing-only scrapers preserved in `src/sources/` but not registered. Evals: 6 modules in `src/evals/`. Scripts: 18 runners in `scripts/`. UIs: 8 dashboards served by `server.js`.
+Sources: 6 editorial sources registered in `source-registry.js` (Skint, NonsenseNYC, Yutori, ScreenSlate, BKMag, RA). Listing-only scrapers preserved in `src/sources/` but not registered. Evals: carryover harness in `src/eval/carryover/` — 10 multi-turn scenarios + matcher + replay against fixture pool; persists per-turn captures to `eval_runs` + `eval_turn_captures`; workspace at `/eval` (PULSE_TEST_MODE-gated) for human labeling on `context_carryover_quality` (1-5) into `response_labels`. Spec: `docs/superpowers/specs/2026-05-31-context-carryover-eval-design.md`. Scripts: 19 runners in `scripts/`. UIs: 9 dashboards served by `server.js`.
 
 ## Design Principles (do not violate)
 
@@ -135,7 +135,7 @@ npm install
 npm start              # boots on PORT (default 3000)
 npm run dev            # dev server with file-watch reload
 npm test               # smoke tests (pure functions, no API calls)
-npm run eval:quality   # quality evals on 15 golden conversations (~$0.02, ~30s)
+npm run eval:carryover # 10-scenario carryover replay; label at /eval (~$0.03, ~60s; PULSE_TEST_MODE=true to view workspace)
 ```
 
 **Railway:** Simulator at `https://web-production-c8fdb.up.railway.app/test`. Test endpoint: `POST /api/sms/test` with `Body` and optional `From`. Health dashboard: `GET /health`. Deploy: `railway up` (async build, ~2-3 min).
