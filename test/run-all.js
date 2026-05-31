@@ -29,11 +29,13 @@ require('./unit/eval-runs-schema.test');
 require('./unit/eval-matcher.test');
 require('./unit/eval-scenario-loader.test');
 const misc = require('./unit/misc.test');
+const evalReplay = require('./unit/eval-replay.test');
 
 (async () => {
   // Async unit tests
   await venues.runAsync();
   await misc.runAsync();
+  await evalReplay.runAsync();
 
   // Summary
   const { pass, fail } = require('./helpers').getResults();

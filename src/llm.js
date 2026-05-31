@@ -481,8 +481,17 @@ async function continueChat(chatSession, toolName, toolResult, options = {}) {
  * @param {object} options - { maxIterations, timeout }
  * @returns {{ text: string, toolCalls: Array<{name, params, result}>, totalUsage: object, provider: string }}
  */
+// Test-only capture hook — set by replay harness to capture every runAgentLoop
+// invocation's systemPrompt + priorMessages. Production code never sets this.
+let _agentLoopCaptureHook = null;
+function setAgentLoopCaptureHook(fn) { _agentLoopCaptureHook = fn; }
+
 async function runAgentLoop(model, systemPrompt, message, tools, executeTool, options = {}) {
   const { maxIterations = 3, timeout = 15000, stopTools = [], priorMessages = [] } = options;
+  if (_agentLoopCaptureHook) {
+    try { _agentLoopCaptureHook({ model, systemPrompt, message, priorMessages }); }
+    catch { /* never let test hook break production */ }
+  }
   const provider = getProvider(model);
   console.log(`[agent-loop] model=${model} provider=${provider}`);
   const loopStart = Date.now();
@@ -743,6 +752,7 @@ module.exports = {
   callWithTools,
   continueChat,
   runAgentLoop,
+  setAgentLoopCaptureHook,
 
   // Tool format converters
   toGeminiTools,
