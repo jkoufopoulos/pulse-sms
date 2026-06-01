@@ -23,8 +23,15 @@
     .crumbs { color: #666; font-size: 13px; margin-bottom: 12px; }
     .crumbs a { color: #2563eb; text-decoration: none; cursor: pointer; }
     table { border-collapse: collapse; width: 100%; font-size: 13px; }
-    th, td { border-bottom: 1px solid #eee; padding: 8px 10px; text-align: left; }
-    tr.runrow:hover, tr.screnrow:hover { background: #f9fafb; cursor: pointer; }
+    th { position: sticky; top: 0; background: #ffffff; z-index: 2; border-bottom: 2px solid #e5e7eb; box-shadow: 0 1px 0 #e5e7eb; }
+    th, td { border-bottom: 1px solid #f3f4f6; padding: 9px 12px; text-align: left; }
+    tr.runrow, tr.screnrow { transition: background 0.1s; }
+    tr.runrow:hover, tr.screnrow:hover { background: #eff6ff; cursor: pointer; }
+    .filter-input { width: 280px; padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; font-family: inherit; }
+    .filter-input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
+    .pill-btn { padding: 5px 12px; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; }
+    .pill-btn:hover { background: #1d4ed8; }
+    .pill-btn:disabled { background: #d1d5db; cursor: not-allowed; }
     .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; }
     .badge.pass { background: #d1fae5; color: #065f46; }
     .badge.fail { background: #fee2e2; color: #991b1b; }
@@ -140,13 +147,22 @@
           firstMsgByScenario[t.scenario_id] = t.user_msg || '';
         }
       }
-      // Sort: scenarios with 0 labels first, then by id.
+      // Sort: fully-labeled top (celebrate completed), partial next (resume work),
+      // untouched bottom (the queue).
+      function progressBucket(s) {
+        if (s.labeled_count === 0) return 2;       // untouched → bottom
+        if (s.labeled_count >= s.turn_count) return 0;  // fully labeled → top
+        return 1;                                  // partial → middle
+      }
       const sortedScenarios = [...r.scenarios].sort((a, b) => {
-        const aDone = a.labeled_count >= a.turn_count;
-        const bDone = b.labeled_count >= b.turn_count;
-        if (aDone !== bDone) return aDone ? 1 : -1;  // unlabeled first
+        const ba = progressBucket(a);
+        const bb = progressBucket(b);
+        if (ba !== bb) return ba - bb;
         return a.scenario_id.localeCompare(b.scenario_id);
       });
+      // Hide the Matcher column when no scenario in this run has matcher data.
+      // (Production runs ingested from traces never have expect blocks → never matched.)
+      const showMatcher = sortedScenarios.some(s => s.matcher_evaluated > 0);
       const tbody = _el('tbody');
       function fmtDateRange(first, last) {
         if (!first) return '';
@@ -165,27 +181,32 @@
         const labeledFully = s.labeled_count >= s.turn_count;
         const isDiscarded = s.status === 'discarded';
         const firstMsg = firstMsgByScenario[s.scenario_id] || '';
-        const matcherCell = s.matcher_evaluated > 0 ? `${s.matcher_passed}/${s.matcher_evaluated}` : '—';
         let rowStyle = '';
         if (isDiscarded) rowStyle = 'opacity:0.4; text-decoration:line-through;';
-        else if (labeledFully) rowStyle = 'opacity:0.55';
+        // Note: fully-labeled rows are no longer dimmed — they're sorted to top instead.
         const idCell = isDiscarded
           ? _el('td', {}, s.scenario_id, ' ', _el('span', { class: 'badge fail' }, 'discarded'))
           : _el('td', {}, s.scenario_id);
-        tbody.append(_el('tr', {
-          class: 'screnrow',
-          style: rowStyle,
-          onclick: () => showScenario(s.scenario_id),
-        },
+        const cells = [
+          _el('td', { style: 'color:#6b7280; font-size:12px; white-space:nowrap;' },
+            fmtDateRange(s.first_captured_at, s.last_captured_at)),
           idCell,
           _el('td', { style: 'color:#374151; max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;' },
             firstMsg.slice(0, 80)),
-          _el('td', { style: 'color:#6b7280; font-size:12px; white-space:nowrap;' },
-            fmtDateRange(s.first_captured_at, s.last_captured_at)),
           _el('td', {}, `${s.turn_count} turns`),
           _el('td', {}, fmtLabelsCell(s)),
-          _el('td', {}, matcherCell),
-        ));
+        ];
+        if (showMatcher) {
+          cells.push(_el('td', {}, s.matcher_evaluated > 0 ? `${s.matcher_passed}/${s.matcher_evaluated}` : '—'));
+        }
+        // dataset for filter: lowercase concat of searchable fields.
+        const searchBlob = (s.scenario_id + ' ' + firstMsg).toLowerCase();
+        tbody.append(_el('tr', {
+          class: 'screnrow',
+          dataset: { search: searchBlob },
+          style: rowStyle,
+          onclick: () => showScenario(s.scenario_id),
+        }, ...cells));
       }
       // Aggregate label progress across all visible scenarios for the progress card.
       const totalTurns = sortedScenarios.reduce((a, s) => a + s.turn_count, 0);
@@ -195,11 +216,14 @@
       const pct = totalTurns > 0 ? Math.round((totalLabeled / totalTurns) * 100) : 0;
       const isComplete = totalLabeled > 0 && totalLabeled === totalTurns;
 
+      // First scenario in sort order that still needs labeling — used by "Jump to next."
+      const nextUnlabeled = sortedScenarios.find(s => s.status !== 'discarded' && s.labeled_count < s.turn_count);
+
       const progressCard = _el('div', {
-        style: 'background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 18px; margin-bottom:16px; display:flex; align-items:center; gap:20px;',
+        style: 'background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 18px; margin-bottom:14px; display:flex; align-items:center; gap:20px;',
       },
         _el('div', { style: 'flex:1;' },
-          _el('div', { style: 'font-size:13px; color:#6b7280; margin-bottom:4px;' }, 'Labeling progress'),
+          _el('div', { style: 'font-size:12px; color:#6b7280; margin-bottom:2px;' }, 'Labeling progress'),
           _el('div', { style: 'font-size:22px; font-weight:700; color:#111827;' },
             `${totalLabeled} / ${totalTurns}`,
             _el('span', { style: 'font-size:14px; color:#6b7280; font-weight:500; margin-left:6px;' }, `(${pct}%)`),
@@ -209,32 +233,66 @@
             _el('div', { style: `height:100%; width:${pct}%; background:#10b981; transition:width 0.2s;` }),
           ),
         ),
-        _el('div', { style: 'text-align:right;' },
-          _el('div', { style: 'font-size:12px; color:#6b7280;' }, 'Pass / Fail'),
-          _el('div', { style: 'font-size:18px; font-weight:600; margin-top:2px;' },
+        _el('div', { style: 'text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:6px;' },
+          _el('div', { style: 'font-size:18px; font-weight:600;' },
             _el('span', { style: 'color:#10b981;' }, `${totalPass} pass`),
             _el('span', { style: 'color:#9ca3af; margin:0 6px;' }, '·'),
             _el('span', { style: 'color:#ef4444;' }, `${totalFail} fail`),
           ),
+          nextUnlabeled
+            ? _el('button', {
+                class: 'pill-btn',
+                onclick: () => showScenario(nextUnlabeled.scenario_id),
+              }, '→ Next unlabeled')
+            : _el('span', { style: 'color:#10b981; font-size:13px; font-weight:500;' }, '✓ all caught up'),
         ),
       );
 
-      const meta = _el('div', { style: 'margin-bottom:12px; color:#6b7280; font-size:13px; display:flex; align-items:center; gap:12px;' },
-        _el('span', {}, `${r.run.source || 'synthetic'} · ${r.run.model || ''} · ${fmtFlags(r.run.env_flags)} · ${fmtShortSha(r.run.git_sha)} · ${sortedScenarios.length} active conversations`),
-        r.discarded_count > 0
-          ? _el('a', {
-              onclick: () => showRun(runId, { showDiscarded: !state.showDiscarded }),
-              style: 'color:#2563eb; cursor:pointer; font-size:12px;',
-            }, state.showDiscarded ? '← hide discarded' : `show ${r.discarded_count} discarded`)
-          : null,
+      // Compact meta line — drop empty fields rather than emit '· ·'.
+      const metaParts = [
+        r.run.source,
+        r.run.model,
+        fmtFlags(r.run.env_flags),
+        fmtShortSha(r.run.git_sha),
+        `${sortedScenarios.length} conversations`,
+      ].filter(p => p && String(p).trim().length);
+      const meta = _el('div', { style: 'margin-bottom:12px; color:#6b7280; font-size:12px; display:flex; align-items:center; justify-content:space-between; gap:12px;' },
+        _el('span', {}, metaParts.join(' · ')),
+        _el('div', { style: 'display:flex; align-items:center; gap:10px;' },
+          _el('input', {
+            class: 'filter-input',
+            type: 'search',
+            placeholder: 'Filter conversations by first message…',
+            oninput: (e) => filterRows(e.target.value),
+          }),
+          r.discarded_count > 0
+            ? _el('a', {
+                onclick: () => showRun(runId, { showDiscarded: !state.showDiscarded }),
+                style: 'color:#2563eb; cursor:pointer; font-size:12px;',
+              }, state.showDiscarded ? '← hide discarded' : `show ${r.discarded_count} discarded`)
+            : null,
+        ),
       );
+      const headers = ['Date', 'Scenario', 'First message', 'Turns', 'Labels'];
+      if (showMatcher) headers.push('Matcher');
       const table = _el('table', {},
         _el('thead', {}, _el('tr', {},
-          ...['Scenario', 'First message', 'Date', 'Turns', 'Labels', 'Matcher'].map(h => _el('th', {}, h))
+          ...headers.map(h => _el('th', {}, h))
         )),
         tbody,
       );
       _replaceChildren(document.getElementById('view'), progressCard, meta, table);
+    }
+
+    // Live filter on scenarios table — hides rows whose data-search blob
+    // doesn't contain the query. Empty query restores all.
+    function filterRows(query) {
+      const q = (query || '').trim().toLowerCase();
+      const rows = document.querySelectorAll('tr.screnrow');
+      for (const r of rows) {
+        const hit = !q || (r.dataset.search || '').includes(q);
+        r.style.display = hit ? '' : 'none';
+      }
     }
 
     async function discardScenario(scenarioId) {
