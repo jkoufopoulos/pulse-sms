@@ -140,12 +140,12 @@ async function main() {
         i,
         t.id || `legacy-${phone}-${i}`,  // some old traces may not have ids
         t.input_message || '',
-        null,  // brain_prompt — not captured in production traces
-        null,  // brain_messages — not captured in production traces
+        t.brain_prompt || null,    // populated for traces captured after the agent-graph patch
+        t.brain_messages || null,  // populated for traces captured after the agent-graph patch
         toolCall ? JSON.stringify(toolCall) : null,
         t.output_sms || null,
-        null,  // session_before — production traces don't snapshot
-        null,  // session_after
+        t.session_before ? JSON.stringify(t.session_before) : null,
+        null,  // session_after — production traces don't snapshot post-state
         null,  // matcher_result — production has no expect block
         t.timestamp || new Date().toISOString(),
       );

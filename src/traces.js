@@ -60,10 +60,13 @@ function startTrace(phone_masked, input_message) {
     // Agent brain fields
     brain_tool: null,       // "search" or "respond"
     brain_params: null,     // the tool call parameters
+    brain_prompt: null,     // system prompt sent to the LLM (for eval/debug)
+    brain_messages: null,   // JSON string of priorMessages array sent to the LLM
     brain_latency_ms: null, // brain LLM call time
     brain_iterations: [],   // per-iteration timing [{tool, ms}]
     brain_provider: null,   // "gemini", "anthropic", or "mechanical"
     brain_error: null,      // error message if brain failed
+    brain_tool_calls: [],   // all tool calls made in the loop (populated by agent-graph)
     annotation: null,
   };
 }

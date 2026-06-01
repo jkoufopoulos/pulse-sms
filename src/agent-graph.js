@@ -178,6 +178,10 @@ const nodes = {
 
   [STATES.AGENT]: async (ctx) => {
     const { systemPrompt, messages: priorMessages } = buildBrainPrompt(ctx.session);
+    // Persist the actual prompt + messages sent to the LLM so the eval workbench
+    // (and any future regression debugging) can see exactly what the brain saw.
+    ctx.trace.brain_prompt = systemPrompt;
+    ctx.trace.brain_messages = JSON.stringify(priorMessages || []);
     const tools = ctx.session?.pendingClarification
       ? BRAIN_TOOLS.filter(t => t.name !== 'clarify')
       : BRAIN_TOOLS;
@@ -301,6 +305,10 @@ const nodes = {
 
   [STATES.FALLBACK_MODEL]: async (ctx) => {
     const { systemPrompt, messages: priorMessages } = buildBrainPrompt(ctx.session);
+    // Same capture as the AGENT node — record the fallback's prompt + messages
+    // so a trace landing on the fallback path is still inspectable.
+    ctx.trace.brain_prompt = systemPrompt;
+    ctx.trace.brain_messages = JSON.stringify(priorMessages || []);
     console.warn(`[agent-graph] ${MODELS.brain} failed, trying ${MODELS.fallback}: ${ctx.error?.message}`);
     try {
       const fallbackResult = await runAgentLoop(
