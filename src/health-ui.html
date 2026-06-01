@@ -607,6 +607,27 @@
 <script>
 const $ = id => document.getElementById(id);
 
+// Propagate the page-load token to every same-origin fetch via an
+// Authorization: Bearer header so authed endpoints (/health, /api/health/*)
+// don't 403 on dashboard data calls. Header (not query string) keeps the
+// secret out of per-request access logs and Referer headers.
+(() => {
+  const token = new URLSearchParams(window.location.search).get('token');
+  if (!token) return;
+  const origFetch = window.fetch.bind(window);
+  const isSameOrigin = (url) => {
+    try { return new URL(url, window.location.origin).origin === window.location.origin; }
+    catch { return false; }
+  };
+  window.fetch = (input, init) => {
+    const url = typeof input === 'string' ? input : input.url;
+    if (typeof url !== 'string' || !isSameOrigin(url)) return origFetch(input, init);
+    const headers = new Headers((init && init.headers) || (typeof input !== 'string' ? input.headers : undefined));
+    headers.set('Authorization', 'Bearer ' + token);
+    return origFetch(input, { ...(init || {}), headers });
+  };
+})();
+
 function fmtDuration(ms) {
   if (ms == null) return '--';
   if (ms < 1000) return ms + 'ms';
