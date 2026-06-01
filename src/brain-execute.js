@@ -313,26 +313,41 @@ async function buildSearchPool(params, session, phone, trace) {
   let events = [];
   let curated = [];
   const eventsStart = Date.now();
+  // Funnel object captures per-layer drop counts from inside getEvents. Critical
+  // observability for "cache had N but search returned 0" debugging.
+  const funnel = {};
 
   if (hood) {
-    const raw = await getEvents(hood, { dateRange: activeFilters.date_range });
-    curated = filterKidsEvents(raw);
+    const raw = await getEvents(hood, { dateRange: activeFilters.date_range, funnel });
+    const afterKids = filterKidsEvents(raw);
+    funnel.after_kids_filter = afterKids.length;
+    curated = afterKids;
   } else if (isBorough && borough) {
     const raw = await getEventsForBorough(borough, { dateRange: activeFilters.date_range, filters: activeFilters });
-    curated = filterKidsEvents(raw);
+    const afterKids = filterKidsEvents(raw);
+    funnel.from = 'borough';
+    funnel.after_kids_filter = afterKids.length;
+    curated = afterKids;
   } else {
     isCitywide = true;
     const raw = await getEventsCitywide({ dateRange: activeFilters.date_range, filters: activeFilters });
-    curated = filterKidsEvents(raw);
+    const afterKids = filterKidsEvents(raw);
+    funnel.from = 'citywide';
+    funnel.after_kids_filter = afterKids.length;
+    curated = afterKids;
   }
 
   // Drop events that already started 2+ hours ago
+  const beforeUpcoming = curated.length;
   curated = filterUpcomingEvents(curated);
+  funnel.after_upcoming_filter = curated.length;
+  funnel.upcoming_dropped = beforeUpcoming - curated.length;
 
   trace.events.getEvents_ms = Date.now() - eventsStart;
   trace.events.cache_size = getCacheStatus().cache_size;
   trace.events.candidates_count = curated.length;
   trace.events.candidate_ids = curated.map(e => e.id);
+  trace.events.funnel = funnel;  // per-layer drop visibility
 
   // 5. Build tagged pool
   const taggedResult = buildTaggedPool(curated, activeFilters, { citywide: isCitywide || isBorough });
@@ -344,7 +359,10 @@ async function buildSearchPool(params, session, phone, trace) {
     if (expandHoods.length > 0) {
       console.log(`[POOL] Sparse results for ${hood} (${matchCount} matches), expanding to: ${expandHoods.join(', ')}`);
       const existingIds = new Set(taggedResult.pool.map(e => e.id));
-      const qualityEvents = getEvents();
+      // `getEvents()` is async — was being called without await, which returned a
+      // Promise that has no .filter() method. Crashed silently in production on
+      // any sparse-expand path.
+      const qualityEvents = await getEvents();
       const adjacentEvents = qualityEvents.filter(e =>
         expandHoods.includes(e.neighborhood) && !existingIds.has(e.id)
       );

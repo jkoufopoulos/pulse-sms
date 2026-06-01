@@ -1142,11 +1142,15 @@ function filterAwareSort(events, filters, sortFn) {
   return [...matching, ...rest];
 }
 
-async function getEvents(neighborhood, { dateRange } = {}) {
+async function getEvents(neighborhood, { dateRange, funnel } = {}) {
   if (eventCache.length === 0) {
     await refreshCache();
   }
 
+  // Per-layer drop observability — populates `funnel` (an object the caller passes in)
+  // with counts after each filter step. Critical for debugging "cache had N but search
+  // returned 0" — without this we can't tell which layer dropped everything.
+  const cacheCount = eventCache.length;
   const qualityFiltered = applyQualityGates(eventCache);
   const ranked = rankEventsByProximity(qualityFiltered, neighborhood);
 
@@ -1159,6 +1163,15 @@ async function getEvents(neighborhood, { dateRange } = {}) {
     const active = isEventInDateRange(e, rangeStart, rangeEnd);
     return active === null ? true : active; // keep undated events
   });
+
+  if (funnel) {
+    funnel.cache_count = cacheCount;
+    funnel.after_quality_gates = qualityFiltered.length;
+    funnel.after_proximity_rank = ranked.length;
+    funnel.after_date_filter = filtered.length;
+    funnel.date_range = `${rangeStart}..${rangeEnd}`;
+    funnel.target_neighborhood = neighborhood || null;
+  }
 
   console.log(`${filtered.length} events near ${neighborhood} (range ${rangeStart}..${rangeEnd}, cache: ${eventCache.length})`);
   return filtered.slice(0, 100);
