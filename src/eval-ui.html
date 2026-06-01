@@ -446,15 +446,25 @@
           mr.mismatches.map(m => `at ${m.path || '<root>'}: ${m.reason}`).join('; ')));
       }
 
+      // Production traces don't capture brain_prompt / brain_messages / session
+      // snapshots — that's a synthetic-replay-only capture (via the runAgentLoop hook
+      // in src/llm.js). Show a clear note instead of leaving the sections silently empty.
+      const missingNote = '(not captured for production traces — see chat rail for conversation context)';
       const dPrompt = _el('details', {},
         _el('summary', {}, 'brain prompt'),
-        _el('pre', {}, t.brain_prompt || ''));
+        t.brain_prompt
+          ? _el('pre', {}, t.brain_prompt)
+          : _el('div', { style: 'color:#6b7280; font-size:12px; font-style:italic; padding:6px 4px;' }, missingNote));
       const dMsgs = _el('details', {},
         _el('summary', {}, 'brain messages'),
-        _el('pre', {}, t.brain_messages || ''));
+        t.brain_messages
+          ? _el('pre', {}, t.brain_messages)
+          : _el('div', { style: 'color:#6b7280; font-size:12px; font-style:italic; padding:6px 4px;' }, missingNote));
       const dFrame = _el('details', {},
         _el('summary', {}, 'session before / after'),
-        _el('pre', {}, `before: ${JSON.stringify(sb, null, 2)}\nafter:  ${JSON.stringify(sa, null, 2)}`));
+        (sb || sa)
+          ? _el('pre', {}, `before: ${JSON.stringify(sb, null, 2)}\nafter:  ${JSON.stringify(sa, null, 2)}`)
+          : _el('div', { style: 'color:#6b7280; font-size:12px; font-style:italic; padding:6px 4px;' }, missingNote));
 
       // Binary scoring per the EDD canon (Hamel + sticker-pipeline):
       //   pass = label 1; fail = label 0; absence of row = unlabeled.
