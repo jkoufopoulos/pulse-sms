@@ -31,7 +31,32 @@ const { execFileSync } = require('child_process');
 const { getDb } = require('../src/db');
 
 const TRACES_DIR = path.join(__dirname, '..', 'data', 'traces');
-const MIN_TURNS_PER_PHONE = 3;  // <3 turns can't exercise carryover
+const MIN_TURNS_PER_PHONE = 3;     // <3 turns can't exercise carryover
+const SESSION_GAP_HOURS = 6;       // gap > this between consecutive turns → new conversation segment
+
+// NYC calendar date for an ISO timestamp ('en-CA' returns YYYY-MM-DD).
+function nycCalendarDay(iso) {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+}
+
+// Split a phone's chronological trace list into conversation segments.
+// New segment when: gap > SESSION_GAP_HOURS OR crosses NYC calendar day.
+// Matches scripts/split-by-session-gap.js so historical + live data use the
+// same conversation-unit definition.
+function segmentTraces(traces) {
+  const segs = [];
+  let cur = [];
+  for (const t of traces) {
+    if (cur.length === 0) { cur.push(t); continue; }
+    const prev = cur[cur.length - 1];
+    const gapMs = new Date(t.timestamp) - new Date(prev.timestamp);
+    const sameDay = nycCalendarDay(t.timestamp) === nycCalendarDay(prev.timestamp);
+    if (gapMs > SESSION_GAP_HOURS * 3600 * 1000 || !sameDay) { segs.push(cur); cur = [t]; }
+    else { cur.push(t); }
+  }
+  if (cur.length) segs.push(cur);
+  return segs;
+}
 
 function parseArgs(argv) {
   return {
@@ -181,35 +206,48 @@ async function main() {
   const tx = db.transaction(() => {
     let inserted = 0, skipped = 0;
     const counts = { sms: 0, simulator: 0 };
+    let segmentsKept = 0, segmentsDroppedSmall = 0;
     for (const [phone, phoneTraces] of conversationalPhones) {
-      let nextIdx = (maxIdxByPhone.get(phone) ?? -1) + 1;
-      for (const t of phoneTraces) {
-        const traceId = t.id || `legacy-${phone}-${nextIdx}`;
-        if (existingIds.has(traceId)) { skipped++; continue; }
-        const toolCall = extractToolCall(t);
-        const eventsMeta = t.events ? JSON.stringify({
-          cache_size: t.events.cache_size ?? null,
-          candidates_count: t.events.candidates_count ?? null,
-          funnel: t.events.funnel ?? null,
-        }) : null;
-        const source = detectSource(t);
-        counts[source] = (counts[source] || 0) + 1;
-        insert.run(
-          runId, phone, nextIdx++, traceId,
-          t.input_message || '',
-          t.brain_prompt || null,
-          t.brain_messages || null,
-          toolCall ? JSON.stringify(toolCall) : null,
-          t.output_sms || null,
-          t.session_before ? JSON.stringify(t.session_before) : null,
-          null, null, eventsMeta,
-          t.timestamp || new Date().toISOString(),
-          source,
-        );
-        inserted++;
+      // Segment by SESSION_GAP_HOURS + NYC calendar day boundaries.
+      // First segment uses the bare phone; subsequent get :s2, :s3, etc.
+      // Note: incremental ingest assumes segmentation is stable across runs.
+      // If a new trace lands in an existing gap, scenario_ids of earlier
+      // turns may need re-assignment via scripts/split-by-session-gap.js.
+      const segments = segmentTraces(phoneTraces);
+      for (let segIdx = 0; segIdx < segments.length; segIdx++) {
+        const seg = segments[segIdx];
+        if (seg.length < MIN_TURNS_PER_PHONE) { segmentsDroppedSmall++; continue; }
+        segmentsKept++;
+        const scenarioId = segIdx === 0 ? phone : `${phone}:s${segIdx + 1}`;
+        let nextIdx = (maxIdxByPhone.get(scenarioId) ?? -1) + 1;
+        for (const t of seg) {
+          const traceId = t.id || `legacy-${scenarioId}-${nextIdx}`;
+          if (existingIds.has(traceId)) { skipped++; continue; }
+          const toolCall = extractToolCall(t);
+          const eventsMeta = t.events ? JSON.stringify({
+            cache_size: t.events.cache_size ?? null,
+            candidates_count: t.events.candidates_count ?? null,
+            funnel: t.events.funnel ?? null,
+          }) : null;
+          const source = detectSource(t);
+          counts[source] = (counts[source] || 0) + 1;
+          insert.run(
+            runId, scenarioId, nextIdx++, traceId,
+            t.input_message || '',
+            t.brain_prompt || null,
+            t.brain_messages || null,
+            toolCall ? JSON.stringify(toolCall) : null,
+            t.output_sms || null,
+            t.session_before ? JSON.stringify(t.session_before) : null,
+            null, null, eventsMeta,
+            t.timestamp || new Date().toISOString(),
+            source,
+          );
+          inserted++;
+        }
       }
     }
-    console.log(`[ingest] inserted ${inserted} new turns (skipped ${skipped} already present); source breakdown: ${JSON.stringify(counts)}`);
+    console.log(`[ingest] inserted ${inserted} new turns (skipped ${skipped} dup); segments kept=${segmentsKept} dropped(<${MIN_TURNS_PER_PHONE} turn)=${segmentsDroppedSmall}; source breakdown: ${JSON.stringify(counts)}`);
   });
   tx();
 
