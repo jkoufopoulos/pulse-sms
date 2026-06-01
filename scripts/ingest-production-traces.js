@@ -21,7 +21,7 @@ const { execFileSync } = require('child_process');
 const { getDb } = require('../src/db');
 
 const TRACES_DIR = path.join(__dirname, '..', 'data', 'traces');
-const MIN_TURNS_PER_PHONE = 2;
+const MIN_TURNS_PER_PHONE = 3;  // <3 turns can't exercise carryover
 
 function parseArgs(argv) {
   return {
