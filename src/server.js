@@ -473,6 +473,8 @@ app.get('/api/eval/runs/:id', (req, res) => {
     SELECT
       c.scenario_id,
       COUNT(*) AS turn_count,
+      MIN(c.captured_at) AS first_captured_at,
+      MAX(c.captured_at) AS last_captured_at,
       SUM(CASE WHEN c.matcher_result IS NOT NULL AND json_extract(c.matcher_result, '$.passed') = 1 THEN 1 ELSE 0 END) AS matcher_passed,
       SUM(CASE WHEN c.matcher_result IS NOT NULL THEN 1 ELSE 0 END) AS matcher_evaluated,
       COALESCE(m.status, 'active') AS status,
@@ -486,11 +488,18 @@ app.get('/api/eval/runs/:id', (req, res) => {
   `).all(req.params.id);
 
   for (const s of scenarios) {
-    s.labeled_count = db.prepare(`
-      SELECT COUNT(*) AS n FROM eval_turn_captures c
+    const counts = db.prepare(`
+      SELECT
+        COUNT(*) AS labeled_count,
+        SUM(CASE WHEN l.label = 1 THEN 1 ELSE 0 END) AS pass_count,
+        SUM(CASE WHEN l.label = 0 THEN 1 ELSE 0 END) AS fail_count
+      FROM eval_turn_captures c
+      JOIN response_labels l ON l.trace_id = c.trace_id
       WHERE c.run_id = ? AND c.scenario_id = ?
-      AND EXISTS (SELECT 1 FROM response_labels l WHERE l.trace_id = c.trace_id)
-    `).get(req.params.id, s.scenario_id).n;
+    `).get(req.params.id, s.scenario_id);
+    s.labeled_count = counts.labeled_count || 0;
+    s.pass_count = counts.pass_count || 0;
+    s.fail_count = counts.fail_count || 0;
   }
 
   const discardedCount = scenarios.filter(s => s.status === 'discarded').length;
