@@ -480,6 +480,7 @@ app.get('/api/eval/runs/:id', (req, res) => {
       MAX(c.captured_at) AS last_captured_at,
       SUM(CASE WHEN c.matcher_result IS NOT NULL AND json_extract(c.matcher_result, '$.passed') = 1 THEN 1 ELSE 0 END) AS matcher_passed,
       SUM(CASE WHEN c.matcher_result IS NOT NULL THEN 1 ELSE 0 END) AS matcher_evaluated,
+      COALESCE(MAX(c.source), 'unknown') AS source,
       COALESCE(m.status, 'active') AS status,
       m.notes AS status_notes
     FROM eval_turn_captures c
@@ -516,7 +517,7 @@ app.get('/api/eval/runs/:id', (req, res) => {
 
   const turns = db.prepare(`
     SELECT id AS capture_id, scenario_id, turn_index, trace_id, user_msg,
-           tool_call, agent_sms, matcher_result, events_meta, captured_at
+           tool_call, agent_sms, matcher_result, events_meta, captured_at, source
     FROM eval_turn_captures WHERE run_id = ? ORDER BY scenario_id, turn_index
   `).all(req.params.id);
 
