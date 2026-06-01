@@ -1,0 +1,30 @@
+{
+  "id": "v1-q07-indecision-and-repair",
+  "description": "low-content noise turns (hmm, wait, nvm) don't drift the session frame",
+  "turns": [
+    { "user": "bushwick" },
+    { "user": "wait actually" },
+    {
+      "user": "lower east side instead",
+      "expect": { "tool": "search", "args": { "neighborhood": "lower east side" } }
+    },
+    { "user": "what's on" },
+    { "user": "hmm" },
+    {
+      "user": "any music",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "lower east side",
+        "filters": { "categories": { "$contains": "music" } }
+      } }
+    },
+    { "user": "1" },
+    { "user": "nvm" },
+    {
+      "user": "show me the comedy ones",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "lower east side",
+        "filters": { "categories": { "$contains": "comedy" } }
+      } }
+    }
+  ]
+}

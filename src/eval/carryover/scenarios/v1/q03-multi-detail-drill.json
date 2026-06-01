@@ -1,0 +1,21 @@
+{
+  "id": "v1-q03-multi-detail-drill",
+  "description": "numeric anchors resolve against the original pool, not the most-recent detail",
+  "turns": [
+    {
+      "user": "bushwick",
+      "expect": { "tool": "search", "args": { "neighborhood": "bushwick" } }
+    },
+    {
+      "user": "1",
+      "expect": { "tool": "search", "args": { "intent": "details", "reference": "1" } }
+    },
+    { "user": "tell me about the second one" },
+    {
+      "user": "what about #3",
+      "expect": { "tool": "search", "args": { "intent": "details", "reference": "3" } }
+    },
+    { "user": "actually back to the first one" },
+    { "user": "ok thanks" }
+  ]
+}

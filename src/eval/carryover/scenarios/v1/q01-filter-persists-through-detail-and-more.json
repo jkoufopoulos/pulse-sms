@@ -1,0 +1,32 @@
+{
+  "id": "v1-q01-filter-persists-through-detail-and-more",
+  "description": "category filter survives detail + chitchat + more, then stacks with free_only",
+  "turns": [
+    {
+      "user": "williamsburg",
+      "expect": { "tool": "search", "args": { "neighborhood": "williamsburg" } }
+    },
+    {
+      "user": "comedy stuff",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "williamsburg",
+        "filters": { "categories": { "$contains": "comedy" } }
+      } }
+    },
+    { "user": "tell me about the first one" },
+    { "user": "ok cool thanks" },
+    {
+      "user": "more",
+      "expect": { "tool": "search", "args": {
+        "filters": { "categories": { "$contains": "comedy" } }
+      } }
+    },
+    {
+      "user": "any free ones",
+      "expect": { "tool": "search", "args": {
+        "filters": { "categories": { "$contains": "comedy" }, "free_only": true }
+      } }
+    },
+    { "user": "tell me about that pete's one" }
+  ]
+}

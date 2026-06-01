@@ -1,0 +1,33 @@
+{
+  "id": "v1-q05-time-chain-refinement",
+  "description": "time_after chains through later/after-midnight, then a date pivot replaces time and category stacks",
+  "turns": [
+    { "user": "williamsburg tonight" },
+    { "user": "more" },
+    {
+      "user": "anything later",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "williamsburg",
+        "filters": { "time_after": { "$present": true } }
+      } }
+    },
+    { "user": "after midnight" },
+    {
+      "user": "actually saturday night instead",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "williamsburg",
+        "filters": { "date_range": { "$present": true } }
+      } }
+    },
+    { "user": "1" },
+    {
+      "user": "music only",
+      "expect": { "tool": "search", "args": {
+        "filters": {
+          "categories": { "$contains": "music" },
+          "date_range": { "$present": true }
+        }
+      } }
+    }
+  ]
+}

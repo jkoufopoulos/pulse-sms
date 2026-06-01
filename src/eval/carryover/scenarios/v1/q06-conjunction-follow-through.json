@@ -1,0 +1,38 @@
+{
+  "id": "v1-q06-conjunction-follow-through",
+  "description": "starts with comedy OR music, then user drills into one side and swaps to the other",
+  "turns": [
+    {
+      "user": "comedy or music in williamsburg",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "williamsburg",
+        "filters": {
+          "categories": { "$contains": "comedy" }
+        }
+      } }
+    },
+    { "user": "more" },
+    {
+      "user": "more like the comedy one",
+      "expect": { "tool": "search", "args": {
+        "filters": { "categories": { "$contains": "comedy" } }
+      } }
+    },
+    {
+      "user": "actually more music instead",
+      "expect": { "tool": "search", "args": {
+        "filters": { "categories": { "$contains": "music" } }
+      } }
+    },
+    { "user": "1" },
+    {
+      "user": "free options",
+      "expect": { "tool": "search", "args": {
+        "filters": {
+          "categories": { "$contains": "music" },
+          "free_only": true
+        }
+      } }
+    }
+  ]
+}

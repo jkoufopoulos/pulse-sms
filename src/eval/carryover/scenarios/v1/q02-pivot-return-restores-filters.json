@@ -1,0 +1,35 @@
+{
+  "id": "v1-q02-pivot-return-restores-filters",
+  "description": "category filter persists across a hood pivot and a return to the original hood",
+  "turns": [
+    {
+      "user": "greenpoint",
+      "expect": { "tool": "search", "args": { "neighborhood": "greenpoint" } }
+    },
+    {
+      "user": "show me comedy",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "greenpoint",
+        "filters": { "categories": { "$contains": "comedy" } }
+      } }
+    },
+    { "user": "tell me about it" },
+    { "user": "thanks" },
+    {
+      "user": "actually try bushwick",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "bushwick",
+        "filters": { "categories": { "$contains": "comedy" } }
+      } }
+    },
+    { "user": "more" },
+    {
+      "user": "back to greenpoint",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "greenpoint",
+        "filters": { "categories": { "$contains": "comedy" } }
+      } }
+    },
+    { "user": "the diamond one looks good" }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "id": "v1-q04-free-paid-flip-flop",
+  "description": "free_only toggles cleanly without dropping a running category filter",
+  "turns": [
+    {
+      "user": "free stuff in williamsburg",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "williamsburg",
+        "filters": { "free_only": true }
+      } }
+    },
+    { "user": "more" },
+    {
+      "user": "ok now show paid ones too",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "williamsburg",
+        "filters": { "free_only": false }
+      } }
+    },
+    { "user": "more" },
+    {
+      "user": "actually just free again",
+      "expect": { "tool": "search", "args": {
+        "filters": { "free_only": true }
+      } }
+    },
+    {
+      "user": "comedy only",
+      "expect": { "tool": "search", "args": {
+        "filters": { "free_only": true, "categories": { "$contains": "comedy" } }
+      } }
+    },
+    { "user": "1" },
+    { "user": "anything tonight" }
+  ]
+}

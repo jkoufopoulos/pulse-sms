@@ -1,0 +1,32 @@
+{
+  "id": "v1-q08-double-hood-swap-anchoring",
+  "description": "two hood swaps with a category filter that must carry across both, plus numeric anchors against the new pool",
+  "turns": [
+    {
+      "user": "comedy in williamsburg",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "williamsburg",
+        "filters": { "categories": { "$contains": "comedy" } }
+      } }
+    },
+    { "user": "more" },
+    {
+      "user": "try bushwick",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "bushwick",
+        "filters": { "categories": { "$contains": "comedy" } }
+      } }
+    },
+    { "user": "1" },
+    { "user": "any others" },
+    {
+      "user": "back to williamsburg",
+      "expect": { "tool": "search", "args": {
+        "neighborhood": "williamsburg",
+        "filters": { "categories": { "$contains": "comedy" } }
+      } }
+    },
+    { "user": "2" },
+    { "user": "where is it exactly" }
+  ]
+}
