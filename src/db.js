@@ -973,6 +973,17 @@ function insertScrapedEvents(events, scrapedDate) {
   return inserted;
 }
 
+/**
+ * Stats on the append-only scraped_events archive (used for SFT and evals).
+ * Surfaced on /health so growth and write-stoppage are visible.
+ */
+function getScrapedEventsStats() {
+  const d = getDb();
+  return d.prepare(
+    'SELECT COUNT(*) as total_rows, COUNT(DISTINCT event_id) as unique_events, MIN(scraped_date) as oldest_scrape, MAX(scraped_date) as latest_scrape, COUNT(DISTINCT scraped_date) as scrape_days FROM scraped_events'
+  ).get();
+}
+
 // --- Event recommendations ---
 
 /**
@@ -1036,6 +1047,7 @@ module.exports = {
   saveConversationToDb,
   getSavedConversations,
   insertScrapedEvents,
+  getScrapedEventsStats,
   insertRecommendations,
   markRecommendationEngaged,
   // Exposed for testing / migrations

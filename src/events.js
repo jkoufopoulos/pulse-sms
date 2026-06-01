@@ -1411,6 +1411,13 @@ function getHealthStatus() {
   } catch {
     result.recurringPatterns = 0;
   }
+  // Attach scraped_events archive stats (append-only history for SFT/evals)
+  try {
+    const { getScrapedEventsStats } = require('./db');
+    result.scrapedEvents = getScrapedEventsStats();
+  } catch {
+    result.scrapedEvents = null;
+  }
   return result;
 }
 
