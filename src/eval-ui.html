@@ -549,10 +549,63 @@
     }
 
     document.addEventListener('click', async (e) => {
+      // --- Conversation-level label widget (the panel above the chat grid) ---
+      // Distinguished from turn-level by dataset attributes (convScore/convSave/convClear).
+      const convPanel = e.target.closest('[data-conv-panel="1"]');
+      if (convPanel && e.target.matches('.score-btns button[data-conv-score]')) {
+        const label = parseInt(e.target.dataset.convScore, 10);
+        const notes = convPanel.querySelector('.conv-notes')?.value || '';
+        convPanel.querySelectorAll('.score-btns button[data-conv-score]').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        const r = await fetch('/api/eval/conversation-labels', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ run_id: state.runId, scenario_id: state.scenarioId, axis: 'overall_quality', label, notes }),
+        }).then(x => x.json());
+        if (r.ok) {
+          if (state.view === 'scenario') showScenario(state.scenarioId);
+        } else {
+          alert('conv save failed: ' + (r.error || 'unknown'));
+        }
+        return;
+      }
+      if (convPanel && e.target.matches('[data-conv-save]')) {
+        const active = convPanel.querySelector('.score-btns button.active');
+        if (!active) { alert('pick Pass or Fail first'); return; }
+        const label = parseInt(active.dataset.convScore, 10);
+        const notes = convPanel.querySelector('.conv-notes')?.value || '';
+        const r = await fetch('/api/eval/conversation-labels', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ run_id: state.runId, scenario_id: state.scenarioId, axis: 'overall_quality', label, notes }),
+        }).then(x => x.json());
+        if (r.ok) {
+          if (state.view === 'scenario') showScenario(state.scenarioId);
+        } else {
+          alert('conv save failed: ' + (r.error || 'unknown'));
+        }
+        return;
+      }
+      if (convPanel && e.target.matches('[data-conv-clear]')) {
+        const r = await fetch('/api/eval/conversation-labels', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ run_id: state.runId, scenario_id: state.scenarioId, axis: 'overall_quality' }),
+        }).then(x => x.json());
+        if (r.ok) {
+          if (state.view === 'scenario') showScenario(state.scenarioId);
+        } else {
+          alert('conv clear failed: ' + (r.error || 'unknown'));
+        }
+        return;
+      }
+
+      // --- Turn-level label handlers (existing behavior) ---
       if (e.target.matches('.score-btns button')) {
         // Auto-save on Pass/Fail click: flip the active class optimistically so the
         // click feels instant, fire POST in background, then re-render to reconcile.
         const turnEl = e.target.closest('.turn');
+        if (!turnEl) return;
         const trace_id = turnEl.dataset.traceId;
         const label = parseInt(e.target.dataset.score, 10);  // 0 = fail, 1 = pass
         const notes = turnEl.querySelector('textarea').value;
@@ -572,6 +625,7 @@
       }
       if (e.target.matches('.clear-link')) {
         const turnEl = e.target.closest('.turn');
+        if (!turnEl) return;
         const trace_id = turnEl.dataset.traceId;
         const r = await fetch('/api/eval/labels', {
           method: 'DELETE',

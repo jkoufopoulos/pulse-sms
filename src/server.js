@@ -503,6 +503,12 @@ app.get('/api/eval/runs/:id', (req, res) => {
     s.labeled_count = counts.labeled_count || 0;
     s.pass_count = counts.pass_count || 0;
     s.fail_count = counts.fail_count || 0;
+    const convLabel = db.prepare(`
+      SELECT label, notes FROM conversation_labels
+      WHERE run_id = ? AND scenario_id = ? AND axis = 'overall_quality' AND labeler_id = ?
+    `).get(req.params.id, s.scenario_id, process.env.PULSE_LABELER_ID || 'jk');
+    s.conversation_label = convLabel ? convLabel.label : null;
+    s.conversation_label_notes = convLabel ? convLabel.notes : null;
   }
 
   const discardedCount = scenarios.filter(s => s.status === 'discarded').length;
@@ -533,6 +539,46 @@ app.get('/api/eval/turns/:capture_id', (req, res) => {
   `).all(turn.scenario_id, turn.turn_index);
 
   res.json({ turn, prior_labels: priorLabels });
+});
+
+app.post('/api/eval/conversation-labels', (req, res) => {
+  const { run_id, scenario_id, axis, label, notes } = req.body || {};
+  if (!run_id || !scenario_id || label === undefined) {
+    return res.status(400).json({ error: 'run_id, scenario_id, label required' });
+  }
+  const finalAxis = axis || 'overall_quality';
+  const labeler_id = process.env.PULSE_LABELER_ID || 'jk';
+  const { getDb } = require('./db');
+  const db = getDb();
+  try {
+    db.prepare(`
+      INSERT INTO conversation_labels (run_id, scenario_id, axis, label, labeler_id, notes, labeled_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(run_id, scenario_id, axis, labeler_id) DO UPDATE SET
+        label = excluded.label, notes = excluded.notes, labeled_at = excluded.labeled_at
+    `).run(run_id, scenario_id, finalAxis, label, labeler_id, notes || null, new Date().toISOString());
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Conv label upsert failed:', e);
+    res.status(500).json({ error: 'internal error' });
+  }
+});
+
+app.delete('/api/eval/conversation-labels', (req, res) => {
+  const { run_id, scenario_id, axis } = req.body || {};
+  if (!run_id || !scenario_id) return res.status(400).json({ error: 'run_id and scenario_id required' });
+  const finalAxis = axis || 'overall_quality';
+  const labeler_id = process.env.PULSE_LABELER_ID || 'jk';
+  const { getDb } = require('./db');
+  const db = getDb();
+  try {
+    db.prepare(`DELETE FROM conversation_labels WHERE run_id = ? AND scenario_id = ? AND axis = ? AND labeler_id = ?`)
+      .run(run_id, scenario_id, finalAxis, labeler_id);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Conv label delete failed:', e);
+    res.status(500).json({ error: 'internal error' });
+  }
 });
 
 app.post('/api/eval/scenarios/status', (req, res) => {
