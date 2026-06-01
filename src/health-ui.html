@@ -635,6 +635,11 @@ function renderSummary(data) {
     { label: 'Scrape Duration', value: fmtDuration(data.scrape.totalDurationMs), sub: data.scrape.completedAt ? fmtTime(data.scrape.completedAt) : 'no scrape' },
     { label: 'Sources OK', value: data.scrape.sourcesOk, sub: data.scrape.sourcesFailed ? data.scrape.sourcesFailed + ' failed' : 'all healthy' },
     { label: 'Events (raw)', value: data.scrape.totalEvents, sub: data.scrape.dedupedEvents + ' after dedup' },
+    ...(data.scrapedEvents ? [{
+      label: 'Archive (SFT/evals)',
+      value: data.scrapedEvents.total_rows.toLocaleString(),
+      sub: `${data.scrapedEvents.unique_events.toLocaleString()} unique · last ${data.scrapedEvents.latest_scrape}`,
+    }] : []),
   ];
 
   $('summary-row').innerHTML = cards.map(c => `
