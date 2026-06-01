@@ -16,6 +16,8 @@
     .bubble.ai.labeled { border-left: 3px solid #10b981; }
     .bubble.ai.matcher-fail { border-left: 3px solid #ef4444; }
     .chat-turn { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+    .session-divider { text-align: center; color: #9ca3af; font-size: 11px; font-weight: 500; margin: 16px 0 10px; letter-spacing: 0.02em; }
+    .session-divider .gap { color: #d1d5db; font-weight: 400; margin-left: 6px; }
     .turn-meta { font-size: 10px; color: #6b7280; margin: 0 4px; }
     .turn-tool-badge { display: inline-block; background: #e5e7eb; color: #374151; font-size: 10px; padding: 1px 6px; border-radius: 8px; margin-left: 4px; }
     .empty-pool-badge { display: inline-block; background: #fef3c7; color: #92400e; font-size: 10px; padding: 1px 6px; border-radius: 8px; margin-left: 4px; font-weight: 600; }
@@ -96,6 +98,36 @@
       } catch { return jsonStr; }
     }
     function fmtShortSha(sha) { return sha ? sha.slice(0, 7) : '—'; }
+
+    // iPhone-style session divider: shows a centered date+time label above the
+    // first message of a session. A "session" ends when there's a gap larger
+    // than `gapMin` minutes between consecutive turns. Returns null when the
+    // turn is a continuation of the previous session (no divider needed).
+    function sessionDivider(curIso, prevIso, gapMin) {
+      if (!curIso) return null;
+      const cur = new Date(curIso);
+      if (isNaN(cur.getTime())) return null;
+      // Always show divider for the first turn (no previous).
+      let gapMs = null;
+      if (prevIso) {
+        const prev = new Date(prevIso);
+        if (!isNaN(prev.getTime())) {
+          gapMs = cur.getTime() - prev.getTime();
+          if (gapMs < gapMin * 60 * 1000) return null;  // same session — no divider
+        }
+      }
+      const dateStr = cur.toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' });
+      const timeStr = cur.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
+      const gapLabel = gapMs === null
+        ? null
+        : gapMs < 60 * 60 * 1000 ? `+${Math.round(gapMs / 60000)} min later`
+        : gapMs < 24 * 60 * 60 * 1000 ? `+${Math.round(gapMs / 3600000)} hr later`
+        : `+${Math.round(gapMs / 86400000)} d later`;
+      return _el('div', { class: 'session-divider' },
+        `${dateStr} · ${timeStr} NYC`,
+        gapLabel ? _el('span', { class: 'gap' }, gapLabel) : null,
+      );
+    }
 
     async function showRuns() {
       state.view = 'runs';
@@ -188,10 +220,12 @@
         const idCell = isDiscarded
           ? _el('td', {}, s.scenario_id, ' ', _el('span', { class: 'badge fail' }, 'discarded'))
           : _el('td', {}, s.scenario_id);
+        const srcBadgeClass = s.source === 'sms' ? 'pass' : (s.source === 'simulator' ? 'none' : '');
         const cells = [
           _el('td', { style: 'color:#6b7280; font-size:12px; white-space:nowrap;' },
             fmtDateRange(s.first_captured_at, s.last_captured_at)),
           idCell,
+          _el('td', {}, _el('span', { class: 'badge ' + srcBadgeClass }, s.source || 'unknown')),
           _el('td', { style: 'color:#374151; max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;' },
             firstMsg.slice(0, 80)),
           _el('td', {}, `${s.turn_count} turns`),
@@ -201,7 +235,7 @@
           cells.push(_el('td', {}, s.matcher_evaluated > 0 ? `${s.matcher_passed}/${s.matcher_evaluated}` : '—'));
         }
         // dataset for filter: lowercase concat of searchable fields.
-        const searchBlob = (s.scenario_id + ' ' + firstMsg).toLowerCase();
+        const searchBlob = (s.scenario_id + ' ' + (s.source || '') + ' ' + firstMsg).toLowerCase();
         tbody.append(_el('tr', {
           class: 'screnrow',
           dataset: { search: searchBlob },
@@ -274,7 +308,7 @@
             : null,
         ),
       );
-      const headers = ['Date', 'Scenario', 'First message', 'Turns', 'Labels'];
+      const headers = ['Date', 'Scenario', 'Source', 'First message', 'Turns', 'Labels'];
       if (showMatcher) headers.push('Matcher');
       const table = _el('table', {},
         _el('thead', {}, _el('tr', {},
@@ -372,6 +406,10 @@
           _el('span', { style: 'font-weight:600; font-size:13px;' },
             `${scenarioId} · ${scenarioTurns.length} turns`,
             dateLine ? _el('span', { style: 'font-weight:400; color:#6b7280; margin-left:8px;' }, dateLine) : null,
+            scenarioMeta.source ? _el('span', {
+              class: 'badge ' + (scenarioMeta.source === 'sms' ? 'pass' : (scenarioMeta.source === 'simulator' ? 'none' : '')),
+              style: 'margin-left:8px;'
+            }, scenarioMeta.source) : null,
             isDiscarded ? _el('span', { class: 'badge fail', style: 'margin-left:8px;' }, 'discarded') : null,
           ),
         ),
@@ -386,7 +424,18 @@
             : 0);
       state.focusedTurnIdx = focusedIdx;
 
-      const chatCol = _el('div', { class: 'chat-col' }, ...details.map((d, i) => renderChatTurn(d, i, i === focusedIdx)));
+      // Build chat column with iPhone-style session dividers between turns
+      // that have a meaningful time gap. First turn always gets a date label.
+      const chatChildren = [];
+      const SESSION_GAP_MIN = 30;  // minutes; below this is "same session"
+      for (let i = 0; i < details.length; i++) {
+        const t = details[i].turn;
+        const prev = i > 0 ? details[i - 1].turn : null;
+        const divider = sessionDivider(t.captured_at, prev?.captured_at, SESSION_GAP_MIN);
+        if (divider) chatChildren.push(divider);
+        chatChildren.push(renderChatTurn(details[i], i, i === focusedIdx));
+      }
+      const chatCol = _el('div', { class: 'chat-col' }, ...chatChildren);
       const detailCol = _el('div', { class: 'detail-col' }, renderTurn(details[focusedIdx]));
 
       const grid = _el('div', { class: 'scenario-grid' }, chatCol, detailCol);
