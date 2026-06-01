@@ -125,8 +125,8 @@ async function main() {
   const insert = db.prepare(`INSERT INTO eval_turn_captures (
     run_id, scenario_id, turn_index, trace_id, user_msg,
     brain_prompt, brain_messages, tool_call, agent_sms,
-    session_before, session_after, matcher_result, captured_at
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    session_before, session_after, matcher_result, events_meta, captured_at
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
   let inserted = 0;
   for (const [phone, phoneTraces] of conversationalPhones) {
@@ -134,6 +134,11 @@ async function main() {
     for (let i = 0; i < phoneTraces.length; i++) {
       const t = phoneTraces[i];
       const toolCall = extractToolCall(t);
+      const eventsMeta = t.events ? JSON.stringify({
+        cache_size: t.events.cache_size ?? null,
+        candidates_count: t.events.candidates_count ?? null,
+        funnel: t.events.funnel ?? null,
+      }) : null;
       insert.run(
         runId,
         phone,
@@ -147,6 +152,7 @@ async function main() {
         t.session_before ? JSON.stringify(t.session_before) : null,
         null,  // session_after — production traces don't snapshot post-state
         null,  // matcher_result — production has no expect block
+        eventsMeta,
         t.timestamp || new Date().toISOString(),
       );
       inserted++;

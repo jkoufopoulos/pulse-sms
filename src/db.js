@@ -236,6 +236,7 @@ function runMigrations(db) {
       session_before TEXT,
       session_after TEXT,
       matcher_result TEXT,
+      events_meta TEXT,                -- JSON: { cache_size, candidates_count, funnel } from trace.events
       captured_at TEXT NOT NULL,
       UNIQUE(run_id, scenario_id, turn_index)
     );

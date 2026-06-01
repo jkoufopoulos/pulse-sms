@@ -18,6 +18,8 @@
     .chat-turn { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
     .turn-meta { font-size: 10px; color: #6b7280; margin: 0 4px; }
     .turn-tool-badge { display: inline-block; background: #e5e7eb; color: #374151; font-size: 10px; padding: 1px 6px; border-radius: 8px; margin-left: 4px; }
+    .empty-pool-badge { display: inline-block; background: #fef3c7; color: #92400e; font-size: 10px; padding: 1px 6px; border-radius: 8px; margin-left: 4px; font-weight: 600; }
+    .empty-pool-banner { background: #fef3c7; color: #92400e; padding: 6px 10px; border-radius: 4px; font-size: 12px; margin: 8px 0; border-left: 3px solid #f59e0b; }
     h1 { font-size: 20px; margin: 0 0 16px; }
     h2 { font-size: 16px; margin: 24px 0 8px; }
     .crumbs { color: #666; font-size: 13px; margin-bottom: 12px; }
@@ -51,7 +53,6 @@
     .clear-link { color: #6b7280; font-size: 12px; cursor: pointer; text-decoration: underline; margin-left: 8px; }
     .clear-link:hover { color: #991b1b; }
     .score-widget textarea { width: 100%; min-height: 50px; padding: 6px 8px; font-family: inherit; font-size: 13px; box-sizing: border-box; margin-top: 8px; border: 1px solid #d1d5db; border-radius: 4px; }
-    .score-widget button.save { padding: 6px 14px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; margin-top: 6px; }
     .saved { color: #065f46; font-size: 12px; margin-left: 8px; }
     .prior { font-size: 12px; color: #6b7280; margin-top: 8px; }
     details summary { cursor: pointer; color: #2563eb; font-size: 12px; margin: 4px 0; }
@@ -318,6 +319,10 @@
     }
 
     async function showScenario(scenarioId) {
+      // Same-scenario re-renders (bubble click, label save, clear) should not
+      // yank the chat rail back to the top — capture/restore scroll across the
+      // _replaceChildren DOM swap below.
+      const isRefresh = state.scenarioId === scenarioId;
       if (state.scenarioId !== scenarioId) state.focusedTurnIdx = undefined;
       state.view = 'scenario';
       state.scenarioId = scenarioId;
@@ -385,7 +390,24 @@
       const detailCol = _el('div', { class: 'detail-col' }, renderTurn(details[focusedIdx]));
 
       const grid = _el('div', { class: 'scenario-grid' }, chatCol, detailCol);
+      const prevChatScroll = isRefresh ? (document.querySelector('.chat-col')?.scrollTop ?? 0) : 0;
+      const prevDetailScroll = isRefresh ? (document.querySelector('.detail-col')?.scrollTop ?? 0) : 0;
       _replaceChildren(document.getElementById('view'), titleBar, grid);
+      if (isRefresh) {
+        const newChat = document.querySelector('.chat-col');
+        const newDetail = document.querySelector('.detail-col');
+        if (newChat) newChat.scrollTop = prevChatScroll;
+        if (newDetail) newDetail.scrollTop = prevDetailScroll;
+      }
+    }
+
+    // True only when the brain actually ran a search AND the search returned 0
+    // candidates against a populated cache. Distinguishes "graceful empty-pool
+    // handling" from "brain didn't search at all" (clarify/respond paths).
+    function isEmptyPool(turn) {
+      if (!turn.events_meta) return false;
+      let m; try { m = JSON.parse(turn.events_meta); } catch { return false; }
+      return m.cache_size > 0 && m.candidates_count === 0;
     }
 
     function renderChatTurn(d, idx, isFocused) {
@@ -393,6 +415,7 @@
       const tc = t.tool_call ? JSON.parse(t.tool_call) : null;
       const mr = t.matcher_result ? JSON.parse(t.matcher_result) : null;
       const labeled = !!d.prior_labels.find(l => l.trace_id === t.trace_id);
+      const emptyPool = isEmptyPool(t);
 
       const classes = ['bubble', 'ai'];
       if (isFocused) classes.push('focused');
@@ -408,6 +431,7 @@
         },
           _el('div', {}, t.agent_sms || _el('em', { style: 'color:#9ca3af;' }, '(no SMS)')),
           tc ? _el('span', { class: 'turn-tool-badge' }, tc.name) : null,
+          emptyPool ? _el('span', { class: 'empty-pool-badge', title: 'search ran but returned 0 events' }, '⚠ empty pool') : null,
           labeled ? _el('span', { class: 'turn-tool-badge', style: 'background:#d1fae5; color:#065f46;' }, '✓ labeled') : null,
         ),
       );
@@ -429,6 +453,13 @@
         : _el('span', { class: 'badge ' + (mr.passed ? 'pass' : 'fail') },
           'matcher: ' + (mr.passed ? 'pass' : 'fail'));
 
+      const emptyPool = isEmptyPool(t);
+      const meta = (() => { try { return JSON.parse(t.events_meta || '{}'); } catch { return {}; } })();
+      const emptyPoolBanner = emptyPool
+        ? _el('div', { class: 'empty-pool-banner' },
+            `⚠ Empty pool: search ran against ${meta.cache_size} events in cache, 0 matched the filters. The brain's response is grading "how it handles absence", not "did it find the right thing."`)
+        : null;
+
       const rows = [
         _el('div', { class: 'row' },
           _el('span', { class: 'label-key' }, 'user:'),
@@ -440,6 +471,8 @@
           _el('span', { class: 'label-key' }, 'sms:'),
           document.createTextNode(t.agent_sms || '')),
       ];
+
+      if (emptyPoolBanner) rows.push(emptyPoolBanner);
 
       if (mr && !mr.passed) {
         rows.push(_el('div', { class: 'row', style: 'color:#991b1b' },
@@ -486,12 +519,14 @@
       const clearLink = hasLabel
         ? _el('span', { class: 'clear-link', dataset: { clearLabel: '1' } }, 'clear')
         : null;
-      const notesArea = _el('textarea', { placeholder: 'critique (why pass/fail? this becomes a judge few-shot later)' });
+      const notesArea = _el('textarea', { placeholder: 'critique (auto-saves on click away; needs a pass/fail first)' });
       notesArea.value = currentNotes;
-      const saveBtn = _el('button', { class: 'save' }, 'Save label');
+      // Used by the focusout auto-save below to suppress no-op POSTs (including
+      // the blur that fires when re-render swaps this textarea out).
+      notesArea.dataset.savedNotes = currentNotes;
 
       const scoreWidget = _el('div', { class: 'score-widget' },
-        scoreBtns, savedAffordance, clearLink, notesArea, saveBtn);
+        scoreBtns, savedAffordance, clearLink, notesArea);
 
       const priorBlock = otherPrior.length
         ? _el('div', { class: 'prior' },
@@ -515,18 +550,14 @@
 
     document.addEventListener('click', async (e) => {
       if (e.target.matches('.score-btns button')) {
-        const turnEl = e.target.closest('.turn');
-        turnEl.querySelectorAll('.score-btns button').forEach(b => b.classList.remove('active'));
-        // active class respects pass-btn / fail-btn variants via CSS
-        e.target.classList.add('active');
-      }
-      if (e.target.matches('.score-widget button.save')) {
+        // Auto-save on Pass/Fail click: flip the active class optimistically so the
+        // click feels instant, fire POST in background, then re-render to reconcile.
         const turnEl = e.target.closest('.turn');
         const trace_id = turnEl.dataset.traceId;
-        const active = turnEl.querySelector('.score-btns button.active');
-        if (!active) { alert('pick Pass or Fail first'); return; }
-        const label = parseInt(active.dataset.score, 10);  // 0 = fail, 1 = pass
+        const label = parseInt(e.target.dataset.score, 10);  // 0 = fail, 1 = pass
         const notes = turnEl.querySelector('textarea').value;
+        turnEl.querySelectorAll('.score-btns button').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
         const r = await fetch('/api/eval/labels', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -537,6 +568,7 @@
         } else {
           alert('save failed: ' + (r.error || 'unknown'));
         }
+        return;
       }
       if (e.target.matches('.clear-link')) {
         const turnEl = e.target.closest('.turn');
@@ -551,6 +583,32 @@
         } else {
           alert('clear failed: ' + (r.error || 'unknown'));
         }
+      }
+    });
+
+    // Notes auto-save on blur. Guards: needs an active pass/fail (notes attach to
+    // a label), and skips when value matches dataset.savedNotes — otherwise the
+    // blur fired by re-render swapping the textarea would re-POST in a loop.
+    // No re-render on success (would steal focus mid-flow); just update savedNotes.
+    document.addEventListener('focusout', async (e) => {
+      if (!e.target.matches('.score-widget textarea')) return;
+      const newVal = e.target.value;
+      if (newVal === (e.target.dataset.savedNotes ?? '')) return;
+      const turnEl = e.target.closest('.turn');
+      if (!turnEl) return;
+      const active = turnEl.querySelector('.score-btns button.active');
+      if (!active) return;
+      const trace_id = turnEl.dataset.traceId;
+      const label = parseInt(active.dataset.score, 10);
+      const r = await fetch('/api/eval/labels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trace_id, axis: AXIS, label, notes: newVal }),
+      }).then(x => x.json());
+      if (r.ok) {
+        e.target.dataset.savedNotes = newVal;
+      } else {
+        alert('notes save failed: ' + (r.error || 'unknown'));
       }
     });
 

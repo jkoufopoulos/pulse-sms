@@ -34,13 +34,16 @@ app.get('/', (req, res) => {
 });
 
 // All /health and /api/health/* routes use the same auth: HEALTH_AUTH_TOKEN
-// must be set and match ?token=. No test-mode bypass — sim must mirror prod.
+// must be set and match ?token= (initial page load) or Authorization: Bearer
+// (XHRs from the dashboard, which avoid logging the token on every request).
+// No test-mode bypass — sim must mirror prod.
 function requireHealthAuth(req, res, next) {
   const authToken = process.env.HEALTH_AUTH_TOKEN;
-  if (!authToken || req.query.token !== authToken) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-  next();
+  if (!authToken) return res.status(403).json({ error: 'Forbidden' });
+  const auth = req.headers.authorization || '';
+  const bearer = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (req.query.token === authToken || bearer === authToken) return next();
+  return res.status(403).json({ error: 'Forbidden' });
 }
 
 // Health dashboard
@@ -507,7 +510,7 @@ app.get('/api/eval/runs/:id', (req, res) => {
 
   const turns = db.prepare(`
     SELECT id AS capture_id, scenario_id, turn_index, trace_id, user_msg,
-           tool_call, agent_sms, matcher_result, captured_at
+           tool_call, agent_sms, matcher_result, events_meta, captured_at
     FROM eval_turn_captures WHERE run_id = ? ORDER BY scenario_id, turn_index
   `).all(req.params.id);
 
