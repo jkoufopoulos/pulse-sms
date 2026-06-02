@@ -451,7 +451,7 @@ app.get('/api/eval/runs', (req, res) => {
       (SELECT COUNT(*) FROM eval_turn_captures WHERE run_id = r.id) AS turn_count,
       (SELECT COUNT(*) FROM eval_turn_captures c
         WHERE c.run_id = r.id
-          AND EXISTS (SELECT 1 FROM response_labels l WHERE l.trace_id = c.trace_id)) AS labeled_count,
+          AND EXISTS (SELECT 1 FROM response_labels l WHERE l.trace_id = c.trace_id AND l.run_id = r.id)) AS labeled_count,
       (SELECT COUNT(*) FROM eval_turn_captures c
         WHERE c.run_id = r.id
           AND c.matcher_result IS NOT NULL
@@ -465,12 +465,29 @@ app.get('/api/eval/runs', (req, res) => {
   res.json({ runs: rows });
 });
 
+// Which axes apply to a given run. Pre-v1-grading runs (id <= 4) used a single
+// turn-level axis and a single conv-level axis. v1 (run #5 onward) splits voice,
+// carryover, intent execution, and formatting at turn level + 5 conv-level binaries.
+function axesForRun(runId) {
+  if (runId <= 4) {
+    return {
+      turn: ['context_carryover_quality'],
+      conversation: ['overall_quality'],
+    };
+  }
+  return {
+    turn: ['voice', 'carryover', 'intent_executed', 'formatting'],
+    conversation: ['reached_goal', 'voice_held', 'coherent_arc', 'recovered_when_stuck', 'user_kept_going'],
+  };
+}
+
 app.get('/api/eval/runs/:id', (req, res) => {
   const { getDb } = require('./db');
   const db = getDb();
   const showAll = req.query.show === 'all';
   const run = db.prepare(`SELECT * FROM eval_runs WHERE id = ?`).get(req.params.id);
   if (!run) return res.status(404).json({ error: 'run not found' });
+  const axes = axesForRun(run.id);
 
   const scenarios = db.prepare(`
     SELECT
@@ -498,18 +515,22 @@ app.get('/api/eval/runs/:id', (req, res) => {
         SUM(CASE WHEN l.label = 1 THEN 1 ELSE 0 END) AS pass_count,
         SUM(CASE WHEN l.label = 0 THEN 1 ELSE 0 END) AS fail_count
       FROM eval_turn_captures c
-      JOIN response_labels l ON l.trace_id = c.trace_id
+      JOIN response_labels l ON l.trace_id = c.trace_id AND l.run_id = c.run_id
       WHERE c.run_id = ? AND c.scenario_id = ?
     `).get(req.params.id, s.scenario_id);
     s.labeled_count = counts.labeled_count || 0;
     s.pass_count = counts.pass_count || 0;
     s.fail_count = counts.fail_count || 0;
-    const convLabel = db.prepare(`
-      SELECT label, notes FROM conversation_labels
-      WHERE run_id = ? AND scenario_id = ? AND axis = 'overall_quality' AND labeler_id = ?
-    `).get(req.params.id, s.scenario_id, process.env.PULSE_LABELER_ID || 'jk');
-    s.conversation_label = convLabel ? convLabel.label : null;
-    s.conversation_label_notes = convLabel ? convLabel.notes : null;
+    // Return all conv-level labels for this scenario keyed by axis. UI picks the
+    // ones it cares about (run.axes.conversation) and renders pass/fail per axis.
+    const convRows = db.prepare(`
+      SELECT axis, label, notes FROM conversation_labels
+      WHERE run_id = ? AND scenario_id = ? AND labeler_id = ?
+    `).all(req.params.id, s.scenario_id, process.env.PULSE_LABELER_ID || 'jk');
+    s.conversation_labels = {};
+    for (const cr of convRows) {
+      s.conversation_labels[cr.axis] = { label: cr.label, notes: cr.notes };
+    }
   }
 
   const discardedCount = scenarios.filter(s => s.status === 'discarded').length;
@@ -521,7 +542,7 @@ app.get('/api/eval/runs/:id', (req, res) => {
     FROM eval_turn_captures WHERE run_id = ? ORDER BY scenario_id, turn_index
   `).all(req.params.id);
 
-  res.json({ run, scenarios: visibleScenarios, turns, discarded_count: discardedCount });
+  res.json({ run, axes, scenarios: visibleScenarios, turns, discarded_count: discardedCount });
 });
 
 app.get('/api/eval/turns/:capture_id', (req, res) => {
@@ -530,11 +551,12 @@ app.get('/api/eval/turns/:capture_id', (req, res) => {
   const turn = db.prepare(`SELECT * FROM eval_turn_captures WHERE id = ?`).get(req.params.capture_id);
   if (!turn) return res.status(404).json({ error: 'turn not found' });
 
-  // Prior labels on the same logical turn (scenario_id, turn_index) across all runs
+  // Prior labels on the same logical turn (scenario_id, turn_index) across all runs.
+  // Filter the JOIN by run_id so cloned captures don't multiply each label row.
   const priorLabels = db.prepare(`
-    SELECT l.*, c.run_id, c.captured_at AS turn_captured_at
+    SELECT l.*, c.captured_at AS turn_captured_at
     FROM response_labels l
-    JOIN eval_turn_captures c ON c.trace_id = l.trace_id
+    JOIN eval_turn_captures c ON c.trace_id = l.trace_id AND c.run_id = l.run_id
     WHERE c.scenario_id = ? AND c.turn_index = ?
     ORDER BY l.labeled_at DESC
   `).all(turn.scenario_id, turn.turn_index);
@@ -609,16 +631,16 @@ app.post('/api/eval/scenarios/status', (req, res) => {
 });
 
 app.delete('/api/eval/labels', (req, res) => {
-  const { trace_id, axis } = req.body || {};
-  if (!trace_id || !axis) {
-    return res.status(400).json({ error: 'trace_id and axis are required' });
+  const { run_id, trace_id, axis } = req.body || {};
+  if (!run_id || !trace_id || !axis) {
+    return res.status(400).json({ error: 'run_id, trace_id, and axis are required' });
   }
   const labeler_id = process.env.PULSE_LABELER_ID || 'jk';
   const { getDb } = require('./db');
   const db = getDb();
   try {
-    db.prepare(`DELETE FROM response_labels WHERE trace_id = ? AND axis = ? AND labeler_id = ?`)
-      .run(trace_id, axis, labeler_id);
+    db.prepare(`DELETE FROM response_labels WHERE run_id = ? AND trace_id = ? AND axis = ? AND labeler_id = ?`)
+      .run(run_id, trace_id, axis, labeler_id);
     res.json({ ok: true });
   } catch (e) {
     console.error('Label delete failed:', e);
@@ -627,22 +649,22 @@ app.delete('/api/eval/labels', (req, res) => {
 });
 
 app.post('/api/eval/labels', (req, res) => {
-  const { trace_id, axis, label, notes } = req.body || {};
-  if (!trace_id || !axis || label === undefined) {
-    return res.status(400).json({ error: 'trace_id, axis, and label are required' });
+  const { run_id, trace_id, axis, label, notes } = req.body || {};
+  if (!run_id || !trace_id || !axis || label === undefined) {
+    return res.status(400).json({ error: 'run_id, trace_id, axis, and label are required' });
   }
   const labeler_id = process.env.PULSE_LABELER_ID || 'jk';
   const { getDb } = require('./db');
   const db = getDb();
   try {
     db.prepare(`
-      INSERT INTO response_labels (trace_id, axis, label, labeler_id, notes, labeled_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(trace_id, axis, labeler_id) DO UPDATE SET
+      INSERT INTO response_labels (run_id, trace_id, axis, label, labeler_id, notes, labeled_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(run_id, trace_id, axis, labeler_id) DO UPDATE SET
         label = excluded.label,
         notes = excluded.notes,
         labeled_at = excluded.labeled_at
-    `).run(trace_id, axis, label, labeler_id, notes || null, new Date().toISOString());
+    `).run(run_id, trace_id, axis, label, labeler_id, notes || null, new Date().toISOString());
     res.json({ ok: true });
   } catch (e) {
     console.error('Label insert failed:', e);

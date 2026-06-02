@@ -189,15 +189,17 @@ function runMigrations(db) {
 
     CREATE TABLE IF NOT EXISTS response_labels (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id INTEGER NOT NULL,        -- labels are scoped to a run for versioning across grading-spec eras
       trace_id TEXT NOT NULL,
       axis TEXT NOT NULL,
       label REAL NOT NULL,            -- human ground truth, same scale as score
       labeler_id TEXT NOT NULL DEFAULT 'anon',  -- caller may supply 'jk' etc.; default makes UNIQUE work
       notes TEXT,
       labeled_at TEXT NOT NULL,
-      UNIQUE(trace_id, axis, labeler_id)
+      UNIQUE(run_id, trace_id, axis, labeler_id)
     );
     CREATE INDEX IF NOT EXISTS idx_response_labels_trace ON response_labels(trace_id);
+    CREATE INDEX IF NOT EXISTS idx_response_labels_run ON response_labels(run_id);
     CREATE INDEX IF NOT EXISTS idx_response_labels_axis_labeled_at ON response_labels(axis, labeled_at);
 
     CREATE TABLE IF NOT EXISTS calibration_runs (

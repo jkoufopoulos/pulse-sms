@@ -47,15 +47,24 @@
     .turn pre { background: #f9fafb; padding: 8px 10px; border-radius: 4px; font-size: 12px; overflow-x: auto; margin: 6px 0; white-space: pre-wrap; word-break: break-word; }
     .score-widget { margin-top: 12px; padding-top: 10px; border-top: 1px solid #f3f4f6; }
     .score-btns { display: inline-flex; gap: 6px; margin-right: 10px; }
-    .score-btns button { padding: 6px 18px; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
+    .score-btns button { padding: 4px 14px; border: 1px solid #d1d5db; background: #fff; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 600; }
     .score-btns button.pass-btn:hover { background: #f0fdf4; border-color: #10b981; }
     .score-btns button.fail-btn:hover { background: #fef2f2; border-color: #ef4444; }
     .score-btns button.pass-btn.active { background: #10b981; color: white; border-color: #10b981; }
     .score-btns button.fail-btn.active { background: #ef4444; color: white; border-color: #ef4444; }
-    .clear-link { color: #6b7280; font-size: 12px; cursor: pointer; text-decoration: underline; margin-left: 8px; }
+    .clear-link { color: #6b7280; font-size: 11px; cursor: pointer; text-decoration: underline; margin-left: 8px; }
     .clear-link:hover { color: #991b1b; }
-    .score-widget textarea { width: 100%; min-height: 50px; padding: 6px 8px; font-family: inherit; font-size: 13px; box-sizing: border-box; margin-top: 8px; border: 1px solid #d1d5db; border-radius: 4px; }
-    .saved { color: #065f46; font-size: 12px; margin-left: 8px; }
+    .score-widget textarea, .axis-widget textarea { width: 100%; min-height: 32px; padding: 5px 7px; font-family: inherit; font-size: 12px; box-sizing: border-box; margin-top: 6px; border: 1px solid #d1d5db; border-radius: 4px; resize: vertical; }
+    .axis-widget textarea:focus { min-height: 60px; }
+    .saved { color: #065f46; font-size: 11px; margin-left: 8px; }
+    /* Per-axis sub-widget — one row per axis, stacked inside the per-turn score block */
+    .axis-widget { padding: 8px 0; border-bottom: 1px dashed #f3f4f6; }
+    .axis-widget:last-child { border-bottom: none; padding-bottom: 0; }
+    .axis-widget .axis-header { display: flex; align-items: center; gap: 8px; }
+    .axis-widget .axis-name { font-weight: 600; font-size: 12px; min-width: 92px; color: #111827; }
+    .axis-widget .axis-hint { color: #9ca3af; font-size: 11px; flex: 1; }
+    .axis-widget.fully-active .axis-name { color: #065f46; }
+    .axis-widget.fully-active .axis-hint { display: none; }
     .prior { font-size: 12px; color: #6b7280; margin-top: 8px; }
     details summary { cursor: pointer; color: #2563eb; font-size: 12px; margin: 4px 0; }
   </style>
@@ -66,8 +75,64 @@
   <div id="view"></div>
 
   <script>
-    const AXIS = 'context_carryover_quality';
+    // v1 grading spec — see ~/.claude memory pulse-grading-spec.md.
+    // Order is intentional (matches the spec doc) so labelers see axes in the same sequence every time.
+    const TURN_AXES = [
+      { key: 'voice',            label: 'voice',      hint: 'warm, on-persona' },
+      { key: 'carryover',        label: 'carryover',  hint: 'uses established frame' },
+      { key: 'intent_executed',  label: 'intent',     hint: 'took substantive action' },
+      { key: 'formatting',       label: 'formatting', hint: 'clean SMS rendering' },
+    ];
+    const CONV_AXES = [
+      { key: 'reached_goal',          label: 'reached goal',         hint: 'user got actionable answer' },
+      { key: 'voice_held',            label: 'voice held',           hint: 'no unrepaired persona break' },
+      { key: 'coherent_arc',          label: 'coherent arc',         hint: 'each turn built on prior' },
+      { key: 'recovered_when_stuck',  label: 'recovered when stuck', hint: 'just-do-something rule' },
+      { key: 'user_kept_going',       label: 'user kept going',      hint: 'engagement signal' },
+    ];
     const state = { view: 'runs', runId: null, scenarioId: null, run: null };
+
+    // Build one per-axis sub-widget. `kind` is 'turn' or 'conv' — used so the
+    // click handler knows which endpoint to POST to. `priorLabels` is the list
+    // already scoped to this row (the current trace or scenario); we pick the
+    // entry matching `axisKey` to drive the active button + textarea value.
+    function renderAxisWidget({ axisKey, label, hint, kind, priorLabels }) {
+      const mine = priorLabels.find(l => l.axis === axisKey);
+      const score = mine ? mine.label : null;
+      const notes = mine ? (mine.notes || '') : '';
+      const hasLabel = score === 0 || score === 1;
+      const passBtn = _el('button', {
+        class: 'pass-btn' + (score === 1 ? ' active' : ''),
+        dataset: { score: '1' },
+      }, '✓');
+      const failBtn = _el('button', {
+        class: 'fail-btn' + (score === 0 ? ' active' : ''),
+        dataset: { score: '0' },
+      }, '✗');
+      const saved = _el('span', {
+        class: 'saved',
+        style: 'display:' + (hasLabel ? 'inline' : 'none'),
+      }, 'saved');
+      const clearLink = hasLabel ? _el('span', { class: 'clear-link', dataset: { clearLabel: '1' } }, 'clear') : null;
+      const notesArea = _el('textarea', {
+        placeholder: `critique for ${label}`,
+      });
+      notesArea.value = notes;
+      notesArea.dataset.savedNotes = notes;
+      return _el('div', {
+        class: 'axis-widget' + (hasLabel ? ' fully-active' : ''),
+        dataset: { axisWidget: '1', axis: axisKey, kind },
+      },
+        _el('div', { class: 'axis-header' },
+          _el('span', { class: 'axis-name' }, label),
+          _el('span', { class: 'axis-hint' }, hint),
+          _el('span', { class: 'score-btns' }, passBtn, failBtn),
+          saved,
+          clearLink,
+        ),
+        notesArea,
+      );
+    }
 
     function _el(tag, attrs = {}, ...children) {
       const node = document.createElement(tag);
@@ -416,11 +481,32 @@
         discardBtn,
       );
 
+      // Conversation-level panel — 5 axes stacked. Server returns
+      // scenarioMeta.conversation_labels as { axis: { label, notes } }; flatten to
+      // [{ axis, label, notes }] so renderAxisWidget can consume it uniformly with
+      // the turn-level prior_labels list.
+      const convLabelMap = scenarioMeta.conversation_labels || {};
+      const convPriorLabels = Object.entries(convLabelMap).map(([axis, v]) => ({
+        axis, label: v.label, notes: v.notes,
+      }));
+      const convPanel = _el('div', {
+        dataset: { convPanel: '1' },
+        style: 'background:#fafafa; border:1px solid #e5e7eb; border-radius:6px; padding:10px 14px; margin-bottom:14px;',
+      },
+        _el('div', { style: 'font-size:11px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;' },
+          'Conversation overall — 5 binaries'),
+        ...CONV_AXES.map(a => renderAxisWidget({
+          axisKey: a.key, label: a.label, hint: a.hint, kind: 'conv',
+          priorLabels: convPriorLabels,
+        })),
+      );
+
       // Pick the focused turn (default: first unlabeled, fallback to turn 0).
+      // "Unlabeled" under v1 multi-axis = no labels at all yet on this trace.
       const focusedIdx = state.focusedTurnIdx !== undefined && details[state.focusedTurnIdx]
         ? state.focusedTurnIdx
-        : (details.findIndex(d => !d.prior_labels.find(l => l.trace_id === d.turn.trace_id)) !== -1
-            ? details.findIndex(d => !d.prior_labels.find(l => l.trace_id === d.turn.trace_id))
+        : (details.findIndex(d => !d.prior_labels.find(l => l.trace_id === d.turn.trace_id && l.run_id === state.runId)) !== -1
+            ? details.findIndex(d => !d.prior_labels.find(l => l.trace_id === d.turn.trace_id && l.run_id === state.runId))
             : 0);
       state.focusedTurnIdx = focusedIdx;
 
@@ -441,7 +527,7 @@
       const grid = _el('div', { class: 'scenario-grid' }, chatCol, detailCol);
       const prevChatScroll = isRefresh ? (document.querySelector('.chat-col')?.scrollTop ?? 0) : 0;
       const prevDetailScroll = isRefresh ? (document.querySelector('.detail-col')?.scrollTop ?? 0) : 0;
-      _replaceChildren(document.getElementById('view'), titleBar, grid);
+      _replaceChildren(document.getElementById('view'), titleBar, convPanel, grid);
       if (isRefresh) {
         const newChat = document.querySelector('.chat-col');
         const newDetail = document.querySelector('.detail-col');
@@ -463,13 +549,33 @@
       const t = d.turn;
       const tc = t.tool_call ? JSON.parse(t.tool_call) : null;
       const mr = t.matcher_result ? JSON.parse(t.matcher_result) : null;
-      const labeled = !!d.prior_labels.find(l => l.trace_id === t.trace_id);
+      // Multi-axis labeled state: count how many turn-level axes have a label
+      // in the current run. Three states surface visually:
+      //   0          → no badge
+      //   1..n-1     → partial (yellow "n/4 labeled")
+      //   n (all)    → full (green "✓ labeled")
+      const axesLabeled = TURN_AXES.filter(a =>
+        d.prior_labels.some(l => l.trace_id === t.trace_id && l.run_id === state.runId && l.axis === a.key)
+      ).length;
+      const fullyLabeled = axesLabeled === TURN_AXES.length;
+      const partiallyLabeled = axesLabeled > 0 && !fullyLabeled;
       const emptyPool = isEmptyPool(t);
 
       const classes = ['bubble', 'ai'];
       if (isFocused) classes.push('focused');
-      if (labeled) classes.push('labeled');
+      if (fullyLabeled) classes.push('labeled');
       if (mr && !mr.passed) classes.push('matcher-fail');
+
+      let labelBadge = null;
+      if (fullyLabeled) {
+        labelBadge = _el('span', { class: 'turn-tool-badge', style: 'background:#d1fae5; color:#065f46;' }, '✓ labeled');
+      } else if (partiallyLabeled) {
+        labelBadge = _el('span', {
+          class: 'turn-tool-badge',
+          style: 'background:#fef3c7; color:#92400e;',
+          title: `${axesLabeled} of ${TURN_AXES.length} axes labeled`,
+        }, `${axesLabeled}/${TURN_AXES.length}`);
+      }
 
       return _el('div', { class: 'chat-turn' },
         _el('div', { class: 'turn-meta' }, `t${t.turn_index}`),
@@ -481,7 +587,7 @@
           _el('div', {}, t.agent_sms || _el('em', { style: 'color:#9ca3af;' }, '(no SMS)')),
           tc ? _el('span', { class: 'turn-tool-badge' }, tc.name) : null,
           emptyPool ? _el('span', { class: 'empty-pool-badge', title: 'search ran but returned 0 events' }, '⚠ empty pool') : null,
-          labeled ? _el('span', { class: 'turn-tool-badge', style: 'background:#d1fae5; color:#065f46;' }, '✓ labeled') : null,
+          labelBadge,
         ),
       );
     }
@@ -492,10 +598,10 @@
       const tc = t.tool_call ? JSON.parse(t.tool_call) : null;
       const sb = t.session_before ? JSON.parse(t.session_before) : null;
       const sa = t.session_after ? JSON.parse(t.session_after) : null;
-      const myPrior = d.prior_labels.find(l => l.trace_id === t.trace_id);
-      const otherPrior = d.prior_labels.filter(l => l.trace_id !== t.trace_id);
-      const currentScore = myPrior ? myPrior.label : null;
-      const currentNotes = myPrior ? (myPrior.notes || '') : '';
+      // v1 multi-axis: per-axis scores live inside each axis-widget. We still
+      // need `otherPrior` for the cross-run history block at the bottom (e.g.,
+      // a turn graded under run #4's single-axis era will surface here).
+      const otherPrior = d.prior_labels.filter(l => !(l.trace_id === t.trace_id && l.run_id === state.runId));
 
       const badge = mr === null
         ? _el('span', { class: 'badge none' }, 'no expect')
@@ -548,34 +654,20 @@
           ? _el('pre', {}, `before: ${JSON.stringify(sb, null, 2)}\nafter:  ${JSON.stringify(sa, null, 2)}`)
           : _el('div', { style: 'color:#6b7280; font-size:12px; font-style:italic; padding:6px 4px;' }, missingNote));
 
-      // Binary scoring per the EDD canon (Hamel + sticker-pipeline):
-      //   pass = label 1; fail = label 0; absence of row = unlabeled.
-      // Skip is not a stored state — just don't click anything and move on.
-      const hasLabel = currentScore === 0 || currentScore === 1;
-      const passBtn = _el('button', {
-        class: 'pass-btn' + (currentScore === 1 ? ' active' : ''),
-        dataset: { score: '1' },
-      }, '✓ Pass');
-      const failBtn = _el('button', {
-        class: 'fail-btn' + (currentScore === 0 ? ' active' : ''),
-        dataset: { score: '0' },
-      }, '✗ Fail');
-      const scoreBtns = _el('div', { class: 'score-btns' }, passBtn, failBtn);
-      const savedAffordance = _el('span', {
-        class: 'saved',
-        style: 'display:' + (hasLabel ? 'inline' : 'none'),
-      }, 'saved ✓');
-      const clearLink = hasLabel
-        ? _el('span', { class: 'clear-link', dataset: { clearLabel: '1' } }, 'clear')
-        : null;
-      const notesArea = _el('textarea', { placeholder: 'critique (auto-saves on click away; needs a pass/fail first)' });
-      notesArea.value = currentNotes;
-      // Used by the focusout auto-save below to suppress no-op POSTs (including
-      // the blur that fires when re-render swaps this textarea out).
-      notesArea.dataset.savedNotes = currentNotes;
-
+      // v1 grading: 4 turn-level axes (voice / carryover / intent_executed / formatting).
+      // Each axis has its own Pass/Fail + notes textarea so the future judge prompt
+      // can few-shot from per-axis critiques without disambiguation ambiguity.
+      // `priorLabelsForTrace` = labels on this exact trace_id in the current run,
+      // grouped by axis. response_labels schema is multi-row per trace_id now.
+      const priorLabelsForTrace = d.prior_labels.filter(l =>
+        l.trace_id === t.trace_id && l.run_id === state.runId
+      );
       const scoreWidget = _el('div', { class: 'score-widget' },
-        scoreBtns, savedAffordance, clearLink, notesArea);
+        ...TURN_AXES.map(a => renderAxisWidget({
+          axisKey: a.key, label: a.label, hint: a.hint, kind: 'turn',
+          priorLabels: priorLabelsForTrace,
+        })),
+      );
 
       const priorBlock = otherPrior.length
         ? _el('div', { class: 'prior' },
@@ -597,122 +689,94 @@
       return turn;
     }
 
+    // v1 click handler — every Pass/Fail button + clear link sits inside an
+    // .axis-widget with data-axis (which axis) and data-kind ('turn'|'conv').
+    // We read both off the wrapping widget rather than tracking state globally,
+    // so a single delegated listener can service all axes on both layers.
     document.addEventListener('click', async (e) => {
-      // --- Conversation-level label widget (the panel above the chat grid) ---
-      // Distinguished from turn-level by dataset attributes (convScore/convSave/convClear).
-      const convPanel = e.target.closest('[data-conv-panel="1"]');
-      if (convPanel && e.target.matches('.score-btns button[data-conv-score]')) {
-        const label = parseInt(e.target.dataset.convScore, 10);
-        const notes = convPanel.querySelector('.conv-notes')?.value || '';
-        convPanel.querySelectorAll('.score-btns button[data-conv-score]').forEach(b => b.classList.remove('active'));
+      // Pass / Fail on any axis row
+      if (e.target.matches('.score-btns button[data-score]')) {
+        const widget = e.target.closest('[data-axis-widget]');
+        if (!widget) return;
+        const axis = widget.dataset.axis;
+        const kind = widget.dataset.kind;
+        const label = parseInt(e.target.dataset.score, 10);
+        const notes = widget.querySelector('textarea')?.value || '';
+        // Scope the de-select to THIS axis only — other axes' active states stay.
+        widget.querySelectorAll('.score-btns button').forEach(b => b.classList.remove('active'));
         e.target.classList.add('active');
-        const r = await fetch('/api/eval/conversation-labels', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ run_id: state.runId, scenario_id: state.scenarioId, axis: 'overall_quality', label, notes }),
-        }).then(x => x.json());
-        if (r.ok) {
-          if (state.view === 'scenario') showScenario(state.scenarioId);
-        } else {
-          alert('conv save failed: ' + (r.error || 'unknown'));
-        }
+        const ok = await postLabel(kind, { axis, label, notes, widget });
+        if (ok && state.view === 'scenario') showScenario(state.scenarioId);
         return;
       }
-      if (convPanel && e.target.matches('[data-conv-save]')) {
-        const active = convPanel.querySelector('.score-btns button.active');
-        if (!active) { alert('pick Pass or Fail first'); return; }
-        const label = parseInt(active.dataset.convScore, 10);
-        const notes = convPanel.querySelector('.conv-notes')?.value || '';
-        const r = await fetch('/api/eval/conversation-labels', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ run_id: state.runId, scenario_id: state.scenarioId, axis: 'overall_quality', label, notes }),
-        }).then(x => x.json());
-        if (r.ok) {
-          if (state.view === 'scenario') showScenario(state.scenarioId);
-        } else {
-          alert('conv save failed: ' + (r.error || 'unknown'));
-        }
+      // Clear an existing label on an axis row
+      if (e.target.matches('.clear-link[data-clear-label]')) {
+        const widget = e.target.closest('[data-axis-widget]');
+        if (!widget) return;
+        const axis = widget.dataset.axis;
+        const kind = widget.dataset.kind;
+        const ok = await deleteLabel(kind, { axis, widget });
+        if (ok && state.view === 'scenario') showScenario(state.scenarioId);
         return;
-      }
-      if (convPanel && e.target.matches('[data-conv-clear]')) {
-        const r = await fetch('/api/eval/conversation-labels', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ run_id: state.runId, scenario_id: state.scenarioId, axis: 'overall_quality' }),
-        }).then(x => x.json());
-        if (r.ok) {
-          if (state.view === 'scenario') showScenario(state.scenarioId);
-        } else {
-          alert('conv clear failed: ' + (r.error || 'unknown'));
-        }
-        return;
-      }
-
-      // --- Turn-level label handlers (existing behavior) ---
-      if (e.target.matches('.score-btns button')) {
-        // Auto-save on Pass/Fail click: flip the active class optimistically so the
-        // click feels instant, fire POST in background, then re-render to reconcile.
-        const turnEl = e.target.closest('.turn');
-        if (!turnEl) return;
-        const trace_id = turnEl.dataset.traceId;
-        const label = parseInt(e.target.dataset.score, 10);  // 0 = fail, 1 = pass
-        const notes = turnEl.querySelector('textarea').value;
-        turnEl.querySelectorAll('.score-btns button').forEach(b => b.classList.remove('active'));
-        e.target.classList.add('active');
-        const r = await fetch('/api/eval/labels', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ trace_id, axis: AXIS, label, notes }),
-        }).then(x => x.json());
-        if (r.ok) {
-          if (state.view === 'scenario') showScenario(state.scenarioId);
-        } else {
-          alert('save failed: ' + (r.error || 'unknown'));
-        }
-        return;
-      }
-      if (e.target.matches('.clear-link')) {
-        const turnEl = e.target.closest('.turn');
-        if (!turnEl) return;
-        const trace_id = turnEl.dataset.traceId;
-        const r = await fetch('/api/eval/labels', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ trace_id, axis: AXIS }),
-        }).then(x => x.json());
-        if (r.ok) {
-          if (state.view === 'scenario') showScenario(state.scenarioId);
-        } else {
-          alert('clear failed: ' + (r.error || 'unknown'));
-        }
       }
     });
 
-    // Notes auto-save on blur. Guards: needs an active pass/fail (notes attach to
-    // a label), and skips when value matches dataset.savedNotes — otherwise the
-    // blur fired by re-render swapping the textarea would re-POST in a loop.
-    // No re-render on success (would steal focus mid-flow); just update savedNotes.
-    document.addEventListener('focusout', async (e) => {
-      if (!e.target.matches('.score-widget textarea')) return;
-      const newVal = e.target.value;
-      if (newVal === (e.target.dataset.savedNotes ?? '')) return;
-      const turnEl = e.target.closest('.turn');
-      if (!turnEl) return;
-      const active = turnEl.querySelector('.score-btns button.active');
-      if (!active) return;
-      const trace_id = turnEl.dataset.traceId;
-      const label = parseInt(active.dataset.score, 10);
-      const r = await fetch('/api/eval/labels', {
+    async function postLabel(kind, { axis, label, notes, widget }) {
+      const endpoint = kind === 'conv' ? '/api/eval/conversation-labels' : '/api/eval/labels';
+      const body = kind === 'conv'
+        ? { run_id: state.runId, scenario_id: state.scenarioId, axis, label, notes }
+        : { run_id: state.runId, trace_id: widget.closest('.turn').dataset.traceId, axis, label, notes };
+      const r = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trace_id, axis: AXIS, label, notes: newVal }),
+        body: JSON.stringify(body),
+      }).then(x => x.json());
+      if (!r.ok) { alert('save failed: ' + (r.error || 'unknown')); return false; }
+      return true;
+    }
+    async function deleteLabel(kind, { axis, widget }) {
+      const endpoint = kind === 'conv' ? '/api/eval/conversation-labels' : '/api/eval/labels';
+      const body = kind === 'conv'
+        ? { run_id: state.runId, scenario_id: state.scenarioId, axis }
+        : { run_id: state.runId, trace_id: widget.closest('.turn').dataset.traceId, axis };
+      const r = await fetch(endpoint, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).then(x => x.json());
+      if (!r.ok) { alert('clear failed: ' + (r.error || 'unknown')); return false; }
+      return true;
+    }
+
+    // Notes auto-save on blur, axis-scoped. Same guard pattern as before — needs
+    // an active pass/fail on THIS axis row, and skips when value hasn't changed
+    // (suppresses the blur fired by re-render swapping the textarea).
+    document.addEventListener('focusout', async (e) => {
+      if (!e.target.matches('.axis-widget textarea')) return;
+      const newVal = e.target.value;
+      if (newVal === (e.target.dataset.savedNotes ?? '')) return;
+      const widget = e.target.closest('[data-axis-widget]');
+      if (!widget) return;
+      const active = widget.querySelector('.score-btns button.active');
+      if (!active) return;  // no pass/fail yet — notes attach to a label
+      const axis = widget.dataset.axis;
+      const kind = widget.dataset.kind;
+      const label = parseInt(active.dataset.score, 10);
+      const endpoint = kind === 'conv' ? '/api/eval/conversation-labels' : '/api/eval/labels';
+      const body = kind === 'conv'
+        ? { run_id: state.runId, scenario_id: state.scenarioId, axis, label, notes: newVal }
+        : { run_id: state.runId, trace_id: widget.closest('.turn').dataset.traceId, axis, label, notes: newVal };
+      const r = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
       }).then(x => x.json());
       if (r.ok) {
         e.target.dataset.savedNotes = newVal;
       } else {
         alert('notes save failed: ' + (r.error || 'unknown'));
       }
+      return;
     });
 
     showRuns();
