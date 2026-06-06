@@ -221,7 +221,8 @@ function runMigrations(db) {
       model TEXT NOT NULL,
       env_flags TEXT,
       notes TEXT,
-      source TEXT NOT NULL DEFAULT 'synthetic'    -- 'synthetic' (scenario replay) | 'production' (ingested traces)
+      source TEXT NOT NULL DEFAULT 'synthetic',   -- 'synthetic' (scenario replay) | 'production' (ingested traces)
+      archived INTEGER NOT NULL DEFAULT 0         -- 1 = hidden from runs list, read-only (e.g. prior grading-rubric eras)
     );
 
     CREATE TABLE IF NOT EXISTS eval_turn_captures (
@@ -334,6 +335,18 @@ function runMigrations(db) {
     // Backfill: existing patterns with last_confirmed != first_seen have been seen multiple times
     db.exec("UPDATE recurring_patterns SET confirmation_count = CASE WHEN last_confirmed > first_seen THEN 2 ELSE 1 END");
     console.log('Added confirmation_count to recurring_patterns');
+  }
+
+  // Migration: add archived flag to eval_runs. Run #4 is the v0 grading era
+  // (single context_carryover_quality axis, 1-5 scale) that #5 was cloned from
+  // with the new multi-axis rubric. The 44 labels there are historical signal
+  // for the judge layer but shouldn't pollute the active labeling surface.
+  try {
+    db.prepare("SELECT archived FROM eval_runs LIMIT 1").get();
+  } catch {
+    db.exec("ALTER TABLE eval_runs ADD COLUMN archived INTEGER NOT NULL DEFAULT 0");
+    db.exec("UPDATE eval_runs SET archived = 1 WHERE id = 4");
+    console.log('Added archived column to eval_runs; marked run #4 archived');
   }
 }
 

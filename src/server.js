@@ -446,6 +446,10 @@ app.get('/eval', (req, res) => {
 app.get('/api/eval/runs', (req, res) => {
   const { getDb } = require('./db');
   const db = getDb();
+  // Default hides archived runs (e.g. prior grading-rubric eras). ?show=all
+  // includes them and the UI marks them as archived inline.
+  const showArchived = req.query.show === 'all' || req.query.show === 'archived';
+  const archivedFilter = showArchived ? '' : 'WHERE r.archived = 0';
   const rows = db.prepare(`
     SELECT r.*,
       (SELECT COUNT(*) FROM eval_turn_captures WHERE run_id = r.id) AS turn_count,
@@ -459,10 +463,14 @@ app.get('/api/eval/runs', (req, res) => {
       (SELECT COUNT(*) FROM eval_turn_captures c
         WHERE c.run_id = r.id AND c.matcher_result IS NOT NULL) AS matcher_evaluated
     FROM eval_runs r
+    ${archivedFilter}
     ORDER BY r.id DESC
     LIMIT 50
   `).all();
-  res.json({ runs: rows });
+  const archivedCount = showArchived
+    ? rows.filter(r => r.archived).length
+    : db.prepare(`SELECT COUNT(*) AS n FROM eval_runs WHERE archived = 1`).get().n;
+  res.json({ runs: rows, archived_count: archivedCount });
 });
 
 // Which axes apply to a given run. Pre-v1-grading runs (id <= 4) used a single

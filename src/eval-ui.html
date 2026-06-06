@@ -52,6 +52,8 @@
     .score-btns button.fail-btn:hover { background: #fef2f2; border-color: #ef4444; }
     .score-btns button.pass-btn.active { background: #10b981; color: white; border-color: #10b981; }
     .score-btns button.fail-btn.active { background: #ef4444; color: white; border-color: #ef4444; }
+    .score-btns button.na-btn:hover { background: #f3f4f6; border-color: #9ca3af; }
+    .score-btns button.na-btn.active { background: #6b7280; color: white; border-color: #6b7280; }
     .clear-link { color: #6b7280; font-size: 11px; cursor: pointer; text-decoration: underline; margin-left: 8px; }
     .clear-link:hover { color: #991b1b; }
     .score-widget textarea, .axis-widget textarea { width: 100%; min-height: 32px; padding: 5px 7px; font-family: inherit; font-size: 12px; box-sizing: border-box; margin-top: 6px; border: 1px solid #d1d5db; border-radius: 4px; resize: vertical; }
@@ -65,6 +67,30 @@
     .axis-widget .axis-hint { color: #9ca3af; font-size: 11px; flex: 1; }
     .axis-widget.fully-active .axis-name { color: #065f46; }
     .axis-widget.fully-active .axis-hint { display: none; }
+    /* N/A-labeled axes get the same "axis resolved" affordance (hide hint, show
+       clear) but neutral colors instead of green — so dashboards reading colors
+       can tell "decided pass/fail" from "labeler marked inapplicable". */
+    .axis-widget.na-active .axis-name { color: #6b7280; }
+    .axis-widget.na-active .axis-hint { display: none; }
+    /* Archived run treatment — muted rows in the runs list and a read-only
+       banner + disabled score affordances when drilled in. */
+    .archived-row { opacity: 0.55; }
+    .archived-row:hover { opacity: 0.85; }
+    .archived-badge { display: inline-block; margin-left: 8px; padding: 1px 6px; background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; border-radius: 3px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .archived-banner { background: #fef3c7; border: 1px solid #fcd34d; color: #78350f; padding: 8px 12px; border-radius: 6px; font-size: 12px; margin-bottom: 12px; }
+    .archived-banner strong { font-weight: 700; }
+    .axis-widget.readonly .score-btns button, .axis-widget.readonly textarea, .axis-widget.readonly .clear-link { pointer-events: none; opacity: 0.6; }
+    /* ⓘ button next to each axis hint — toggles the inline definition panel.
+       Open-state per-axis is mirrored to localStorage so it survives reloads. */
+    .axis-info-btn { background: none; border: none; padding: 0 4px; cursor: pointer; color: #9ca3af; font-size: 14px; line-height: 1; }
+    .axis-info-btn:hover, .axis-info-btn.open { color: #2563eb; }
+    .axis-def { background: #f9fafb; border-left: 2px solid #e5e7eb; padding: 8px 12px; margin: 6px 0 4px 8px; font-size: 11.5px; color: #4b5563; line-height: 1.5; border-radius: 0 4px 4px 0; }
+    .axis-def-row { display: flex; gap: 10px; margin-bottom: 4px; }
+    .axis-def-row:last-child { margin-bottom: 0; }
+    .axis-def-label { font-weight: 700; min-width: 40px; font-size: 10px; letter-spacing: 0.04em; padding-top: 2px; }
+    .axis-def-label.pass { color: #047857; }
+    .axis-def-label.fail { color: #b91c1c; }
+    .axis-def-label.note { color: #6b7280; }
     .prior { font-size: 12px; color: #6b7280; margin-top: 8px; }
     details summary { cursor: pointer; color: #2563eb; font-size: 12px; margin: 4px 0; }
   </style>
@@ -78,17 +104,59 @@
     // v1 grading spec — see ~/.claude memory pulse-grading-spec.md.
     // Order is intentional (matches the spec doc) so labelers see axes in the same sequence every time.
     const TURN_AXES = [
-      { key: 'voice',            label: 'voice',      hint: 'warm, on-persona' },
-      { key: 'carryover',        label: 'carryover',  hint: 'uses established frame' },
-      { key: 'intent_executed',  label: 'intent',     hint: 'took substantive action' },
-      { key: 'formatting',       label: 'formatting', hint: 'clean SMS rendering' },
+      {
+        key: 'voice', label: 'voice', hint: 'warm, on-persona',
+        passDef: 'warm, conversational, on-persona ("plugged-in friend"). engages user as a person.',
+        failDef: 'robotic survey openers, criticism of user, meta-narration, clinical tone, formal greetings to a casual question.',
+      },
+      {
+        key: 'carryover', label: 'carryover', hint: 'uses established frame',
+        passDef: 'uses established frame (neighborhood, intent, filters, pool, last detail) without re-asking.',
+        failDef: 'forgot something user established; treated a follow-up as cold open; asked for neighborhood when one is in session.',
+      },
+      {
+        key: 'intent_executed', label: 'intent', hint: 'took substantive action',
+        passDef: 'took a substantive action — searched, gave a pick, relaxed a constraint and shipped, warmly admitted a limitation.',
+        failDef: 'bounced back with a menu / clarifying question / "what neighborhood" when it could have acted. "more" treated as disambiguation. numbered options after user already filtered.',
+        noteDef: 'fail only when agent COULD have acted. genuine cold opens with zero signal ("hey") pass.',
+      },
+      {
+        key: 'formatting', label: 'formatting', hint: 'clean SMS rendering',
+        passDef: 'renders correctly in SMS — clean prose, sensible line breaks, no markdown, length right for one text.',
+        failDef: 'asterisks-meant-as-bold rendering literally, dense walls of text, JSON-y artifacts.',
+      },
     ];
     const CONV_AXES = [
-      { key: 'reached_goal',          label: 'reached goal',         hint: 'user got actionable answer' },
-      { key: 'voice_held',            label: 'voice held',           hint: 'no unrepaired persona break' },
-      { key: 'coherent_arc',          label: 'coherent arc',         hint: 'each turn built on prior' },
-      { key: 'recovered_when_stuck',  label: 'recovered when stuck', hint: 'just-do-something rule' },
-      { key: 'user_kept_going',       label: 'user kept going',      hint: 'engagement signal' },
+      {
+        key: 'reached_goal', label: 'reached goal', hint: 'user got actionable answer',
+        passDef: 'user got a concrete pick (venue + time, link, asked details on #2). "said thanks" counts.',
+        failDef: 'user left without an actionable answer (kept polling, gave up, agent admitted it couldn\'t help and ended).',
+        noteDef: 'a single bad turn doesn\'t fail this. polite "no comedy, want music?" → user yes → pick still passes.',
+      },
+      {
+        key: 'voice_held', label: 'voice held', hint: 'no unrepaired persona break',
+        passDef: 'no persona break that wasn\'t repaired later in the same conversation.',
+        failDef: 'at least one persona break that didn\'t get recovered (slow drift into survey mode, etc.).',
+        noteDef: 'different from turn-level voice — this is about whether the agent came back from a bad turn.',
+      },
+      {
+        key: 'coherent_arc', label: 'coherent arc', hint: 'each turn built on prior',
+        passDef: 'conversation built — each turn referenced or extended what came before.',
+        failDef: 'at least one reset point where the agent started over or treated a follow-up as cold open.',
+        noteDef: 'macro version of carryover. catches "the thread was a series of cold opens."',
+      },
+      {
+        key: 'recovered_when_stuck', label: 'recovered when stuck', hint: 'just-do-something rule',
+        passDef: 'when stuck (empty results, ambiguity, search miss), took a credible action — relaxed constraint and shipped, gave best-guess, admitted outage, pivoted on user\'s behalf.',
+        failDef: 'when stuck, bounced back to a multiple-choice menu / "what neighborhood are you in" at any point.',
+        noteDef: 'the "just do something" rule across whole conversations.',
+      },
+      {
+        key: 'user_kept_going', label: 'user kept going', hint: 'engagement signal',
+        passDef: 'user stayed engaged — sent substantive messages, escalated requests, came back for details.',
+        failDef: 'user disengaged — terse one-word follow-ups in second half, long silence, "nvm" close.',
+        noteDef: 'strongest proxy for "was this worth the user\'s time?" combined with reached_goal, separates "Pulse failed but user pushed through" from "user bailed early."',
+      },
     ];
     const state = { view: 'runs', runId: null, scenarioId: null, run: null };
 
@@ -96,11 +164,16 @@
     // click handler knows which endpoint to POST to. `priorLabels` is the list
     // already scoped to this row (the current trace or scenario); we pick the
     // entry matching `axisKey` to drive the active button + textarea value.
-    function renderAxisWidget({ axisKey, label, hint, kind, priorLabels }) {
+    function renderAxisWidget({ axisKey, label, hint, passDef, failDef, noteDef, kind, priorLabels, readonly }) {
       const mine = priorLabels.find(l => l.axis === axisKey);
       const score = mine ? mine.label : null;
       const notes = mine ? (mine.notes || '') : '';
-      const hasLabel = score === 0 || score === 1;
+      // score is one of: null (unlabeled), 1 (pass), 0 (fail), -1 (N/A).
+      // hasLabel drives the saved/clear affordances and the "axis resolved"
+      // widget class. fully-active vs na-active distinguishes the two graded
+      // states so the green-name treatment is reserved for actual pass/fail.
+      const hasLabel = score === -1 || score === 0 || score === 1;
+      const stateClass = score === -1 ? 'na-active' : (hasLabel ? 'fully-active' : '');
       const passBtn = _el('button', {
         class: 'pass-btn' + (score === 1 ? ' active' : ''),
         dataset: { score: '1' },
@@ -109,6 +182,11 @@
         class: 'fail-btn' + (score === 0 ? ' active' : ''),
         dataset: { score: '0' },
       }, '✗');
+      const naBtn = _el('button', {
+        class: 'na-btn' + (score === -1 ? ' active' : ''),
+        dataset: { score: '-1' },
+        title: 'not applicable to this turn / conversation',
+      }, '—');
       const saved = _el('span', {
         class: 'saved',
         style: 'display:' + (hasLabel ? 'inline' : 'none'),
@@ -119,17 +197,55 @@
       });
       notesArea.value = notes;
       notesArea.dataset.savedNotes = notes;
+
+      // Definition panel — Pass / Fail / optional Note rows pulled from the
+      // pulse-grading-spec. Per-axis open-state persists in localStorage so the
+      // labeler can pin definitions open for axes they're still calibrating on
+      // and have them stay open across reloads / scenario navigation.
+      const defStorageKey = `axisDef:${axisKey}`;
+      const defOpen = localStorage.getItem(defStorageKey) === '1';
+      const defRows = [
+        _el('div', { class: 'axis-def-row' },
+          _el('span', { class: 'axis-def-label pass' }, 'PASS'),
+          _el('span', {}, passDef || '')),
+        _el('div', { class: 'axis-def-row' },
+          _el('span', { class: 'axis-def-label fail' }, 'FAIL'),
+          _el('span', {}, failDef || '')),
+      ];
+      if (noteDef) {
+        defRows.push(_el('div', { class: 'axis-def-row' },
+          _el('span', { class: 'axis-def-label note' }, 'NOTE'),
+          _el('span', {}, noteDef)));
+      }
+      const defPanel = _el('div', {
+        class: 'axis-def',
+        style: 'display:' + (defOpen ? 'block' : 'none'),
+      }, ...defRows);
+      const infoBtn = _el('button', {
+        class: 'axis-info-btn' + (defOpen ? ' open' : ''),
+        title: 'show definition',
+        onclick: (e) => {
+          e.stopPropagation();
+          const isOpen = defPanel.style.display !== 'none';
+          defPanel.style.display = isOpen ? 'none' : 'block';
+          localStorage.setItem(defStorageKey, isOpen ? '0' : '1');
+          infoBtn.classList.toggle('open', !isOpen);
+        },
+      }, 'ⓘ');
+
       return _el('div', {
-        class: 'axis-widget' + (hasLabel ? ' fully-active' : ''),
+        class: 'axis-widget' + (stateClass ? ' ' + stateClass : '') + (readonly ? ' readonly' : ''),
         dataset: { axisWidget: '1', axis: axisKey, kind },
       },
         _el('div', { class: 'axis-header' },
           _el('span', { class: 'axis-name' }, label),
           _el('span', { class: 'axis-hint' }, hint),
-          _el('span', { class: 'score-btns' }, passBtn, failBtn),
+          infoBtn,
+          _el('span', { class: 'score-btns' }, passBtn, failBtn, naBtn),
           saved,
           clearLink,
         ),
+        defPanel,
         notesArea,
       );
     }
@@ -194,18 +310,26 @@
       );
     }
 
-    async function showRuns() {
+    async function showRuns(opts = {}) {
       state.view = 'runs';
+      if (opts.showArchived !== undefined) state.showArchived = !!opts.showArchived;
       _replaceChildren(document.getElementById('crumbs'), document.createTextNode('Runs'));
-      const r = await fetch('/api/eval/runs').then(x => x.json());
+      const url = '/api/eval/runs' + (state.showArchived ? '?show=archived' : '');
+      const r = await fetch(url).then(x => x.json());
       const tbody = _el('tbody');
       if (!r.runs.length) {
         tbody.append(_el('tr', {}, _el('td', { colspan: 8, style: 'color:#6b7280' },
           'No runs yet. Run ', _el('code', {}, 'npm run eval:carryover'), '.')));
       } else {
         for (const run of r.runs) {
-          tbody.append(_el('tr', { class: 'runrow', onclick: () => showRun(run.id) },
-            _el('td', {}, `#${run.id}`),
+          const isArchived = !!run.archived;
+          tbody.append(_el('tr', {
+            class: 'runrow' + (isArchived ? ' archived-row' : ''),
+            onclick: () => showRun(run.id),
+            title: isArchived ? 'archived run — read-only' : '',
+          },
+            _el('td', {}, `#${run.id}`,
+              isArchived ? _el('span', { class: 'archived-badge' }, 'archived') : null),
             _el('td', {}, _el('span', {
               class: 'badge ' + (run.source === 'production' ? 'pass' : 'none'),
             }, run.source || 'synthetic')),
@@ -224,7 +348,18 @@
         )),
         tbody,
       );
-      _replaceChildren(document.getElementById('view'), table);
+      // Archived-runs toggle. Hidden by default — these are prior grading-rubric
+      // eras kept for historical signal, not active labeling work.
+      const archivedToggle = r.archived_count > 0 || state.showArchived
+        ? _el('div', { style: 'margin-top:12px; font-size:12px; color:#6b7280;' },
+            _el('a', {
+              onclick: () => showRuns({ showArchived: !state.showArchived }),
+              style: 'color:#2563eb; cursor:pointer;',
+            }, state.showArchived
+              ? 'hide archived runs'
+              : `show ${r.archived_count} archived run${r.archived_count === 1 ? '' : 's'}`))
+        : null;
+      _replaceChildren(document.getElementById('view'), table, archivedToggle);
     }
 
     async function showRun(runId, opts = {}) {
@@ -381,7 +516,12 @@
         )),
         tbody,
       );
-      _replaceChildren(document.getElementById('view'), progressCard, meta, table);
+      const archivedBanner = r.run.archived
+        ? _el('div', { class: 'archived-banner' },
+            _el('strong', {}, 'Archived run — read-only.'),
+            ' Prior grading-rubric era; labels here use the legacy single-axis schema and are preserved for historical signal. Active labeling work happens on the latest non-archived run.')
+        : null;
+      _replaceChildren(document.getElementById('view'), archivedBanner, progressCard, meta, table);
     }
 
     // Live filter on scenarios table — hides rows whose data-search blob
@@ -489,15 +629,26 @@
       const convPriorLabels = Object.entries(convLabelMap).map(([axis, v]) => ({
         axis, label: v.label, notes: v.notes,
       }));
+      // user_kept_going measures real-user engagement signal — meaningless on
+      // synthetic scenario replays where the user side is scripted and sends
+      // whatever the scenario dictates regardless of Pulse's response quality.
+      // Hide it entirely for synthetic source rather than ask the labeler to
+      // mark it N/A on every synthetic conversation.
+      const isSynthetic = scenarioMeta.source === 'synthetic';
+      const isReadonly = !!state.run?.run?.archived;
+      const visibleConvAxes = isSynthetic
+        ? CONV_AXES.filter(a => a.key !== 'user_kept_going')
+        : CONV_AXES;
       const convPanel = _el('div', {
         dataset: { convPanel: '1' },
         style: 'background:#fafafa; border:1px solid #e5e7eb; border-radius:6px; padding:10px 14px; margin-bottom:14px;',
       },
         _el('div', { style: 'font-size:11px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;' },
-          'Conversation overall — 5 binaries'),
-        ...CONV_AXES.map(a => renderAxisWidget({
-          axisKey: a.key, label: a.label, hint: a.hint, kind: 'conv',
-          priorLabels: convPriorLabels,
+          `Conversation overall — ${visibleConvAxes.length} binaries`),
+        ...visibleConvAxes.map(a => renderAxisWidget({
+          axisKey: a.key, label: a.label, hint: a.hint,
+          passDef: a.passDef, failDef: a.failDef, noteDef: a.noteDef,
+          kind: 'conv', priorLabels: convPriorLabels, readonly: isReadonly,
         })),
       );
 
@@ -527,7 +678,12 @@
       const grid = _el('div', { class: 'scenario-grid' }, chatCol, detailCol);
       const prevChatScroll = isRefresh ? (document.querySelector('.chat-col')?.scrollTop ?? 0) : 0;
       const prevDetailScroll = isRefresh ? (document.querySelector('.detail-col')?.scrollTop ?? 0) : 0;
-      _replaceChildren(document.getElementById('view'), titleBar, convPanel, grid);
+      const archivedBanner = isReadonly
+        ? _el('div', { class: 'archived-banner' },
+            _el('strong', {}, 'Archived run — read-only.'),
+            ' Labels here are the legacy single-axis schema (v0 grading). Toggle ⓘ on each axis to read the v1 spec, but you can\'t score from this view.')
+        : null;
+      _replaceChildren(document.getElementById('view'), archivedBanner, titleBar, convPanel, grid);
       if (isRefresh) {
         const newChat = document.querySelector('.chat-col');
         const newDetail = document.querySelector('.detail-col');
@@ -664,16 +820,28 @@
       );
       const scoreWidget = _el('div', { class: 'score-widget' },
         ...TURN_AXES.map(a => renderAxisWidget({
-          axisKey: a.key, label: a.label, hint: a.hint, kind: 'turn',
-          priorLabels: priorLabelsForTrace,
+          axisKey: a.key, label: a.label, hint: a.hint,
+          passDef: a.passDef, failDef: a.failDef, noteDef: a.noteDef,
+          kind: 'turn', priorLabels: priorLabelsForTrace,
+          readonly: !!state.run?.run?.archived,
         })),
       );
 
+      // Full prior-run notes (not the old 40-char truncation). v0 grading-era
+      // labels carry the most useful signal in their notes — these are the
+      // labeler critiques that motivated the v1 axis rubric. Surface them at
+      // full length so v1 labeling can lean on the prior thinking directly.
       const priorBlock = otherPrior.length
         ? _el('div', { class: 'prior' },
-          'Previous labels: ' + otherPrior.map(p =>
-            `run #${p.run_id} → ${p.label}` + (p.notes ? ` ("${p.notes.slice(0, 40)}")` : '')
-          ).join(', '))
+            _el('div', { style: 'font-weight:600; margin-bottom:4px;' }, 'Previous labels:'),
+            ...otherPrior.map(p =>
+              _el('div', { style: 'margin:3px 0 6px 8px;' },
+                _el('span', { style: 'color:#374151; font-weight:500;' }, `run #${p.run_id} → ${p.label}`),
+                _el('span', { style: 'color:#9ca3af; margin-left:4px; font-size:11px;' }, `(${p.axis})`),
+                p.notes
+                  ? _el('div', { style: 'color:#4b5563; font-style:italic; margin-left:6px; margin-top:2px; white-space:pre-wrap;' }, `"${p.notes}"`)
+                  : null,
+              )))
         : null;
 
       const turn = _el('div', {
@@ -694,6 +862,12 @@
     // We read both off the wrapping widget rather than tracking state globally,
     // so a single delegated listener can service all axes on both layers.
     document.addEventListener('click', async (e) => {
+      // Archived runs are read-only — score clicks and clear links are no-ops.
+      // The widgets are also visually disabled via .readonly, this is the
+      // belt-and-suspenders behavioral guard.
+      if (state.run?.run?.archived && (e.target.matches('.score-btns button[data-score]') || e.target.matches('.clear-link[data-clear-label]'))) {
+        return;
+      }
       // Pass / Fail on any axis row
       if (e.target.matches('.score-btns button[data-score]')) {
         const widget = e.target.closest('[data-axis-widget]');
@@ -768,6 +942,7 @@
     // (suppresses the blur fired by re-render swapping the textarea).
     document.addEventListener('focusout', async (e) => {
       if (!e.target.matches('.axis-widget textarea')) return;
+      if (state.run?.run?.archived) return;  // archived runs are read-only
       const newVal = e.target.value;
       if (newVal === (e.target.dataset.savedNotes ?? '')) return;
       const widget = e.target.closest('[data-axis-widget]');
