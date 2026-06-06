@@ -51,10 +51,13 @@ function extractSkintSections(html) {
 
     entry.find('p').each((i, el) => {
       const text = $(el).text().trim();
-      if (!text || text.length < 10) return;
-      if (text.toLowerCase().startsWith('sponsored')) return;
+      if (!text) return;
 
-      // Day header starts a new section
+      // Day header starts a new section. Must run BEFORE the length filter
+      // because Skint's current format uses bare-word day labels ("friday",
+      // "saturday", etc.) all under the 10-char minimum applied to event text.
+      // The original ordering silently collapsed every post into one 'intro'
+      // chunk and stripped the date context the LLM extractor relies on.
       if (dayHeaderPattern.test(text)) {
         if (currentSection && currentSection.paragraphs.length > 0) {
           sections.push(currentSection);
@@ -66,6 +69,9 @@ function extractSkintSections(html) {
         };
         return;
       }
+
+      if (text.length < 10) return;
+      if (text.toLowerCase().startsWith('sponsored')) return;
 
       if (!currentSection) {
         currentSection = { label: 'intro', postHeading, paragraphs: [] };
@@ -244,4 +250,4 @@ async function fetchSkintOngoingEvents() {
   }
 }
 
-module.exports = { fetchSkintEvents, fetchSkintOngoingEvents };
+module.exports = { fetchSkintEvents, fetchSkintOngoingEvents, extractSkintSections };

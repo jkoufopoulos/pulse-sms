@@ -51,3 +51,37 @@ const comedyEvent = normalizeExtractedEvent({ name: 'Stand Up', category: 'comed
 check('comedy category unchanged', comedyEvent.category === 'comedy');
 const noCategory = normalizeExtractedEvent({ name: 'Some Event', venue_name: 'Somewhere', date_local: '2026-03-05' }, 'TestSource', 'primary', 0.8);
 check('missing category defaults to other', noCategory.category === 'other');
+
+// ---- Skint: bare-word day-header section split ----
+// Skint's live HTML uses single-word day headers ("friday", "saturday", etc.)
+// inside <p> tags. extractSkintSections must split on these BEFORE applying its
+// short-paragraph filter — otherwise the day labels (6-8 chars) get silently
+// dropped and the entire post collapses into a single 'intro' chunk, stripping
+// the date context the LLM extractor relies on.
+console.log('\nSkint day-header parsing:');
+const { extractSkintSections } = require('../../src/sources/skint');
+
+const skintFixtureHtml = `<article>
+  <h2 class="entry-title">FRI-MON, 6/5-8: SKINT WEEKEND</h2>
+  <div class="entry-content">
+    <p>cultural fests and events this weekend, free admission unless noted:</p>
+    <p>friday</p>
+    <p>fri thru 1/10/2027: guggenheim pop 1960 to now exploring the museum</p>
+    <p>saturday</p>
+    <p>sat 6/14 motor company writers lab reading series 5 playwrights</p>
+    <p>sunday</p>
+    <p>sun 9/27 yoga at socrates sculpture park free admission</p>
+  </div>
+</article>`;
+
+const skintSections = extractSkintSections(skintFixtureHtml);
+const skintLabels = skintSections.map(s => s.label);
+check('skint splits into 4 sections (intro + 3 day sections)', skintSections.length === 4);
+check('skint sections include "intro"', skintLabels.includes('intro'));
+check('skint sections include "friday"', skintLabels.includes('friday'));
+check('skint sections include "saturday"', skintLabels.includes('saturday'));
+check('skint sections include "sunday"', skintLabels.includes('sunday'));
+const friSection = skintSections.find(s => s.label === 'friday');
+check('skint friday section has guggenheim paragraph', friSection?.paragraphs?.[0]?.includes('guggenheim'));
+const introSection = skintSections.find(s => s.label === 'intro');
+check('skint friday content not bleeding into intro', !introSection?.paragraphs?.join(' ')?.includes('guggenheim'));
