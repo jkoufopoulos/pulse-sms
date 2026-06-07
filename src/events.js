@@ -9,7 +9,7 @@ const { eventMatchesFilters, failsTimeGate } = require('./pipeline');
 const { computeCompleteness, backfillEvidence, backfillDateTimes } = require('./sources/shared');
 const { captureExtractionInput, getExtractionInputs, clearExtractionInputs } = require('./extraction-capture');
 const { checkBaseline } = require('./scrape-guard');
-const { recordStage, latestRunIdForSource } = require('./scrape-telemetry');
+const { recordStage } = require('./scrape-telemetry');
 const { checkInvariants } = require('./scrape-invariants');
 
 // ============================================================
@@ -518,11 +518,14 @@ async function timedFetch(fetchFn, label, weight) {
       if (e.completeness === undefined) e.completeness = computeCompleteness(e);
       if (e.extraction_confidence === undefined) e.extraction_confidence = null;
     }
-    return { events, durationMs, status: events.length > 0 ? 'ok' : 'empty', error: null };
+    // Forward the scrape run id stamped by instrumented sources (if any). Lets
+    // the merge phase attach its stage record to THIS run rather than guessing
+    // via latestRunIdForSource — which races with concurrent scrape processes.
+    return { events, runId: events.__scrapeRunId ?? null, durationMs, status: events.length > 0 ? 'ok' : 'empty', error: null };
   } catch (err) {
     const durationMs = Date.now() - start;
     const status = err.name === 'AbortError' || err.message?.includes('timeout') ? 'timeout' : 'error';
-    return { events: [], durationMs, status, error: err.message };
+    return { events: [], runId: null, durationMs, status, error: err.message };
   }
 }
 
@@ -712,9 +715,11 @@ async function refreshCache() {
     }
     const skintAfterGeo = countSkint(validEvents);
 
-    // Record the merge stage for any instrumented source. latestRunIdForSource
-    // returns null for non-instrumented sources so this is a no-op for them.
-    const skintRunId = latestRunIdForSource('Skint');
+    // Record the merge stage for any instrumented source. fetchMap carries
+    // the runId stamped by the source's startRun call so we attach to the
+    // EXACT run we just merged (no concurrent-scrape race). Returns null for
+    // sources not yet instrumented, making this a no-op for them.
+    const skintRunId = fetchMap['Skint']?.runId ?? null;
     if (skintRunId) {
       recordStage(skintRunId, 'merge', {
         events_in: skintAfterPerSource,

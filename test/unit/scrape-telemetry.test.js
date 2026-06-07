@@ -30,6 +30,14 @@ check('fetch stage carries metrics', fetchMetrics.status_code === 200 && fetchMe
 
 check('latestRunIdForSource returns this run', latestRunIdForSource(probeSource) === runId);
 
+// runId threading: a source-fn result tagged with __scrapeRunId must propagate
+// through timedFetch (the merge phase uses fetchMap[label].runId for stage
+// recording — concurrent scrapes from sibling processes would otherwise race).
+const taggedEvents = [];
+Object.defineProperty(taggedEvents, '__scrapeRunId', { value: runId, enumerable: false });
+check('non-enumerable runId hidden from JSON', JSON.stringify(taggedEvents) === '[]');
+check('non-enumerable runId readable directly', taggedEvents.__scrapeRunId === runId);
+
 // Clean up
 db.prepare('DELETE FROM scrape_stages WHERE run_id = ?').run(runId);
 db.prepare('DELETE FROM scrape_runs WHERE id = ?').run(runId);

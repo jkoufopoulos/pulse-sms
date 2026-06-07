@@ -221,11 +221,18 @@ async function fetchSkintEvents() {
 
     console.log(`Skint: ${allEvents.length} total events (LLM)`);
     endRun(runId, allEvents.length > 0 ? 'ok' : 'empty', allEvents.length);
+    // Attach the run id as a non-enumerable property so the caller (timedFetch
+    // -> refreshCache) can associate downstream merge/cache stages with THIS
+    // run rather than guessing via latestRunIdForSource — which races under
+    // concurrent scrapes from sibling processes.
+    if (runId) Object.defineProperty(allEvents, '__scrapeRunId', { value: runId, enumerable: false });
     return allEvents;
   } catch (err) {
     console.error('Skint error:', err.message);
     endRun(runId, 'error', 0, err.message);
-    return [];
+    const empty = [];
+    if (runId) Object.defineProperty(empty, '__scrapeRunId', { value: runId, enumerable: false });
+    return empty;
   }
 }
 
