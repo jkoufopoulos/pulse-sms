@@ -13,6 +13,7 @@ require('./unit/pipeline.test');
 require('./unit/ai.test');
 require('./unit/curation.test');
 require('./unit/scrapers.test');
+require('./unit/scrape-telemetry.test');
 require('./unit/db.test');
 require('./unit/agent-brain.test');
 require('./unit/model-config.test');

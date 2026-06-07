@@ -682,6 +682,48 @@ app.post('/api/eval/labels', (req, res) => {
 
 } // end PULSE_TEST_MODE gate for carryover eval workspace
 
+// --- Data-health workbench (v1 observability slice) ---
+// Read-only view onto the scrape_runs / scrape_stages / scrape_invariants
+// tables. PULSE_TEST_MODE-gated for the same reason as /eval — local dev tool.
+if (process.env.PULSE_TEST_MODE === 'true') {
+
+app.get('/data-health', (req, res) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
+  res.sendFile(require('path').join(__dirname, 'data-health-ui.html'));
+});
+
+app.get('/api/data-health/runs', (req, res) => {
+  const { getDb } = require('./db');
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT r.*,
+      (SELECT COUNT(*) FROM scrape_invariants WHERE run_id = r.id) AS invariants_checked,
+      (SELECT COUNT(*) FROM scrape_invariants WHERE run_id = r.id AND passed = 0) AS invariants_failed
+    FROM scrape_runs r
+    ORDER BY r.id DESC
+    LIMIT 50
+  `).all();
+  res.json({ runs: rows });
+});
+
+app.get('/api/data-health/runs/:id', (req, res) => {
+  const { getDb } = require('./db');
+  const db = getDb();
+  const run = db.prepare(`SELECT * FROM scrape_runs WHERE id = ?`).get(req.params.id);
+  if (!run) return res.status(404).json({ error: 'run not found' });
+  const stages = db.prepare(`
+    SELECT stage_name, duration_ms, metrics_json, started_at
+    FROM scrape_stages WHERE run_id = ? ORDER BY id
+  `).all(req.params.id);
+  const invariants = db.prepare(`
+    SELECT name, passed, value, threshold, message, checked_at
+    FROM scrape_invariants WHERE run_id = ? ORDER BY id
+  `).all(req.params.id);
+  res.json({ run, stages, invariants });
+});
+
+} // end PULSE_TEST_MODE gate for data-health workbench
+
 // --- Test mode: SMS simulator + mutating APIs ---
 if (process.env.PULSE_TEST_MODE === 'true') {
   app.get('/test', (req, res) => {

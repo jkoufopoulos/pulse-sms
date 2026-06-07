@@ -258,6 +258,49 @@ function runMigrations(db) {
       UNIQUE(run_id, scenario_id)
     );
 
+    -- Per-scrape-run telemetry. One row per source per scrape pass. The pipeline
+    -- writes a row on startRun, updates it on endRun. Stages are normalized into
+    -- scrape_stages below so we can query per-stage metrics without parsing JSON.
+    -- This is the "did the scrape actually do what we think it did?" surface.
+    CREATE TABLE IF NOT EXISTS scrape_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      completed_at TEXT,
+      status TEXT NOT NULL DEFAULT 'running',  -- 'running' | 'ok' | 'error' | 'empty' | 'quarantined'
+      events_returned INTEGER,                 -- final count returned from the source fn
+      error_message TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_scrape_runs_source_time ON scrape_runs(source, started_at DESC);
+
+    -- One row per stage within a scrape run. metrics_json holds stage-specific
+    -- fields (fetch: status/bytes/latency; parse: sections/paragraphs; llm: calls/cost;
+    -- merge: events_surviving_each_filter; cache: events_in_serving_window).
+    CREATE TABLE IF NOT EXISTS scrape_stages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id INTEGER NOT NULL REFERENCES scrape_runs(id),
+      stage_name TEXT NOT NULL,                -- 'fetch' | 'parse' | 'llm_extract' | 'normalize' | 'merge' | 'cache'
+      started_at TEXT NOT NULL,
+      duration_ms INTEGER,
+      metrics_json TEXT                        -- JSON blob with stage-specific metrics
+    );
+    CREATE INDEX IF NOT EXISTS idx_scrape_stages_run ON scrape_stages(run_id, stage_name);
+
+    -- Per-run invariant check results. One row per (run, invariant). Failures
+    -- trigger a Resend alert via the existing sendRuntimeAlert path.
+    CREATE TABLE IF NOT EXISTS scrape_invariants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id INTEGER NOT NULL REFERENCES scrape_runs(id),
+      source TEXT NOT NULL,
+      name TEXT NOT NULL,                      -- 'output_variance' | 'date_freshness' | etc.
+      passed INTEGER NOT NULL,                 -- 0 or 1
+      value REAL,                              -- the measured value
+      threshold REAL,                          -- the gate threshold
+      message TEXT,
+      checked_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_invariants_run ON scrape_invariants(run_id, name);
+
     CREATE TABLE IF NOT EXISTS places (
       place_id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -347,6 +390,22 @@ function runMigrations(db) {
     db.exec("ALTER TABLE eval_runs ADD COLUMN archived INTEGER NOT NULL DEFAULT 0");
     db.exec("UPDATE eval_runs SET archived = 1 WHERE id = 4");
     console.log('Added archived column to eval_runs; marked run #4 archived');
+  }
+
+  // Migration: add scrape_run_id provenance to scraped_events + events. Lets us
+  // trace any event in the cache back to the specific scrape pass that produced
+  // it — required to answer "did this user's pick come from a healthy scrape?"
+  try {
+    db.prepare("SELECT scrape_run_id FROM scraped_events LIMIT 1").get();
+  } catch {
+    db.exec("ALTER TABLE scraped_events ADD COLUMN scrape_run_id INTEGER");
+    console.log('Added scrape_run_id to scraped_events');
+  }
+  try {
+    db.prepare("SELECT scrape_run_id FROM events LIMIT 1").get();
+  } catch {
+    db.exec("ALTER TABLE events ADD COLUMN scrape_run_id INTEGER");
+    console.log('Added scrape_run_id to events');
   }
 }
 
@@ -940,12 +999,12 @@ function insertScrapedEvents(events, scrapedDate) {
       event_id, scraped_date, source_name, name, venue_name, neighborhood,
       date_local, start_time_local, category, subcategory, is_free, price_display,
       source_weight, extraction_confidence, completeness, description_short,
-      source_url, ticket_url, editorial_note, data_json, created_at
+      source_url, ticket_url, editorial_note, data_json, created_at, scrape_run_id
     ) VALUES (
       @event_id, @scraped_date, @source_name, @name, @venue_name, @neighborhood,
       @date_local, @start_time_local, @category, @subcategory, @is_free, @price_display,
       @source_weight, @extraction_confidence, @completeness, @description_short,
-      @source_url, @ticket_url, @editorial_note, @data_json, @created_at
+      @source_url, @ticket_url, @editorial_note, @data_json, @created_at, @scrape_run_id
     )
   `);
 
@@ -980,6 +1039,7 @@ function insertScrapedEvents(events, scrapedDate) {
     editorial_note: e.editorial_note || null,
     data_json: JSON.stringify(e),
     created_at: now,
+    scrape_run_id: e.scrape_run_id ?? null,  // propagated from per-source telemetry hook
   }));
 
   const inserted = tx(rows);

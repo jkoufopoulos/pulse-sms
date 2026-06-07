@@ -9,6 +9,8 @@ const { eventMatchesFilters, failsTimeGate } = require('./pipeline');
 const { computeCompleteness, backfillEvidence, backfillDateTimes } = require('./sources/shared');
 const { captureExtractionInput, getExtractionInputs, clearExtractionInputs } = require('./extraction-capture');
 const { checkBaseline } = require('./scrape-guard');
+const { recordStage, latestRunIdForSource } = require('./scrape-telemetry');
+const { checkInvariants } = require('./scrape-invariants');
 
 // ============================================================
 // Category remap + canonicalization (must be above boot code)
@@ -632,12 +634,22 @@ async function refreshCache() {
       console.warn(`[SCRAPE-GUARD] ${sourcesQuarantined} source(s) quarantined this scrape`);
     }
 
+    // Per-source merge-survival captures for the observability slice. v1 tracks
+    // Skint only (the source currently instrumented end-to-end); the pattern
+    // generalizes by source label. Each value is the count of events from that
+    // source surviving each merge gate, recorded as a 'merge' stage on the
+    // matching scrape run after the NYC bounds gate completes below.
+    const SKINT_SOURCE_NAME = 'theskint';
+    const countSkint = (arr) => arr.filter(e => e.source_name === SKINT_SOURCE_NAME).length;
+    const skintAfterPerSource = countSkint(allEvents);
+
     // Secondary dedup: merge near-duplicates at same venue + date + time + category
     const beforeVenueDedup = allEvents.length;
     const venueDedupedEvents = deduplicateByVenueSlot(allEvents);
     if (venueDedupedEvents.length < beforeVenueDedup) {
       console.log(`Venue-slot dedup: removed ${beforeVenueDedup - venueDedupedEvents.length} near-duplicates`);
     }
+    const skintAfterVenueDedup = countSkint(venueDedupedEvents);
 
     // Filter out stale/far-future events and kids events at scrape time
     // Include yesterday so Friday newsletter events survive Saturday's scrape;
@@ -649,7 +661,9 @@ async function refreshCache() {
       const active = isEventInDateRange(e, yesterday, monthOut);
       return active === null ? true : active; // keep undated events (perennials, venues)
     });
+    const skintAfterDate = countSkint(dateFiltered);
     let validEvents = filterKidsEvents(dateFiltered);
+    const skintAfterKids = countSkint(validEvents);
     const staleCount = venueDedupedEvents.length - dateFiltered.length;
     const kidsCount = dateFiltered.length - validEvents.length;
     if (staleCount > 0 || kidsCount > 0) {
@@ -696,6 +710,21 @@ async function refreshCache() {
       const breakdown = Object.entries(droppedBySource).map(([s, n]) => `${s}:${n}`).join(', ');
       console.log(`Geo gate: dropped ${geoDropped} out-of-NYC events (${breakdown})`);
     }
+    const skintAfterGeo = countSkint(validEvents);
+
+    // Record the merge stage for any instrumented source. latestRunIdForSource
+    // returns null for non-instrumented sources so this is a no-op for them.
+    const skintRunId = latestRunIdForSource('Skint');
+    if (skintRunId) {
+      recordStage(skintRunId, 'merge', {
+        events_in: skintAfterPerSource,
+        after_venue_dedup: skintAfterVenueDedup,
+        after_date_filter: skintAfterDate,
+        after_kids_filter: skintAfterKids,
+        after_geo_gate: skintAfterGeo,
+        geo_dropped: droppedBySource[SKINT_SOURCE_NAME] || 0,
+      });
+    }
 
     // Persist learned venues to disk for next restart
     const learned = exportLearnedVenues();
@@ -741,6 +770,21 @@ async function refreshCache() {
 
       cacheTimestamp = Date.now();
       console.log(`SQLite: ${validEvents.length} events stored, serving ${eventCache.length} (${dbEvents.length} scraped + ${freshOccurrences.length} recurring)`);
+
+      // Telemetry: cache stage — count of source events surviving into the
+      // 7-day serving window. This is the last gate before users see anything.
+      if (skintRunId) {
+        const skintInCache = eventCache.filter(e => e.source_name === SKINT_SOURCE_NAME).length;
+        recordStage(skintRunId, 'cache', {
+          source_events_in_cache: skintInCache,
+          total_cache_size: eventCache.length,
+        });
+        // Run invariants after the cache stage is recorded so editorial_share
+        // and survival_rate have the data they need. Fire-and-forget — alert
+        // delivery shouldn't block the scrape from completing.
+        checkInvariants(skintRunId, 'Skint').catch(err =>
+          console.warn('[invariants] check failed:', err.message));
+      }
     } catch (err) {
       // SQLite failed — fall back to 7-day in-memory cache
       console.warn('SQLite write failed, using in-memory cache:', err.message);

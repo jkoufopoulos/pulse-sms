@@ -3,6 +3,7 @@ const { extractEvents } = require('../ai');
 const { FETCH_HEADERS, normalizeExtractedEvent } = require('./shared');
 const { captureExtractionInput } = require('../extraction-capture');
 const { getCachedExtraction, setCachedExtraction } = require('../extraction-cache');
+const { startRun, recordStage, endRun } = require('../scrape-telemetry');
 
 /**
  * Get NYC date context.
@@ -101,22 +102,40 @@ function extractSkintSections(html) {
 
 async function fetchSkintEvents() {
   console.log('Fetching The Skint...');
+  // Telemetry: one run per scrape, with per-stage metrics + run_id stamped on
+  // each returned event so the merge phase can persist provenance. Failure to
+  // record telemetry never blocks the scrape (see scrape-telemetry.js guards).
+  const runId = startRun('Skint');
   try {
+    const fetchStart = Date.now();
     const res = await fetch('https://theskint.com/', {
       headers: FETCH_HEADERS,
       signal: AbortSignal.timeout(10000),
     });
+    const fetchMs = Date.now() - fetchStart;
 
     if (!res.ok) {
+      recordStage(runId, 'fetch', { status_code: res.status, ok: false }, fetchMs);
       console.error(`Skint fetch failed: ${res.status}`);
+      endRun(runId, 'error', 0, `HTTP ${res.status}`);
       return [];
     }
 
     const html = await res.text();
+    recordStage(runId, 'fetch', { status_code: res.status, ok: true, bytes: html.length }, fetchMs);
+
+    const parseStart = Date.now();
     const sections = extractSkintSections(html);
+    const paragraphsTotal = sections.reduce((a, s) => a + s.paragraphs.length, 0);
+    recordStage(runId, 'parse', {
+      sections: sections.length,
+      paragraphs_total: paragraphsTotal,
+      section_labels: sections.map(s => s.label),
+    }, Date.now() - parseStart);
 
     if (sections.length === 0) {
       console.warn('Skint: no event content found');
+      endRun(runId, 'empty', 0);
       return [];
     }
 
@@ -141,6 +160,11 @@ async function fetchSkintEvents() {
 
     const allEvents = [];
     const CONCURRENCY = 3;
+    const llmStart = Date.now();
+    let llmCalls = 0;
+    let cacheHits = 0;
+    let chunkFailures = 0;
+    let eventsPreFilter = 0;
 
     for (let i = 0; i < chunks.length; i += CONCURRENCY) {
       const batch = chunks.slice(i, i + CONCURRENCY);
@@ -151,10 +175,16 @@ async function fetchSkintEvents() {
 
           const cacheKey = `theskint:${section.label}`;
           const cached = getCachedExtraction(cacheKey, content);
-          if (cached) return cached;
+          if (cached) {
+            cacheHits++;
+            return cached;
+          }
 
           captureExtractionInput('theskint', content, 'https://theskint.com/');
           const result = await extractEvents(content, 'theskint', 'https://theskint.com/');
+          llmCalls++;
+          const rawCount = (result.events || []).length;
+          eventsPreFilter += rawCount;
           const events = (result.events || [])
             .map(e => normalizeExtractedEvent(e, 'theskint', 'curated', 0.9))
             .filter(e => e.name && e.completeness >= 0.5);
@@ -169,15 +199,32 @@ async function fetchSkintEvents() {
         if (r.status === 'fulfilled') {
           allEvents.push(...r.value);
         } else {
+          chunkFailures++;
           console.warn('Skint: extraction failed:', r.reason?.message);
         }
       }
     }
+    recordStage(runId, 'llm_extract', {
+      chunks: chunks.length,
+      llm_calls: llmCalls,
+      cache_hits: cacheHits,
+      chunk_failures: chunkFailures,
+      events_pre_filter: eventsPreFilter,
+      events_post_filter: allEvents.length,
+    }, Date.now() - llmStart);
+
+    // Stamp the run id on every event so insertScrapedEvents (and any future
+    // merge-phase consumer) can persist provenance back to this scrape pass.
+    if (runId) {
+      for (const e of allEvents) e.scrape_run_id = runId;
+    }
 
     console.log(`Skint: ${allEvents.length} total events (LLM)`);
+    endRun(runId, allEvents.length > 0 ? 'ok' : 'empty', allEvents.length);
     return allEvents;
   } catch (err) {
     console.error('Skint error:', err.message);
+    endRun(runId, 'error', 0, err.message);
     return [];
   }
 }

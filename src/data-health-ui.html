@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pulse Data Health</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 24px; max-width: 1200px; color: #222; }
+    h1 { font-size: 20px; margin: 0 0 16px; }
+    .crumbs { color: #666; font-size: 13px; margin-bottom: 12px; }
+    .crumbs a { color: #2563eb; text-decoration: none; cursor: pointer; }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    th { background: #fff; border-bottom: 2px solid #e5e7eb; }
+    th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid #f3f4f6; }
+    tr.run-row { cursor: pointer; transition: background 0.1s; }
+    tr.run-row:hover { background: #eff6ff; }
+    .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge.ok { background: #d1fae5; color: #065f46; }
+    .badge.empty { background: #fef3c7; color: #92400e; }
+    .badge.error { background: #fee2e2; color: #991b1b; }
+    .badge.quarantined { background: #ffd8a8; color: #9a3412; }
+    .badge.running { background: #e0e7ff; color: #3730a3; }
+    .stage { background: #fafafa; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px 14px; margin-bottom: 10px; }
+    .stage-name { font-weight: 700; font-size: 13px; margin-bottom: 6px; color: #111827; text-transform: uppercase; letter-spacing: 0.04em; }
+    .stage-meta { color: #6b7280; font-size: 11px; margin-left: 8px; font-weight: 400; text-transform: none; letter-spacing: 0; }
+    .metric { display: inline-block; margin: 3px 14px 3px 0; font-size: 12px; }
+    .metric .k { color: #6b7280; }
+    .metric .v { color: #111827; font-weight: 600; margin-left: 4px; }
+    .inv-row { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 1px dashed #f3f4f6; font-size: 13px; }
+    .inv-row:last-child { border-bottom: none; }
+    .inv-row .marker { font-size: 14px; font-weight: 700; min-width: 18px; }
+    .inv-row.pass .marker { color: #10b981; }
+    .inv-row.fail .marker { color: #ef4444; }
+    .inv-row .name { font-weight: 600; min-width: 140px; color: #111827; }
+    .inv-row .msg { color: #4b5563; flex: 1; }
+    pre { background: #f9fafb; padding: 8px 10px; border-radius: 4px; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+    .empty-state { color: #6b7280; font-style: italic; padding: 20px; text-align: center; }
+  </style>
+</head>
+<body>
+  <h1>Pulse Data Health</h1>
+  <div id="crumbs" class="crumbs"></div>
+  <div id="view"></div>
+
+  <script>
+    const state = { view: 'runs', runId: null };
+
+    function _el(tag, attrs = {}, ...children) {
+      const node = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs || {})) {
+        if (k === 'class') node.className = v;
+        else if (k === 'dataset') Object.assign(node.dataset, v);
+        else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+        else if (v !== null && v !== undefined) node.setAttribute(k, v);
+      }
+      for (const c of children) {
+        if (c === null || c === undefined) continue;
+        node.append(c instanceof Node ? c : document.createTextNode(String(c)));
+      }
+      return node;
+    }
+    function _replaceChildren(host, ...nodes) {
+      host.innerHTML = '';
+      for (const n of nodes) if (n) host.append(n);
+    }
+    function fmtTime(iso) {
+      if (!iso) return '—';
+      return iso.slice(0, 19).replace('T', ' ');
+    }
+    function fmtDuration(startedAt, completedAt) {
+      if (!completedAt) return 'running';
+      const ms = new Date(completedAt) - new Date(startedAt);
+      if (ms < 1000) return ms + 'ms';
+      return (ms / 1000).toFixed(1) + 's';
+    }
+
+    async function showRuns() {
+      state.view = 'runs';
+      _replaceChildren(document.getElementById('crumbs'), document.createTextNode('Runs'));
+      const r = await fetch('/api/data-health/runs').then(x => x.json());
+      const groups = {};
+      for (const row of r.runs) {
+        (groups[row.source] = groups[row.source] || []).push(row);
+      }
+      const sections = [];
+      for (const source of Object.keys(groups).sort()) {
+        const tbody = _el('tbody');
+        for (const run of groups[source]) {
+          const failedCount = run.invariants_failed || 0;
+          tbody.append(_el('tr', { class: 'run-row', onclick: () => showRun(run.id) },
+            _el('td', {}, '#' + run.id),
+            _el('td', {}, fmtTime(run.started_at)),
+            _el('td', {}, _el('span', { class: 'badge ' + run.status }, run.status)),
+            _el('td', {}, run.events_returned == null ? '—' : String(run.events_returned)),
+            _el('td', {}, fmtDuration(run.started_at, run.completed_at)),
+            _el('td', {}, failedCount > 0
+              ? _el('span', { style: 'color:#ef4444; font-weight:600;' }, failedCount + ' invariant failed')
+              : (run.invariants_checked ? _el('span', { style: 'color:#10b981;' }, '✓') : '—')),
+          ));
+        }
+        const table = _el('table', {},
+          _el('thead', {}, _el('tr', {},
+            ...['Run', 'Started', 'Status', 'Events', 'Duration', 'Invariants'].map(h => _el('th', {}, h))
+          )),
+          tbody,
+        );
+        sections.push(
+          _el('h2', { style: 'font-size:15px; margin:18px 0 6px; color:#111827;' }, source),
+          table,
+        );
+      }
+      if (sections.length === 0) {
+        sections.push(_el('div', { class: 'empty-state' },
+          'No scrape runs yet. Telemetry rows show up here once a scrape with an instrumented source runs.'));
+      }
+      _replaceChildren(document.getElementById('view'), ...sections);
+    }
+
+    async function showRun(runId) {
+      state.view = 'run';
+      state.runId = runId;
+      _replaceChildren(document.getElementById('crumbs'),
+        _el('a', { onclick: showRuns }, 'Runs'),
+        document.createTextNode(' · Run #' + runId),
+      );
+      const r = await fetch('/api/data-health/runs/' + runId).then(x => x.json());
+      const { run, stages, invariants } = r;
+      const header = _el('div', { style: 'background:#fafafa; border:1px solid #e5e7eb; border-radius:6px; padding:14px; margin-bottom:14px;' },
+        _el('div', { style: 'font-size:14px; font-weight:600; color:#111827;' }, run.source + ' · Run #' + run.id),
+        _el('div', { style: 'font-size:12px; color:#6b7280; margin-top:4px;' },
+          'started ', fmtTime(run.started_at), ' · ',
+          run.completed_at ? ('finished ' + fmtTime(run.completed_at) + ' (' + fmtDuration(run.started_at, run.completed_at) + ')') : 'still running'),
+        _el('div', { style: 'margin-top:8px;' },
+          _el('span', { class: 'badge ' + run.status }, run.status),
+          run.events_returned != null ? _el('span', { style: 'margin-left:10px; font-size:13px;' },
+            run.events_returned + ' events returned') : null),
+        run.error_message
+          ? _el('div', { style: 'margin-top:6px; color:#991b1b; font-size:12px;' }, 'error: ' + run.error_message)
+          : null,
+      );
+
+      const stageBlocks = stages.map(s => {
+        let metrics = {};
+        try { metrics = JSON.parse(s.metrics_json || '{}'); } catch {}
+        const metricEls = Object.entries(metrics).map(([k, v]) =>
+          _el('span', { class: 'metric' },
+            _el('span', { class: 'k' }, k + ':'),
+            _el('span', { class: 'v' }, Array.isArray(v) ? '[' + v.join(', ') + ']' : String(v))));
+        return _el('div', { class: 'stage' },
+          _el('div', { class: 'stage-name' }, s.stage_name,
+            s.duration_ms != null ? _el('span', { class: 'stage-meta' }, s.duration_ms + 'ms') : null),
+          metricEls.length > 0
+            ? _el('div', {}, ...metricEls)
+            : _el('span', { style: 'color:#6b7280; font-size:12px;' }, '(no metrics)'),
+        );
+      });
+
+      const invBlock = _el('div', { class: 'stage' },
+        _el('div', { class: 'stage-name' }, 'invariants'),
+        ...(invariants.length > 0
+          ? invariants.map(i =>
+              _el('div', { class: 'inv-row ' + (i.passed ? 'pass' : 'fail') },
+                _el('span', { class: 'marker' }, i.passed ? '✓' : '✗'),
+                _el('span', { class: 'name' }, i.name),
+                _el('span', { class: 'msg' }, i.message),
+              ))
+          : [_el('span', { style: 'color:#6b7280; font-size:12px;' }, '(no invariants recorded)')]),
+      );
+
+      _replaceChildren(document.getElementById('view'), header, ...stageBlocks, invBlock);
+    }
+
+    showRuns();
+  </script>
+</body>
+</html>
